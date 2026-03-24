@@ -2162,8 +2162,8 @@ validAssets++;
 
 const current = closes[closes.length - 1];
 
-const ma200 = movingAverage(closes,200);
-const ma50 = movingAverage(closes,50);
+const ma200 = movingAverage(closes,200) ?? 0;
+const ma50 = movingAverage(closes,50) ?? 0;
 
 if (current > ma200) above200Count++;
 if (current > ma50) above50Count++;
