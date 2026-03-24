@@ -2122,8 +2122,8 @@ const spClosesFull = await fetchIndex("^GSPC","5y");
 
 const spCurrent = spClosesFull.length ? spClosesFull[spClosesFull.length - 1] : 0;
 
-const spMA200 = movingAverage(spClosesFull,200);
-const spMA50 = movingAverage(spClosesFull,50);
+const spMA200 = movingAverage(spClosesFull,200) ?? 0;
+const spMA50 = movingAverage(spClosesFull,50) ?? 0;
 
 /* ================= SPX MOMENTUM ================= */
 
