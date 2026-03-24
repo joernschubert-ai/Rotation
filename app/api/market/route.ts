@@ -370,7 +370,7 @@ if(closes.length < 25) return;
 valid++;
 
 const current = closes[closes.length-1];
-const ma20 = movingAverage(closes,20);
+const ma20 = movingAverage(closes, 20) ?? 0;
 
 if(current > ma20) above20++;
 
