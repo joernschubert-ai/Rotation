@@ -2758,7 +2758,7 @@ const history = loadHistory();
 
 const crashTrend =
 history.length > 5
-? history.slice(-5).map(h => h.shockScore)
+? history.slice(-5).map((h: any) => h.shockScore)
 : [];
 
 const responseData = {
