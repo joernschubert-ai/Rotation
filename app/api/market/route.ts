@@ -439,7 +439,7 @@ adSignal: signal
 
 /* ================= NEW HIGHS / NEW LOWS ================= */
 
-async function calculateHighLowIndicator(fetchETF) {
+async function calculateHighLowIndicator(fetchETF: (symbol: string) => Promise<number[]>) {
 
 const universe = [
 "SPY","QQQ","IWM","DIA","MDY","VTI",
