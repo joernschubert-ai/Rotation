@@ -1751,27 +1751,13 @@ regime
 const historyFile = path.join(process.cwd(), "regime-history.json");
 
 function saveRegimeSnapshot(snapshot: any) {
-let history: any[] = [];
-
-if (fs.existsSync(historyFile)) {
-history = JSON.parse(fs.readFileSync(historyFile, "utf-8"));
-}
-
-const today = new Date().toISOString().split("T")[0];
-
-if (!history.some((e) => e.date.split("T")[0] === today)) {
-history.push(snapshot);
-if (history.length > 250)
-history = history.slice(-250);
-fs.writeFileSync(historyFile, JSON.stringify(history, null, 2));
-}
+// ❌ VERCEL: disabled (no filesystem write allowed)
+return;
 }
 
 function loadHistory() {
-if (!fs.existsSync(historyFile)) return [];
-return JSON.parse(fs.readFileSync(historyFile, "utf-8"));
+return [];
 }
-
 /* ================= INSTITUTIONELLE PHASENLOGIK 2.0 ================= */
 
 function determinePhase(
