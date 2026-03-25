@@ -2912,11 +2912,13 @@ lastFetchTime = Date.now();
 return NextResponse.json(responseData);
 
 } catch (err) {
-return NextResponse.json({ error: "API Fehler" });
+console.error("API CRASH:", err);
+return NextResponse.json({
+error: "API Fehler",
+details: String(err)
+});
 }
-
 }
-
 
 
 
