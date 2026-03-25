@@ -1,8 +1,9 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+// ❌ raus
+// import fs from "fs";
+// import path from "path";
 
 /* ================= MARKET CACHE ================= */
 
@@ -1748,12 +1749,10 @@ regime
 
 /* ================= HISTORIE ================= */
 
-const historyFile = path.join(process.cwd(), "regime-history.json");
 
-function saveRegimeSnapshot(snapshot: any) {
-// ❌ VERCEL: disabled (no filesystem write allowed)
-return;
-}
+
+// KOMPLETT LÖSCHEN
+function saveRegimeSnapshot(snapshot: any) {}
 
 function loadHistory() {
 return [];
@@ -2739,8 +2738,8 @@ systemicStress: shockData.systemicStress
 
 const newsSentiment = await fetchNewsSentiment();
 
-saveRegimeSnapshot(snapshot);
-const history = loadHistory();
+// saveRegimeSnapshot(snapshot); ❌ raus
+const history: any[] = [];
 
 const crashTrend =
 history.length > 5
