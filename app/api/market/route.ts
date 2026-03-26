@@ -19,10 +19,6 @@ const CACHE_DURATION = 60 * 1000; // 60 Sekunden
 
 const etfCache: Record<string, {data:number[], time:number}> = {};
 
-/* ================= HISTORY MEMORY ================= */
-
-let regimeHistory: any[] = [];
-
 /* ================= UTILITIES ================= */
 
 function percentChange(current: number, previous: number) {
@@ -1753,19 +1749,13 @@ regime
 
 /* ================= HISTORIE ================= */
 
-function saveRegimeSnapshot(snapshot: any) {
 
-regimeHistory.push(snapshot);
 
-// Nur letzte 50 behalten (Speicher + Performance)
-if(regimeHistory.length > 50){
-regimeHistory = regimeHistory.slice(-50);
-}
-
-}
+// KOMPLETT LÖSCHEN
+function saveRegimeSnapshot(snapshot: any) {}
 
 function loadHistory() {
-return regimeHistory;
+return [];
 }
 /* ================= INSTITUTIONELLE PHASENLOGIK 2.0 ================= */
 
@@ -2748,9 +2738,8 @@ systemicStress: shockData.systemicStress
 
 const newsSentiment = await fetchNewsSentiment();
 
-saveRegimeSnapshot(snapshot);
-
-const history = loadHistory();
+// saveRegimeSnapshot(snapshot); ❌ raus
+const history: any[] = [];
 
 const crashTrend =
 history.length > 5
