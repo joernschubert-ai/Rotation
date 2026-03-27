@@ -1,9 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
 
+const router = useRouter();
 const [data, setData] = useState<any>(null);
+
+useEffect(() => {
+const auth = localStorage.getItem("auth");
+
+if (auth !== "true") {
+router.push("/login");
+}
+}, []);
 
 useEffect(() => {
 console.log("DATA UPDATE", data);
@@ -46,7 +56,13 @@ if(prevMasterScore === null) return;
 
 const stressScore = data?.marketStressScore ?? 0;
 const breadth200 = (data?.breadth200 ?? 0);
-const gamma = data?.gammaExposure ?? 0;
+
+const gammaImpact =
+gamma < -5 ? 12 :
+gamma < -2 ? 8 :
+gamma < 0 ? 5 :
+gamma > 5 ? -5 :
+0;
 
 const computedScore = Math.round(
 (stressScore*2) +
@@ -54,7 +70,7 @@ const computedScore = Math.round(
 (data?.crossAssetRiskScore || 0) +
 (data?.liquidityVacuumScore || 0) +
 (100 - breadth200)/10 +
-(gamma < 0 ? 10 : 0)
+(+ gammaImpact)
 );
 
 if(computedScore > prevMasterScore) setMasterTrend("RISING");
@@ -93,8 +109,14 @@ const structuralRisk =
 // FLOOR LOGIK
 let finalCrash = smoothed;
 
-if(structuralRisk >= 2 && smoothed < 45){
-finalCrash = 45;
+let dynamicFloor = 0;
+
+if(structuralRisk === 3) dynamicFloor = 50;
+else if(structuralRisk === 2) dynamicFloor = 40;
+else if(structuralRisk === 1) dynamicFloor = 30;
+
+if(smoothed < dynamicFloor){
+finalCrash = dynamicFloor;
 }
 
 // FINAL SETZEN
@@ -104,9 +126,26 @@ setadjustedCrash(Math.round(finalCrash));
 
 
 useEffect(() => {
-fetch("/api/market")
-.then((res) => res.json())
-.then((d) => setData(d));
+const fetchData = async () => {
+const token = localStorage.getItem("token");
+
+const res = await fetch("/api/market", {
+headers: {
+Authorization: token || ""
+}
+});
+
+if (res.status === 401) {
+console.log("Nicht eingeloggt → redirect");
+window.location.href = "/login";
+return;
+}
+
+const data = await res.json();
+setData(data);
+};
+
+fetchData();
 }, []);
 
 if (!data) return <div className="p-10 text-white">Marktdaten werden geladen...</div>;
@@ -809,22 +848,30 @@ dynamicExit = "REDUCE / EXIT";
 }
 
 
+const base = data.positionSize ?? 0;
+
+const crashFactor =
+adjustedCrash > 70 ? 1.2 :
+adjustedCrash > 55 ? 1.1 :
+adjustedCrash > 45 ? 1.0 :
+0.9;
+
+const momentumFactor =
+crashMomentum > 5 ? 1.1 :
+crashMomentum < -5 ? 0.85 :
+1;
+
+const panicFactor = panicSignal ? 0.75 : 1;
+
+const confidenceFactor = decisionConfidence / 100;
+
+// 🔥 FINAL (WEICH!)
 const effectivePosition = Math.round(
-
-(data.positionSize ?? 0)
-
-// Confidence bleibt Basis
-* (decisionConfidence / 100)
-
-// 🔥 CRASH BOOST (mehr Risiko erlaubt)
-* (adjustedCrash > 60 ? 1.2 : 1)
-
-// ⚠️ PANIC REDUCTION (nicht überhebeln)
-* (panicSignal ? 0.7 : 1)
-
-// 📉 MOMENTUM FILTER (wenn Crash nachlässt → kleiner)
-* (crashMomentum < 0 ? 0.8 : 1)
-
+base *
+(0.5 + confidenceFactor * 0.5) *
+crashFactor *
+momentumFactor *
+panicFactor
 );
 
 

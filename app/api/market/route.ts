@@ -1,9 +1,6 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-// ❌ raus
-// import fs from "fs";
-// import path from "path";
 
 /* ================= MARKET CACHE ================= */
 
@@ -1884,8 +1881,13 @@ topHeadlines: []
 
 /* ================= MAIN ================= */
 
-export async function GET() {
+export async function GET(req: Request) {
 
+const token = req.headers.get("authorization");
+
+if (token !== "x9KfP2LmQa83zZ_2519.BJ") {
+return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
 const now = Date.now();
 
 /* CACHE CHECK */
