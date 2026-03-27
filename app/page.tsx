@@ -56,13 +56,7 @@ if(prevMasterScore === null) return;
 
 const stressScore = data?.marketStressScore ?? 0;
 const breadth200 = (data?.breadth200 ?? 0);
-
-const gammaImpact =
-gamma < -5 ? 12 :
-gamma < -2 ? 8 :
-gamma < 0 ? 5 :
-gamma > 5 ? -5 :
-0;
+const gamma = data?.gammaExposure ?? 0;
 
 const computedScore = Math.round(
 (stressScore*2) +
@@ -70,7 +64,7 @@ const computedScore = Math.round(
 (data?.crossAssetRiskScore || 0) +
 (data?.liquidityVacuumScore || 0) +
 (100 - breadth200)/10 +
-(+ gammaImpact)
+(gamma < 0 ? 10 : 0)
 );
 
 if(computedScore > prevMasterScore) setMasterTrend("RISING");
