@@ -1776,7 +1776,18 @@ if (!redis) return []; // 🔥 HIER
 
 try {
 const data = await redis.lrange("regimeHistory", 0, 49);
-return data.map((item: string) => JSON.parse(item));
+
+return data.map((item: any) => {
+try {
+return typeof item === "string"
+? JSON.parse(item)
+: item; // falls schon Objekt
+} catch (e) {
+console.log("BAD REDIS ENTRY:", item);
+return null;
+}
+}).filter(Boolean);
+
 } catch (e) {
 console.error("Redis Load Error:", e);
 return [];
