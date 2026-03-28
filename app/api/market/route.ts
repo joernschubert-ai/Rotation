@@ -1115,11 +1115,11 @@ let score = 0;
 /* Gamma Stress */
 
 if(gammaRegime === "negative"){
-score += 1;
+score += 2;
 }
 
 if(gammaRegime === "unstable"){
-score += 2;
+score += 4;
 }
 
 /* VIX explosion */
@@ -1426,8 +1426,8 @@ let score = 0
 
 /* Negative Gamma verstärkt Bewegungen */
 
-if(gammaRegime === "negative") score += 1
-if(gammaRegime === "unstable") score += 2
+if(gammaRegime === "negative") score += 2
+if(gammaRegime === "unstable") score += 3
 
 /* Volatility Stress */
 
@@ -1467,8 +1467,8 @@ let score = 0
 
 /* Negative Gamma */
 
-if(gammaRegime === "negative") score += 1
-if(gammaRegime === "unstable") score += 2
+if(gammaRegime === "negative") score += 2
+if(gammaRegime === "unstable") score += 4
 
 /* Volatility Stress */
 
@@ -1805,7 +1805,7 @@ breadthScore: number,
 spAbove200: boolean
 ) {
 
-if (!spAbove200 && structureScore >= 4 && breadth200 < 0.5) {
+if (!spAbove200 && structureScore >= 5 && breadth200 < 0.45) {
 if (stressScore >= 2)
 return "Phase 7 – Kapitulation";
 return "Phase 6 – Bärische Kontraktion";
@@ -2490,7 +2490,9 @@ vix,
 breadth50,
 trendAcceleration
 );
+
 const gammaRegime = gamma.regime;
+
 
 /* ================= DEALER PRESSURE ================= */
 
