@@ -3,10 +3,13 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
 const { password } = await req.json();
 
+console.log("INPUT:", password);
+console.log("ENV:", process.env.APP_PASSWORD);
+
 if (password === process.env.APP_PASSWORD) {
 return NextResponse.json({
 success: true,
-token: "my-secret-token-123" // 👈 einfach, reicht hier
+token: "my-secret-token-123"
 });
 }
 
