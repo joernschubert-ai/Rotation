@@ -9,7 +9,7 @@ console.log("ENV:", process.env.APP_PASSWORD);
 if (password?.trim() === process.env.APP_PASSWORD?.trim()) {
 return NextResponse.json({
 success: true,
-token: "my-secret-token-123"
+token: "x9KfP2LmQa83zZ_2519.BJ"
 });
 }
 
