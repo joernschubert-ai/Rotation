@@ -244,8 +244,14 @@ gamma = -3000000000;
 
 if(
 vix > 30 &&
-breadth50 < 0.45 &&
-trendAcceleration < -1
+breadth50 < 0.25
+){
+gamma = -8000000000;
+}
+
+if(
+vix > 28 &&
+breadth50 < 0.35
 ){
 gamma = -6000000000;
 }
@@ -790,7 +796,7 @@ if(score >=3) regime="caution"
 if(score >=5) regime="stress"
 if(score >=7) regime="crash_risk"
 
-score = Math.min(score, 5)
+score = Math.min(score, 10)
 return{
 score,
 regime
@@ -935,10 +941,12 @@ concentrationScore:number
 let score = 0;
 
 score += structureScore * 0.5;
-score += breadthScore * 0.4;
+score += breadthScore * 0.8;
 score += stressScore * 0.3;
 score += shockScore * 0.25;
 score += concentrationScore * 0.25;
+
+
 
 /* Distribution nur Frühsignal */
 score += Math.min(distributionScore,7) * 0.5;
@@ -951,8 +959,6 @@ if(gammaRegime === "unstable") score += 1;
 
 if(internalMomentumScore < -4) score += 2
 else if(internalMomentumScore < -2) score += 1
-
-
 
 /* logistische Wahrscheinlichkeit */
 
@@ -1135,7 +1141,7 @@ if(sp3d < -4) score++;
 /* Breadth collapse */
 
 if(breadth20 < 0.4) score++;
-if(breadth20 < 0.25) score++
+if(breadth20 < 0.25) score += 2;
 if(breadth50 < 0.45) score++;
 if(breadth50 < 0.35) score++;
 
@@ -1805,11 +1811,18 @@ breadthScore: number,
 spAbove200: boolean
 ) {
 
+// 🔥 SHORT TERM CAPITULATION OVERRIDE
+if (breadth200 < 0.5 && breadthScore >= 3 && stressScore >= 2) {
+return "Phase 7 – Kapitulation";
+}
+
 if (!spAbove200 && structureScore >= 5 && breadth200 < 0.45) {
 if (stressScore >= 2)
 return "Phase 7 – Kapitulation";
 return "Phase 6 – Bärische Kontraktion";
 }
+
+
 
 if (!spAbove200) {
 return "Phase 5 – Späte Distribution";
@@ -2325,13 +2338,11 @@ vix3m
 
 let vixTermStructure = "contango";
 
-if(vix > vix3m){
-vixTermStructure = "backwardation";
-}
+const ratio = vix3m ? vix / vix3m : 0;
 
-if(vix9d > vix3m){
-vixTermStructure = "stress";
-}
+if (ratio > 1.15) vixTermStructure = "stress";
+else if (ratio > 1.05) vixTermStructure = "backwardation";
+else vixTermStructure = "contango";
 
 const vixSpread = vix3m - vix;
 
@@ -2730,6 +2741,10 @@ else positionSize = 10;
 // Confidence (du hast "confidence", nicht decisionConfidence!)
 if(confidence > 70) positionSize += 10;
 if(confidence < 50) positionSize -= 10;
+
+// 🔥 Crash Risk Verstärkung
+if(crashRisk.probability > 60) positionSize += 10;
+if(crashRisk.probability > 75) positionSize += 10;
 
 // Clamp
 positionSize = Math.max(0, Math.min(100, positionSize));
