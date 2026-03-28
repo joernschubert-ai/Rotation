@@ -239,8 +239,8 @@ r==="crash_risk"?red:
 gray;
 
 const crashColor = (v:number)=>
-v<30?green:
-v<60?yellow:
+v<45?green:
+v<65?yellow:
 v<80?orange:red;
 
 const fragilityColor = (v:number)=>
@@ -1757,7 +1757,7 @@ Score {regimeSignalScore}
 
 {/* MARKTRISIKO */}
 
-<div className="flex justify-end gap-6">
+<div className="flex flex-wrap justify-end gap-3">
 
 <RiskDot color={volRisk} label="VOL"/>
 <RiskDot color={creditRisk} label="CREDIT"/>
@@ -2035,7 +2035,8 @@ color:
 data.volOfVolRatio > 1.5 ? red :
 data.volOfVolRatio > 1.35 ? orange :
 data.volOfVolRatio > 1.2 ? yellow :
-green
+data.volOfVolRatio >  0.95 ? green :
+blue
 }}>
 
 {data.volOfVolRatio?.toFixed(2)}
