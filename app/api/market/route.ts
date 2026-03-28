@@ -1812,7 +1812,12 @@ spAbove200: boolean
 ) {
 
 // 🔥 SHORT TERM CAPITULATION OVERRIDE
-if (breadth200 < 0.5 && breadthScore >= 3 && stressScore >= 2) {
+if (
+breadth200 < 0.45 &&
+breadthScore >= 3 &&
+stressScore >= 3 &&
+trendAcceleration < -2
+) {
 return "Phase 7 – Kapitulation";
 }
 
@@ -2973,7 +2978,6 @@ details: String(err)
 });
 }
 }
-
 
 
 
