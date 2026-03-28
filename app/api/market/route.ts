@@ -14,7 +14,14 @@ const CACHE_DURATION = 60 * 1000; // 60 Sekunden
 
 import { Redis } from "@upstash/redis";
 
-const redis = Redis.fromEnv();
+let redis;
+
+try {
+redis = Redis.fromEnv();
+} catch (e) {
+console.log("Redis not available");
+}
+
 
 /* ================= ETF DATA CACHE ================= */
 
