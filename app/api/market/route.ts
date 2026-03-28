@@ -12,6 +12,10 @@ let smoothedBreadth50 = 0;
 
 const CACHE_DURATION = 60 * 1000; // 60 Sekunden
 
+import { Redis } from "@upstash/redis";
+
+const redis = Redis.fromEnv();
+
 /* ================= ETF DATA CACHE ================= */
 
 const etfCache: Record<string, {data:number[], time:number}> = {};
@@ -1746,13 +1750,23 @@ regime
 
 /* ================= HISTORIE ================= */
 
+async function saveRegimeSnapshot(snapshot: any) {
+try {
+await redis.lpush("regimeHistory", JSON.stringify(snapshot));
+await redis.ltrim("regimeHistory", 0, 49); // max 50 Einträge
+} catch (e) {
+console.error("Redis Save Error:", e);
+}
+}
 
-
-// KOMPLETT LÖSCHEN
-function saveRegimeSnapshot(snapshot: any) {}
-
-function loadHistory() {
+async function loadHistory() {
+try {
+const data = await redis.lrange("regimeHistory", 0, 49);
+return data.map((item: string) => JSON.parse(item));
+} catch (e) {
+console.error("Redis Load Error:", e);
 return [];
+}
 }
 /* ================= INSTITUTIONELLE PHASENLOGIK 2.0 ================= */
 
@@ -2740,8 +2754,8 @@ systemicStress: shockData.systemicStress
 
 const newsSentiment = await fetchNewsSentiment();
 
-// saveRegimeSnapshot(snapshot); ❌ raus
-const history: any[] = [];
+await saveRegimeSnapshot(snapshot);
+const history = await loadHistory();
 
 const crashTrend =
 history.length > 5
