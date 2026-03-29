@@ -10,7 +10,7 @@ let previousCrashProbability = 0;
 let smoothedBreadth200 = 0;
 let smoothedBreadth50 = 0;
 
-const CACHE_DURATION = 15 * 1000; // 15 Sekunden
+const CACHE_DURATION = 10 * 1000; // 15 Sekunden
 // const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
 
 import { Redis } from "@upstash/redis";
@@ -1972,6 +1972,13 @@ return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 const now = Date.now();
 
+if (
+cachedResponse &&
+(now - lastFetchTime) < CACHE_DURATION
+) {
+return NextResponse.json(cachedResponse);
+}
+
 const state = await loadMarketState();
 
 if (state) {
@@ -1980,20 +1987,7 @@ smoothedBreadth200 = state.smoothedBreadth200 ?? 0;
 smoothedBreadth50 = state.smoothedBreadth50 ?? 0;
 }
 
-await saveMarketState({
-previousCrashProbability,
-smoothedBreadth200,
-smoothedBreadth50
-});
-
 /* CACHE CHECK */
-
-if (
-cachedResponse &&
-(now - lastFetchTime) < CACHE_DURATION
-) {
-return NextResponse.json(cachedResponse);
-}
 
 try {
 const marketData: any = {};
@@ -2997,6 +2991,12 @@ capitulationProbability,
 capitulationAlarm,
 regimeHistory: history,
 };
+
+await saveMarketState({
+previousCrashProbability,
+smoothedBreadth200,
+smoothedBreadth50
+});
 
 cachedResponse = responseData;
 previousCrashProbability = responseData.crashProbability;
