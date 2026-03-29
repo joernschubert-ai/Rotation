@@ -23,6 +23,27 @@ redis = Redis.fromEnv();
 console.log("Redis not available");
 }
 
+async function loadMarketState() {
+if (!redis) return null;
+
+try {
+const data = await redis.get("marketState");
+return data ? JSON.parse(data) : null;
+} catch (e) {
+console.error("Load Market State Error:", e);
+return null;
+}
+}
+
+async function saveMarketState(state: any) {
+if (!redis) return;
+
+try {
+await redis.set("marketState", JSON.stringify(state));
+} catch (e) {
+console.error("Save Market State Error:", e);
+}
+}
 
 /* ================= ETF DATA CACHE ================= */
 
@@ -1950,6 +1971,20 @@ if (!token || !token.includes("x9KfP2LmQa83zZ_2519.BJ")) {
 return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 const now = Date.now();
+
+const state = await loadMarketState();
+
+if (state) {
+previousCrashProbability = state.previousCrashProbability ?? 0;
+smoothedBreadth200 = state.smoothedBreadth200 ?? 0;
+smoothedBreadth50 = state.smoothedBreadth50 ?? 0;
+}
+
+await saveMarketState({
+previousCrashProbability,
+smoothedBreadth200,
+smoothedBreadth50
+});
 
 /* CACHE CHECK */
 
