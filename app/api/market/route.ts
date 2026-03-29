@@ -10,8 +10,8 @@ let previousCrashProbability = 0;
 let smoothedBreadth200 = 0;
 let smoothedBreadth50 = 0;
 
-// const CACHE_DURATION = 60 * 1000; // 60 Sekunden
-const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
+const CACHE_DURATION = 15 * 1000; // 15 Sekunden
+// const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
 
 import { Redis } from "@upstash/redis";
 
@@ -1791,7 +1791,7 @@ if (!redis) return; // 🔥 HIER
 
 try {
 await redis.lpush("regimeHistory", JSON.stringify(snapshot));
-await redis.ltrim("regimeHistory", 0, 49);
+await redis.ltrim("regimeHistory", 0, 99);
 } catch (e) {
 console.error("Redis Save Error:", e);
 }
