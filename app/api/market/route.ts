@@ -10,8 +10,8 @@ let previousCrashProbability = 0;
 let smoothedBreadth200 = 0;
 let smoothedBreadth50 = 0;
 
-const CACHE_DURATION = 10 * 1000; // 15 Sekunden
-// const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
+// const CACHE_DURATION = 10 * 1000; // 15 Sekunden
+const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
 
 import { Redis } from "@upstash/redis";
 
