@@ -3012,6 +3012,22 @@ volOfVolTrend: volOfVolTrend,
 optionsSkewRatio: optionsSkew.ratio,
 optionsSkewRegime: optionsSkew.regime,
 
+indices: {
+nasdaq: {
+value: marketData.nasdaq,
+change: marketData.nasdaqChange,
+momentum: spMomentum.score
+},
+sp500: {
+value: marketData.sp500,
+change: marketData.sp500Change
+},
+russell: {
+value: marketData.russell,
+change: marketData.russellChange
+}
+},
+
 moveIndex: move,
 
 financialConditionsScore: financialConditions.score,
