@@ -35,6 +35,14 @@ return null;
 }
 }
 
+const state = await loadMarketState();
+
+if (state) {
+previousCrashProbability = state.previousCrashProbability ?? previousCrashProbability;
+smoothedBreadth200 = state.smoothedBreadth200 ?? smoothedBreadth200;
+smoothedBreadth50 = state.smoothedBreadth50 ?? smoothedBreadth50;
+}
+
 async function saveMarketState(state: any) {
 if (!redis) return;
 
@@ -127,13 +135,13 @@ creditRatio: 0
 
 /* Ratio berechnen */
 
-const ratio = hyg.map((v: number, i: number) => {
+const minLength = Math.min(hyg.length, ief.length);
 
-if(!ief[i]) return v;
+const ratio = [];
 
-return v / ief[i];
-
-});
+for (let i = 0; i < minLength; i++) {
+ratio.push(hyg[i] / ief[i]);
+}
 
 /* 50 MA */
 
@@ -984,9 +992,9 @@ else if(internalMomentumScore < -2) score += 1
 
 /* ===== MOMENTUM BOOST ===== */
 
-if(crashMomentumScore >= 3) score += 1;
-if(crashMomentumScore >= 5) score += 2;
-if(crashMomentumScore >= 7) score += 3;
+if(crashMomentumScore >= 3) score += 1.5;
+if(crashMomentumScore >= 5) score += 3;
+if(crashMomentumScore >= 7) score += 5;
 
 /* logistische Wahrscheinlichkeit */
 
@@ -2344,13 +2352,13 @@ let rawBreadth50 = validAssets ? above50Count / validAssets : 0;
 
 /* ===== EMA SMOOTHING ===== */
 
-if(smoothedBreadth200 === 0) smoothedBreadth200 = rawBreadth200;
-else smoothedBreadth200 =
-(smoothedBreadth200 * 0.5) + (rawBreadth200 * 0.5);
+const alpha = 0.2;
 
-if(smoothedBreadth50 === 0) smoothedBreadth50 = rawBreadth50;
-else smoothedBreadth50 =
-(smoothedBreadth50 * 0.5) + (rawBreadth50 * 0.5);
+smoothedBreadth200 =
+(smoothedBreadth200 * (1 - alpha)) + (rawBreadth200 * alpha);
+
+smoothedBreadth50 =
+(smoothedBreadth50 * (1 - alpha)) + (rawBreadth50 * alpha);
 
 const breadth200 = smoothedBreadth200;
 const breadth50 = smoothedBreadth50;
@@ -2563,9 +2571,14 @@ spClosesFull[spClosesFull.length-1],
 spClosesFull[spClosesFull.length-21]
 );
 
-if(tlt20 > sp20Momentum && creditData.creditSignal === "risk_off")
+if(tlt20 - sp20Momentum > 2 && creditData.creditSignal === "risk_off")
 liquidityFlow = "risk_off";
-if(tlt20 < sp20Momentum) liquidityFlow = "risk_on";
+
+else if(sp20Momentum - tlt20 > 2)
+liquidityFlow = "risk_on";
+
+else
+liquidityFlow = "neutral";
 
 }
 
@@ -2871,11 +2884,16 @@ else if(finalPhase.includes("Phase 4")) riskPhase = "FRAGILE";
 // POSITION SIZE
 let positionSize = 0;
 
-if(riskPhase === "CRASH BUILD") positionSize = 90;
-else if(riskPhase === "ACCELERATION") positionSize = 75;
-else if(riskPhase === "BREAKDOWN") positionSize = 60;
-else if(riskPhase === "FRAGILE") positionSize = 30;
+if(riskPhase === "CRASH BUILD") positionSize = 70;
+else if(riskPhase === "ACCELERATION") positionSize = 60;
+else if(riskPhase === "BREAKDOWN") positionSize = 45;
+else if(riskPhase === "FRAGILE") positionSize = 25;
 else positionSize = 10;
+
+// 🔥 Additive Factors
+if(gammaRegime === "unstable") positionSize += 15;
+if(liquidityVacuum.score >= 5) positionSize += 10;
+if(crashMomentum.score >= 5) positionSize += 10;
 
 // Confidence (du hast "confidence", nicht decisionConfidence!)
 if(confidence > 70) positionSize += 10;
@@ -3118,7 +3136,7 @@ smoothedBreadth50
 });
 
 cachedResponse = responseData;
-previousCrashProbability = responseData.crashProbability;
+
 
 lastFetchTime = Date.now();
 
