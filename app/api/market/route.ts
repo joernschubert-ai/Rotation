@@ -398,7 +398,8 @@ const universe = [
 "XLK","XLF","XLE","XLV","XLI",
 "XLY","XLP","XLU","XLB",
 "SPHB","SPLV","IWO","IWN","MTUM",
-"USMV","XRT","SOXX","XLRE"
+"USMV","XRT","SOXX","XLRE",
+"ARKK","XBI","SMH","IWO","IWN","RSP"
 ];
 
 let above20 = 0;
@@ -510,13 +511,13 @@ const current = closes[closes.length - 1];
 
 const highLookback = Math.min(252, closes.length);
 
-const history = closes.slice(-highLookback, -1);
+const history = closes.slice(-252, -1);
 
 const high252 = Math.max(...history);
 const low252 = Math.min(...history);
 
-if (current >= high252 * 0.99) newHighs++;
-if (current <= low252 * 1.01) newLows++;
+if (current > high252) newHighs++;
+if (current < low252) newLows++;
 
 });
 
@@ -1369,7 +1370,7 @@ ma200:number,
 spCloses:number[]
 ){
 
-if(spCloses.length < 60){
+if(spCloses.length < 61){
 return{score:0,regime:"neutral"}
 }
 
@@ -2305,7 +2306,7 @@ const spMA50 = movingAverage(spClosesFull,50) ?? 0;
 /* ================= SPX MOMENTUM ================= */
 
 const spMomentum =
-spMA50 && spMA200
+spClosesFull.length >= 60
 ? calculateSPXMomentum(
 spCurrent,
 spMA50,
