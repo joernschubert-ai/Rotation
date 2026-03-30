@@ -503,7 +503,7 @@ universe.map(s => fetchETF(s))
 
 results.forEach((closes)=>{
 
-if (closes.length < 252) return;
+if (closes.length < 100) return;
 
 valid++;
 
@@ -511,7 +511,8 @@ const current = closes[closes.length - 1];
 
 const highLookback = Math.min(252, closes.length);
 
-const history = closes.slice(-252, -1);
+const lookback = Math.min(252, closes.length - 1);
+const history = closes.slice(-lookback, -1);
 
 const high252 = Math.max(...history);
 const low252 = Math.min(...history);
@@ -1371,6 +1372,14 @@ spCloses:number[]
 ){
 
 if(spCloses.length < 61){
+return{score:0,regime:"neutral"}
+}
+
+/* 🔥 NEU: HARTE VALIDIERUNG */
+const prev20 = spCloses[spCloses.length-21]
+const prev60 = spCloses[spCloses.length-61]
+
+if(!prev20 || !prev60){
 return{score:0,regime:"neutral"}
 }
 
@@ -2296,7 +2305,7 @@ return [];
 }
 
 
-const spClosesFull = await fetchIndex("^GSPC","5y");
+const spClosesFull = await fetchIndex("^GSPC","max");
 
 const spCurrent = spClosesFull.length ? spClosesFull[spClosesFull.length - 1] : 0;
 
