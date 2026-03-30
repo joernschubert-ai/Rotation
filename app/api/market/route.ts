@@ -10,8 +10,8 @@ let previousCrashProbability = 0;
 let smoothedBreadth200 = 0;
 let smoothedBreadth50 = 0;
 
-// const CACHE_DURATION = 10 * 1000; // 15 Sekunden
-const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
+const CACHE_DURATION = 10 * 1000; // 15 Sekunden
+// const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
 
 import { Redis } from "@upstash/redis";
 
@@ -956,7 +956,8 @@ shockScore:number,
 creditSignal:string,
 gammaRegime:string,
 internalMomentumScore:number,
-concentrationScore:number
+concentrationScore:number,
+crashMomentumScore:number
 ){
 
 let score = 0;
@@ -980,6 +981,12 @@ if(gammaRegime === "unstable") score += 1;
 
 if(internalMomentumScore < -4) score += 2
 else if(internalMomentumScore < -2) score += 1
+
+/* ===== MOMENTUM BOOST ===== */
+
+if(crashMomentumScore >= 3) score += 1;
+if(crashMomentumScore >= 5) score += 2;
+if(crashMomentumScore >= 7) score += 3;
 
 /* logistische Wahrscheinlichkeit */
 
@@ -1175,6 +1182,91 @@ score
 
 }
 
+/* ================= CRASH MOMENTUM ENGINE ================= */
+
+function calculateCrashMomentum(
+
+vixCloses:number[],
+spCloses:number[],
+breadth20:number,
+breadth50:number,
+gammaRegime:string,
+creditSignal:string
+
+){
+
+if(
+vixCloses.length < 4 ||
+spCloses.length < 4
+){
+return{
+score:0,
+regime:"neutral"
+};
+}
+
+/* ===== CORE MOVES ===== */
+
+const vix3d =
+percentChange(
+vixCloses[vixCloses.length-1],
+vixCloses[vixCloses.length-4]
+);
+
+const sp3d =
+percentChange(
+spCloses[spCloses.length-1],
+spCloses[spCloses.length-4]
+);
+
+/* ===== SCORE ===== */
+
+let score = 0;
+
+/* 1. VOL EXPANSION */
+
+if(vix3d > 10) score += 1;
+if(vix3d > 25) score += 1;
+
+/* 2. PRICE ACCELERATION */
+
+if(sp3d < -1.5) score += 1;
+if(sp3d < -3) score += 1;
+
+/* 3. BREADTH COLLAPSE */
+
+if(breadth20 < 0.4) score += 1;
+if(breadth20 < 0.25) score += 1;
+
+if(breadth50 < 0.45) score += 1;
+
+/* 4. STRUCTURAL FORCING */
+
+if(gammaRegime === "negative") score += 1;
+if(gammaRegime === "unstable") score += 2;
+
+if(creditSignal === "risk_off") score += 1;
+
+/* ===== REGIME ===== */
+
+let regime = "neutral";
+
+if(score >= 3) regime = "building";
+if(score >= 5) regime = "accelerating";
+if(score >= 7) regime = "cascade";
+
+return{
+score,
+regime,
+details:{
+vix3d,
+sp3d,
+breadth20,
+breadth50
+}
+};
+
+}
 
 /* ================= PUT DECISION ENGINE ================= */
 
@@ -2556,6 +2648,18 @@ breadth50,
 gammaRegime
 );
 
+const crashMomentum =
+calculateCrashMomentum(
+
+vixCloses,
+spClosesFull,
+breadth20Data.breadth20,
+breadth50,
+gammaRegime,
+creditData.creditSignal
+
+);
+
 /* ================= LIQUIDITY VACUUM ================= */
 
 const sp3dMove =
@@ -2688,7 +2792,8 @@ shockData.shockScore,
 creditData.creditSignal,
 gammaRegime,
 internalMomentum.score,
-concentration.score
+concentration.score,
+crashMomentum.score
 );
 
 /* ================= REGIME SIGNAL ================= */
@@ -2795,26 +2900,37 @@ const panicSignal = capitulationAlarm;
 const adjustedCrash = crashRisk.probability;
 
 // Momentum Proxy (du hast keinen crashMomentum → wir nehmen internals)
-const crashMomentum = internalMomentum.score;
+const crashMomentumScore = crashMomentum.score;
+const crashMomentumData = crashMomentum;
 
-// 1. PANIC → sofort sichern
+// 1. Panic
 if(panicSignal){
 profitAction = "TAKE PROFIT (30-50%)";
 }
 
-// 2. Momentum Shift (SEHR WICHTIG)
-else if(crashMomentum > -1){
-profitAction = "REDUCE FAST";
-}
-
-// 3. Extrem hoher Crash → trimmen
+// 2. Extrem Crash Level
 else if(adjustedCrash > 75){
 profitAction = "TRIM (20-30%)";
 }
 
-// 4. Perfekter Trend → laufen lassen
-else if(riskPhase === "CRASH BUILD"){
+// 3. Momentum entscheidet ALLES
+else {
+
+if(crashMomentumScore <= 2){
+profitAction = "REDUCE FAST";
+}
+
+else if(crashMomentumScore <= 4){
+profitAction = "TRIM (20-30%)";
+}
+
+else if(crashMomentumScore >= 5){
 profitAction = "LET RUN";
+}
+
+else{
+profitAction = "HOLD";
+}
 }
 
 
@@ -2898,6 +3014,9 @@ marketLiquidityRegime: marketLiquidity.regime,
 
 dxyMomentum20: dxy20,
 tltMomentum20: tlt20,
+
+crashMomentumScore: crashMomentum.score,
+crashMomentumRegime: crashMomentum.regime,
 
 putDecision: putDecision.decision,
 putScore: putDecision.score,
