@@ -2663,14 +2663,13 @@ gammaRegime
 
 const crashMomentum =
 calculateCrashMomentum(
-
+vix,
 vixCloses,
 spClosesFull,
 breadth20Data.breadth20,
 breadth50,
 gammaRegime,
 creditData.creditSignal
-
 );
 
 /* ================= LIQUIDITY VACUUM ================= */
@@ -2934,7 +2933,7 @@ profitAction = "TRIM (20-30%)";
 // 3. Momentum entscheidet ALLES
 else {
 
-if(crashMomentumScore <= 2){
+if(crashMomentumScore <= 2 && crashRisk.probability < 50){
 profitAction = "REDUCE FAST";
 }
 
