@@ -494,10 +494,7 @@ Math.round(
 
 
 // === CRASH MOMENTUM ===
-const crashMomentum =
-crashHistory.length >= 3
-? crashHistory[crashHistory.length-1] - crashHistory[crashHistory.length-3]
-: 0;
+const crashMomentum = data?.crashMomentum ?? 0;
 
 
 
@@ -571,7 +568,7 @@ if(adjustedCrash >= 55) trigger = "PREPARE";
 if(adjustedCrash >= 70) trigger = "ATTACK";
 
 // Momentum Override
-if(crashMomentum > 8 && adjustedCrash > 50){
+if(crashMomentum <= -4 && adjustedCrash > 50){
 trigger = "ATTACK";
 }
 
@@ -651,7 +648,7 @@ earlyWarning = "HIDDEN DISTRIBUTION";
 earlyColor = orange;
 }
 
-else if(crashMomentum > 8){
+else if(crashMomentum <= -3){
 earlyWarning = "CRASH PRESSURE RISING";
 earlyColor = red;
 }
@@ -686,7 +683,7 @@ marketPriority = "PANIC";
 }
 
 // 2. Crash Momentum
-else if(crashMomentum > 8 && adjustedCrash > 60){
+else if(crashMomentum <= -4 && adjustedCrash > 60){
 marketPriority = "ACCELERATION";
 }
 
@@ -827,7 +824,7 @@ dynamicExit = "TAKE PROFIT (50-70%)";
 }
 
 // 2. CRASH BESCHLEUNIGT
-else if(crashMomentum > 10 && adjustedCrash > 70){
+else if(crashMomentum <= -5 && adjustedCrash > 70){
 dynamicExit = "TRIM FAST (30-50%)";
 }
 
@@ -851,8 +848,8 @@ adjustedCrash > 45 ? 1.0 :
 0.9;
 
 const momentumFactor =
-crashMomentum > 5 ? 1.1 :
-crashMomentum < -5 ? 0.85 :
+crashMomentum <= -4 ? 1.1 :
+crashMomentum >= -1 ? 0.85 :
 1;
 
 const panicFactor = panicSignal ? 0.75 : 1;
