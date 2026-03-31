@@ -907,6 +907,34 @@ oneLookExecution = "WAIT";
 
 console.log("EXECUTION:", oneLookExecution);
 
+const indices = {
+nasdaq: {
+price: md["^NDX"]?.current ?? null,
+change: md["^NDX"]?.change ?? null
+},
+sp500: {
+price: md["^GSPC"]?.current ?? null,
+change: md["^GSPC"]?.change ?? null
+},
+russell: {
+price: md["^RUT"]?.current ?? null,
+change: md["^RUT"]?.change ?? null
+},
+dow: {
+price: md["^DJI"]?.current ?? null,
+change: md["^DJI"]?.change ?? null
+},
+
+// 🔥 NEU – EXTREM WICHTIG
+divergence: {
+nasdaq_vs_russell:
+(md["^NDX"]?.change ?? 0) - (md["^RUT"]?.change ?? 0),
+sp_vs_equal:
+(data.rotationDetails?.concentrationDivergence ?? 0)
+}
+};
+
+
 // ================= SNAPSHOT =================
 
 const snapshot = {
@@ -959,7 +987,8 @@ positioning: {
 baseSize: data.positionSize,
 adjustedSize: effectivePosition,
 confidence: decisionConfidence
-}
+},
+indices
 };
 
 function copySnapshot(){
