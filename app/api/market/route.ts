@@ -10,7 +10,7 @@ let previousCrashProbability = 0;
 let smoothedBreadth200 = 0;
 let smoothedBreadth50 = 0;
 
-const CACHE_DURATION = 10 * 1000; // 15 Sekunden
+const CACHE_DURATION = 10 * 1000; // 10 Sekunden
 // const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
 
 import { Redis } from "@upstash/redis";
@@ -33,14 +33,6 @@ return data ? JSON.parse(data) : null;
 console.error("Load Market State Error:", e);
 return null;
 }
-}
-
-const state = await loadMarketState();
-
-if (state) {
-previousCrashProbability = state.previousCrashProbability ?? previousCrashProbability;
-smoothedBreadth200 = state.smoothedBreadth200 ?? smoothedBreadth200;
-smoothedBreadth50 = state.smoothedBreadth50 ?? smoothedBreadth50;
 }
 
 async function saveMarketState(state: any) {
@@ -135,13 +127,13 @@ creditRatio: 0
 
 /* Ratio berechnen */
 
-const minLength = Math.min(hyg.length, ief.length);
+const ratio = hyg.map((v: number, i: number) => {
 
-const ratio = [];
+if(!ief[i]) return v;
 
-for (let i = 0; i < minLength; i++) {
-ratio.push(hyg[i] / ief[i]);
-}
+return v / ief[i];
+
+});
 
 /* 50 MA */
 
@@ -398,8 +390,7 @@ const universe = [
 "XLK","XLF","XLE","XLV","XLI",
 "XLY","XLP","XLU","XLB",
 "SPHB","SPLV","IWO","IWN","MTUM",
-"USMV","XRT","SOXX","XLRE",
-"ARKK","XBI","SMH","IWO","IWN","RSP"
+"USMV","XRT","SOXX","XLRE"
 ];
 
 let above20 = 0;
@@ -503,7 +494,7 @@ universe.map(s => fetchETF(s))
 
 results.forEach((closes)=>{
 
-if (closes.length < 100) return;
+if (closes.length < 252) return;
 
 valid++;
 
@@ -511,14 +502,13 @@ const current = closes[closes.length - 1];
 
 const highLookback = Math.min(252, closes.length);
 
-const lookback = Math.min(252, closes.length - 1);
-const history = closes.slice(-lookback, -1);
+const history = closes.slice(-highLookback, -1);
 
 const high252 = Math.max(...history);
 const low252 = Math.min(...history);
 
-if (current > high252) newHighs++;
-if (current < low252) newLows++;
+if (current >= high252 * 0.99) newHighs++;
+if (current <= low252 * 1.01) newLows++;
 
 });
 
@@ -966,8 +956,7 @@ shockScore:number,
 creditSignal:string,
 gammaRegime:string,
 internalMomentumScore:number,
-concentrationScore:number,
-crashMomentumScore:number
+concentrationScore:number
 ){
 
 let score = 0;
@@ -991,12 +980,6 @@ if(gammaRegime === "unstable") score += 1;
 
 if(internalMomentumScore < -4) score += 2
 else if(internalMomentumScore < -2) score += 1
-
-/* ===== MOMENTUM BOOST ===== */
-
-if(crashMomentumScore >= 3) score += 1.5;
-if(crashMomentumScore >= 5) score += 3;
-if(crashMomentumScore >= 7) score += 5;
 
 /* logistische Wahrscheinlichkeit */
 
@@ -1192,91 +1175,6 @@ score
 
 }
 
-/* ================= CRASH MOMENTUM ENGINE ================= */
-
-function calculateCrashMomentum(
-
-vixCloses:number[],
-spCloses:number[],
-breadth20:number,
-breadth50:number,
-gammaRegime:string,
-creditSignal:string
-
-){
-
-if(
-vixCloses.length < 4 ||
-spCloses.length < 4
-){
-return{
-score:0,
-regime:"neutral"
-};
-}
-
-/* ===== CORE MOVES ===== */
-
-const vix3d =
-percentChange(
-vixCloses[vixCloses.length-1],
-vixCloses[vixCloses.length-4]
-);
-
-const sp3d =
-percentChange(
-spCloses[spCloses.length-1],
-spCloses[spCloses.length-4]
-);
-
-/* ===== SCORE ===== */
-
-let score = 0;
-
-/* 1. VOL EXPANSION */
-
-if(vix3d > 10) score += 1;
-if(vix3d > 25) score += 1;
-
-/* 2. PRICE ACCELERATION */
-
-if(sp3d < -1.5) score += 1;
-if(sp3d < -3) score += 1;
-
-/* 3. BREADTH COLLAPSE */
-
-if(breadth20 < 0.4) score += 1;
-if(breadth20 < 0.25) score += 1;
-
-if(breadth50 < 0.45) score += 1;
-
-/* 4. STRUCTURAL FORCING */
-
-if(gammaRegime === "negative") score += 1;
-if(gammaRegime === "unstable") score += 2;
-
-if(creditSignal === "risk_off") score += 1;
-
-/* ===== REGIME ===== */
-
-let regime = "neutral";
-
-if(score >= 3) regime = "building";
-if(score >= 5) regime = "accelerating";
-if(score >= 7) regime = "cascade";
-
-return{
-score,
-regime,
-details:{
-vix3d,
-sp3d,
-breadth20,
-breadth50
-}
-};
-
-}
 
 /* ================= PUT DECISION ENGINE ================= */
 
@@ -1371,15 +1269,7 @@ ma200:number,
 spCloses:number[]
 ){
 
-if(spCloses.length < 61){
-return{score:0,regime:"neutral"}
-}
-
-/* 🔥 NEU: HARTE VALIDIERUNG */
-const prev20 = spCloses[spCloses.length-21]
-const prev60 = spCloses[spCloses.length-61]
-
-if(!prev20 || !prev60){
+if(spCloses.length < 60){
 return{score:0,regime:"neutral"}
 }
 
@@ -2305,7 +2195,7 @@ return [];
 }
 
 
-const spClosesFull = await fetchIndex("^GSPC","max");
+const spClosesFull = await fetchIndex("^GSPC","5y");
 
 const spCurrent = spClosesFull.length ? spClosesFull[spClosesFull.length - 1] : 0;
 
@@ -2315,7 +2205,7 @@ const spMA50 = movingAverage(spClosesFull,50) ?? 0;
 /* ================= SPX MOMENTUM ================= */
 
 const spMomentum =
-spClosesFull.length >= 60
+spMA50 && spMA200
 ? calculateSPXMomentum(
 spCurrent,
 spMA50,
@@ -2362,13 +2252,13 @@ let rawBreadth50 = validAssets ? above50Count / validAssets : 0;
 
 /* ===== EMA SMOOTHING ===== */
 
-const alpha = 0.2;
+if(smoothedBreadth200 === 0) smoothedBreadth200 = rawBreadth200;
+else smoothedBreadth200 =
+(smoothedBreadth200 * 0.5) + (rawBreadth200 * 0.5);
 
-smoothedBreadth200 =
-(smoothedBreadth200 * (1 - alpha)) + (rawBreadth200 * alpha);
-
-smoothedBreadth50 =
-(smoothedBreadth50 * (1 - alpha)) + (rawBreadth50 * alpha);
+if(smoothedBreadth50 === 0) smoothedBreadth50 = rawBreadth50;
+else smoothedBreadth50 =
+(smoothedBreadth50 * 0.5) + (rawBreadth50 * 0.5);
 
 const breadth200 = smoothedBreadth200;
 const breadth50 = smoothedBreadth50;
@@ -2581,14 +2471,9 @@ spClosesFull[spClosesFull.length-1],
 spClosesFull[spClosesFull.length-21]
 );
 
-if(tlt20 - sp20Momentum > 2 && creditData.creditSignal === "risk_off")
+if(tlt20 > sp20Momentum && creditData.creditSignal === "risk_off")
 liquidityFlow = "risk_off";
-
-else if(sp20Momentum - tlt20 > 2)
-liquidityFlow = "risk_on";
-
-else
-liquidityFlow = "neutral";
+if(tlt20 < sp20Momentum) liquidityFlow = "risk_on";
 
 }
 
@@ -2669,18 +2554,6 @@ spClosesFull,
 breadth20Data.breadth20,
 breadth50,
 gammaRegime
-);
-
-const crashMomentum =
-calculateCrashMomentum(
-
-vixCloses,
-spClosesFull,
-breadth20Data.breadth20,
-breadth50,
-gammaRegime,
-creditData.creditSignal
-
 );
 
 /* ================= LIQUIDITY VACUUM ================= */
@@ -2815,8 +2688,7 @@ shockData.shockScore,
 creditData.creditSignal,
 gammaRegime,
 internalMomentum.score,
-concentration.score,
-crashMomentum.score
+concentration.score
 );
 
 /* ================= REGIME SIGNAL ================= */
@@ -2894,16 +2766,11 @@ else if(finalPhase.includes("Phase 4")) riskPhase = "FRAGILE";
 // POSITION SIZE
 let positionSize = 0;
 
-if(riskPhase === "CRASH BUILD") positionSize = 70;
-else if(riskPhase === "ACCELERATION") positionSize = 60;
-else if(riskPhase === "BREAKDOWN") positionSize = 45;
-else if(riskPhase === "FRAGILE") positionSize = 25;
+if(riskPhase === "CRASH BUILD") positionSize = 90;
+else if(riskPhase === "ACCELERATION") positionSize = 75;
+else if(riskPhase === "BREAKDOWN") positionSize = 60;
+else if(riskPhase === "FRAGILE") positionSize = 30;
 else positionSize = 10;
-
-// 🔥 Additive Factors
-if(gammaRegime === "unstable") positionSize += 15;
-if(liquidityVacuum.score >= 5) positionSize += 10;
-if(crashMomentum.score >= 5) positionSize += 10;
 
 // Confidence (du hast "confidence", nicht decisionConfidence!)
 if(confidence > 70) positionSize += 10;
@@ -2928,37 +2795,26 @@ const panicSignal = capitulationAlarm;
 const adjustedCrash = crashRisk.probability;
 
 // Momentum Proxy (du hast keinen crashMomentum → wir nehmen internals)
-const crashMomentumScore = crashMomentum.score;
-const crashMomentumData = crashMomentum;
+const crashMomentum = internalMomentum.score;
 
-// 1. Panic
+// 1. PANIC → sofort sichern
 if(panicSignal){
 profitAction = "TAKE PROFIT (30-50%)";
 }
 
-// 2. Extrem Crash Level
+// 2. Momentum Shift (SEHR WICHTIG)
+else if(crashMomentum > -1){
+profitAction = "REDUCE FAST";
+}
+
+// 3. Extrem hoher Crash → trimmen
 else if(adjustedCrash > 75){
 profitAction = "TRIM (20-30%)";
 }
 
-// 3. Momentum entscheidet ALLES
-else {
-
-if(crashMomentumScore <= 2){
-profitAction = "REDUCE FAST";
-}
-
-else if(crashMomentumScore <= 4){
-profitAction = "TRIM (20-30%)";
-}
-
-else if(crashMomentumScore >= 5){
+// 4. Perfekter Trend → laufen lassen
+else if(riskPhase === "CRASH BUILD"){
 profitAction = "LET RUN";
-}
-
-else{
-profitAction = "HOLD";
-}
 }
 
 
@@ -3021,22 +2877,6 @@ volOfVolTrend: volOfVolTrend,
 optionsSkewRatio: optionsSkew.ratio,
 optionsSkewRegime: optionsSkew.regime,
 
-indices: {
-nasdaq: {
-value: marketData.nasdaq,
-change: marketData.nasdaqChange,
-momentum: spMomentum.score
-},
-sp500: {
-value: marketData.sp500,
-change: marketData.sp500Change
-},
-russell: {
-value: marketData.russell,
-change: marketData.russellChange
-}
-},
-
 moveIndex: move,
 
 financialConditionsScore: financialConditions.score,
@@ -3058,9 +2898,6 @@ marketLiquidityRegime: marketLiquidity.regime,
 
 dxyMomentum20: dxy20,
 tltMomentum20: tlt20,
-
-crashMomentumScore: crashMomentum.score,
-crashMomentumRegime: crashMomentum.regime,
 
 putDecision: putDecision.decision,
 putScore: putDecision.score,
@@ -3162,7 +2999,7 @@ smoothedBreadth50
 });
 
 cachedResponse = responseData;
-
+previousCrashProbability = responseData.crashProbability;
 
 lastFetchTime = Date.now();
 
