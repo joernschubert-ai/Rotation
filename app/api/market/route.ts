@@ -479,9 +479,20 @@ adSignal: signal
 async function calculateHighLowIndicator(fetchETF: (symbol: string) => Promise<number[]>) {
 
 const universe = [
-"SPY","QQQ","IWM","DIA","MDY","VTI",
-"XLK","XLF","XLE","XLV","XLI",
-"XLY","XLP","XLU","XLB","XLRE"
+"AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA",
+"JPM","BAC","GS","MS",
+"XOM","CVX",
+"UNH","JNJ","PFE",
+"HD","MCD","NKE",
+"AMD","INTC","AVGO",
+"CRM","ADBE","ORCL",
+"WMT","COST","PG",
+"DIS","NFLX",
+"LIN","HON","CAT","BA",
+"UPS","RTX",
+"LOW","SBUX",
+"GE","IBM",
+"PLTR","SNOW","SHOP"
 ];
 
 let newHighs = 0;
@@ -500,31 +511,39 @@ valid++;
 
 const current = closes[closes.length - 1];
 
-const highLookback = Math.min(252, closes.length);
-
-const history = closes.slice(-(highLookback + 1), -1);
+// 🔥 WICHTIG: echtes Lookback (ohne aktuellen Wert)
+const history = closes.slice(-252, -1);
 
 const high252 = Math.max(...history);
 const low252 = Math.min(...history);
 
-if (current >= high252 * 0.995) newHighs++;
-if (current <= low252 * 1.005) newLows++;
+// 🔥 KEINE RANGE-FUDGE MEHR
+if (current >= high252) newHighs++;
+if (current <= low252) newLows++;
 
 });
 
+/* 🔥 RELATIVER SCORE statt absolute Counts */
+
+const total = newHighs + newLows;
+
+let ratio = total > 0 ? (newHighs - newLows) / total : 0;
+
 let signal = "neutral";
 
-if (newLows > newHighs) signal = "weak";
-if (newLows > newHighs * 2) signal = "distribution";
-if (newLows > newHighs * 4) signal = "collapse";
+if (ratio < -0.3) signal = "weak";
+if (ratio < -0.6) signal = "distribution";
+if (ratio < -0.8) signal = "collapse";
 
 return {
 newHighs,
 newLows,
+highLowRatio: ratio,
 highLowSignal: signal
 };
 
 }
+
 
 
 /* ================= INSTITUTIONELLE DISTRIBUTION ================= */
@@ -1171,6 +1190,72 @@ return{
 trigger: score >= 4,
 score
 
+};
+
+}
+
+function calculateCrashMomentum(
+spCloses:number[],
+vixCloses:number[],
+breadth20:number
+){
+
+if(
+spCloses.length < 4 ||
+vixCloses.length < 4
+){
+return {
+score: 0,
+regime: "neutral"
+};
+}
+
+const sp3d =
+percentChange(
+spCloses[spCloses.length-1],
+spCloses[spCloses.length-4]
+);
+
+const vix3d =
+percentChange(
+vixCloses[vixCloses.length-1],
+vixCloses[vixCloses.length-4]
+);
+
+let score = 0;
+
+/* PRICE ACCELERATION */
+
+if(sp3d < -1.5) score -= 1;
+if(sp3d < -3) score -= 2;
+if(sp3d < -5) score -= 3;
+
+/* VOL EXPANSION */
+
+if(vix3d > 15) score -= 1;
+if(vix3d > 30) score -= 2;
+if(vix3d > 50) score -= 3;
+
+/* BREADTH COLLAPSE */
+
+if(breadth20 < 0.4) score -= 1;
+if(breadth20 < 0.25) score -= 2;
+if(breadth20 < 0.15) score -= 3;
+
+/* REGIME */
+
+let regime = "neutral";
+
+if(score <= -2) regime = "accelerating";
+if(score <= -4) regime = "crash";
+if(score <= -6) regime = "panic";
+
+return {
+score,
+regime,
+sp3d,
+vix3d,
+breadth20
 };
 
 }
@@ -2556,6 +2641,13 @@ breadth50,
 gammaRegime
 );
 
+const crashMomentumData =
+calculateCrashMomentum(
+spClosesFull,
+vixCloses,
+breadth20Data.breadth20
+);
+
 /* ================= LIQUIDITY VACUUM ================= */
 
 const sp3dMove =
@@ -2795,19 +2887,8 @@ const panicSignal = capitulationAlarm;
 const adjustedCrash = crashRisk.probability;
 
 // Momentum Proxy (du hast keinen crashMomentum → wir nehmen internals)
-let crashMomentum = 0;
+const crashMomentum = crashMomentumData.score;
 
-// PRICE ACCELERATION
-if (sp3dMove < -2) crashMomentum -= 1;
-if (sp3dMove < -4) crashMomentum -= 2;
-
-// VOL EXPANSION
-if (shockData.vix5d > 20) crashMomentum -= 1;
-if (shockData.vix5d > 35) crashMomentum -= 2;
-
-// BREADTH COLLAPSE
-if (breadth20Data.breadth20 < 0.4) crashMomentum -= 1;
-if (breadth20Data.breadth20 < 0.25) crashMomentum -= 2;
 
 // 1. PANIC → sofort sichern
 if(panicSignal){
@@ -2930,6 +3011,9 @@ macroRisk: crashAttribution.macroRisk,
 
 regimeStabilityScore: regimeStability.score,
 regimeStabilityRegime: regimeStability.regime,
+
+crashMomentum: crashMomentumData.score,
+crashMomentumRegime: crashMomentumData.regime,
 
 phase6Acceleration,
 
