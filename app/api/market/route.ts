@@ -502,13 +502,13 @@ const current = closes[closes.length - 1];
 
 const highLookback = Math.min(252, closes.length);
 
-const history = closes.slice(-highLookback, -1);
+const history = closes.slice(-(highLookback + 1), -1);
 
 const high252 = Math.max(...history);
 const low252 = Math.min(...history);
 
-if (current >= high252 * 0.99) newHighs++;
-if (current <= low252 * 1.01) newLows++;
+if (current >= high252 * 0.995) newHighs++;
+if (current <= low252 * 1.005) newLows++;
 
 });
 
@@ -2795,7 +2795,19 @@ const panicSignal = capitulationAlarm;
 const adjustedCrash = crashRisk.probability;
 
 // Momentum Proxy (du hast keinen crashMomentum → wir nehmen internals)
-const crashMomentum = internalMomentum.score;
+let crashMomentum = 0;
+
+// PRICE ACCELERATION
+if (sp3dMove < -2) crashMomentum -= 1;
+if (sp3dMove < -4) crashMomentum -= 2;
+
+// VOL EXPANSION
+if (shockData.vix5d > 20) crashMomentum -= 1;
+if (shockData.vix5d > 35) crashMomentum -= 2;
+
+// BREADTH COLLAPSE
+if (breadth20Data.breadth20 < 0.4) crashMomentum -= 1;
+if (breadth20Data.breadth20 < 0.25) crashMomentum -= 2;
 
 // 1. PANIC → sofort sichern
 if(panicSignal){
@@ -2803,7 +2815,7 @@ profitAction = "TAKE PROFIT (30-50%)";
 }
 
 // 2. Momentum Shift (SEHR WICHTIG)
-else if(crashMomentum > -1){
+else if(crashMomentum >= 0){
 profitAction = "REDUCE FAST";
 }
 
