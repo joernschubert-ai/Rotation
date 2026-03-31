@@ -516,16 +516,36 @@ const finalDecisionScore = Math.round(
 
 // ================= TIMING ENGINE =================
 
-// Bounce Detection
-const shortTermBounce =
+// ================= AUTO BOUNCE DETECTOR =================
+
+// 1. Micro Bounce (reine kurzfristige Bewegung)
+const microBounce =
 breadth20 > breadth50 &&
 data.spMomentumScore > 0;
 
-// Weak Bounce (perfekt für PUT ADD)
-const weakBounce =
-shortTermBounce &&
+// 2. Struktur prüfen (kein echter Bull Move!)
+const badStructure =
 breadth200 < 60 &&
-data.gammaExposure < 0;
+data.gammaExposure < 0 &&
+creditSignal === "risk_off";
+
+// 3. Bounce Qualität
+const bounceStrength =
+(data.spMomentumScore ?? 0) +
+(breadth20 - breadth50);
+
+// 4. FAKE / WEAK BOUNCE (dein Sweet Spot)
+const weakBounce =
+microBounce &&
+badStructure &&
+bounceStrength < 25;
+
+// 5. STRONG BOUNCE (Gefahr → kein sofortiger PUT Entry)
+const strongBounce =
+microBounce &&
+bounceStrength >= 25 &&
+breadth200 > 55;
+
 
 // Panic Spike
 const panicSignal =
@@ -599,7 +619,12 @@ finalAction = "AGGRESSIVE PUTS";
 
 // 1. Weak Bounce = BEST ENTRY
 if(weakBounce && riskPhase !== "STABLE"){
-finalAction = "ADD PUTS (BOUNCE)";
+finalAction = "ADD PUTS (WEAK BOUNCE)";
+}
+
+// 2. Strong Bounce = warten (wichtig!)
+if(strongBounce && riskPhase !== "STABLE"){
+finalAction = "WAIT → POSSIBLE LOWER HIGH";
 }
 
 // 2. Panic = nicht jagen
@@ -745,7 +770,11 @@ putSignal = "HOLD PUTS";
 }
 
 else if(weakBounce){
-putSignal = "ADD ON BOUNCE";
+putSignal = "ADD ON WEAK BOUNCE";
+}
+
+else if(strongBounce){
+putSignal = "WAIT (BOUNCE TOO STRONG)";
 }
 
 else if(riskPhase === "STABLE"){
@@ -882,7 +911,8 @@ let oneLookRisk = riskPhase;
 // 3. TIMING
 let oneLookTiming = "WAIT";
 
-if(weakBounce) oneLookTiming = "BOUNCE (ENTRY)";
+if(weakBounce) oneLookTiming = "WEAK BOUNCE (ENTRY)";
+else if(strongBounce) oneLookTiming = "STRONG BOUNCE (WAIT)";
 else if(panicSignal) oneLookTiming = "PANIC";
 else if(trendBreakdown) oneLookTiming = "TREND DOWN";
 
@@ -972,6 +1002,7 @@ marketPriority,
 crashMomentum,
 panicSignal,
 weakBounce,
+strongBounce,
 trendBreakdown
 },
 
