@@ -514,6 +514,70 @@ const finalDecisionScore = Math.round(
 ((data.crossAssetRiskScore ?? 0) * 2)
 );
 
+// ================= DANGER ZONE ENGINE =================
+
+// === INPUTS ===
+const nasdaqPrice = md["^NDX"]?.current ?? 0;
+const vix = md["^VIX"]?.current ?? 0;
+
+const breadth200_raw = data?.breadth200 ?? 0;
+const gamma = data?.gammaExposure ?? 0;
+const credit = data?.creditSignal ?? "neutral";
+
+// === LEVEL RISK (NASDAQ) ===
+let levelRisk = 0;
+
+if(nasdaqPrice < 24200) levelRisk = 20;
+else if(nasdaqPrice < 24600) levelRisk = 50;
+else if(nasdaqPrice < 25000) levelRisk = 75;
+else levelRisk = 90;
+
+// === VIX RISK (wichtig: invertiert!) ===
+let vixRisk = 0;
+
+if(vix > 25) vixRisk = 20;
+else if(vix > 22) vixRisk = 40;
+else if(vix > 20) vixRisk = 60;
+else vixRisk = 85;
+
+// === STRUCTURAL RISK ===
+let structuralRisk = 0;
+
+// Gamma (negativ = gut für Puts)
+if(gamma >= 0) structuralRisk += 30;
+
+// Credit
+if(credit === "neutral") structuralRisk += 15;
+if(credit === "risk_on") structuralRisk += 30;
+
+// Breadth
+if(breadth200_raw >= 0.5) structuralRisk += 20;
+
+// === FINAL SCORE ===
+const dangerScore = Math.round(
+(levelRisk * 0.4) +
+(vixRisk * 0.3) +
+(structuralRisk * 0.3)
+);
+
+// === AMPEL ===
+let dangerColor = "#00ff88";
+let dangerLabel = "LOW RISK";
+
+if(dangerScore > 75){
+dangerColor = "#ff4d4f";
+dangerLabel = "HIGH RISK";
+}
+else if(dangerScore > 55){
+dangerColor = "#ff8844";
+dangerLabel = "ELEVATED";
+}
+else if(dangerScore > 35){
+dangerColor = "#ffd166";
+dangerLabel = "MODERATE";
+}
+
+
 // ================= TIMING ENGINE =================
 
 // ================= AUTO BOUNCE DETECTOR =================
@@ -868,7 +932,23 @@ dynamicExit = "REDUCE / EXIT";
 }
 
 
-const base = data.positionSize ?? 0;
+// ================= DYNAMIC BASE SIZE =================
+
+let dynamicBase = data.positionSize ?? 0;
+
+// Danger reduziert die strategische Zielgröße!
+if(dangerScore > 75){
+dynamicBase *= 0.7;
+}
+else if(dangerScore > 55){
+dynamicBase *= 0.85;
+}
+else if(dangerScore < 35){
+dynamicBase *= 1.1;
+}
+
+// Deckel (wichtig!)
+dynamicBase = Math.max(10, Math.min(100, dynamicBase));
 
 const crashFactor =
 adjustedCrash > 70 ? 1.2 :
@@ -885,15 +965,39 @@ const panicFactor = panicSignal ? 0.75 : 1;
 
 const confidenceFactor = decisionConfidence / 100;
 
+// ================= DANGER POSITION FACTOR =================
+
+let dangerFactor = 1.0;
+
+if(dangerScore > 75){
+dangerFactor = 0.6; // stark reduzieren
+}
+else if(dangerScore > 55){
+dangerFactor = 0.8; // moderat reduzieren
+}
+else if(dangerScore > 35){
+dangerFactor = 1.0; // neutral
+}
+else{
+dangerFactor = 1.15; // aggressiver (Top-Zone)
+}
+
 // 🔥 FINAL (WEICH!)
 const effectivePosition = Math.round(
-base *
+dynamicBase *
 (0.5 + confidenceFactor * 0.5) *
 crashFactor *
 momentumFactor *
 panicFactor
 );
 
+// ================= HARD CAP =================
+
+// Maximal leicht über Base erlaubt (5%)
+const maxPosition = dynamicBase * 1.05;
+
+// Final begrenzen
+const finalPositionCapped = Math.min(effectivePosition, maxPosition);
 
 // ================= ONE LOOK ENGINE =================
 
@@ -989,7 +1093,8 @@ breadth20,
 distribution: Math.round(smoothDistribution),
 crashProbability: adjustedCrash,
 correlationScore,
-concentrationScore: data.rotationDetails?.concentrationScore ?? 0
+concentrationScore: data.rotationDetails?.concentrationScore ?? 0,
+dangerScore
 },
 
 market: {
@@ -1025,8 +1130,8 @@ exit: dynamicExit
 },
 
 positioning: {
-baseSize: data.positionSize,
-adjustedSize: effectivePosition,
+baseSize: Math.round(dynamicBase),
+adjustedSize: finalPositionCapped,
 confidence: decisionConfidence
 },
 indices
@@ -1347,8 +1452,6 @@ Rotation: {(rsSmall*100).toFixed(2)}%
 
 </Panel>
 
-
-
 {/* POSITION */}
 <Panel title="POSITION" bg="#0b1a2a">
 <div
@@ -1361,10 +1464,13 @@ effectivePosition > 20 ? yellow :
 green
 }}
 >
-{effectivePosition}%
+{finalPositionCapped}%
 </div>
 <div className="text-xs text-zinc-400 mt-2">
 Size (adjusted)
+</div>
+<div className="text-xs text-zinc-400 mt-2">
+Danger Factor: {dangerFactor.toFixed(2)}
 </div>
 </Panel>
 
@@ -1384,6 +1490,24 @@ red
 </div>
 <div className="text-xs text-zinc-400 mt-2">
 Crash {adjustedCrash}%
+</div>
+<div className="mt-3 border-t border-zinc-800 pt-3">
+
+<div className="text-xs text-zinc-400 mb-1">
+DANGER ZONE
+</div>
+
+<div
+className="text-lg font-bold"
+style={{color: dangerColor}}
+>
+{dangerLabel}
+</div>
+
+<div className="text-xs text-zinc-400 mt-1">
+Score: {dangerScore}/100
+</div>
+
 </div>
 </Panel>
 
@@ -1472,7 +1596,7 @@ green
 </div>
 
 <div className="text-xs text-zinc-400 mt-1">
-Base: {data.positionSize}% → Adjusted: {effectivePosition}%
+Base (dynamic): {Math.round(dynamicBase)}% → Final: {finalPositionCapped}%
 </div>
 
 <div className="text-xs text-zinc-400 mt-2">
