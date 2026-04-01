@@ -948,7 +948,81 @@ callSize = 0;
 
 }
 
+// ================= CALL RE-ENTRY ENGINE =================
 
+let callReEntry = "NONE";
+
+// === 1. EARLY SIGNAL ===
+// Micro-Shift in Rotation + Momentum
+const earlyRotation =
+rsSmall > 0 &&
+breadth20 > breadth50 &&
+data.spMomentumScore > 0;
+
+// Panic lässt nach
+const panicRelease =
+(data.capitulationProbability ?? 0) < 60 &&
+crashMomentum > -2;
+
+// Liquidity stabilisiert sich
+const liquidityRecovery =
+data.liquidityVacuumScore < 5;
+
+if(earlyRotation && panicRelease && liquidityRecovery){
+callReEntry = "WATCH";
+}
+
+
+// === 2. CONFIRMATION ===
+// echte strukturelle Verbesserung
+const rotationConfirmed =
+rsSmall > 0.015 &&
+breadth50 > breadth200 &&
+creditSignal !== "risk_off";
+
+const volSupport =
+data.vixTermStructure === "contango";
+
+if(rotationConfirmed && volSupport){
+callReEntry = "ENTRY";
+}
+
+
+// === 3. FULL RE-ENTRY ===
+// echte Risk-On Phase
+const strongBreadth =
+breadth200 > 60;
+
+const positiveGamma =
+data.gammaExposure > 0;
+
+const lowCrash =
+adjustedCrash < 40;
+
+if(rotationConfirmed && strongBreadth && positiveGamma && lowCrash){
+callReEntry = "FULL BUILD";
+}
+
+// ================= CALL RE-ENTRY INTEGRATION =================
+
+// Re-Entry überschreibt nur wenn kein aktiver Call läuft
+if(callSignal === "NO TRADE"){
+
+if(callReEntry === "WATCH"){
+callSignal = "WATCH FOR CALL ENTRY";
+}
+
+if(callReEntry === "ENTRY"){
+callSignal = "START CALL POSITION";
+callSize = Math.max(callSize, 20);
+}
+
+if(callReEntry === "FULL BUILD"){
+callSignal = "BUILD CALL POSITION";
+callSize = Math.max(callSize, 50);
+}
+
+}
 
 // ================= MASTER DECISION PANEL =================
 
@@ -1518,6 +1592,17 @@ Size: {callSize}% | Mode: {callScaling}
 
 <div className="text-xs mt-1">
 Exit: {callExit}
+</div>
+<div className="text-xs text-zinc-400 mt-2">
+Re-Entry: <span style={{
+color:
+callReEntry === "WATCH" ? "#ffd166" :
+callReEntry === "ENTRY" ? "#86efac" :
+callReEntry === "FULL BUILD" ? "#00ff88" :
+"#888"
+}}>
+{callReEntry}
+</span>
 </div>
 </Panel>
 
