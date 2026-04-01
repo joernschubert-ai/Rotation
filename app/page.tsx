@@ -920,7 +920,17 @@ else if(trendBreakdown) oneLookTiming = "TREND DOWN";
 let oneLookExecution = "";
 
 if(oneLookAction.startsWith("BUILD")){
+
+if(weakBounce){
 oneLookExecution = "ADD ON BOUNCE";
+}
+else if(trendBreakdown && crashMomentum <= -4){
+oneLookExecution = "ADD SMALL (TREND)";
+}
+else{
+oneLookExecution = "WAIT FOR BOUNCE";
+}
+
 }
 else if(oneLookAction.startsWith("ADD")){
 oneLookExecution = "ADD ON BOUNCE";
