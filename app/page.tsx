@@ -848,39 +848,104 @@ putSignal = "WAIT";
 }
 
 
-// ================= CALL ENGINE (RUSSELL) =================
+// ================= CALL ENGINE V2 (FULL LOGIC) =================
 
 let callSignal = "NO TRADE";
+let callSize = 0; // % von Base Position
+let callScaling = "NONE";
+let callExit = callSize > 0 ? "HOLD" : "NO POSITION";
 
-// 1. Rotation zu Small Caps
-if(
-rsSmall > 0.02 &&
-breadth50 > breadth200 &&
-creditSignal !== "risk_off"
-){
-callSignal = "ADD CALLS (RUSSELL)";
-}
+// ================= 1. REGIME FILTER =================
 
-// 2. Frühe Rotation (aggressiv)
-if(
-rsSmall > 0.01 &&
-breadth20 > breadth50 &&
-data.gammaExposure > 0
-){
-callSignal = "EARLY CALL ENTRY";
-}
+// Calls nur wenn echtes Risk-On Fenster
+const callAllowed =
+creditSignal !== "risk_off" &&
+adjustedCrash < 55 &&
+data.gammaExposure > 0;
 
-// 3. Risk Off → KEINE Calls
-if(
-creditSignal === "risk_off" ||
-adjustedCrash > 60
-){
+// Hard Block
+if(!callAllowed){
 callSignal = "NO TRADE";
+callSize = 0;
+}
+else{
+
+// ================= 2. STRENGTH SCORE =================
+
+let callStrength = 0;
+
+if(rsSmall > 0.01) callStrength += 1;
+if(rsSmall > 0.02) callStrength += 1;
+
+if(breadth50 > breadth200) callStrength += 1;
+if(breadth200 > 60) callStrength += 1;
+
+if(data.gammaExposure > 5) callStrength += 1;
+if(creditSignal === "risk_on") callStrength += 1;
+
+// ================= 3. BASE SIGNAL =================
+
+if(callStrength >= 5){
+callSignal = "AGGRESSIVE BUILD";
+}
+else if(callStrength >= 3){
+callSignal = "ADD CALLS";
+}
+else{
+callSignal = "SMALL POSITION";
 }
 
-// 4. Take Profit Calls wenn Rotation kippt
-if(rsSmall < 0.02){
-callSignal = "REDUCE CALLS";
+// ================= 4. SCALING ENGINE =================
+
+// EARLY ROTATION (klein starten)
+if(rsSmall > 0.01 && rsSmall <= 0.02){
+callSize = 20;
+callScaling = "STARTER";
+}
+
+// CONFIRMED ROTATION
+if(rsSmall > 0.02 && breadth50 > breadth200){
+callSize = 40;
+callScaling = "BUILD";
+}
+
+// STRONG MOMENTUM
+if(rsSmall > 0.03 && breadth200 > 60 && data.gammaExposure > 5){
+callSize = 70;
+callScaling = "PRESS";
+}
+
+// OVEREXTENSION → NICHT MEHR ADDEN
+if(rsSmall > 0.05){
+callScaling = "OVEREXTENDED";
+}
+
+// ================= 5. EXIT ENGINE =================
+
+// Rotation kippt → sofort reagieren
+if(rsSmall < 0){
+callExit = "EXIT FULL";
+callSize = 0;
+}
+
+// Momentum verliert Kraft
+else if(rsSmall < 0.01){
+callExit = "TRIM 50%";
+callSize *= 0.5;
+}
+
+// Breadth kippt → Risiko rausnehmen
+else if(breadth50 < breadth200){
+callExit = "REDUCE 30%";
+callSize *= 0.7;
+}
+
+// Crash steigt → raus
+if(adjustedCrash > 50){
+callExit = "EXIT FAST";
+callSize = 0;
+}
+
 }
 
 
@@ -896,11 +961,9 @@ else if(putSignal.includes("HOLD")) nasdaqDecision = "HOLD PUTS";
 else if(putSignal.includes("REDUCE")) nasdaqDecision = "REDUCE PUTS";
 
 // RUSSELL DECISION
-let russellDecision = "NO TRADE";
-
-if(callSignal.includes("ADD")) russellDecision = "BUILD CALLS";
-else if(callSignal.includes("EARLY")) russellDecision = "EARLY ENTRY";
-else if(callSignal.includes("REDUCE")) russellDecision = "REDUCE CALLS";
+let russellDecision = callSignal;
+// else if(callSignal.includes("EARLY")) russellDecision = "EARLY ENTRY";
+// else if(callSignal.includes("REDUCE")) russellDecision = "REDUCE CALLS";
 
 // CONFIDENCE SCORE (NEU – sehr wichtig)
 const decisionConfidence = Math.round(
@@ -1449,7 +1512,13 @@ style={{color:callDecisionColor(callSignal)}}
 <div className="text-xs text-zinc-400 mt-2">
 Rotation: {(rsSmall*100).toFixed(2)}%
 </div>
+<div className="text-xs text-zinc-400 mt-2">
+Size: {callSize}% | Mode: {callScaling}
+</div>
 
+<div className="text-xs mt-1">
+Exit: {callExit}
+</div>
 </Panel>
 
 {/* POSITION */}
