@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 
 export default function Home() {
 
+const [isReady, setIsReady] = useState(false);
 const router = useRouter();
 const [data, setData] = useState<any>(null);
 
@@ -85,8 +86,13 @@ const newHistory = [...crashHistory, current].slice(-5);
 setCrashHistory(newHistory);
 
 // SMOOTHING (WICHTIG: alter State verwenden!)
-const smoothed =
-(adjustedCrash * 0.4) + (current * 0.6);
+let smoothed;
+
+if (crashHistory.length === 0) {
+smoothed = current; // 🔥 erster Wert = kein Bias!
+} else {
+smoothed = (adjustedCrash * 0.4) + (current * 0.6);
+}
 
 // ================= STRUCTURAL FILTER =================
 
@@ -137,12 +143,15 @@ return;
 
 const data = await res.json();
 setData(data);
+setIsReady(true);
 };
 
 fetchData();
 }, []);
 
-if (!data) return <div className="p-10 text-white">Marktdaten werden geladen...</div>;
+if (!isReady) {
+return <div className="p-10 text-white">Marktdaten werden geladen...</div>;
+}
 
 if (data.error) return <div className="p-10 text-red-500">API Fehler</div>;
 
