@@ -1550,12 +1550,6 @@ className="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
 </button>
 
 <button
-onClick={downloadSnapshot}
-className="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
->
-⬇ Download
-</button>
-<button
 onClick={fetchData}
 className="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
 >
