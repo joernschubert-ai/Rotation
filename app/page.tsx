@@ -17,14 +17,18 @@ const token = typeof window !== "undefined"
 ? localStorage.getItem("token")
 : null;
 
-const res = await fetch("/api/market", {
-headers: {
-Authorization: token || ""
+const headers: any = {};
+
+if (token) {
+headers["Authorization"] = `Bearer ${token}`;
 }
+
+const res = await fetch("/api/market", {
+headers
 });
 
 if (res.status === 401) {
-window.location.href = "/login";
+router.push("/login");
 return;
 }
 
@@ -41,14 +45,20 @@ setLoading(false);
 };
 
 useEffect(() => {
+if (typeof window === "undefined") return;
+
 const auth = localStorage.getItem("auth");
 
 if (auth !== "true") {
-router.push("/login");
-} else {
-fetchData(); // 🔥 HIER rein
+router.replace("/login"); // 🔥 replace statt push
+return;
 }
-}, [router]);
+
+setIsReady(true); // 🔥 HIER setzen (nicht in fetch!)
+
+fetchData();
+
+}, []);
 
 useEffect(() => {
 console.log("DATA UPDATE", data);
@@ -154,7 +164,7 @@ return newHistory;
 }, [data?.crashProbability]); // ok so
 
 
-if (!isReady || loading) {
+if (!isReady || loading || !data) {
 return <div className="p-10 text-white">Marktdaten werden geladen...</div>;
 }
 
