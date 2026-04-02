@@ -7,6 +7,26 @@ export default function Home() {
 const [isReady, setIsReady] = useState(false);
 const router = useRouter();
 const [data, setData] = useState<any>(null);
+const [loading, setLoading] = useState(false);
+
+const fetchData = async () => {
+const token = localStorage.getItem("token");
+
+const res = await fetch("/api/market", {
+headers: {
+Authorization: token || ""
+}
+});
+
+if (res.status === 401) {
+window.location.href = "/login";
+return;
+}
+
+const data = await res.json();
+setData(data);
+setIsReady(true); // wichtig!
+};
 
 useEffect(() => {
 const auth = localStorage.getItem("auth");
@@ -126,26 +146,6 @@ setadjustedCrash(Math.round(finalCrash));
 
 
 useEffect(() => {
-const fetchData = async () => {
-const token = localStorage.getItem("token");
-
-const res = await fetch("/api/market", {
-headers: {
-Authorization: token || ""
-}
-});
-
-if (res.status === 401) {
-console.log("Nicht eingeloggt → redirect");
-window.location.href = "/login";
-return;
-}
-
-const data = await res.json();
-setData(data);
-setIsReady(true);
-};
-
 fetchData();
 }, []);
 
@@ -1551,6 +1551,12 @@ onClick={downloadSnapshot}
 className="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
 >
 ⬇ Download
+</button>
+<button
+onClick={fetchData}
+className="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
+>
+🔄 Reload
 </button>
 </div>
 </div>
