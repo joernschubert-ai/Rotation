@@ -10,6 +10,9 @@ const [data, setData] = useState<any>(null);
 const [loading, setLoading] = useState(false);
 
 const fetchData = async () => {
+try {
+setLoading(true);
+
 const token = localStorage.getItem("token");
 
 const res = await fetch("/api/market", {
@@ -24,8 +27,15 @@ return;
 }
 
 const data = await res.json();
+
 setData(data);
-setIsReady(true); // wichtig!
+setIsReady(true);
+
+} catch (err) {
+console.error("FETCH ERROR", err);
+} finally {
+setLoading(false);
+}
 };
 
 useEffect(() => {
@@ -33,6 +43,8 @@ const auth = localStorage.getItem("auth");
 
 if (auth !== "true") {
 router.push("/login");
+} else {
+fetchData(); // 🔥 HIER rein
 }
 }, []);
 
@@ -46,7 +58,7 @@ const [prevMasterScore, setPrevMasterScore] = useState<number | null>(null);
 const [masterTrend, setMasterTrend] = useState<string>("FLAT");
 
 // === CRASH MEMORY ===
-const [adjustedCrash, setadjustedCrash] = useState<number>(0);
+const [adjustedCrash, setAdjustedCrash] = useState<number>(0);
 const [crashHistory, setCrashHistory] = useState<number[]>([]);
 
 const [distributionHistory, setDistributionHistory] = useState<number[]>([]);
@@ -56,8 +68,8 @@ useEffect(() => {
 
 const current = data?.distributionScore ?? 0;
 
-const newHist = [...distributionHistory, current].slice(-7);
-setDistributionHistory(newHist);
+setDistributionHistory(prev => {
+const newHist = [...prev, current].slice(-7);
 
 const avg =
 newHist.length > 0
@@ -66,14 +78,13 @@ newHist.length > 0
 
 setSmoothDistribution(avg);
 
+return newHist;
+});
+
 }, [data?.distributionScore]);
 
 // === MASTER TREND EFFECT (FIXED POSITION) ===
 useEffect(() => {
-
-if(prevMasterScore === null) return;
-
-// masterScore ist hier NOCH NICHT definiert → deshalb nutzen wir data
 
 const stressScore = data?.marketStressScore ?? 0;
 const breadth200 = (data?.breadth200 ?? 0);
@@ -88,6 +99,11 @@ const computedScore = Math.round(
 (gamma < 0 ? 10 : 0)
 );
 
+if(prevMasterScore === null){
+setPrevMasterScore(computedScore);
+return;
+}
+
 if(computedScore > prevMasterScore) setMasterTrend("RISING");
 else if(computedScore < prevMasterScore) setMasterTrend("FALLING");
 else setMasterTrend("FLAT");
@@ -101,22 +117,17 @@ useEffect(() => {
 
 const current = data?.crashProbability ?? 0;
 
-// HISTORY
-const newHistory = [...crashHistory, current].slice(-5);
-setCrashHistory(newHistory);
+setCrashHistory(prev => {
+const newHistory = [...prev, current].slice(-5);
 
-// SMOOTHING (WICHTIG: alter State verwenden!)
 let smoothed;
 
-if (crashHistory.length === 0) {
-smoothed = current; // 🔥 erster Wert = kein Bias!
+if (prev.length === 0) {
+smoothed = current;
 } else {
 smoothed = (adjustedCrash * 0.4) + (current * 0.6);
 }
 
-// ================= STRUCTURAL FILTER =================
-
-// HIER lokale Variablen holen (wichtig!)
 const breadth200_local = (data?.breadth200 ?? 0) * 100;
 const gamma_local = data?.gammaExposure ?? 0;
 const credit_local = data?.creditSignal ?? "neutral";
@@ -126,30 +137,22 @@ const structuralRisk =
 (gamma_local < 0 ? 1 : 0) +
 (credit_local === "risk_off" ? 1 : 0);
 
-// FLOOR LOGIK
-let finalCrash = smoothed;
-
 let dynamicFloor = 0;
 
 if(structuralRisk === 3) dynamicFloor = 50;
 else if(structuralRisk === 2) dynamicFloor = 40;
 else if(structuralRisk === 1) dynamicFloor = 30;
 
-if(smoothed < dynamicFloor){
-finalCrash = dynamicFloor;
-}
+let finalCrash = Math.max(smoothed, dynamicFloor);
 
-// FINAL SETZEN
-setadjustedCrash(Math.round(finalCrash));
+setAdjustedCrash(Math.round(finalCrash));
+
+return newHistory;
+});
 
 }, [data?.crashProbability]);
 
-
-useEffect(() => {
-fetchData();
-}, []);
-
-if (!isReady) {
+if (!isReady || loading) {
 return <div className="p-10 text-white">Marktdaten werden geladen...</div>;
 }
 
