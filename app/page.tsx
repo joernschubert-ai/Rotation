@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 
 export default function Home() {
 
@@ -13,24 +14,9 @@ const fetchData = async () => {
 try {
 setLoading(true);
 
-const token = typeof window !== "undefined"
-? localStorage.getItem("token")
-: null;
+const res = await apiFetch("/api/market");
 
-const headers: any = {};
-
-if (token) {
-headers["Authorization"] = `Bearer ${token}`;
-}
-
-const res = await fetch("/api/market", {
-headers
-});
-
-if (res.status === 401) {
-router.push("/login");
-return;
-}
+if (!res) return;
 
 const data = await res.json();
 
@@ -53,8 +39,6 @@ if (auth !== "true") {
 router.replace("/login"); // 🔥 replace statt push
 return;
 }
-
-setIsReady(true); // 🔥 HIER setzen (nicht in fetch!)
 
 fetchData();
 
