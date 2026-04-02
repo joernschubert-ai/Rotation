@@ -13,7 +13,9 @@ const fetchData = async () => {
 try {
 setLoading(true);
 
-const token = localStorage.getItem("token");
+const token = typeof window !== "undefined"
+? localStorage.getItem("token")
+: null;
 
 const res = await fetch("/api/market", {
 headers: {
@@ -46,7 +48,7 @@ router.push("/login");
 } else {
 fetchData(); // 🔥 HIER rein
 }
-}, []);
+}, [router]);
 
 useEffect(() => {
 console.log("DATA UPDATE", data);
@@ -122,11 +124,10 @@ const newHistory = [...prev, current].slice(-5);
 
 let smoothed;
 
-if (prev.length === 0) {
-smoothed = current;
-} else {
-smoothed = (adjustedCrash * 0.4) + (current * 0.6);
-}
+// 🔥 FIX: letztes Element aus History statt adjustedCrash nutzen
+const last = prev.length > 0 ? prev[prev.length - 1] : current;
+
+smoothed = (last * 0.4) + (current * 0.6);
 
 const breadth200_local = (data?.breadth200 ?? 0) * 100;
 const gamma_local = data?.gammaExposure ?? 0;
@@ -150,7 +151,8 @@ setAdjustedCrash(Math.round(finalCrash));
 return newHistory;
 });
 
-}, [data?.crashProbability]);
+}, [data?.crashProbability]); // ok so
+
 
 if (!isReady || loading) {
 return <div className="p-10 text-white">Marktdaten werden geladen...</div>;
@@ -709,7 +711,7 @@ finalAction = "HOLD (PANIC)";
 }
 
 // 3. Trend bestätigt → laufen lassen
-if(trendBreakdown && adjustedCrash > 50){
+if(trendBreakdown && adjustedCrash > 50 && finalAction !== "AGGRESSIVE PUTS"){
 finalAction = "HOLD / ADD LIGHT";
 }
 
@@ -1939,7 +1941,7 @@ Mag7 Dominance
 
 <div className="flex justify-between">
 <span>Credit</span>
-<span style={{color: crossAssetDot}}>
+<span style={{color: crossAssetColor(data.crossAssetRiskScore)}}>
 {data.crossAssetRiskScore}/10
 </span>
 </div>
