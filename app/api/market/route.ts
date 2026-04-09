@@ -30,7 +30,12 @@ if (!redis) return null;
 
 try {
 const data = await redis.get("marketState");
-return data ? JSON.parse(data) : null;
+
+if (typeof data === "string") {
+return JSON.parse(data);
+}
+
+return null;
 } catch (e) {
 console.error("Load Market State Error:", e);
 return null;
