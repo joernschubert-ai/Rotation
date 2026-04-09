@@ -390,6 +390,13 @@ const indexLabels:any = {
 "^RUT":"Russell 2000"
 };
 
+const futuresLabels:any = {
+"ES=F":"S&P Futures",
+"NQ=F":"NASDAQ Futures",
+"RTY=F":"Russell Futures",
+"YM=F":"Dow Futures"
+};
+
 const etfLabels:any = {
 "qqq.us":"NASDAQ ETF (QQQ)",
 "iwm.us":"Russell 2000 ETF (IWM)",
@@ -1219,7 +1226,10 @@ divergence: {
 nasdaq_vs_russell:
 (md["^NDX"]?.change ?? 0) - (md["^RUT"]?.change ?? 0),
 sp_vs_equal:
-(data.rotationDetails?.concentrationDivergence ?? 0)
+(data.rotationDetails?.concentrationDivergence ?? 0),
+// 🔥 NEU
+futures_vs_cash:
+(md["NQ=F"]?.change ?? 0) - (md["^NDX"]?.change ?? 0)
 }
 };
 
@@ -1279,8 +1289,28 @@ baseSize: Math.round(dynamicBase),
 adjustedSize: finalPositionCapped,
 confidence: decisionConfidence
 },
-indices
+indices,
+futures: {
+nasdaq: {
+price: md["NQ=F"]?.current ?? null,
+change: md["NQ=F"]?.change ?? null
+},
+sp500: {
+price: md["ES=F"]?.current ?? null,
+change: md["ES=F"]?.change ?? null
+},
+russell: {
+price: md["RTY=F"]?.current ?? null,
+change: md["RTY=F"]?.change ?? null
+},
+dow: {
+price: md["YM=F"]?.current ?? null,
+change: md["YM=F"]?.change ?? null
+}
+},
 };
+
+
 
 function copySnapshot(){
 navigator.clipboard.writeText(
@@ -1970,6 +2000,33 @@ Mag7 Dominance
 
 <div className="text-xs text-zinc-500">
 {indexLabels[k]}
+</div>
+
+<div className="text-lg">
+{md[k]?.current ? md[k].current.toFixed(0) : "-"}
+</div>
+
+<div style={{color:percentColor(md[k]?.change ?? 0)}}>
+{md[k]?.change >=0 ? "▲":"▼"}{" "}
+{md[k]?.change?.toFixed(2)}%
+</div>
+
+</div>
+))}
+
+</div>
+
+</Panel>
+
+<Panel title="FUTURES (PRE-MARKET / LIVE)" bg="#111">
+
+<div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4">
+
+{Object.keys(futuresLabels).map((k)=>(
+<div key={k} className="border border-zinc-800 p-3">
+
+<div className="text-xs text-zinc-500">
+{futuresLabels[k]}
 </div>
 
 <div className="text-lg">
