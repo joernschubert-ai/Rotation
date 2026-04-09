@@ -10,8 +10,8 @@ let previousCrashProbability = 0;
 let smoothedBreadth200 = 0;
 let smoothedBreadth50 = 0;
 
-const CACHE_DURATION = 10 * 1000; // 10 Sekunden
-// const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
+// const CACHE_DURATION = 10 * 1000; // 10 Sekunden
+const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
 
 import { Redis } from "@upstash/redis";
 
@@ -1970,7 +1970,8 @@ async function fetchNewsSentiment() {
 try {
 
 const res = await fetch(
-`https://finnhub.io/api/v1/news?category=general&token=${process.env.FINNHUB_API_KEY}`
+`https://finnhub.io/api/v1/news?category=general&token=${process.env.FINNHUB_API_KEY}`, {cache: "no-store"}
+
 );
 
 const data = await res.json();
@@ -2066,10 +2067,21 @@ return NextResponse.json(cachedResponse);
 
 const state = await loadMarketState();
 
-if (state) {
+const MAX_STATE_AGE = 60 * 1000; // 60 Sekunden (anpassbar)
+
+if (
+state &&
+state.timestamp &&
+(Date.now() - state.timestamp) < MAX_STATE_AGE
+) {
 previousCrashProbability = state.previousCrashProbability ?? 0;
 smoothedBreadth200 = state.smoothedBreadth200 ?? 0;
 smoothedBreadth50 = state.smoothedBreadth50 ?? 0;
+} else {
+// 🔥 WICHTIG: Reset bei stale state
+previousCrashProbability = 0;
+smoothedBreadth200 = 0;
+smoothedBreadth50 = 0;
 }
 
 /* CACHE CHECK */
@@ -2168,8 +2180,8 @@ if (etfCache[symbol]){
 
 const age =
 Date.now() - etfCache[symbol].time
-
-if(age < 15 * 60 * 1000){
+// if(age < 15 * 60 * 1000){ Dauer 15 min)
+if(age < 30 * 1000){
 return etfCache[symbol].data
 }
 
@@ -2219,7 +2231,7 @@ console.log("Yahoo failed -> using STOOQ:",symbol)
 const stooqSymbol = symbol.toLowerCase() + ".us"
 
 const res2 =
-await fetch(`https://stooq.com/q/d/l/?s=${stooqSymbol}&i=d`)
+await fetch(`https://stooq.com/q/d/l/?s=${stooqSymbol}&i=d`, {cache: "no-store"})
 
 const text = await res2.text()
 
@@ -2796,6 +2808,9 @@ creditData.creditSignal
 
 )
 
+const creditStressScore =
+creditData.creditSignal === "risk_off" ? 1 : 0;
+
 /* ================= CRASH ATTRIBUTION ================= */
 
 const crashAttribution =
@@ -2806,7 +2821,7 @@ spMomentum.regime,
 liquidityVacuum.score,
 gammaRegime,
 dealerPressure.score,
-creditData.creditSignal === "risk_off" ? 2 : 0,
+creditStressScore,
 vix
 
 );
@@ -3095,7 +3110,7 @@ smoothedBreadth50
 });
 
 cachedResponse = responseData;
-previousCrashProbability = responseData.crashProbability;
+// previousCrashProbability = responseData.crashProbability;
 
 lastFetchTime = Date.now();
 
