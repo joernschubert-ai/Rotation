@@ -48,8 +48,6 @@ console.error("Save Market State Error:", e);
 /* ================= ETF DATA CACHE ================= */
 
 const etfCache: Record<string, {data:number[], time:number}> = {};
-/* ✅ NEU */
-const futuresCache: Record<string, {data:number[], time:number}> = {};
 
 /* ================= UTILITIES ================= */
 
@@ -789,8 +787,7 @@ vix:number,
 move:number,
 breadth200:number,
 creditSignal:string,
-fragility:number,
-futuresSignal?: any
+fragility:number
 ){
 
 let score = 0
@@ -828,9 +825,6 @@ return{
 score,
 regime
 }
-
-if(futuresSignal?.signal === "risk_off") score += 1
-if(futuresSignal?.signal === "panic") score += 2
 
 }
 
@@ -964,8 +958,7 @@ shockScore:number,
 creditSignal:string,
 gammaRegime:string,
 internalMomentumScore:number,
-concentrationScore:number,
-futuresSignal: any
+concentrationScore:number
 ){
 
 let score = 0;
@@ -987,9 +980,6 @@ if(gammaRegime === "unstable") score += 1;
 
 if(internalMomentumScore < -4) score += 2
 else if(internalMomentumScore < -2) score += 1
-
-if(futuresSignal.signal === "risk_off") score += 0.5;
-if(futuresSignal.signal === "panic") score += 1.5;
 
 /* logistische Wahrscheinlichkeit */
 
@@ -1593,10 +1583,6 @@ regime
 
 }
 
-if(futuresSignal.signal === "panic"){
-liquidityVacuum.score += 2;
-}
-
 }
 
 /* ================= LIQUIDITY REGIME ================= */
@@ -1719,57 +1705,6 @@ regime
 }
 
 }
-
-/* ================= FUTURES SIGNAL ================= */
-
-function calculateFuturesSignal(
-es:number[],
-nq:number[],
-rty:number[]
-){
-
-if(es.length < 2 || nq.length < 2 || rty.length < 2){
-return {
-signal: "neutral",
-score: 0
-}
-}
-
-const esMove = percentChange(
-es[es.length-1],
-es[es.length-2]
-)
-
-const nqMove = percentChange(
-nq[nq.length-1],
-nq[nq.length-2]
-)
-
-const rtyMove = percentChange(
-rty[rty.length-1],
-rty[rty.length-2]
-)
-
-let score = 0
-
-if(esMove < -0.3 && nqMove < -0.4) score += 2
-if(rtyMove < -0.5) score += 1
-if(rtyMove < esMove - 0.3) score += 1
-
-let signal = "neutral"
-
-if(score >= 3) signal = "risk_off"
-if(score >= 4) signal = "panic"
-
-return {
-signal,
-score,
-esMove,
-nqMove,
-rtyMove
-}
-}
-
 
 /* ================= CROSS ASSET RISK ================= */
 
@@ -2318,68 +2253,11 @@ return [];
 }
 
 const spClosesFull = await fetchIndex("^GSPC","5y");
-/* ================= FUTURES ================= */
-
-const [es, nq, rty] = await Promise.all([
-fetchFutures("ES=F"),
-fetchFutures("NQ=F"),
-fetchFutures("RTY=F")
-]);
 
 const spCurrent = spClosesFull.length ? spClosesFull[spClosesFull.length - 1] : 0;
 
 const spMA200 = movingAverage(spClosesFull,200) ?? 0;
 const spMA50 = movingAverage(spClosesFull,50) ?? 0;
-
-
-/* ================= FUTURES FETCH ================= */
-
-async function fetchFutures(symbol: string) {
-
-/* CACHE HIT */
-if (futuresCache[symbol]) {
-const age = Date.now() - futuresCache[symbol].time;
-
-if (age < 30 * 1000) {
-return futuresCache[symbol].data;
-}
-}
-
-try {
-
-const res = await fetch(
-`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=1d`,
-{
-headers: {
-"User-Agent": "Mozilla/5.0",
-"Accept": "application/json"
-},
-cache: "no-store"
-}
-);
-
-const data = await res.json();
-
-if (!data?.chart?.result) return [];
-
-const closes =
-data.chart.result[0].indicators.quote[0].close ?? [];
-
-const cleaned = closes.filter((v: number) => v !== null);
-
-futuresCache[symbol] = {
-data: cleaned,
-time: Date.now()
-};
-
-return cleaned;
-
-} catch (e) {
-console.log("Futures fetch error:", symbol);
-return [];
-}
-}
-
 
 /* ================= SPX MOMENTUM ================= */
 
@@ -2689,11 +2567,6 @@ creditData.creditSignal
 
 )
 
-/* ================= FUTURES SIGNAL ================= */
-
-const futuresSignal =
-calculateFuturesSignal(es, nq, rty);
-
 /* ================= CORRELATION SPIKE ================= */
 
 const correlationSpike =
@@ -2788,8 +2661,7 @@ vix,
 move,
 breadth200,
 creditData.creditSignal,
-fragilityData.fragility,
-futuresSignal
+fragilityData.fragility
 )
 
 /* ================= FINANCIAL CONDITIONS ================= */
@@ -2848,14 +2720,6 @@ sp.above200
 
 let finalPhase = basePhase;
 
-if(
-futuresSignal.signal === "panic" &&
-gammaRegime !== "positive" &&
-vix > 22
-){
-finalPhase = "Phase 6 – Futures Triggered Acceleration";
-}
-
 if (shockData.systemicStress) {
 finalPhase = "Override – Systemischer Stress";
 } else if (shockData.geopoliticalOverride) {
@@ -2883,8 +2747,7 @@ shockData.shockScore,
 creditData.creditSignal,
 gammaRegime,
 internalMomentum.score,
-concentration.score,
-futuresSignal
+concentration.score
 );
 
 /* ================= REGIME SIGNAL ================= */
@@ -3185,14 +3048,6 @@ gammaRegime: gamma.regime,
 dealerPressureScore: dealerPressure.score,
 dealerPressureRegime: dealerPressure.regime,
 
-futuresSignal: futuresSignal.signal,
-futuresScore: futuresSignal.score,
-futuresMoves: {
-es: futuresSignal.esMove,
-nq: futuresSignal.nqMove,
-rty: futuresSignal.rtyMove
-},
-
 capitulationProbability,
 capitulationAlarm,
 regimeHistory: history,
@@ -3219,3 +3074,5 @@ details: String(err)
 });
 }
 }
+
+
