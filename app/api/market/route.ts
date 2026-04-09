@@ -48,6 +48,8 @@ console.error("Save Market State Error:", e);
 /* ================= ETF DATA CACHE ================= */
 
 const etfCache: Record<string, {data:number[], time:number}> = {};
+/* ✅ NEU */
+const futuresCache: Record<string, {data:number[], time:number}> = {};
 
 /* ================= UTILITIES ================= */
 
@@ -123,8 +125,6 @@ creditRatio: 0
 };
 }
 
-
-
 /* Ratio berechnen */
 
 const ratio = hyg.map((v: number, i: number) => {
@@ -156,8 +156,6 @@ creditRatio: lastRatio
 };
 
 }
-
-
 
 /* ================= GEOPOLITICAL / SYSTEMIC SHOCK ENGINE ================= */
 
@@ -293,7 +291,6 @@ regime
 
 }
 
-
 /* ================= PHASE 6 ACCELERATION TRIGGER ================= */
 
 function calculatePhase6Acceleration(
@@ -356,8 +353,6 @@ breadth50
 };
 
 }
-
-
 
 /* ================= FEINE BREADTH LOGIK ================= */
 
@@ -427,7 +422,6 @@ breadth20Signal: signal
 
 }
 
-
 /* ================= ADVANCE DECLINE LINE ================= */
 
 async function calculateAdvanceDecline(fetchETF:any) {
@@ -472,7 +466,6 @@ adSignal: signal
 };
 
 }
-
 
 /* ================= NEW HIGHS / NEW LOWS ================= */
 
@@ -544,8 +537,6 @@ highLowSignal: signal
 
 }
 
-
-
 /* ================= INSTITUTIONELLE DISTRIBUTION ================= */
 
 function calculateInstitutionalDistribution(
@@ -567,7 +558,6 @@ if(trendAcceleration < -1) priceTrend += 2;
 
 priceTrend = Math.min(priceTrend,7);
 
-
 /* ================= BREADTH WEAKNESS ================= */
 
 let breadthWeakness = 0;
@@ -579,11 +569,9 @@ if(breadth50 < 0.4) breadthWeakness += 2;
 
 breadthWeakness = Math.min(breadthWeakness,7);
 
-
 /* ================= VOLUME (Fallback) ================= */
 
 let volumeTrend = 4; // leicht bearish default
-
 
 /* ================= FINAL SCORE ================= */
 
@@ -619,7 +607,6 @@ score >= 6
 : "keine",
 };
 }
-
 
 /* ================= ADAPTIVE CONFIDENCE ================= */
 
@@ -795,7 +782,6 @@ regime
 
 }
 
-
 /* ================= MARKET STRESS PANEL ================= */
 
 function calculateMarketStress(
@@ -803,7 +789,8 @@ vix:number,
 move:number,
 breadth200:number,
 creditSignal:string,
-fragility:number
+fragility:number,
+futuresSignal?: any
 ){
 
 let score = 0
@@ -841,6 +828,9 @@ return{
 score,
 regime
 }
+
+if(futuresSignal?.signal === "risk_off") score += 1
+if(futuresSignal?.signal === "panic") score += 2
 
 }
 
@@ -963,7 +953,6 @@ regime
 
 }
 
-
 /* ================= CRASH PROBABILITY ENGINE ================= */
 
 function calculateCrashProbability(
@@ -975,7 +964,8 @@ shockScore:number,
 creditSignal:string,
 gammaRegime:string,
 internalMomentumScore:number,
-concentrationScore:number
+concentrationScore:number,
+futuresSignal: any
 ){
 
 let score = 0;
@@ -985,8 +975,6 @@ score += breadthScore * 0.8;
 score += stressScore * 0.3;
 score += shockScore * 0.25;
 score += concentrationScore * 0.25;
-
-
 
 /* Distribution nur Frühsignal */
 score += Math.min(distributionScore,7) * 0.5;
@@ -999,6 +987,9 @@ if(gammaRegime === "unstable") score += 1;
 
 if(internalMomentumScore < -4) score += 2
 else if(internalMomentumScore < -2) score += 1
+
+if(futuresSignal.signal === "risk_off") score += 0.5;
+if(futuresSignal.signal === "panic") score += 1.5;
 
 /* logistische Wahrscheinlichkeit */
 
@@ -1083,12 +1074,10 @@ if(breadth20 < 0.35) structureRisk += 5
 if(spMomentum === "weak") structureRisk += 3
 if(spMomentum === "downtrend") structureRisk += 7
 
-
 /* LIQUIDITY RISK */
 
 let liquidityRisk =
 Math.min(liquidityVacuumScore * 2 , 20)
-
 
 /* OPTIONS RISK */
 
@@ -1099,7 +1088,6 @@ if(gammaRegime === "unstable") optionsRisk += 10
 
 optionsRisk += dealerPressureScore * 1.5
 
-
 /* MACRO RISK */
 
 let macroRisk = 0
@@ -1108,7 +1096,6 @@ macroRisk += creditStressScore * 2
 
 if(vix > 22) macroRisk += 4
 if(vix > 28) macroRisk += 6
-
 
 return{
 
@@ -1120,7 +1107,6 @@ macroRisk: Math.round(macroRisk)
 }
 
 }
-
 
 /* ================= CRASH RADAR (3-5 TAGE) ================= */
 
@@ -1155,8 +1141,6 @@ spCloses[spCloses.length-4]
 );
 
 let score = 0;
-
-
 
 /* Gamma Stress */
 
@@ -1260,7 +1244,6 @@ breadth20
 
 }
 
-
 /* ================= PUT DECISION ENGINE ================= */
 
 function calculatePutDecision(
@@ -1343,8 +1326,6 @@ decision
 
 }
 
-
-
 /* ================= SPX MOMENTUM REGIME ================= */
 
 function calculateSPXMomentum(
@@ -1406,7 +1387,6 @@ regime
 }
 
 }
-
 
 /* ================= VIX TERM STRUCTURE RATIO ================= */
 
@@ -1495,7 +1475,6 @@ return "flat"
 
 }
 
-
 /* ================= OPTIONS SKEW PROXY ================= */
 
 function calculateOptionsSkew(
@@ -1524,7 +1503,6 @@ regime
 }
 
 }
-
 
 /* ================= DEALER POSITIONING PRESSURE ================= */
 
@@ -1615,8 +1593,11 @@ regime
 
 }
 
+if(futuresSignal.signal === "panic"){
+liquidityVacuum.score += 2;
 }
 
+}
 
 /* ================= LIQUIDITY REGIME ================= */
 
@@ -1738,6 +1719,57 @@ regime
 }
 
 }
+
+/* ================= FUTURES SIGNAL ================= */
+
+function calculateFuturesSignal(
+es:number[],
+nq:number[],
+rty:number[]
+){
+
+if(es.length < 2 || nq.length < 2 || rty.length < 2){
+return {
+signal: "neutral",
+score: 0
+}
+}
+
+const esMove = percentChange(
+es[es.length-1],
+es[es.length-2]
+)
+
+const nqMove = percentChange(
+nq[nq.length-1],
+nq[nq.length-2]
+)
+
+const rtyMove = percentChange(
+rty[rty.length-1],
+rty[rty.length-2]
+)
+
+let score = 0
+
+if(esMove < -0.3 && nqMove < -0.4) score += 2
+if(rtyMove < -0.5) score += 1
+if(rtyMove < esMove - 0.3) score += 1
+
+let signal = "neutral"
+
+if(score >= 3) signal = "risk_off"
+if(score >= 4) signal = "panic"
+
+return {
+signal,
+score,
+esMove,
+nqMove,
+rtyMove
+}
+}
+
 
 /* ================= CROSS ASSET RISK ================= */
 
@@ -1867,7 +1899,6 @@ regime
 
 }
 
-
 /* ================= HISTORIE ================= */
 
 async function saveRegimeSnapshot(snapshot: any) {
@@ -1933,8 +1964,6 @@ return "Phase 7 – Kapitulation";
 return "Phase 6 – Bärische Kontraktion";
 }
 
-
-
 if (!spAbove200) {
 return "Phase 5 – Späte Distribution";
 }
@@ -1960,8 +1989,6 @@ return "Phase 3 – Momentum-Expansion";
 
 return "Phase 1 – Frühe Expansion";
 }
-
-
 
 /* ================= MACRO NEWS ENGINE ================= */
 
@@ -2041,7 +2068,6 @@ topHeadlines: []
 }
 
 }
-
 
 /* ================= MAIN ================= */
 
@@ -2291,13 +2317,69 @@ return [];
 }
 }
 
-
 const spClosesFull = await fetchIndex("^GSPC","5y");
+/* ================= FUTURES ================= */
+
+const [es, nq, rty] = await Promise.all([
+fetchFutures("ES=F"),
+fetchFutures("NQ=F"),
+fetchFutures("RTY=F")
+]);
 
 const spCurrent = spClosesFull.length ? spClosesFull[spClosesFull.length - 1] : 0;
 
 const spMA200 = movingAverage(spClosesFull,200) ?? 0;
 const spMA50 = movingAverage(spClosesFull,50) ?? 0;
+
+
+/* ================= FUTURES FETCH ================= */
+
+async function fetchFutures(symbol: string) {
+
+/* CACHE HIT */
+if (futuresCache[symbol]) {
+const age = Date.now() - futuresCache[symbol].time;
+
+if (age < 30 * 1000) {
+return futuresCache[symbol].data;
+}
+}
+
+try {
+
+const res = await fetch(
+`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=1d`,
+{
+headers: {
+"User-Agent": "Mozilla/5.0",
+"Accept": "application/json"
+},
+cache: "no-store"
+}
+);
+
+const data = await res.json();
+
+if (!data?.chart?.result) return [];
+
+const closes =
+data.chart.result[0].indicators.quote[0].close ?? [];
+
+const cleaned = closes.filter((v: number) => v !== null);
+
+futuresCache[symbol] = {
+data: cleaned,
+time: Date.now()
+};
+
+return cleaned;
+
+} catch (e) {
+console.log("Futures fetch error:", symbol);
+return [];
+}
+}
+
 
 /* ================= SPX MOMENTUM ================= */
 
@@ -2458,7 +2540,6 @@ vixCloses,
 vix9dCloses
 );
 
-
 /* ================= OPTIONS SKEW ================= */
 
 const optionsSkew =
@@ -2574,7 +2655,6 @@ if(tlt20 < sp20Momentum) liquidityFlow = "risk_on";
 
 }
 
-
 let structureScore = 0;
 if (!sp.above200) structureScore += 2;
 if (!sp.above50) structureScore += 1;
@@ -2609,6 +2689,11 @@ creditData.creditSignal
 
 )
 
+/* ================= FUTURES SIGNAL ================= */
+
+const futuresSignal =
+calculateFuturesSignal(es, nq, rty);
+
 /* ================= CORRELATION SPIKE ================= */
 
 const correlationSpike =
@@ -2634,7 +2719,6 @@ trendAcceleration
 );
 
 const gammaRegime = gamma.regime;
-
 
 /* ================= DEALER PRESSURE ================= */
 
@@ -2704,7 +2788,8 @@ vix,
 move,
 breadth200,
 creditData.creditSignal,
-fragilityData.fragility
+fragilityData.fragility,
+futuresSignal
 )
 
 /* ================= FINANCIAL CONDITIONS ================= */
@@ -2763,13 +2848,19 @@ sp.above200
 
 let finalPhase = basePhase;
 
+if(
+futuresSignal.signal === "panic" &&
+gammaRegime !== "positive" &&
+vix > 22
+){
+finalPhase = "Phase 6 – Futures Triggered Acceleration";
+}
+
 if (shockData.systemicStress) {
 finalPhase = "Override – Systemischer Stress";
 } else if (shockData.geopoliticalOverride) {
 finalPhase = "Override – Geopolitischer Stress";
 }
-
-
 
 const confidence =
 calculateAdaptiveConfidence(
@@ -2792,7 +2883,8 @@ shockData.shockScore,
 creditData.creditSignal,
 gammaRegime,
 internalMomentum.score,
-concentration.score
+concentration.score,
+futuresSignal
 );
 
 /* ================= REGIME SIGNAL ================= */
@@ -2826,7 +2918,6 @@ vix
 
 );
 
-
 /* ================= PUT DECISION ================= */
 
 const putDecision =
@@ -2859,7 +2950,6 @@ shockData.shockScore * 2
 
 const capitulationAlarm = capitulationProbability > 60;
 
-
 // ================= POSITION ENGINE =================
 
 // Mapping deiner Phase → Risk Phase
@@ -2889,7 +2979,6 @@ if(crashRisk.probability > 75) positionSize += 10;
 
 // Clamp
 positionSize = Math.max(0, Math.min(100, positionSize));
-
 
 // ================= EXIT ENGINE =================
 
@@ -2924,8 +3013,6 @@ profitAction = "TRIM (20-30%)";
 else if(riskPhase === "CRASH BUILD"){
 profitAction = "LET RUN";
 }
-
-
 
 const snapshot = {
 date: new Date().toISOString(),
@@ -3098,6 +3185,14 @@ gammaRegime: gamma.regime,
 dealerPressureScore: dealerPressure.score,
 dealerPressureRegime: dealerPressure.regime,
 
+futuresSignal: futuresSignal.signal,
+futuresScore: futuresSignal.score,
+futuresMoves: {
+es: futuresSignal.esMove,
+nq: futuresSignal.nqMove,
+rty: futuresSignal.rtyMove
+},
+
 capitulationProbability,
 capitulationAlarm,
 regimeHistory: history,
@@ -3124,10 +3219,3 @@ details: String(err)
 });
 }
 }
-
-
-
-
-
-
-
