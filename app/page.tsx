@@ -391,10 +391,10 @@ const indexLabels:any = {
 };
 
 const futuresLabels:any = {
-"ES=F":"S&P Futures",
+"YM=F":"Dow Futures",
 "NQ=F":"NASDAQ Futures",
-"RTY=F":"Russell Futures",
-"YM=F":"Dow Futures"
+"ES=F":"S&P Futures",
+"RTY=F":"Russell Futures"
 };
 
 const etfLabels:any = {
