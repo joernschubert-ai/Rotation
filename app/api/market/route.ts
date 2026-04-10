@@ -2093,8 +2093,10 @@ const now = Date.now();
 
 if (
 cachedResponse &&
-(now - lastFetchTime) < CACHE_DURATION
+(now - lastFetchTime) < CACHE_DURATION &&
+cachedResponse?.dataQuality?.futuresAvailable
 ) {
+console.log("USING CACHE (VALID FUTURES)");
 return NextResponse.json(cachedResponse);
 }
 
@@ -2324,18 +2326,11 @@ const spClosesFull = await fetchIndex("^GSPC","5y");
 async function fetchFutures(symbol: string) {
 
 /* CACHE HIT */
-if (futuresCache[symbol]) {
-const age = Date.now() - futuresCache[symbol].time;
-
-if (age < 30 * 1000) {
-return futuresCache[symbol].data;
-}
-}
 
 try {
 
 const res = await fetch(
-`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d`,
+`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=5d`,
 {
 headers: {
 "User-Agent": "Mozilla/5.0",
@@ -2354,12 +2349,12 @@ data.chart.result[0].indicators.quote[0].close ?? [];
 
 const cleaned = closes.filter((v: number) => v !== null);
 
-futuresCache[symbol] = {
-data: cleaned,
-time: Date.now()
-};
-
 return cleaned;
+
+if (cleaned.length < 10) {
+console.log("FUTURES WARNING: insufficient data", symbol);
+return [];
+}
 
 } catch (e) {
 console.log("Futures fetch error:", symbol);
@@ -2381,6 +2376,15 @@ const spCurrent = spClosesFull.length ? spClosesFull[spClosesFull.length - 1] : 
 
 const spMA200 = movingAverage(spClosesFull,200) ?? 0;
 const spMA50 = movingAverage(spClosesFull,50) ?? 0;
+
+if (es.length === 0 || nq.length === 0) {
+console.log("CRITICAL: Futures missing");
+
+return NextResponse.json({
+error: "Futures data missing",
+details: { es: es.length, nq: nq.length, rty: rty.length }
+}, { status: 500 });
+}
 
 console.log("FUTURES FINAL:", {
 es_last: es[es.length - 1],
@@ -3063,6 +3067,8 @@ rotationScore,
 crashTrend,
 vixTermStructure,
 liquidityFlow,
+
+serverTime: new Date().toISOString(),
 
 spMomentumScore: spMomentum.score,
 spMomentumRegime: spMomentum.regime,
