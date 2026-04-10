@@ -1,5 +1,5 @@
 export const runtime = "nodejs";
-
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 /* ================= MARKET CACHE ================= */
@@ -2100,21 +2100,14 @@ return NextResponse.json(cachedResponse);
 
 const state = await loadMarketState();
 
-const MAX_STATE_AGE = 60 * 1000; // 60 Sekunden (anpassbar)
+if (state && state.timestamp) {
+const age = Date.now() - state.timestamp;
 
-if (
-state &&
-state.timestamp &&
-(Date.now() - state.timestamp) < MAX_STATE_AGE
-) {
+if (age < 15000) { // 🔥 nur 15 Sekunden
 previousCrashProbability = state.previousCrashProbability ?? 0;
 smoothedBreadth200 = state.smoothedBreadth200 ?? 0;
 smoothedBreadth50 = state.smoothedBreadth50 ?? 0;
-} else {
-// 🔥 WICHTIG: Reset bei stale state
-previousCrashProbability = 0;
-smoothedBreadth200 = 0;
-smoothedBreadth50 = 0;
+}
 }
 
 /* CACHE CHECK */
@@ -2342,7 +2335,7 @@ return futuresCache[symbol].data;
 try {
 
 const res = await fetch(
-`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=1d`,
+`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d`,
 {
 headers: {
 "User-Agent": "Mozilla/5.0",
@@ -2374,6 +2367,8 @@ return [];
 }
 }
 
+
+
 /* ================= FUTURES ================= */
 
 const [es, nq, rty] = await Promise.all([
@@ -2386,6 +2381,12 @@ const spCurrent = spClosesFull.length ? spClosesFull[spClosesFull.length - 1] : 
 
 const spMA200 = movingAverage(spClosesFull,200) ?? 0;
 const spMA50 = movingAverage(spClosesFull,50) ?? 0;
+
+console.log("FUTURES FINAL:", {
+es_last: es[es.length - 1],
+nq_last: nq[nq.length - 1],
+rty_last: rty[rty.length - 1]
+});
 
 /* ================= SPX MOMENTUM ================= */
 
@@ -3200,6 +3201,33 @@ nq: futuresSignal.nqMove,
 rty: futuresSignal.rtyMove
 },
 
+futures: {
+es: {
+price: es.length ? es[es.length - 1] : null,
+change: es.length > 1
+? ((es[es.length - 1] - es[es.length - 2]) / es[es.length - 2]) * 100
+: null
+},
+nq: {
+price: nq.length ? nq[nq.length - 1] : null,
+change: nq.length > 1
+? ((nq[nq.length - 1] - nq[nq.length - 2]) / nq[nq.length - 2]) * 100
+: null
+},
+rty: {
+price: rty.length ? rty[rty.length - 1] : null,
+change: rty.length > 1
+? ((rty[rty.length - 1] - rty[rty.length - 2]) / rty[rty.length - 2]) * 100
+: null
+}
+},
+
+dataQuality: {
+futuresAvailable:
+es.length > 0 && nq.length > 0 && rty.length > 0,
+timestamp: Date.now()
+},
+
 capitulationProbability,
 capitulationAlarm,
 regimeHistory: history,
@@ -3208,10 +3236,21 @@ regimeHistory: history,
 await saveMarketState({
 previousCrashProbability,
 smoothedBreadth200,
-smoothedBreadth50
+smoothedBreadth50,
+futuresSnapshot: {
+es: es[es.length - 1],
+nq: nq[nq.length - 1],
+rty: rty[rty.length - 1]
+}
 });
 
+// Cache nur wenn Futures valide
+if (
+responseData.futures?.es?.price !== null &&
+responseData.futures?.nq?.price !== null
+) {
 cachedResponse = responseData;
+}
 // previousCrashProbability = responseData.crashProbability;
 
 lastFetchTime = Date.now();
