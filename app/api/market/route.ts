@@ -2086,9 +2086,9 @@ const token = req.headers.get("authorization");
 
 console.log("TOKEN AFTER GET:", token);
 
-if (!token || !token.includes("x9KfP2LmQa83zZ_2519.BJ")) {
-return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-}
+// if (!token || !token.includes("x9KfP2LmQa83zZ_2519.BJ")) {
+// return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// }
 const now = Date.now();
 
 if (
@@ -3208,19 +3208,19 @@ rty: futuresSignal.rtyMove
 },
 
 futures: {
-es: {
+"ES=F": {
 price: es.length ? es[es.length - 1] : null,
 change: es.length > 1
 ? ((es[es.length - 1] - es[es.length - 2]) / es[es.length - 2]) * 100
 : null
 },
-nq: {
+"NQ=F": {
 price: nq.length ? nq[nq.length - 1] : null,
 change: nq.length > 1
 ? ((nq[nq.length - 1] - nq[nq.length - 2]) / nq[nq.length - 2]) * 100
 : null
 },
-rty: {
+"RTY=F": {
 price: rty.length ? rty[rty.length - 1] : null,
 change: rty.length > 1
 ? ((rty[rty.length - 1] - rty[rty.length - 2]) / rty[rty.length - 2]) * 100
@@ -3252,8 +3252,8 @@ rty: rty[rty.length - 1]
 
 // Cache nur wenn Futures valide
 if (
-responseData.futures?.es?.price !== null &&
-responseData.futures?.nq?.price !== null
+responseData.futures?.["ES=F"]?.price !== null &&
+responseData.futures?.["NQ=F"]?.price !== null
 ) {
 cachedResponse = responseData;
 }
