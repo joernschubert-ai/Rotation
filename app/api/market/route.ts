@@ -2148,27 +2148,38 @@ const etfs = [
 "qqq.us","iwm.us","spy.us","dia.us","ivw.us","ive.us","rsp.us",
 ];
 
-const etfResponses = await Promise.all(
-etfs.map(s => fetch(`https://stooq.com/q/d/l/?s=${s}&i=d`))
+const etfSymbols = [
+"QQQ","IWM","SPY","DIA","IVW","IVE","RSP"
+];
+
+const etfResults = await Promise.all(
+etfSymbols.map(sym => fetchETF(sym))
 );
 
-const etfTexts = await Promise.all(
-etfResponses.map(r => r.text())
-);
+etfSymbols.forEach((sym, i) => {
 
-etfs.forEach((s, i) => {
+const closes = etfResults[i];
 
-const rows = etfTexts[i].trim().split("\n");
+if (!closes || closes.length < 2) {
+console.log("ETF ERROR (no data):", sym);
+return;
+}
 
-if(rows.length < 3) return;
+const current = closes[closes.length - 1];
+const previous = closes[closes.length - 2];
 
-const last = rows[rows.length - 1].split(",");
-const prev = rows[rows.length - 2].split(",");
+if (isNaN(current) || isNaN(previous)) {
+console.log("ETF NAN ERROR:", sym, current, previous);
+return;
+}
 
-marketData[s] = {
-current: parseFloat(last[4]),
-previous: parseFloat(prev[4]),
-change: percentChange(parseFloat(last[4]), parseFloat(prev[4])),
+// 🔥 Wichtig: Mapping zurück auf dein Frontend-Format
+const key = sym.toLowerCase() + ".us";
+
+marketData[key] = {
+current,
+previous,
+change: percentChange(current, previous),
 };
 
 });
