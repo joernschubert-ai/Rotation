@@ -2367,6 +2367,8 @@ console.log("FUTURES WARNING: insufficient data", symbol);
 return [];
 }
 
+return cleaned;
+
 } catch (e) {
 console.log("Futures fetch error:", symbol);
 return [];
@@ -2684,6 +2686,26 @@ const rsGrowth60 = relativePerformance(ivw, ive, 60);
 const rsShiftSmall = rsSmall20 - rsSmall60;
 const rsShiftGrowth = rsGrowth20 - rsGrowth60;
 
+// ================= ROTATION ENGINE =================
+
+let rotationSignal = "neutral";
+let rotationStrength = 0;
+
+// Short Term Shift wichtiger als Level!
+if(rsShiftSmall > 0.03) rotationStrength += 1;
+if(rsShiftSmall > 0.06) rotationStrength += 1;
+
+// Bestätigung über Level
+if(rsSmall20 > 0) rotationStrength += 1;
+if(rsSmall20 > 0.03) rotationStrength += 1;
+
+// Growth → Value Shift (sehr wichtig!)
+if(rsShiftGrowth < -0.03) rotationStrength += 1;
+
+// Final Signal
+if(rotationStrength >= 4) rotationSignal = "strong_risk_on";
+else if(rotationStrength >= 2) rotationSignal = "early_rotation";
+
 /* ================= CONCENTRATION ================= */
 
 const concentration =
@@ -2713,6 +2735,17 @@ liquidityFlow = "risk_off";
 if(tlt20 < sp20Momentum) liquidityFlow = "risk_on";
 
 }
+
+// ================= RISK-ON LIQUIDITY =================
+
+let riskOnLiquidity = 0;
+
+if(liquidityFlow === "risk_on") riskOnLiquidity += 1;
+if(tlt20 < -2) riskOnLiquidity += 1; // Bonds fallen = Risk On
+if(dxy20 < -1) riskOnLiquidity += 1; // Dollar fällt = Risk On
+
+const liquidityRegimeRiskOn =
+riskOnLiquidity >= 2 ? "supportive" : "neutral";
 
 let structureScore = 0;
 if (!sp.above200) structureScore += 2;
@@ -2879,6 +2912,15 @@ gammaRegime
 
 )
 
+// ================= LIQUIDITY MASTER =================
+
+const liquidityStress = (
+marketLiquidity.score * 0.4 +
+liquidityVacuum.score * 0.4 +
+financialConditions.score * 0.2
+);
+
+
 /* ================= REGIME STABILITY ================= */
 
 const regimeStability =
@@ -2947,6 +2989,55 @@ concentration.score,
 futuresSignal
 );
 
+
+// ================= GAMMA NONLINEAR =================
+
+let gammaMultiplier = 1;
+
+// Nur relevant wenn Stress vorhanden
+if(crashRisk.probability > 40){
+
+if(gamma.regime === "negative") gammaMultiplier = 1.15;
+if(gamma.regime === "unstable") gammaMultiplier = 1.35;
+
+}
+
+// Positive Gamma dämpft aktiv
+if(gamma.regime === "positive"){
+gammaMultiplier = 0.85;
+}
+
+// Anwenden
+crashRisk.probability = Math.round(
+Math.max(0, Math.min(100, crashRisk.probability * gammaMultiplier))
+);
+
+// ================= LIQUIDITY TRIGGER =================
+
+if(
+liquidityStress > 60 &&
+crashRisk.probability < 50
+){
+crashRisk.probability += 8;
+}
+
+// ================= LIQUIDITY ACCELERATION =================
+
+if(
+liquidityStress > 75 &&
+crashRisk.probability > 55
+){
+crashRisk.probability += 15;
+}
+
+if(
+liquidityStress > 85 &&
+crashRisk.probability > 65
+){
+crashRisk.probability += 25;
+}
+
+
 /* ================= REGIME SIGNAL ================= */
 
 const regimeSignal =
@@ -2978,6 +3069,7 @@ vix
 
 );
 
+
 /* ================= PUT DECISION ================= */
 
 const putDecision =
@@ -3000,6 +3092,7 @@ breadth50,
 adData.adValue
 );
 
+
 /* ================= KAPITULATIONS ALARM ================= */
 
 const capitulationProbability = (
@@ -3009,6 +3102,48 @@ shockData.shockScore * 2
 );
 
 const capitulationAlarm = capitulationProbability > 60;
+
+// ================= BOTTOM DETECTION =================
+
+const bottomSignal =
+capitulationAlarm &&
+vix > 25 &&
+breadth20Data.breadth20 < 0.3 &&
+crashMomentumData.score >= 0;
+
+// ================= CALL DECISION =================
+
+let callScore = 0;
+
+// 1. Rotation
+if(rotationSignal === "early_rotation") callScore += 2;
+if(rotationSignal === "strong_risk_on") callScore += 4;
+
+// 2. Liquidity
+if(liquidityRegimeRiskOn === "supportive") callScore += 2;
+
+// 3. Gamma
+if(gamma.regime === "positive") callScore += 2;
+
+// 4. Volatility Reset
+if(vix < 18 && vixTermStructure === "contango") callScore += 2;
+
+// 5. Crash Rückgang
+if(crashRisk.probability < 40) callScore += 2;
+if(crashRisk.probability < 30) callScore += 2;
+
+// BottomSignal
+
+if(bottomSignal) callScore += 4;
+
+// Final Decision
+let callDecision = "NO TRADE";
+
+if(callScore >= 8) callDecision = "AGGRESSIVE CALL";
+else if(callScore >= 5) callDecision = "BUILD CALL POSITION";
+else if(callScore >= 3) callDecision = "EARLY ENTRY";
+
+
 
 // ================= POSITION ENGINE =================
 
@@ -3022,6 +3157,17 @@ else if(finalPhase.includes("Phase 4")) riskPhase = "FRAGILE";
 
 // POSITION SIZE
 let positionSize = 0;
+
+let positionDirection = "PUT";
+
+if(
+rotationSignal === "strong_risk_on" &&
+gamma.regime === "positive" &&
+liquidityStress < 50
+){
+positionDirection = "CALL";
+positionSize += 10;
+}
 
 if(riskPhase === "CRASH BUILD") positionSize = 90;
 else if(riskPhase === "ACCELERATION") positionSize = 75;
@@ -3037,8 +3183,45 @@ if(confidence < 50) positionSize -= 10;
 if(crashRisk.probability > 60) positionSize += 10;
 if(crashRisk.probability > 75) positionSize += 10;
 
+// ================= LIQUIDITY → POSITION =================
+
+if(liquidityStress > 70 && crashRisk.probability > 50){
+positionSize += 10;
+}
+
+if(liquidityStress > 80 && crashRisk.probability > 65){
+positionSize += 10;
+}
+
+if(liquidityVacuum.score > 7) positionSize += 10;
+
 // Clamp
 positionSize = Math.max(0, Math.min(100, positionSize));
+
+// ================= GAMMA → POSITION SIZE =================
+
+if(gamma.regime === "unstable" && crashRisk.probability > 60){
+positionSize += 10;
+}
+else if(gamma.regime === "negative" && crashRisk.probability > 50){
+positionSize += 5;
+}
+
+if(gamma.regime === "positive"){
+positionSize -= 10;
+}
+
+// ================= GAMMA + LIQUIDITY COMBO =================
+
+if(
+gamma.regime === "unstable" &&
+liquidityStress > 75 &&
+crashRisk.probability > 60
+){
+crashRisk.probability += 10;
+}
+
+
 
 // ================= EXIT ENGINE =================
 
@@ -3059,8 +3242,11 @@ if(panicSignal){
 profitAction = "TAKE PROFIT (30-50%)";
 }
 
-// 2. Momentum Shift (SEHR WICHTIG)
-else if(crashMomentum >= 0){
+// 2. Momentum Shift + Gamma Kontext
+else if(
+crashMomentum >= 0 &&
+gamma.regime === "positive"
+){
 profitAction = "REDUCE FAST";
 }
 
@@ -3072,6 +3258,11 @@ profitAction = "TRIM (20-30%)";
 // 4. Perfekter Trend → laufen lassen
 else if(riskPhase === "CRASH BUILD"){
 profitAction = "LET RUN";
+}
+
+// 5. Liquidität kehrt zurück → Risiko rausnehmen
+else if(liquidityStress < 40 && crashMomentum >= 0){
+profitAction = "REDUCE FAST";
 }
 
 const snapshot = {
@@ -3142,6 +3333,10 @@ dxyIndex: dxy,
 
 crossAssetRiskScore: crossAssetRisk.score,
 crossAssetRiskRegime: crossAssetRisk.regime,
+
+rotationSignal,
+rotationStrength,
+bottomSignal,
 
 correlationScore: correlationSpike.score,
 correlationRegime: correlationSpike.regime,
