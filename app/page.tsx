@@ -108,7 +108,6 @@ setPrevMasterScore(computedScore);
 
 }, [data]);
 
-
 useEffect(() => {
 
 const current = data?.crashProbability ?? 0;
@@ -154,7 +153,6 @@ return <div className="p-10 text-white">Marktdaten werden geladen...</div>;
 
 if (data.error) return <div className="p-10 text-red-500">API Fehler</div>;
 
-
 /* ================= COLORS ================= */
 
 const green = "#00ff88";
@@ -167,8 +165,6 @@ const gray = "#888";
 const earlyBg="#0a2e4d";
 const structureBg="#4a3a00";
 const crashBg="#4a0000";
-
-
 
 /* ================= COLOR FUNCTIONS ================= */
 
@@ -364,11 +360,35 @@ red;
 
 };
 
-
 /* ================= DATA ================= */
 
 const md = data.marketData ?? {};
 
+const nqFutures = md["NQ=F"];
+const ndx = md["^NDX"];
+
+const futuresChangePct =
+nqFutures?.changePercent ??
+(nqFutures?.change && nqFutures?.previousClose
+? (nqFutures.change / nqFutures.previousClose) * 100
+: 0);
+
+const cashChangePct =
+ndx?.changePercent ??
+(ndx?.change && ndx?.previousClose
+? (ndx.change / ndx.previousClose) * 100
+: ndx?.change ?? 0);
+
+const futuresVsCash = futuresChangePct - cashChangePct;
+
+// optional Debug
+console.log("Futures vs Cash DEBUG", {
+futuresChangePct,
+cashChangePct,
+futuresVsCash,
+nqFutures,
+ndx
+});
 
 /* CORRELATION SPIKE */
 
@@ -423,7 +443,6 @@ creditSignal === "risk_on" ? green :
 creditSignal === "risk_off" ? red :
 yellow;
 
-
 /* ================= ROTATION ================= */
 
 const rsSmall = data.rotationDetails?.rsSmall20 ?? 0;
@@ -466,7 +485,6 @@ rotationLabel = "ROTATION FAILURE";
 rotationColor = red;
 }
 
-
 /* ================= VIX CURVE ================= */
 
 const vixCurve = data.vixTermStructure ?? "contango";
@@ -507,11 +525,8 @@ Math.round(
 (data.gammaExposure < 0 ? 10 : 0)
 );
 
-
 // === CRASH MOMENTUM ===
 const crashMomentum = data?.crashMomentum ?? 0;
-
-
 
 // === FAKE CRASH FILTER ===
 const fakeCrash =
@@ -625,7 +640,6 @@ microBounce &&
 bounceStrength >= 25 &&
 breadth200 > 55;
 
-
 // Panic Spike
 const panicSignal =
 (data.capitulationProbability ?? 0) > 70 &&
@@ -670,7 +684,6 @@ if(adjustedCrash >= 70) trigger = "ATTACK";
 if(crashMomentum <= -4 && adjustedCrash > 50){
 trigger = "ATTACK";
 }
-
 
 // 3. FINAL ACTION (TIMING + STRUKTUR)
 
@@ -776,7 +789,6 @@ earlyWarning = "CRASH BUILDUP";
 earlyColor = red;
 }
 
-
 // ================= PRIORITY ENGINE =================
 
 let marketPriority = "NORMAL";
@@ -805,9 +817,7 @@ else if(adjustedCrash > 40){
 marketPriority = "EARLY_WARNING";
 }
 
-
 /* TRADE ENGINE */
-
 
 console.log("PUT ENGINE INPUT:", {
 adjustedCrash,
@@ -861,7 +871,6 @@ putSignal = "WAIT";
 }
 
 }
-
 
 // ================= CALL ENGINE V2 (FULL LOGIC) =================
 
@@ -987,7 +996,6 @@ if(earlyRotation && panicRelease && liquidityRecovery){
 callReEntry = "WATCH";
 }
 
-
 // === 2. CONFIRMATION ===
 // echte strukturelle Verbesserung
 const rotationConfirmed =
@@ -1001,7 +1009,6 @@ data.vixTermStructure === "contango";
 if(rotationConfirmed && volSupport){
 callReEntry = "ENTRY";
 }
-
 
 // === 3. FULL RE-ENTRY ===
 // echte Risk-On Phase
@@ -1082,7 +1089,6 @@ dynamicExit = "TRIM (20-30%)";
 else if(crashMomentum < 0){
 dynamicExit = "REDUCE / EXIT";
 }
-
 
 // ================= DYNAMIC BASE SIZE =================
 
@@ -1228,11 +1234,9 @@ nasdaq_vs_russell:
 sp_vs_equal:
 (data.rotationDetails?.concentrationDivergence ?? 0),
 // 🔥 NEU
-futures_vs_cash:
-(md["NQ=F"]?.change ?? 0) - (md["^NDX"]?.change ?? 0)
+futures_vs_cash: futuresVsCash
 }
 };
-
 
 // ================= SNAPSHOT =================
 
@@ -1310,8 +1314,6 @@ change: md["YM=F"]?.change ?? null
 },
 };
 
-
-
 function copySnapshot(){
 navigator.clipboard.writeText(
 JSON.stringify(snapshot, null, 2)
@@ -1334,8 +1336,6 @@ a.download = `snapshot-${Date.now()}.json`;
 a.click();
 }
 
-
-
 /* CONCENTRATION */
 
 let concentrationState = "HEALTHY";
@@ -1350,7 +1350,6 @@ if(data.rotationDetails?.concentrationScore >=2){
 concentrationState = "EXTREME CONCENTRATION";
 concentrationColorFinal = red;
 }
-
 
 /* ================= HEATMAP LOGIK ================= */
 
@@ -1457,7 +1456,6 @@ if(v.includes("WAIT")) return gray;
 return gray;
 
 };
-
 
 const currentPhase =
 data.cyclePhase?.match(/\d+/)?.[0] ?? "1";
@@ -1733,8 +1731,6 @@ style={{color:executionColor(oneLookExecution)}}
 <div className="text-xs text-zinc-400 mt-1">
 Execution Plan
 </div>
-
-
 <div
 className="text-xs mt-2"
 style={{
@@ -1763,10 +1759,7 @@ Execution Quality
 </div>
 </Panel>
 
-
 </div>
-
-
 
 <Panel title="POSITIONING" bg="#0b1a2a">
 
@@ -1799,8 +1792,6 @@ Risk Allocation
 EXIT STRATEGY
 </div>
 
-
-
 <div
 className="text-sm font-bold"
 style={{
@@ -1815,8 +1806,6 @@ green
 </div>
 
 </Panel>
-
-
 
 {/* ================= MASTER BAR ================= */}
 
@@ -1877,8 +1866,6 @@ green
 }}>
 {finalAction}
 </div>
-
-
 
 </Panel>
 
@@ -1988,8 +1975,6 @@ Mag7 Dominance
 
 </Panel>
 
-
-
 {/* INDEX BAR */}
 
 <Panel title="INDEX MARKETS" bg="#111">
@@ -2003,12 +1988,12 @@ Mag7 Dominance
 </div>
 
 <div className="text-lg">
-{md[k]?.current ? md[k].current.toFixed(0) : "-"}
+{md[k]?.current !== undefined ? md[k].current.toFixed(0) : "-"}
 </div>
 
 <div style={{color:percentColor(md[k]?.change ?? 0)}}>
 {md[k]?.change >=0 ? "▲":"▼"}{" "}
-{md[k]?.change?.toFixed(2)}%
+{md[k]?.change !== undefined ? md[k].change.toFixed(2) : "-"}%
 </div>
 
 </div>
@@ -2070,8 +2055,6 @@ MARKT ETFs
 
 </div>
 ))}
-
-
 
 </div>
 </Panel>
@@ -2163,7 +2146,6 @@ Score {regimeSignalScore}
 </div>
 
 </div>
-
 
 {/* MARKTRISIKO */}
 
@@ -2517,7 +2499,6 @@ style={{color:stressColor(stressScore)}}
 {stressRegime}
 </div>
 
-
 {/* REGIME AMPEL */}
 
 <div>
@@ -2537,10 +2518,7 @@ Score {regimeSignalScore}
 
 </div>
 
-
 </Panel>
-
-
 
 <Panel title="CORRELATION SPIKE" bg={earlyBg}>
 
@@ -2833,7 +2811,6 @@ Trend: {data.volOfVolTrend}
 {/* VOL EXPANSION SIGNAL */}
 <div className="flex justify-between text-sm mt-2">
 <span>Vol Expansion</span>
-
 <span style={{
 color:
 (data.volOfVolRatio > 1.3 && data.gammaExposure < 0)
@@ -2846,17 +2823,10 @@ color:
 : "NORMAL"
 }
 </span>
-
 </div>
-
 </Panel>
 
-
 </div>
-
 </div>
 );
 }
-
-
-
