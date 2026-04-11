@@ -2086,9 +2086,9 @@ const token = req.headers.get("authorization");
 
 console.log("TOKEN AFTER GET:", token);
 
-// if (!token || !token.includes("x9KfP2LmQa83zZ_2519.BJ")) {
-// return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-// }
+if (!token || !token.includes("x9KfP2LmQa83zZ_2519.BJ")) {
+return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
 const now = Date.now();
 
 if (
@@ -2366,10 +2366,11 @@ return [];
 
 /* ================= FUTURES ================= */
 
-const [es, nq, rty] = await Promise.all([
+const [es, nq, rty, ym] = await Promise.all([
 fetchFutures("ES=F"),
 fetchFutures("NQ=F"),
-fetchFutures("RTY=F")
+fetchFutures("RTY=F"),
+fetchFutures("YM=F")
 ]);
 
 const spCurrent = spClosesFull.length ? spClosesFull[spClosesFull.length - 1] : 0;
@@ -2391,6 +2392,42 @@ es_last: es[es.length - 1],
 nq_last: nq[nq.length - 1],
 rty_last: rty[rty.length - 1]
 });
+
+marketData["ES=F"] = {
+current: es[es.length - 1],
+previous: es[es.length - 2] ?? es[es.length - 1],
+change: percentChange(
+es[es.length - 1],
+es[es.length - 2] ?? es[es.length - 1]
+)
+};
+
+marketData["NQ=F"] = {
+current: nq[nq.length - 1],
+previous: nq[nq.length - 2] ?? nq[nq.length - 1],
+change: percentChange(
+nq[nq.length - 1],
+nq[nq.length - 2] ?? nq[nq.length - 1]
+)
+};
+
+marketData["RTY=F"] = {
+current: rty[rty.length - 1],
+previous: rty[rty.length - 2] ?? rty[rty.length - 1],
+change: percentChange(
+rty[rty.length - 1],
+rty[rty.length - 2] ?? rty[rty.length - 1]
+)
+};
+
+marketData["YM=F"] = {
+current: ym.length ? ym[ym.length - 1] : null,
+previous: ym.length > 1 ? ym[ym.length - 2] : null,
+change: ym.length > 1
+? percentChange(ym[ym.length - 1], ym[ym.length - 2])
+: 0
+};
+
 
 /* ================= SPX MOMENTUM ================= */
 
