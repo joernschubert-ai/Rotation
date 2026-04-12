@@ -572,6 +572,40 @@ rotationStatus = "TRANSITION";
 rotationStatusColor = orange;
 }
 
+// ================= MARKET BIAS =================
+
+let marketBias = "NEUTRAL";
+let marketBiasColor = yellow;
+
+// CRASH / DEFENSIVE
+if (
+adjustedCrash > 60 ||
+(creditSignal === "risk_off" && breadth200 < 50)
+) {
+marketBias = "DEFENSIVE";
+marketBiasColor = red;
+}
+
+// EARLY RISK
+else if (
+adjustedCrash > 45 ||
+stressScore > 5
+) {
+marketBias = "CAUTIOUS";
+marketBiasColor = orange;
+}
+
+// RISK ON
+else if (
+creditSignal === "risk_on" &&
+breadth200 > 60 &&
+data.gammaExposure > 0
+) {
+marketBias = "RISK ON";
+marketBiasColor = green;
+}
+
+
 // ================= DANGER ZONE ENGINE =================
 
 // === INPUTS ===
@@ -1284,6 +1318,7 @@ concentrationScore: data.rotationDetails?.concentrationScore ?? 0,
 rotationStatus,
 russellSuperSignal,
 positionDirection,
+marketBias,
 dangerScore
 },
 
@@ -2368,6 +2403,25 @@ Score {data.spMomentumScore}
 </div>
 
 </Panel>
+
+{/* MARKET BIAS */}
+
+<div className="text-sm mb-2 text-white">MARKET BIAS</div>
+
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 mb-6">
+
+<Panel title="MARKET BIAS" bg="bg-zinc-900">
+
+<div
+className="text-xl font-bold"
+style={{ color: marketBiasColor }}
+>
+{marketBias}
+</div>
+
+</Panel>
+
+</div>
 
 {/* FRÜHSIGNALE */}
 
