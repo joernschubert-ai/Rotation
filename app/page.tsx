@@ -627,29 +627,32 @@ else levelRisk = 90;
 // === VIX RISK (wichtig: invertiert!) ===
 let vixRisk = 0;
 
-if(vix > 25) vixRisk = 20;
-else if(vix > 22) vixRisk = 40;
-else if(vix > 20) vixRisk = 60;
+if(vix < 18) vixRisk = 10;
+else if(vix < 22) vixRisk = 30;
+else if(vix < 28) vixRisk = 60;
 else vixRisk = 85;
 
 // === STRUCTURAL RISK ===
 let structuralRisk = 0;
 
-// Gamma (negativ = gut für Puts)
-if(gamma >= 0) structuralRisk += 30;
+// Gamma (negativ = gefährlich)
+if(gamma < 0) structuralRisk += 30;
 
 // Credit
-if(credit === "neutral") structuralRisk += 15;
-if(credit === "risk_on") structuralRisk += 30;
+if(credit === "risk_off") structuralRisk += 30;
+else if(credit === "neutral") structuralRisk += 15;
 
-// Breadth
-if(breadth200_raw >= 0.5) structuralRisk += 20;
+// Breadth (schwach = gefährlich)
+if(breadth200_raw < 0.5) structuralRisk += 25;
+else if(breadth200_raw < 0.6) structuralRisk += 10;
 
 // === FINAL SCORE ===
 const dangerScore = Math.round(
-(levelRisk * 0.4) +
-(vixRisk * 0.3) +
-(structuralRisk * 0.3)
+(levelRisk * 0.25) +
+(vixRisk * 0.2) +
+(structuralRisk * 0.25) +
+(adjustedCrash * 0.2) +
+(stressScore * 5 * 0.1)
 );
 
 // === AMPEL ===
