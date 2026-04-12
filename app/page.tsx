@@ -451,6 +451,16 @@ const rsGrowth = data.rotationDetails?.rsGrowth20 ?? 0;
 const rsEqual =
 data.rotationDetails?.concentrationDivergence ?? 0;
 
+// ================= NEW BACKEND FIELDS =================
+
+const rotationSignalBackend = data.rotationSignal ?? "neutral";
+const rotationStrength = data.rotationStrength ?? 0;
+
+const russellSuperSignal = data.russellSuperSignal ?? false;
+const russellSuperScore = data.russellSuperScore ?? 0;
+
+const positionDirection = data.positionDirection ?? "neutral";
+
 let rotationLabel = "NEUTRAL";
 let rotationColor = gray;
 
@@ -543,6 +553,24 @@ const finalDecisionScore = Math.round(
 ((data.marketStressScore ?? 0) * 5) +
 ((data.crossAssetRiskScore ?? 0) * 2)
 );
+
+// ================= ROTATION STATUS =================
+
+let rotationStatus = "NEUTRAL";
+let rotationStatusColor = yellow; // WICHTIG: gleiche Farbvariablen wie im UI!
+
+if (rsSmall > 0.02 && rsEqual > 0) {
+rotationStatus = "RUSSELL LEADING";
+rotationStatusColor = green;
+}
+else if (rsSmall < -0.02 && rsEqual < 0) {
+rotationStatus = "NASDAQ DOMINANCE";
+rotationStatusColor = red;
+}
+else {
+rotationStatus = "TRANSITION";
+rotationStatusColor = orange;
+}
 
 // ================= DANGER ZONE ENGINE =================
 
@@ -1253,6 +1281,9 @@ distribution: Math.round(smoothDistribution),
 crashProbability: adjustedCrash,
 correlationScore,
 concentrationScore: data.rotationDetails?.concentrationScore ?? 0,
+rotationStatus,
+russellSuperSignal,
+positionDirection,
 dangerScore
 },
 
@@ -1642,6 +1673,74 @@ callReEntry === "FULL BUILD" ? "#00ff88" :
 </div>
 </Panel>
 
+{/* ROTATION STATUS */}
+<Panel title="ROTATION" bg="#0b1a2a">
+
+<div
+className="text-lg font-bold"
+style={{
+color:
+rotationSignalBackend === "strong_risk_on" ? green :
+rotationSignalBackend === "early_rotation" ? yellow :
+gray
+}}
+>
+{rotationSignalBackend.toUpperCase()}
+</div>
+
+<div className="text-xs text-zinc-400 mt-2">
+Strength: {rotationStrength}
+</div>
+
+<div className="text-xs text-zinc-400 mt-1">
+RS Small: {(rsSmall*100).toFixed(2)}%
+</div>
+
+</Panel>
+
+{/* RUSSELL SUPER SIGNAL */}
+<Panel title="RUSSELL SUPER SIGNAL" bg="#0b1a2a">
+
+<div
+className="text-lg font-bold"
+style={{
+color: russellSuperSignal ? green : gray
+}}
+>
+{russellSuperSignal ? "ACTIVE" : "INACTIVE"}
+</div>
+
+<div className="text-xs text-zinc-400 mt-2">
+Score: {russellSuperScore}
+</div>
+
+<div className="text-xs text-zinc-400 mt-1">
+Trigger ≥ 8
+</div>
+
+</Panel>
+
+{/* POSITION DIRECTION */}
+<Panel title="POSITION DIRECTION" bg="#0b1a2a">
+
+<div
+className="text-lg font-bold"
+style={{
+color:
+positionDirection === "risk_on" ? green :
+positionDirection === "risk_off" ? red :
+yellow
+}}
+>
+{positionDirection.toUpperCase()}
+</div>
+
+<div className="text-xs text-zinc-400 mt-2">
+Macro Bias
+</div>
+
+</Panel>
+
 {/* POSITION */}
 <Panel title="POSITION" bg="#0b1a2a">
 <div
@@ -1867,6 +1966,18 @@ green
 {finalAction}
 </div>
 
+<div className="text-xs mt-2">
+Direction:{" "}
+<span style={{
+color:
+positionDirection === "NET SHORT" ? red :
+positionDirection === "NET LONG" ? green :
+yellow
+}}>
+{positionDirection}
+</span>
+</div>
+
 </Panel>
 
 <Panel title="EARLY WARNING" bg="#111">
@@ -1902,9 +2013,28 @@ NASDAQ (PUTS)
 RUSSELL (CALLS)
 </div>
 
-<div style={{color:callDecisionColor(callSignal)}}>
-{callSignal}
+<div
+className="text-lg font-bold"
+style={{
+color: russellSuperSignal
+? "#00ff88"
+: callDecisionColor(callSignal)
+}}
+>
+{russellSuperSignal ? "SUPER ENTRY 🚀" : callSignal}
 </div>
+</div>
+
+<div className="mt-2 text-xs">
+<span className="text-zinc-400">Super Signal:</span>{" "}
+<span style={{
+color:
+russellSuperSignal === "ACTIVE" ? red :
+russellSuperSignal === "BUILDING" ? orange :
+green
+}}>
+{russellSuperSignal}
+</span>
 </div>
 
 </div>
@@ -2175,11 +2305,18 @@ Score {regimeSignalScore}
 
 <div className="border border-zinc-800 p-3 mb-6">
 
-<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 text-sm">
 
 <div>
 <div className="text-zinc-400">Kapitalrotation</div>
 <div style={{color:rotationColor}}>{rotationLabel}</div>
+</div>
+
+<div>
+<div className="text-zinc-400">Rotation Status</div>
+<div style={{color: rotationStatusColor}}>
+{rotationStatus}
+</div>
 </div>
 
 {/* ===== MARKTPHASE ===== */}
