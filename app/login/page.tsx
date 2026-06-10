@@ -14,9 +14,6 @@ body: JSON.stringify({ password }),
 
 const data = await res.json();
 
-localStorage.setItem("token", accessToken);
-localStorage.setItem("refreshToken", refreshToken);
-
 if (res.ok) {
 localStorage.setItem("auth", "true");
 localStorage.setItem("token", "x9KfP2LmQa83zZ_2519.BJ"); // 👈 NEU
