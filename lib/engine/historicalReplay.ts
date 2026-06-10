@@ -60,9 +60,11 @@ const runner =
 snapshotRunner(snap);
 
 const outputs =
+(
 runner?.outputs ??
 runner ??
-{};
+{}
+) as any;
 
 /* =====================================================
 OUTPUTS
