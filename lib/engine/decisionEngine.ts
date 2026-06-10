@@ -60,48 +60,48 @@ MASTER STATE
 ====================================================== */
 
 const masterMode =
-master?.mode ?? “NEUTRAL”
+master?.mode ?? "NEUTRAL"
 
 const phase =
 phaseData?.phase ??
-“PHASE_1_EXPANSION”
+"PHASE_1_EXPANSION"
 
 const marketMode =
 executionState?.marketMode ??
-“NEUTRAL”
+"NEUTRAL"
 
 const riskState =
 executionState?.riskState ??
-“NORMAL”
+"NORMAL"
 
 /* ======================================================
 EDGE STATE
 ====================================================== */
 
-let edgeStateLabel = “NO_EDGE”
+let edgeStateLabel = "NO_EDGE"
 
 if (edgeScore >= 80) {
-edgeStateLabel = “EXTREME”
+edgeStateLabel = "EXTREME"
 }
 
 else if (edgeScore >= 60) {
-edgeStateLabel = “STRONG”
+edgeStateLabel = "STRONG"
 }
 
 else if (edgeScore >= 40) {
-edgeStateLabel = “TRADEABLE”
+edgeStateLabel = "TRADEABLE"
 }
 
 else if (edgeScore >= 20) {
-edgeStateLabel = “EARLY”
+edgeStateLabel = "EARLY"
 }
 
 /* ======================================================
 BASE
 ====================================================== */
 
-let finalAction = “WAIT”
-let direction = “NEUTRAL”
+let finalAction = "WAIT"
+let direction = "NEUTRAL"
 /* ======================================================
 
 HIERARCHY
@@ -120,18 +120,18 @@ CRASH PRIORITY
 
 if (
 
-masterMode === “CRASH” ||
+masterMode === "CRASH" ||
 
-phase === “PHASE_5_BREAKDOWN” ||
+phase === "PHASE_5_BREAKDOWN" ||
 
-phase === “PHASE_6_ACCELERATION” ||
+phase === "PHASE_6_ACCELERATION" ||
 
-phase === “PHASE_7_CAPITULATION”
+phase === "PHASE_7_CAPITULATION"
 
 ) {
 
-finalAction = “DEFENSIVE SHORT”
-direction = “SHORT”
+finalAction = "DEFENSIVE SHORT"
+direction = "SHORT"
 }
 
 /* ======================================================
@@ -140,16 +140,16 @@ RISK PRIORITY
 
 else if (
 
-masterMode === “RISK” ||
+masterMode === "RISK" ||
 
-marketMode === “RISK_OFF” ||
+marketMode === "RISK_OFF" ||
 
-riskState === “BREAKDOWN”
+riskState === "BREAKDOWN"
 
 ) {
 
-finalAction = “REDUCE RISK”
-direction = “DEFENSIVE”
+finalAction = "REDUCE RISK"
+direction = "DEFENSIVE"
 }
 
 /* ======================================================
@@ -158,14 +158,14 @@ NEUTRAL DISTRIBUTION
 
 else if (
 
-masterMode === “NEUTRAL” ||
+masterMode === "NEUTRAL" ||
 
-phase === “PHASE_3_DISTRIBUTION”
+phase === "PHASE_3_DISTRIBUTION"
 
 ) {
 
-finalAction = “WAIT”
-direction = “NEUTRAL”
+finalAction = "WAIT"
+direction = "NEUTRAL"
 }
 
 /* ======================================================
@@ -182,8 +182,8 @@ edgeScore >= 40
 
 ) {
 
-finalAction = “BUILD RUSSELL”
-direction = “LONG”
+finalAction = "BUILD RUSSELL"
+direction = "LONG"
 }
 
 else if (
@@ -194,8 +194,8 @@ edgeScore >= 40
 
 ) {
 
-finalAction = “BUILD PUTS”
-direction = “SHORT”
+finalAction = "BUILD PUTS"
+direction = "SHORT"
 }
 }
 
@@ -209,12 +209,12 @@ rotationDecayScore >= 70 &&
 
 falseBreakRisk >= 80 &&
 
-direction !== “SHORT”
+direction !== "SHORT"
 
 ) {
 
-finalAction = “DEFENSIVE SHORT”
-direction = “SHORT”
+finalAction = "DEFENSIVE SHORT"
+direction = "SHORT"
 }
 
 /* ======================================================
@@ -225,14 +225,14 @@ let conviction = edgeScore
 
 if (
 crashProb >= 80 &&
-direction === “SHORT”
+direction === "SHORT"
 ) {
 conviction += 10
 }
 
 if (
 crashProb >= 85 &&
-direction === “LONG”
+direction === "LONG"
 ) {
 conviction -= 20
 }
@@ -247,50 +247,50 @@ EXECUTION MODE
 ====================================================== */
 
 let execution = {
-mode: “WAIT”,
-note: “No edge”
+mode: "WAIT",
+note: "No edge"
 }
 
 if (
-direction === “NEUTRAL” ||
-direction === “DEFENSIVE”
+direction === "NEUTRAL" ||
+direction === "DEFENSIVE"
 ) {
 
 execution = {
-mode: “WAIT”,
-note: “Structural regime conflict”
+mode: "WAIT",
+note: "Structural regime conflict"
 }
 }
 
 else if (edgeScore >= 80) {
 
 execution = {
-mode: “AGGRESSIVE”,
-note: “Extreme asymmetric setup”
+mode: "AGGRESSIVE",
+note: "Extreme asymmetric setup"
 }
 }
 
 else if (edgeScore >= 60) {
 
 execution = {
-mode: “BUILD”,
-note: “Strong setup”
+mode: "BUILD",
+note: "Strong setup"
 }
 }
 
 else if (edgeScore >= 40) {
 
 execution = {
-mode: “SCALE”,
-note: “Tradable setup”
+mode: "SCALE",
+note: "Tradable setup"
 }
 }
 
 else if (edgeScore >= 20) {
 
 execution = {
-mode: “PROBE”,
-note: “Early setup”
+mode: "PROBE",
+note: "Early setup"
 }
 }
 
@@ -302,14 +302,14 @@ if (
 
 edgeScore < 20 ||
 
-masterMode === “NEUTRAL” ||
+masterMode === "NEUTRAL" ||
 
-marketMode === “RISK_OFF”
+marketMode === "RISK_OFF"
 
 ) {
 
-finalAction = “WAIT”
-direction = “NEUTRAL”
+finalAction = "WAIT"
+direction = "NEUTRAL"
 }
 
 /* ======================================================
