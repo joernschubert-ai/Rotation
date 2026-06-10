@@ -1,0 +1,94 @@
+[
+{
+"date": "2022-01-10",
+"breadth50": 72,
+"breadth200": 66,
+"marketLiquidityScore": 69,
+"creditRatio": 1.00,
+"gammaExposure": 0.1,
+"vixTermRatio": 1.02,
+"volOfVolRatio": 1.05,
+"correlationScore": 1.1,
+"moveIndex": 64,
+"concentrationScore": 69,
+"crashProbability": 18,
+"marketData": {
+"^VIX": { "current": 19.3 }
+},
+"rotation": {
+"rsSmall": 0.99,
+"rsGrowth": 1.06,
+"rsEqual": 0.98,
+"score": 61
+}
+},
+{
+"date": "2022-04-26",
+"breadth50": 38,
+"breadth200": 41,
+"marketLiquidityScore": 46,
+"creditRatio": 0.94,
+"gammaExposure": -0.9,
+"vixTermRatio": 0.91,
+"volOfVolRatio": 1.28,
+"correlationScore": 2.1,
+"moveIndex": 96,
+"concentrationScore": 73,
+"crashProbability": 58,
+"marketData": {
+"^VIX": { "current": 33.5 }
+},
+"rotation": {
+"rsSmall": 0.92,
+"rsGrowth": 0.96,
+"rsEqual": 0.91,
+"score": 29
+}
+},
+{
+"date": "2022-06-16",
+"breadth50": 16,
+"breadth200": 21,
+"marketLiquidityScore": 24,
+"creditRatio": 0.86,
+"gammaExposure": -1.9,
+"vixTermRatio": 0.79,
+"volOfVolRatio": 1.61,
+"correlationScore": 3.0,
+"moveIndex": 131,
+"concentrationScore": 77,
+"crashProbability": 86,
+"marketData": {
+"^VIX": { "current": 37.8 }
+},
+"rotation": {
+"rsSmall": 0.84,
+"rsGrowth": 0.89,
+"rsEqual": 0.86,
+"score": 12
+}
+},
+{
+"date": "2022-10-14",
+"breadth50": 44,
+"breadth200": 28,
+"marketLiquidityScore": 38,
+"creditRatio": 0.91,
+"gammaExposure": -0.5,
+"vixTermRatio": 0.89,
+"volOfVolRatio": 1.22,
+"correlationScore": 2.0,
+"moveIndex": 108,
+"concentrationScore": 66,
+"crashProbability": 61,
+"marketData": {
+"^VIX": { "current": 31.2 }
+},
+"rotation": {
+"rsSmall": 0.96,
+"rsGrowth": 0.92,
+"rsEqual": 0.95,
+"score": 37
+}
+}
+]

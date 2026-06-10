@@ -1,0 +1,94 @@
+[
+{
+"date": "2021-01-15",
+"breadth50": 84,
+"breadth200": 77,
+"marketLiquidityScore": 88,
+"creditRatio": 1.08,
+"gammaExposure": 1.6,
+"vixTermRatio": 1.14,
+"volOfVolRatio": 0.94,
+"correlationScore": 0.7,
+"moveIndex": 49,
+"concentrationScore": 58,
+"crashProbability": 8,
+"marketData": {
+"^VIX": { "current": 22.4 }
+},
+"rotation": {
+"rsSmall": 1.09,
+"rsGrowth": 1.04,
+"rsEqual": 1.07,
+"score": 84
+}
+},
+{
+"date": "2021-03-10",
+"breadth50": 79,
+"breadth200": 73,
+"marketLiquidityScore": 82,
+"creditRatio": 1.05,
+"gammaExposure": 1.1,
+"vixTermRatio": 1.10,
+"volOfVolRatio": 0.97,
+"correlationScore": 0.9,
+"moveIndex": 57,
+"concentrationScore": 51,
+"crashProbability": 11,
+"marketData": {
+"^VIX": { "current": 23.2 }
+},
+"rotation": {
+"rsSmall": 1.11,
+"rsGrowth": 0.98,
+"rsEqual": 1.08,
+"score": 82
+}
+},
+{
+"date": "2021-09-20",
+"breadth50": 48,
+"breadth200": 55,
+"marketLiquidityScore": 61,
+"creditRatio": 0.98,
+"gammaExposure": -0.4,
+"vixTermRatio": 0.97,
+"volOfVolRatio": 1.14,
+"correlationScore": 1.7,
+"moveIndex": 86,
+"concentrationScore": 63,
+"crashProbability": 38,
+"marketData": {
+"^VIX": { "current": 28.8 }
+},
+"rotation": {
+"rsSmall": 0.96,
+"rsGrowth": 1.05,
+"rsEqual": 0.97,
+"score": 44
+}
+},
+{
+"date": "2021-11-22",
+"breadth50": 76,
+"breadth200": 71,
+"marketLiquidityScore": 85,
+"creditRatio": 1.04,
+"gammaExposure": 1.2,
+"vixTermRatio": 1.11,
+"volOfVolRatio": 0.99,
+"correlationScore": 0.8,
+"moveIndex": 52,
+"concentrationScore": 74,
+"crashProbability": 10,
+"marketData": {
+"^VIX": { "current": 17.2 }
+},
+"rotation": {
+"rsSmall": 0.98,
+"rsGrowth": 1.11,
+"rsEqual": 0.99,
+"score": 71
+}
+}
+]

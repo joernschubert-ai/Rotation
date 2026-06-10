@@ -1,0 +1,71 @@
+[
+{
+"date": "2025-01-22",
+"breadth50": 72,
+"breadth200": 69,
+"marketLiquidityScore": 84,
+"creditRatio": 1.05,
+"gammaExposure": 1.5,
+"vixTermRatio": 1.15,
+"volOfVolRatio": 0.88,
+"correlationScore": 0.7,
+"moveIndex": 46,
+"concentrationScore": 94,
+"crashProbability": 6,
+"marketData": {
+"^VIX": { "current": 12.8 }
+},
+"rotation": {
+"rsSmall": 0.96,
+"rsGrowth": 1.18,
+"rsEqual": 0.97,
+"score": 79
+}
+},
+{
+"date": "2025-03-14",
+"breadth50": 58,
+"breadth200": 63,
+"marketLiquidityScore": 73,
+"creditRatio": 1.02,
+"gammaExposure": 0.8,
+"vixTermRatio": 1.07,
+"volOfVolRatio": 1.02,
+"correlationScore": 1.0,
+"moveIndex": 63,
+"concentrationScore": 92,
+"crashProbability": 18,
+"marketData": {
+"^VIX": { "current": 17.6 }
+},
+"rotation": {
+"rsSmall": 0.94,
+"rsGrowth": 1.12,
+"rsEqual": 0.95,
+"score": 63
+}
+},
+{
+"date": "2025-06-18",
+"breadth50": 46,
+"breadth200": 57,
+"marketLiquidityScore": 62,
+"creditRatio": 0.98,
+"gammaExposure": -0.2,
+"vixTermRatio": 0.97,
+"volOfVolRatio": 1.12,
+"correlationScore": 1.7,
+"moveIndex": 82,
+"concentrationScore": 91,
+"crashProbability": 36,
+"marketData": {
+"^VIX": { "current": 22.1 }
+},
+"rotation": {
+"rsSmall": 0.90,
+"rsGrowth": 1.08,
+"rsEqual": 0.92,
+"score": 47
+}
+}
+]

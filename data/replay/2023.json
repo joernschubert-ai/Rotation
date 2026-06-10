@@ -1,0 +1,94 @@
+[
+{
+"date": "2023-02-02",
+"breadth50": 71,
+"breadth200": 62,
+"marketLiquidityScore": 73,
+"creditRatio": 1.01,
+"gammaExposure": 0.8,
+"vixTermRatio": 1.07,
+"volOfVolRatio": 1.01,
+"correlationScore": 1.0,
+"moveIndex": 66,
+"concentrationScore": 68,
+"crashProbability": 16,
+"marketData": {
+"^VIX": { "current": 18.6 }
+},
+"rotation": {
+"rsSmall": 1.04,
+"rsGrowth": 1.03,
+"rsEqual": 1.02,
+"score": 72
+}
+},
+{
+"date": "2023-05-30",
+"breadth50": 49,
+"breadth200": 58,
+"marketLiquidityScore": 76,
+"creditRatio": 1.03,
+"gammaExposure": 1.2,
+"vixTermRatio": 1.12,
+"volOfVolRatio": 0.96,
+"correlationScore": 0.8,
+"moveIndex": 52,
+"concentrationScore": 88,
+"crashProbability": 14,
+"marketData": {
+"^VIX": { "current": 16.7 }
+},
+"rotation": {
+"rsSmall": 0.93,
+"rsGrowth": 1.15,
+"rsEqual": 0.95,
+"score": 67
+}
+},
+{
+"date": "2023-08-18",
+"breadth50": 42,
+"breadth200": 49,
+"marketLiquidityScore": 58,
+"creditRatio": 0.97,
+"gammaExposure": -0.3,
+"vixTermRatio": 0.96,
+"volOfVolRatio": 1.15,
+"correlationScore": 1.8,
+"moveIndex": 88,
+"concentrationScore": 84,
+"crashProbability": 42,
+"marketData": {
+"^VIX": { "current": 22.9 }
+},
+"rotation": {
+"rsSmall": 0.91,
+"rsGrowth": 1.09,
+"rsEqual": 0.92,
+"score": 43
+}
+},
+{
+"date": "2023-11-20",
+"breadth50": 83,
+"breadth200": 74,
+"marketLiquidityScore": 81,
+"creditRatio": 1.05,
+"gammaExposure": 1.3,
+"vixTermRatio": 1.13,
+"volOfVolRatio": 0.92,
+"correlationScore": 0.7,
+"moveIndex": 49,
+"concentrationScore": 71,
+"crashProbability": 9,
+"marketData": {
+"^VIX": { "current": 13.8 }
+},
+"rotation": {
+"rsSmall": 1.07,
+"rsGrowth": 1.05,
+"rsEqual": 1.06,
+"score": 86
+}
+}
+]

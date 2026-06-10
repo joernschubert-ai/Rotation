@@ -1,0 +1,117 @@
+[
+{
+"date": "2020-02-10",
+"breadth50": 74,
+"breadth200": 68,
+"marketLiquidityScore": 78,
+"creditRatio": 1.03,
+"gammaExposure": 0.7,
+"vixTermRatio": 1.08,
+"volOfVolRatio": 1.01,
+"correlationScore": 0.9,
+"moveIndex": 58,
+"concentrationScore": 42,
+"crashProbability": 12,
+"marketData": {
+"^VIX": { "current": 14.8 }
+},
+"rotation": {
+"rsSmall": 1.04,
+"rsGrowth": 1.01,
+"rsEqual": 1.03,
+"score": 72
+}
+},
+{
+"date": "2020-02-24",
+"breadth50": 58,
+"breadth200": 61,
+"marketLiquidityScore": 64,
+"creditRatio": 0.99,
+"gammaExposure": -0.2,
+"vixTermRatio": 0.96,
+"volOfVolRatio": 1.18,
+"correlationScore": 1.6,
+"moveIndex": 82,
+"concentrationScore": 49,
+"crashProbability": 34,
+"marketData": {
+"^VIX": { "current": 25.1 }
+},
+"rotation": {
+"rsSmall": 0.99,
+"rsGrowth": 1.02,
+"rsEqual": 0.98,
+"score": 48
+}
+},
+{
+"date": "2020-03-12",
+"breadth50": 12,
+"breadth200": 18,
+"marketLiquidityScore": 18,
+"creditRatio": 0.82,
+"gammaExposure": -2.4,
+"vixTermRatio": 0.72,
+"volOfVolRatio": 1.82,
+"correlationScore": 3.6,
+"moveIndex": 145,
+"concentrationScore": 64,
+"crashProbability": 94,
+"marketData": {
+"^VIX": { "current": 69.2 }
+},
+"rotation": {
+"rsSmall": 0.82,
+"rsGrowth": 0.91,
+"rsEqual": 0.85,
+"score": 8
+}
+},
+{
+"date": "2020-04-20",
+"breadth50": 39,
+"breadth200": 28,
+"marketLiquidityScore": 72,
+"creditRatio": 0.96,
+"gammaExposure": 0.2,
+"vixTermRatio": 0.98,
+"volOfVolRatio": 1.38,
+"correlationScore": 2.2,
+"moveIndex": 108,
+"concentrationScore": 61,
+"crashProbability": 44,
+"marketData": {
+"^VIX": { "current": 38.7 }
+},
+"rotation": {
+"rsSmall": 0.93,
+"rsGrowth": 1.06,
+"rsEqual": 0.92,
+"score": 41
+}
+},
+{
+"date": "2020-08-18",
+"breadth50": 81,
+"breadth200": 72,
+"marketLiquidityScore": 86,
+"creditRatio": 1.06,
+"gammaExposure": 1.4,
+"vixTermRatio": 1.12,
+"volOfVolRatio": 0.98,
+"correlationScore": 0.8,
+"moveIndex": 54,
+"concentrationScore": 71,
+"crashProbability": 10,
+"marketData": {
+"^VIX": { "current": 21.5 }
+},
+"rotation": {
+"rsSmall": 1.01,
+"rsGrowth": 1.12,
+"rsEqual": 0.99,
+"score": 76
+}
+}
+]

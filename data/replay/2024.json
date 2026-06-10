@@ -1,0 +1,71 @@
+[
+{
+"date": "2024-02-12",
+"breadth50": 68,
+"breadth200": 66,
+"marketLiquidityScore": 82,
+"creditRatio": 1.06,
+"gammaExposure": 1.4,
+"vixTermRatio": 1.14,
+"volOfVolRatio": 0.89,
+"correlationScore": 0.7,
+"moveIndex": 47,
+"concentrationScore": 91,
+"crashProbability": 7,
+"marketData": {
+"^VIX": { "current": 13.2 }
+},
+"rotation": {
+"rsSmall": 0.95,
+"rsGrowth": 1.17,
+"rsEqual": 0.97,
+"score": 73
+}
+},
+{
+"date": "2024-04-19",
+"breadth50": 39,
+"breadth200": 54,
+"marketLiquidityScore": 59,
+"creditRatio": 0.98,
+"gammaExposure": -0.5,
+"vixTermRatio": 0.94,
+"volOfVolRatio": 1.19,
+"correlationScore": 1.9,
+"moveIndex": 92,
+"concentrationScore": 89,
+"crashProbability": 41,
+"marketData": {
+"^VIX": { "current": 24.5 }
+},
+"rotation": {
+"rsSmall": 0.89,
+"rsGrowth": 1.11,
+"rsEqual": 0.91,
+"score": 46
+}
+},
+{
+"date": "2024-07-10",
+"breadth50": 74,
+"breadth200": 71,
+"marketLiquidityScore": 86,
+"creditRatio": 1.07,
+"gammaExposure": 1.7,
+"vixTermRatio": 1.16,
+"volOfVolRatio": 0.87,
+"correlationScore": 0.6,
+"moveIndex": 44,
+"concentrationScore": 93,
+"crashProbability": 5,
+"marketData": {
+"^VIX": { "current": 12.4 }
+},
+"rotation": {
+"rsSmall": 0.97,
+"rsGrowth": 1.19,
+"rsEqual": 0.98,
+"score": 81
+}
+}
+]
