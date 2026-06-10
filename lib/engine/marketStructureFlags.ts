@@ -321,6 +321,7 @@ narrowLeadership,
 severeNarrowLeadership,
 
 megaCapDominance,
+megaCapOnlyTape: megaCapDominance,
 severeMegaCapDominance,
 
 /* ---------- RELATIVE STRUCTURE ---------- */
