@@ -2452,9 +2452,9 @@ const token = req.headers.get("authorization");
 
 console.log("TOKEN AFTER GET:", token);
 
-// if (!token || !token.includes("x9KfP2LmQa83zZ_2519.BJ")) {
-// return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-// }
+if (!token || !token.includes("x9KfP2LmQa83zZ_2519.BJ")) {
+return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
 const now = Date.now();
 
 if (
