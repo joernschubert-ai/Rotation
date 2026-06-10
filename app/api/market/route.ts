@@ -387,12 +387,136 @@ breadthDivergence: divergence
 async function calculateBreadth20(fetchETF:any){
 
 const universe = [
-"SPY","QQQ","IWM","DIA","MDY","VTI",
-"RSP","MTUM","QUAL","SMH","XBI",
-"XLK","XLF","XLE","XLV","XLI",
-"XLY","XLP","XLU","XLB",
-"SPHB","SPLV","IWO","IWN","MTUM",
-"USMV","XRT","SOXX","XLRE"
+/* ================= MEGA CAP ================= */
+
+"AAPL","MSFT","NVDA","AMZN","META",
+"GOOGL","AVGO","TSLA","BRK-B","JPM",
+"LLY","V","XOM","UNH","MA",
+"PG","COST","JNJ","HD","ABBV",
+"MRK","KO","PEP","ADBE","NFLX",
+"AMD","CVX","WMT","BAC","TMO",
+"CRM","DIS","LIN","MCD","CSCO",
+"ACN","ABT","DHR","WFC","TXN",
+"INTU","QCOM","AMGN","IBM","PM",
+"CAT","NOW","GE","RTX","SPGI",
+
+/* ================= INDUSTRIALS ================= */
+
+"DE","ETN","PH","TT","EMR",
+"ROK","PCAR","CMI","OTIS","FAST",
+"PWR","URI","JCI","LHX","ITW",
+
+/* ================= FINANCIALS ================= */
+
+"GS","MS","BLK","SCHW","AXP",
+"C","USB","PNC","TFC","BK",
+"AIG","MET","CB","TRV","AFL",
+
+/* ================= CONSUMER ================= */
+"SBUX","LOW","TJX","BKNG","MAR",
+"YUM","CMG","ORLY","ROST","DHI",
+
+/* ================= HEALTHCARE ================= */
+
+"ISRG","BSX","SYK","VRTX","REGN",
+"CI","HUM","MDT","BMY","GILD",
+
+/* ================= SEMIS / TECH BREADTH ================= */
+
+"MU","KLAC","LRCX","AMAT","ADI",
+"MCHP","NXPI","SNPS","CDNS","ANET",
+"PANW","CRWD","DDOG","MDB","TEAM",
+
+/* ================= ENERGY / MATERIALS ================= */
+
+"SLB","EOG","MPC","PSX","VLO",
+"NEM","FCX","MLM","NUE","DD",
+
+/* ================= TRANSPORT / CYCLICAL ================= */
+
+"UPS","FDX","DAL","UAL","CSX",
+"NSC","JBHT","ODFL","LUV","UAL",
+
+/* ================= MID CAP / INTERNALS ================= */
+
+"DOCU","SQ","SHOP","ROKU","UPST",
+"AFRM","SNOW","NET","COIN","PLTR",
+
+/* ================= EQUAL-WEIGHT STYLE ================= */
+
+"RSP","MDY","IJH","IWM","QQEW",
+
+/* ================= UTILITIES ================= */
+
+"NEE","DUK","SO","EXC","AEP",
+"SRE","XEL","PEG","ED","D",
+
+/* ================= REITS ================= */
+
+"PLD","AMT","EQIX","O","SPG",
+"CCI","WELL","DLR","VICI","PSA",
+
+/* ================= REGIONAL BANKS ================= */
+
+"FITB","RF","HBAN","KEY","ZION",
+"CMA","MTB","FHN","PACW","EWBC",
+
+/* ================= HOMEBUILDERS ================= */
+
+"LEN","PHM","NVR","TOL","KBH",
+"MTH","BLD","TREX","MAS","WHR",
+
+/* ================= RETAIL / CONSUMER INTERNALS ================= */
+
+"TGT","DG","DLTR","ULTA","BBY",
+"KMX","AZO","EBAY","ETSY","W",
+
+/* ================= SOFTWARE BREADTH ================= */
+
+"ZS","OKTA","HUBS","ESTC","DOCN",
+"SMAR","BILL","TWLO","U","PATH",
+
+/* ================= CLOUD / INFRA ================= */
+
+"FSLY","AKAM","DT","CFLT","IOT",
+"GTLB","AI","S","CYBR","ZI",
+
+/* ================= BIOTECH / RISK APPETITE ================= */
+
+"MRNA","DNA","XBI","IBB","ALNY",
+"EXAS","TECH","SRPT","CRSP","NTLA",
+
+/* ================= SMALL / MID CYCLICALS ================= */
+
+"WCC","GWW","SITE","CNM","SSD",
+"AIT","LPX","UFPI","BCC","WIRE",
+
+/* ================= TRANSPORT EXPANSION ================= */
+
+"CHRW","EXPD","MATX","KEX","SAIA",
+"ARCB","XPO","RYAAY","ALK","AAL",
+
+/* ================= ENERGY BREADTH ================= */
+
+"OXY","DVN","FANG","HES","BKR",
+"HAL","COP","CTRA","MRO","APA",
+
+/* ================= MATERIALS / GLOBAL CYCLE ================= */
+
+"APD","ECL","IFF","SHW","BALL",
+"PKG","IP","CF","MOS","ALB",
+
+/* ================= NON-AI TECH ================= */
+
+"HPQ","DELL","STX","WDAY","NTAP",
+"CTSH","VRSN","GEN","PAYX","TYL",
+
+/* ================= SMALL CAP RISK / SPECULATION ================= */
+
+"SOFI","IONQ","ASTS","RKLB","CAVA",
+"CELH","DUOL","APP","HIMS","RIOT"
+
+
 ];
 
 let above20 = 0;
@@ -434,9 +558,135 @@ breadth20Signal: signal
 async function calculateAdvanceDecline(fetchETF:any) {
 
 const universe = [
-"SPY","QQQ","IWM","DIA","MDY","VTI",
-"XLK","XLF","XLE","XLV","XLI",
-"XLY","XLP","XLU","XLB","XLRE"
+/* ================= MEGA CAP ================= */
+
+"AAPL","MSFT","NVDA","AMZN","META",
+"GOOGL","AVGO","TSLA","BRK-B","JPM",
+"LLY","V","XOM","UNH","MA",
+"PG","COST","JNJ","HD","ABBV",
+"MRK","KO","PEP","ADBE","NFLX",
+"AMD","CVX","WMT","BAC","TMO",
+"CRM","DIS","LIN","MCD","CSCO",
+"ACN","ABT","DHR","WFC","TXN",
+"INTU","QCOM","AMGN","IBM","PM",
+"CAT","NOW","GE","RTX","SPGI",
+
+/* ================= INDUSTRIALS ================= */
+
+"DE","ETN","PH","TT","EMR",
+"ROK","PCAR","CMI","OTIS","FAST",
+"PWR","URI","JCI","LHX","ITW",
+
+/* ================= FINANCIALS ================= */
+
+"GS","MS","BLK","SCHW","AXP",
+"C","USB","PNC","TFC","BK",
+"AIG","MET","CB","TRV","AFL",
+
+/* ================= CONSUMER ================= */
+"SBUX","LOW","TJX","BKNG","MAR",
+"YUM","CMG","ORLY","ROST","DHI",
+
+/* ================= HEALTHCARE ================= */
+
+"ISRG","BSX","SYK","VRTX","REGN",
+"CI","HUM","MDT","BMY","GILD",
+
+/* ================= SEMIS / TECH BREADTH ================= */
+
+"MU","KLAC","LRCX","AMAT","ADI",
+"MCHP","NXPI","SNPS","CDNS","ANET",
+"PANW","CRWD","DDOG","MDB","TEAM",
+
+/* ================= ENERGY / MATERIALS ================= */
+
+"SLB","EOG","MPC","PSX","VLO",
+"NEM","FCX","MLM","NUE","DD",
+
+/* ================= TRANSPORT / CYCLICAL ================= */
+
+"UPS","FDX","DAL","UAL","CSX",
+"NSC","JBHT","ODFL","LUV","UAL",
+
+/* ================= MID CAP / INTERNALS ================= */
+
+"DOCU","SQ","SHOP","ROKU","UPST",
+"AFRM","SNOW","NET","COIN","PLTR",
+
+/* ================= EQUAL-WEIGHT STYLE ================= */
+
+"RSP","MDY","IJH","IWM","QQEW",
+/* ================= UTILITIES ================= */
+
+"NEE","DUK","SO","EXC","AEP",
+"SRE","XEL","PEG","ED","D",
+
+/* ================= REITS ================= */
+
+"PLD","AMT","EQIX","O","SPG",
+"CCI","WELL","DLR","VICI","PSA",
+
+/* ================= REGIONAL BANKS ================= */
+
+"FITB","RF","HBAN","KEY","ZION",
+"CMA","MTB","FHN","PACW","EWBC",
+
+/* ================= HOMEBUILDERS ================= */
+
+"LEN","PHM","NVR","TOL","KBH",
+"MTH","BLD","TREX","MAS","WHR",
+
+/* ================= RETAIL / CONSUMER INTERNALS ================= */
+
+"TGT","DG","DLTR","ULTA","BBY",
+"KMX","AZO","EBAY","ETSY","W",
+
+/* ================= SOFTWARE BREADTH ================= */
+
+"ZS","OKTA","HUBS","ESTC","DOCN",
+"SMAR","BILL","TWLO","U","PATH",
+
+/* ================= CLOUD / INFRA ================= */
+
+"FSLY","AKAM","DT","CFLT","IOT",
+"GTLB","AI","S","CYBR","ZI",
+
+/* ================= BIOTECH / RISK APPETITE ================= */
+
+"MRNA","DNA","XBI","IBB","ALNY",
+"EXAS","TECH","SRPT","CRSP","NTLA",
+
+/* ================= SMALL / MID CYCLICALS ================= */
+
+"WCC","GWW","SITE","CNM","SSD",
+"AIT","LPX","UFPI","BCC","WIRE",
+
+/* ================= TRANSPORT EXPANSION ================= */
+
+"CHRW","EXPD","MATX","KEX","SAIA",
+"ARCB","XPO","RYAAY","ALK","AAL",
+
+/* ================= ENERGY BREADTH ================= */
+
+"OXY","DVN","FANG","HES","BKR",
+"HAL","COP","CTRA","MRO","APA",
+
+/* ================= MATERIALS / GLOBAL CYCLE ================= */
+
+"APD","ECL","IFF","SHW","BALL",
+"PKG","IP","CF","MOS","ALB",
+
+/* ================= NON-AI TECH ================= */
+
+"HPQ","DELL","STX","WDAY","NTAP",
+"CTSH","VRSN","GEN","PAYX","TYL",
+
+/* ================= SMALL CAP RISK / SPECULATION ================= */
+
+"SOFI","IONQ","ASTS","RKLB","CAVA",
+"CELH","DUOL","APP","HIMS","RIOT"
+
+
 ];
 
 let advances = 0;
@@ -479,20 +729,135 @@ adSignal: signal
 async function calculateHighLowIndicator(fetchETF: (symbol: string) => Promise<number[]>) {
 
 const universe = [
-"AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA",
-"JPM","BAC","GS","MS",
-"XOM","CVX",
-"UNH","JNJ","PFE",
-"HD","MCD","NKE",
-"AMD","INTC","AVGO",
-"CRM","ADBE","ORCL",
-"WMT","COST","PG",
-"DIS","NFLX",
-"LIN","HON","CAT","BA",
-"UPS","RTX",
-"LOW","SBUX",
-"GE","IBM",
-"PLTR","SNOW","SHOP"
+/* ================= MEGA CAP ================= */
+
+"AAPL","MSFT","NVDA","AMZN","META",
+"GOOGL","AVGO","TSLA","BRK-B","JPM",
+"LLY","V","XOM","UNH","MA",
+"PG","COST","JNJ","HD","ABBV",
+"MRK","KO","PEP","ADBE","NFLX",
+"AMD","CVX","WMT","BAC","TMO",
+"CRM","DIS","LIN","MCD","CSCO",
+"ACN","ABT","DHR","WFC","TXN",
+"INTU","QCOM","AMGN","IBM","PM",
+"CAT","NOW","GE","RTX","SPGI",
+
+/* ================= INDUSTRIALS ================= */
+
+"DE","ETN","PH","TT","EMR",
+"ROK","PCAR","CMI","OTIS","FAST",
+"PWR","URI","JCI","LHX","ITW",
+
+/* ================= FINANCIALS ================= */
+
+"GS","MS","BLK","SCHW","AXP",
+"C","USB","PNC","TFC","BK",
+"AIG","MET","CB","TRV","AFL",
+
+/* ================= CONSUMER ================= */
+"SBUX","LOW","TJX","BKNG","MAR",
+"YUM","CMG","ORLY","ROST","DHI",
+
+/* ================= HEALTHCARE ================= */
+
+"ISRG","BSX","SYK","VRTX","REGN",
+"CI","HUM","MDT","BMY","GILD",
+
+/* ================= SEMIS / TECH BREADTH ================= */
+
+"MU","KLAC","LRCX","AMAT","ADI",
+"MCHP","NXPI","SNPS","CDNS","ANET",
+"PANW","CRWD","DDOG","MDB","TEAM",
+
+/* ================= ENERGY / MATERIALS ================= */
+
+"SLB","EOG","MPC","PSX","VLO",
+"NEM","FCX","MLM","NUE","DD",
+
+/* ================= TRANSPORT / CYCLICAL ================= */
+
+"UPS","FDX","DAL","UAL","CSX",
+"NSC","JBHT","ODFL","LUV","UAL",
+
+/* ================= MID CAP / INTERNALS ================= */
+
+"DOCU","SQ","SHOP","ROKU","UPST",
+"AFRM","SNOW","NET","COIN","PLTR",
+
+/* ================= EQUAL-WEIGHT STYLE ================= */
+
+"RSP","MDY","IJH","IWM","QQEW",
+/* ================= UTILITIES ================= */
+
+"NEE","DUK","SO","EXC","AEP",
+"SRE","XEL","PEG","ED","D",
+
+/* ================= REITS ================= */
+
+"PLD","AMT","EQIX","O","SPG",
+"CCI","WELL","DLR","VICI","PSA",
+
+/* ================= REGIONAL BANKS ================= */
+
+"FITB","RF","HBAN","KEY","ZION",
+"CMA","MTB","FHN","PACW","EWBC",
+
+/* ================= HOMEBUILDERS ================= */
+
+"LEN","PHM","NVR","TOL","KBH",
+"MTH","BLD","TREX","MAS","WHR",
+
+/* ================= RETAIL / CONSUMER INTERNALS ================= */
+
+"TGT","DG","DLTR","ULTA","BBY",
+"KMX","AZO","EBAY","ETSY","W",
+
+/* ================= SOFTWARE BREADTH ================= */
+
+"ZS","OKTA","HUBS","ESTC","DOCN",
+"SMAR","BILL","TWLO","U","PATH",
+
+/* ================= CLOUD / INFRA ================= */
+
+"FSLY","AKAM","DT","CFLT","IOT",
+"GTLB","AI","S","CYBR","ZI",
+
+/* ================= BIOTECH / RISK APPETITE ================= */
+
+"MRNA","DNA","XBI","IBB","ALNY",
+"EXAS","TECH","SRPT","CRSP","NTLA",
+
+/* ================= SMALL / MID CYCLICALS ================= */
+
+"WCC","GWW","SITE","CNM","SSD",
+"AIT","LPX","UFPI","BCC","WIRE",
+
+/* ================= TRANSPORT EXPANSION ================= */
+
+"CHRW","EXPD","MATX","KEX","SAIA",
+"ARCB","XPO","RYAAY","ALK","AAL",
+
+/* ================= ENERGY BREADTH ================= */
+
+"OXY","DVN","FANG","HES","BKR",
+"HAL","COP","CTRA","MRO","APA",
+
+/* ================= MATERIALS / GLOBAL CYCLE ================= */
+
+"APD","ECL","IFF","SHW","BALL",
+"PKG","IP","CF","MOS","ALB",
+
+/* ================= NON-AI TECH ================= */
+
+"HPQ","DELL","STX","WDAY","NTAP",
+"CTSH","VRSN","GEN","PAYX","TYL",
+
+/* ================= SMALL CAP RISK / SPECULATION ================= */
+
+"SOFI","IONQ","ASTS","RKLB","CAVA",
+"CELH","DUOL","APP","HIMS","RIOT"
+
+
 ];
 
 let newHighs = 0;
@@ -510,6 +875,7 @@ if (closes.length < 252) return;
 valid++;
 
 const current = closes[closes.length - 1];
+
 
 // 🔥 WICHTIG: echtes Lookback (ohne aktuellen Wert)
 const history = closes.slice(-252, -1);
@@ -2086,9 +2452,9 @@ const token = req.headers.get("authorization");
 
 console.log("TOKEN AFTER GET:", token);
 
-if (!token || !token.includes("x9KfP2LmQa83zZ_2519.BJ")) {
-return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-}
+// if (!token || !token.includes("x9KfP2LmQa83zZ_2519.BJ")) {
+// return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// }
 const now = Date.now();
 
 if (
@@ -2185,30 +2551,135 @@ change: percentChange(current, previous),
 });
 
 const breadthUniverse = [
-"SPY", // S&P500
-"QQQ", // Nasdaq 100
-"IWM", // Russell 2000
-"DIA", // Dow
-"MDY", // Midcap
-"VTI", // Total Market
+/* ================= MEGA CAP ================= */
 
-// Sektoren
-"XLK", // Tech
-"XLF", // Financials
-"XLE", // Energy
-"XLV", // Healthcare
-"XLI", // Industrials
-"XLY", // Consumer Discretionary
-"XLP", // Consumer Staples
-"XLU", // Utilities
-"XLB", // Materials
-"XLRE", // Real Estate
-"SMH",
-"XBI",
-"ARKK",
-"MTUM",
-"QUAL",
-"IYR"
+"AAPL","MSFT","NVDA","AMZN","META",
+"GOOGL","AVGO","TSLA","BRK-B","JPM",
+"LLY","V","XOM","UNH","MA",
+"PG","COST","JNJ","HD","ABBV",
+"MRK","KO","PEP","ADBE","NFLX",
+"AMD","CVX","WMT","BAC","TMO",
+"CRM","DIS","LIN","MCD","CSCO",
+"ACN","ABT","DHR","WFC","TXN",
+"INTU","QCOM","AMGN","IBM","PM",
+"CAT","NOW","GE","RTX","SPGI",
+
+/* ================= INDUSTRIALS ================= */
+
+"DE","ETN","PH","TT","EMR",
+"ROK","PCAR","CMI","OTIS","FAST",
+"PWR","URI","JCI","LHX","ITW",
+
+/* ================= FINANCIALS ================= */
+
+"GS","MS","BLK","SCHW","AXP",
+"C","USB","PNC","TFC","BK",
+"AIG","MET","CB","TRV","AFL",
+
+/* ================= CONSUMER ================= */
+"SBUX","LOW","TJX","BKNG","MAR",
+"YUM","CMG","ORLY","ROST","DHI",
+
+/* ================= HEALTHCARE ================= */
+
+"ISRG","BSX","SYK","VRTX","REGN",
+"CI","HUM","MDT","BMY","GILD",
+
+/* ================= SEMIS / TECH BREADTH ================= */
+
+"MU","KLAC","LRCX","AMAT","ADI",
+"MCHP","NXPI","SNPS","CDNS","ANET",
+"PANW","CRWD","DDOG","MDB","TEAM",
+
+/* ================= ENERGY / MATERIALS ================= */
+
+"SLB","EOG","MPC","PSX","VLO",
+"NEM","FCX","MLM","NUE","DD",
+
+/* ================= TRANSPORT / CYCLICAL ================= */
+
+"UPS","FDX","DAL","UAL","CSX",
+"NSC","JBHT","ODFL","LUV","UAL",
+
+/* ================= MID CAP / INTERNALS ================= */
+
+"DOCU","SQ","SHOP","ROKU","UPST",
+"AFRM","SNOW","NET","COIN","PLTR",
+
+/* ================= EQUAL-WEIGHT STYLE ================= */
+
+"RSP","MDY","IJH","IWM","QQEW",
+/* ================= UTILITIES ================= */
+
+"NEE","DUK","SO","EXC","AEP",
+"SRE","XEL","PEG","ED","D",
+
+/* ================= REITS ================= */
+
+"PLD","AMT","EQIX","O","SPG",
+"CCI","WELL","DLR","VICI","PSA",
+
+/* ================= REGIONAL BANKS ================= */
+
+"FITB","RF","HBAN","KEY","ZION",
+"CMA","MTB","FHN","PACW","EWBC",
+
+/* ================= HOMEBUILDERS ================= */
+
+"LEN","PHM","NVR","TOL","KBH",
+"MTH","BLD","TREX","MAS","WHR",
+
+/* ================= RETAIL / CONSUMER INTERNALS ================= */
+
+"TGT","DG","DLTR","ULTA","BBY",
+"KMX","AZO","EBAY","ETSY","W",
+
+/* ================= SOFTWARE BREADTH ================= */
+
+"ZS","OKTA","HUBS","ESTC","DOCN",
+"SMAR","BILL","TWLO","U","PATH",
+
+/* ================= CLOUD / INFRA ================= */
+
+"FSLY","AKAM","DT","CFLT","IOT",
+"GTLB","AI","S","CYBR","ZI",
+
+/* ================= BIOTECH / RISK APPETITE ================= */
+
+"MRNA","DNA","XBI","IBB","ALNY",
+"EXAS","TECH","SRPT","CRSP","NTLA",
+
+/* ================= SMALL / MID CYCLICALS ================= */
+
+"WCC","GWW","SITE","CNM","SSD",
+"AIT","LPX","UFPI","BCC","WIRE",
+
+/* ================= TRANSPORT EXPANSION ================= */
+
+"CHRW","EXPD","MATX","KEX","SAIA",
+"ARCB","XPO","RYAAY","ALK","AAL",
+
+/* ================= ENERGY BREADTH ================= */
+
+"OXY","DVN","FANG","HES","BKR",
+"HAL","COP","CTRA","MRO","APA",
+
+/* ================= MATERIALS / GLOBAL CYCLE ================= */
+
+"APD","ECL","IFF","SHW","BALL",
+"PKG","IP","CF","MOS","ALB",
+
+/* ================= NON-AI TECH ================= */
+
+"HPQ","DELL","STX","WDAY","NTAP",
+"CTSH","VRSN","GEN","PAYX","TYL",
+
+/* ================= SMALL CAP RISK / SPECULATION ================= */
+
+"SOFI","IONQ","ASTS","RKLB","CAVA",
+"CELH","DUOL","APP","HIMS","RIOT"
+
+
 ];
 
 async function fetchETF(symbol: string) {
@@ -2989,6 +3460,38 @@ concentration.score,
 futuresSignal
 );
 
+// ================= RUSSELL SUPER ENTRY =================
+
+let russellSuperSignal = false;
+let russellSuperScore = 0;
+
+// 1. Rotation (Kernbedingung)
+if(rotationSignal === "strong_risk_on") russellSuperScore += 2;
+if(rsShiftSmall > 0.05) russellSuperScore += 1;
+
+// 2. Breadth Expansion (früh + explosiv)
+if(breadth50 > 0.55) russellSuperScore += 1;
+if(breadth200 > 0.50) russellSuperScore += 1;
+
+// 3. Liquidität / Risk-On
+if(liquidityFlow === "risk_on") russellSuperScore += 1;
+if(creditData.creditSignal === "risk_on") russellSuperScore += 1;
+
+// 4. Volatility Support (kein Stress!)
+if(vix < 18) russellSuperScore += 1;
+if(vixTermStructure === "contango") russellSuperScore += 1;
+
+// 5. Gamma Tailwind
+if(gamma.regime === "POSITIVE") russellSuperScore += 2;
+
+// 6. Kein Crash-Umfeld!
+if(crashRisk.probability < 35) russellSuperScore += 1;
+
+// 🔥 FINAL TRIGGER (Top 5%)
+if(russellSuperScore >= 8){
+russellSuperSignal = true;
+}
+
 
 // ================= GAMMA NONLINEAR =================
 
@@ -3158,8 +3661,26 @@ else if(finalPhase.includes("Phase 4")) riskPhase = "FRAGILE";
 // POSITION SIZE
 let positionSize = 0;
 
+// ================= POSITION DIRECTION =================
 let positionDirection = "PUT";
 
+// ================= DIRECTION SWITCH =================
+
+// 🔥 SUPER SIGNAL → MAX AGGRESSION
+if(russellSuperSignal){
+positionDirection = "CALL";
+positionSize = Math.max(positionSize, 80);
+}
+
+// Normale Call Bedingungen
+else if(
+callScore > 6 &&
+crashRisk.probability < 45
+){
+positionDirection = "CALL";
+}
+
+// Starker Risk-On Override
 if(
 rotationSignal === "strong_risk_on" &&
 gamma.regime === "positive" &&
@@ -3168,6 +3689,7 @@ liquidityStress < 50
 positionDirection = "CALL";
 positionSize += 10;
 }
+
 
 if(riskPhase === "CRASH BUILD") positionSize = 90;
 else if(riskPhase === "ACCELERATION") positionSize = 75;
@@ -3337,6 +3859,8 @@ crossAssetRiskRegime: crossAssetRisk.regime,
 rotationSignal,
 rotationStrength,
 bottomSignal,
+russellSuperSignal,
+russellSuperScore,
 
 correlationScore: correlationSpike.score,
 correlationRegime: correlationSpike.regime,
