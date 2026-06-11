@@ -7,11 +7,16 @@ rotation?: any
 rotationConfirm?: any
 breadthVelocity?: any
 liquidity?: any
-breadthThrust: any
+breadthThrust?: any
 fragility?: any
 crash?: any
 executionState?: any
 regimeSync?: any
+
+breadth?: any
+structure?: any
+concentrationScore?: number
+phase?: string
 }
 
 export interface SummaryBuilderOutput {

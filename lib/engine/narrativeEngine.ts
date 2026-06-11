@@ -9,6 +9,13 @@ liquidity?: any
 fragility?: any
 crash?: any
 summary?: any
+
+breadthThrust?: any
+masterScore?: any
+
+breadth?: any
+concentrationScore?: number
+phase?: string
 }
 
 export interface NarrativeEngineOutput {
