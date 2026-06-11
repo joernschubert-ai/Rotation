@@ -530,10 +530,11 @@ futures={engine.futures}
 ROTATION COMPOSITE
 ===================================================== */}
 
-<div className="mb-6">
+<div className="grid grid-cols-1 gap-4 mb-6">
 <RotationCompositePanel
 rotation={engine.rotation}
 rotationConfirm={engine.rotationConfirm}
+
 rotationDecay={engine.rotationDecay}
 fragility={engine.fragility}
 liquidity={engine.liquidity}
