@@ -20,6 +20,7 @@ breadth50: number
 breadth200: number
 
 participation?: any
+breadthThrust?: any
 fragility?: any
 divergence?: any
 
