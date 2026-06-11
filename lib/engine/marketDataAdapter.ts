@@ -85,6 +85,9 @@ Number(raw.structureHealth ?? 50),
 ROTATION
 ===================================================== */
 
+rsGrowth:
+Number(raw.rsGrowth ?? 1),
+
 rsEqual:
 Number(raw.rsEqual ?? 1),
 
