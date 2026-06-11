@@ -372,13 +372,15 @@ cursor: "pointer"
 {/* =====================================================
 REGIME RIBBON
 ===================================================== */}
-
+<div className="mb-6">
 <RegimeRibbonPanel
 executionState={engine.executionState}
 regimeSync={engine.regimeSync}
 dangerZone={engine.dangerZone}
 phase={engine.phase}
 />
+
+</div>
 
 {/* =====================================================
 MASTER GRID
