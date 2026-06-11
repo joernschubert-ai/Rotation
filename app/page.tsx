@@ -528,20 +528,20 @@ futures={engine.futures}
 ROTATION COMPOSITE
 ===================================================== */}
 
+<div className="mb-6">
 <RotationCompositePanel
 rotation={engine.rotation}
 rotationConfirm={engine.rotationConfirm}
 rotationDecay={engine.rotationDecay}
-
 fragility={engine.fragility}
 liquidity={engine.liquidity}
 squeeze={engine.squeeze}
 participation={engine.participation}
-
 executionState={engine.executionState}
 regimeSync={engine.regimeSync}
 superSignal={engine.superSignal}
 />
+</div>
 
 {/* =====================================================
 INTERNALS
