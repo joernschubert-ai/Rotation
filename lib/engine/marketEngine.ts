@@ -208,7 +208,7 @@ Number(data.gammaExposure ?? 0),
 
 vix,
 
-move:
+moveIndex:
 Number(data.moveIndex ?? 80),
 
 breadth50,
