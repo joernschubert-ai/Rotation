@@ -7,6 +7,7 @@ rotation?: any
 rotationConfirm?: any
 breadthVelocity?: any
 liquidity?: any
+breadthThrust: any
 fragility?: any
 crash?: any
 executionState?: any
