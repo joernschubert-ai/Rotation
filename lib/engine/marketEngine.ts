@@ -211,10 +211,8 @@ vix,
 moveIndex:
 Number(data.moveIndex ?? 80),
 
-breadth50,
+breadth50
 
-correlationScore:
-Number(data.correlationScore ?? 0)
 });
 
 /* =====================================================
