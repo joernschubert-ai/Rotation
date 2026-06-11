@@ -48,7 +48,7 @@ background: getSignalColor(value, max)
 };
 }
 
-function delta(d: number) {
+function delta(d: number | null) {
 if (d === undefined || d === null) return "";
 if (d === 0) return "(0)";
 return d > 0 ? `(+${d})` : `(${d})`;
