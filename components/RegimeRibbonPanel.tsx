@@ -278,7 +278,7 @@ borderRadius: "6px"
 </div>
 
 {/* GRID */}
-
+<div className="mb-6">
 <div
 style={{
 display: "grid",
@@ -321,6 +321,7 @@ dangerColor
 executionState.executionMode,
 "#40a9ff"
 )}
+</div>
 </div>
 
 {/* FOOTER */}
