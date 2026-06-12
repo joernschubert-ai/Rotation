@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
 
+import { useRouter } from "next/navigation";
 import { marketEngine } from "@/lib/engine/marketEngine";
 import { mapBackendToEngine } from "@/lib/adapters/mapBackendToEngine";
 import { validateEngineData } from "@/lib/engine/validateEngineData";
@@ -47,24 +47,37 @@ import HistoricalReplayPanel from "@/components/HistoricalReplayPanel";
 import RotationDecayPanel from "@/components/RotationDecayPanel";
 
 export default function Home() {
+const router = useRouter();
 
-const [engine, setEngine] =
-useState<any>(null);
+const [engine, setEngine] = useState<any>(null);
+const [checkedAuth, setCheckedAuth] = useState(false);
+
 
 /* =====================================================
 LOAD
 ===================================================== */
 
 useEffect(() => {
+
+const auth = localStorage.getItem("auth");
+
+if (auth !== "true") {
+router.replace("/login");
+return;
+}
+
+setCheckedAuth(true);
 load();
-}, []);
+
+}, [router]);
+
 
 async function load() {
 
 try {
 
 const res =
-await apiFetch("/api/market");
+await fetch("/api/market");
 
 const json =
 await res.json();
@@ -302,6 +315,10 @@ snapshot
 UI LOADING
 ===================================================== */
 
+if (!checkedAuth) {
+return null;
+}
+
 if (!engine) {
 
 return (
@@ -364,6 +381,21 @@ cursor: "pointer"
 }}
 >
 📸
+</button>
+
+<button
+onClick={() => {
+localStorage.removeItem("auth");
+router.push("/login");
+}}
+style={{
+background: "#8b0000",
+padding: "6px 10px",
+border: "1px solid #444",
+cursor: "pointer"
+}}
+>
+🔒
 </button>
 
 </div>
