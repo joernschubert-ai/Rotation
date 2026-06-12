@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 import { marketEngine } from "@/lib/engine/marketEngine";
 import { mapBackendToEngine } from "@/lib/adapters/mapBackendToEngine";
@@ -63,7 +64,7 @@ async function load() {
 try {
 
 const res =
-await fetch("/api/market");
+await apiFetch("/api/market");
 
 const json =
 await res.json();
