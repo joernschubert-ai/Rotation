@@ -1,17 +1,32 @@
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
+try {
 const { password } = await req.json();
 
-console.log("INPUT:", password);
-console.log("ENV:", process.env.APP_PASSWORD);
+const appPassword = process.env.APP_PASSWORD;
 
-if (password?.trim() === process.env.APP_PASSWORD?.trim()) {
+if (!appPassword) {
+return NextResponse.json(
+{ error: "APP_PASSWORD missing" },
+{ status: 500 }
+);
+}
+
+if (password?.trim() === appPassword.trim()) {
 return NextResponse.json({
-success: true,
-token: "x9KfP2LmQa83zZ_2519.BJ"
+success: true
 });
 }
 
-return NextResponse.json({ success: false }, { status: 401 });
+return NextResponse.json(
+{ success: false },
+{ status: 401 }
+);
+} catch (error) {
+return NextResponse.json(
+{ success: false },
+{ status: 500 }
+);
+}
 }
