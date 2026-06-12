@@ -288,7 +288,7 @@ gap: "18px"
 {/* =====================================================
 MASTER HEADER
 ===================================================== */}
-
+<div className="mb-6">
 <div
 style={{
 background: "#0d0d0d",
@@ -378,6 +378,7 @@ border: "1px solid #222",
 padding: "12px"
 }}
 >
+
 
 <div
 style={{
@@ -503,7 +504,7 @@ fontWeight: "bold"
 >
 {superSignalStrength}
 </div>
-
+</div>
 </div>
 
 </div>
