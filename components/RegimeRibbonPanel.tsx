@@ -278,7 +278,7 @@ borderRadius: "6px"
 </div>
 
 {/* GRID */}
-
+<div className="grid mb-6">
 <div
 style={{
 display: "grid",
@@ -286,7 +286,7 @@ gridTemplateColumns: "repeat(6, 1fr)",
 gap: "10px"
 }}
 >
-<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+
 {block(
 "PHASE",
 phase ?? "UNKNOWN",
