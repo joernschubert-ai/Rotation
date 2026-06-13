@@ -228,7 +228,7 @@ borderRadius: "8px"
 }}
 >
 {/* HEADER */}
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
+
 <div
 style={{
 marginBottom: "14px",
@@ -278,6 +278,7 @@ borderRadius: "6px"
 </div>
 
 {/* GRID */}
+
 <div
 style={{
 display: "grid",
@@ -285,6 +286,7 @@ gridTemplateColumns: "repeat(6, 1fr)",
 gap: "10px"
 }}
 >
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
 {block(
 "PHASE",
 phase ?? "UNKNOWN",
