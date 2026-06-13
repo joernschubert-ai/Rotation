@@ -228,7 +228,7 @@ borderRadius: "8px"
 }}
 >
 {/* HEADER */}
-
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
 <div
 style={{
 marginBottom: "14px",
@@ -278,7 +278,6 @@ borderRadius: "6px"
 </div>
 
 {/* GRID */}
-<div className="mb-6">
 <div
 style={{
 display: "grid",
