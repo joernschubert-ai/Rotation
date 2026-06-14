@@ -46,6 +46,11 @@ export async function POST(req: Request) {
 try {
 const body = await req.json();
 
+console.log(
+"SIGNAL BODY:",
+JSON.stringify(body, null, 2)
+);
+
 if (!body?.signal) {
 return NextResponse.json({ ok: false, error: "No signal provided" });
 }
