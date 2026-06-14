@@ -65,6 +65,10 @@ if (typeof data === "string") {
 return JSON.parse(data);
 }
 
+if (Array.isArray(data)) {
+return data;
+}
+
 return [];
 } catch (e) {
 console.error("Load Signals Error:", e);
