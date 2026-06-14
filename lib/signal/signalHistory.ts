@@ -22,6 +22,7 @@ type: signal.type,
 strength: signal.strength,
 message: signal.message,
 priority: signal.priority,
+phase: signal.phase,
 timestamp: Date.now()
 };
 
@@ -68,6 +69,13 @@ return JSON.parse(data);
 if (Array.isArray(data)) {
 return data;
 }
+
+console.log(
+"RAW SIGNAL DATA:",
+data,
+typeof data,
+Array.isArray(data)
+);
 
 return [];
 } catch (e) {
