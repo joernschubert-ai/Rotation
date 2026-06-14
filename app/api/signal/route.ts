@@ -88,6 +88,9 @@ return NextResponse.json({ ok: false });
 /* ================= GET (LOAD) ================= */
 
 export async function GET() {
+
+console.log("SIGNAL GET START");
+
 try {
 const history = await loadSignals();
 
