@@ -118,20 +118,22 @@ headers: {
 
 body: JSON.stringify({
 
-timestamp:
-Date.now(),
+signal: {
 
-phase:
-e.phase,
+timestamp: Date.now(),
 
-type:
-e.signal.type,
+phase: e.phase,
 
-strength:
-e.signal.strength,
+type: e.signal.type,
 
-message:
-e.signal.message
+strength: e.signal.strength,
+
+message: e.signal.message,
+
+priority:
+e.signal.priority ?? "MEDIUM"
+}
+
 })
 })
 .catch(() => {});
