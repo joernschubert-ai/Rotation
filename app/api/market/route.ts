@@ -1,6 +1,17 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { Redis } from "@upstash/redis";
+import type { Redis as RedisType } from "@upstash/redis";
+
+import {
+loadMarketHistory,
+saveMarketSnapshot
+} from "@/lib/history/marketHistory";
+
+import {
+historyEngine
+} from "@/lib/history/historyEngine";
 
 /* ================= MARKET CACHE ================= */
 
@@ -13,10 +24,7 @@ let smoothedBreadth50 = 0;
 // const CACHE_DURATION = 10 * 1000; // 10 Sekunden
 const CACHE_DURATION = 0; // 🔥 deaktiviert Cache komplett (Debug-Modus)
 
-import { Redis } from "@upstash/redis";
 
-// let redis; alte version
-import type { Redis as RedisType } from "@upstash/redis";
 let redis: RedisType | undefined;
 
 try {
@@ -880,6 +888,11 @@ const current = closes[closes.length - 1];
 // 🔥 WICHTIG: echtes Lookback (ohne aktuellen Wert)
 const history = closes.slice(-252, -1);
 
+// const marketHistory =
+// await loadMarketHistory();
+
+// const historyMetrics =
+// historyEngine(marketHistory);
 const high252 = Math.max(...history);
 const low252 = Math.min(...history);
 
@@ -4003,7 +4016,8 @@ timestamp: Date.now()
 
 capitulationProbability,
 capitulationAlarm,
-regimeHistory: history,
+regimeHistory: history
+
 };
 
 await saveMarketState({
@@ -4016,6 +4030,36 @@ nq: nq[nq.length - 1],
 rty: rty[rty.length - 1]
 }
 });
+
+await saveMarketSnapshot({
+timestamp: Date.now(),
+
+breadth50,
+breadth200,
+
+advanceDecline: adData.adValue,
+
+newHighs: highLowData.newHighs,
+newLows: highLowData.newLows,
+
+crashProbability: crashRisk.probability,
+
+marketStressScore: marketStress.score,
+
+rotationStrength,
+
+concentrationScore:
+concentration.score
+});
+
+const testHistory =
+await loadMarketHistory();
+
+console.log(
+"MARKET HISTORY SIZE:",
+testHistory.length
+);
+
 
 // Cache nur wenn Futures valide
 if (
