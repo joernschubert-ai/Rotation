@@ -88,14 +88,18 @@ return NextResponse.json({ ok: false });
 /* ================= GET (LOAD) ================= */
 
 export async function GET() {
-
-console.log("SIGNAL GET START");
-
 try {
+
 const history = await loadSignals();
 
-/* Safety Normalize (alte Daten absichern) */
-const safe = (history || []).map((s: any) => normalizeSignal(s));
+console.log("GET HISTORY:", history);
+
+const safe =
+(history || []).map((s: any) =>
+normalizeSignal(s)
+);
+
+console.log("GET SAFE:", safe);
 
 return NextResponse.json(safe);
 
