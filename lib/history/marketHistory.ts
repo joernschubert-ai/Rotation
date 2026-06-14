@@ -22,6 +22,12 @@ if (!redis) return [];
 try {
 const data = await redis.get(KEY);
 
+console.log("RAW MARKET DATA:", data);
+
+if (Array.isArray(data)) {
+return data;
+}
+
 if (typeof data === "string") {
 return JSON.parse(data);
 }
@@ -32,6 +38,8 @@ console.error("Load Market History Error:", e);
 return [];
 }
 }
+
+
 
 /* =====================================================
 SAVE
@@ -47,7 +55,10 @@ const data = await redis.get(KEY);
 
 let history: any[] = [];
 
-if (typeof data === "string") {
+if (Array.isArray(data)) {
+history = data;
+}
+else if (typeof data === "string") {
 history = JSON.parse(data);
 }
 
