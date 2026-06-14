@@ -4032,12 +4032,8 @@ rty: rty[rty.length - 1]
 });
 
 await saveMarketSnapshot({
-
 timestamp: Date.now(),
 
-// phase: phaseData.phase,
-
-breadth20,
 breadth50,
 breadth200,
 
@@ -4046,40 +4042,13 @@ advanceDecline: adData.adValue,
 newHighs: highLowData.newHighs,
 newLows: highLowData.newLows,
 
-rotationScore: rotation.score,
-rotationStrength,
-
-participationScore: participation.score,
-
 crashProbability: crashRisk.probability,
+
 marketStressScore: marketStress.score,
 
-liquidityScore: liquidity.score,
-fragilityScore: fragility.score,
-marketQualityScore: master.meta.marketQualityScore,
+rotationStrength,
 
-concentrationScore: concentration.score,
-
-rsSmall: rotation.rsSmall,
-rsEqual: rotation.rsEqual,
-rsGrowth: rotation.rsGrowth,
-
-vix,
-
-spx: indices.spx.value,
-ndx: indices.ndx.value,
-rut: indices.rut.value,
-
-effectiveGamma: liquidity.metrics.effectiveGamma,
-credit: liquidity.metrics.credit,
-vixTerm: liquidity.metrics.vixTerm,
-
-persistenceScore: phaseData.drivers.persistenceScore,
-divergenceSeverity: phaseData.drivers.divergenceSeverity,
-
-leadershipBreadth: participation.leadershipBreadth,
-institutionalParticipation: participation.institutionalParticipation,
-passiveDependence: participation.passiveDependence
+concentrationScore: concentration.score
 });
 
 
