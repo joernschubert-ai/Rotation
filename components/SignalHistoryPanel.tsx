@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 export default function SignalHistoryPanel() {
 const [signals, setSignals] = useState<any[]>([]);
 
+console.log("SIGNALS STATE:", signals);
+
 /* ================= LOAD ================= */
 
 useEffect(() => {
@@ -15,6 +17,9 @@ async function load() {
 try {
 const res = await fetch("/api/signal");
 const json = await res.json();
+
+console.log("SIGNAL API RESPONSE:", json);
+
 setSignals(json || []);
 } catch (e) {
 console.error("LOAD SIGNAL HISTORY ERROR", e);
@@ -59,6 +64,10 @@ padding: "16px"
 <h3 style={{ color: "#888", marginBottom: "12px" }}>
 SIGNAL HISTORY
 </h3>
+
+<div style={{ color: "red" }}>
+COUNT: {signals.length}
+</div>
 
 {signals.length === 0 && (
 <div style={{ color: "#666" }}>No signals yet</div>
