@@ -4035,7 +4035,7 @@ await saveMarketSnapshot({
 
 timestamp: Date.now(),
 
-phase: phaseData.phase,
+// phase: phaseData.phase,
 
 breadth20,
 breadth50,
