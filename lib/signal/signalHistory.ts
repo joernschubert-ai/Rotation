@@ -59,6 +59,8 @@ if (!redis) return [];
 try {
 const data = await redis.get(KEY);
 
+console.log("RAW SIGNAL DATA:", data);
+
 if (typeof data === "string") {
 return JSON.parse(data);
 }
