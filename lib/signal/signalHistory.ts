@@ -37,11 +37,19 @@ history = JSON.parse(existing);
 history.unshift(entry);
 history = history.slice(0, MAX_ITEMS);
 
+console.log("SAVE SIGNAL:", signal);
+console.log("CURRENT HISTORY:", history.length);
+
 await redis.set(KEY, JSON.stringify(history));
+
+console.log("SIGNAL SAVED");
+
 } catch (e) {
 console.error("Save Signal Error:", e);
 }
 }
+
+console.log("SIGNAL SAVED");
 
 /* ================= LOAD ================= */
 
