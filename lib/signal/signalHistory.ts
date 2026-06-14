@@ -15,7 +15,7 @@ const MAX_ITEMS = 50;
 /* ================= SAVE ================= */
 
 export async function saveSignal(signal: any) {
-if (!redis || !signal?.active) return;
+if (!redis) return;
 
 const entry = {
 type: signal.type,
