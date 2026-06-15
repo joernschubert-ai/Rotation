@@ -2,76 +2,190 @@ export interface HistoryMetrics {
 breadthTrend: number;
 breadthAcceleration: number;
 
+participationTrend: number;
 participationDecay: number;
 
-leadershipDecay: number;
+rotationTrend: number;
+liquidityTrend: number;
+fragilityTrend: number;
+
+leadershipTrend: number;
+
+rsSmallTrend: number;
+rsEqualTrend: number;
+rsGrowthTrend: number;
 
 relativeBreadthWeakness: number;
 
 crashTrend: number;
 
+persistenceScore: number;
+
 phasePersistence: number;
 }
 
-export function historyEngine(history: any[]): HistoryMetrics {
+export function historyEngine(
+history: any[]
+): HistoryMetrics {
 
 if (!history || history.length < 5) {
 return {
 breadthTrend: 0,
 breadthAcceleration: 0,
+
+participationTrend: 0,
 participationDecay: 0,
-leadershipDecay: 0,
+
+rotationTrend: 0,
+liquidityTrend: 0,
+fragilityTrend: 0,
+
+leadershipTrend: 0,
+
+rsSmallTrend: 0,
+rsEqualTrend: 0,
+rsGrowthTrend: 0,
+
 relativeBreadthWeakness: 0,
+
 crashTrend: 0,
+
+persistenceScore: 0,
+
 phasePersistence: 0
 };
 }
 
 const newest = history[0];
-const oldest = history[Math.min(history.length - 1, 10)];
+
+const oldest =
+history[
+Math.min(
+history.length - 1,
+10
+)
+];
+
+/* =====================================
+BREADTH
+===================================== */
 
 const breadthTrend =
-(newest.breadth50 ?? 0)
--
+(newest.breadth50 ?? 0) -
 (oldest.breadth50 ?? 0);
 
 const breadthAcceleration =
-(history[0]?.breadth50 ?? 0)
--
+(history[0]?.breadth50 ?? 0) -
 (history[5]?.breadth50 ?? 0);
 
-const participationDecay =
-(oldest.newHighs ?? 0)
--
-(newest.newHighs ?? 0);
-
-const leadershipDecay =
-(oldest.rotationDetails?.concentrationScore ?? 0)
--
-(newest.rotationDetails?.concentrationScore ?? 0);
-
 const relativeBreadthWeakness =
-(newest.breadth50 ?? 0)
--
+(newest.breadth50 ?? 0) -
 (newest.breadth20 ?? 0);
 
-const crashTrend =
-(newest.crashProbability ?? 0)
+/* =====================================
+PARTICIPATION
+===================================== */
+
+const participationTrend =
+(newest.participationScore ?? 0) -
+(oldest.participationScore ?? 0);
+
+const participationDecay =
+(oldest.newHighs ?? 0) -
+(newest.newHighs ?? 0);
+
+/* =====================================
+ROTATION
+===================================== */
+
+const rotationTrend =
+(newest.rotationScore ??
+newest.rotationStrength ??
+0)
 -
+(oldest.rotationScore ??
+oldest.rotationStrength ??
+0);
+
+/* =====================================
+LIQUIDITY / FRAGILITY
+===================================== */
+
+const liquidityTrend =
+(newest.liquidityScore ?? 0) -
+(oldest.liquidityScore ?? 0);
+
+const fragilityTrend =
+(newest.fragilityScore ?? 0) -
+(oldest.fragilityScore ?? 0);
+
+/* =====================================
+LEADERSHIP
+===================================== */
+
+const leadershipTrend =
+(newest.leadershipBreadth ?? 0) -
+(oldest.leadershipBreadth ?? 0);
+
+/* =====================================
+RELATIVE STRENGTH
+===================================== */
+
+const rsSmallTrend =
+(newest.rsSmall ?? 0) -
+(oldest.rsSmall ?? 0);
+
+const rsEqualTrend =
+(newest.rsEqual ?? 0) -
+(oldest.rsEqual ?? 0);
+
+const rsGrowthTrend =
+(newest.rsGrowth ?? 0) -
+(oldest.rsGrowth ?? 0);
+
+/* =====================================
+CRASH
+===================================== */
+
+const crashTrend =
+(newest.crashProbability ?? 0) -
 (oldest.crashProbability ?? 0);
+
+/* =====================================
+PERSISTENCE
+===================================== */
+
+const persistenceScore =
+(newest.persistenceScore ?? 0);
 
 const phasePersistence =
 history.filter(
-h => h.cyclePhase === newest.cyclePhase
+h => h.phase === newest.phase
 ).length;
 
 return {
 breadthTrend,
 breadthAcceleration,
+
+participationTrend,
 participationDecay,
-leadershipDecay,
+
+rotationTrend,
+liquidityTrend,
+fragilityTrend,
+
+leadershipTrend,
+
+rsSmallTrend,
+rsEqualTrend,
+rsGrowthTrend,
+
 relativeBreadthWeakness,
+
 crashTrend,
+
+persistenceScore,
+
 phasePersistence
 };
 }
