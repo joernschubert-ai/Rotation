@@ -429,7 +429,9 @@ putTiming: putTimingTemp,
 earlyWarning,
 structure,
 
-russell: russellTemp
+russell: russellTemp,
+historyMetrics:
+data.historyMetrics
 });
 
 const phase =
@@ -662,7 +664,22 @@ creditRatio:
 Number(data.creditRatio ?? 1),
 
 marketLiquidityScore:
-Number(data.marketLiquidityScore ?? 50)
+Number(data.marketLiquidityScore ?? 50),
+
+breadthTrend:
+data.historyMetrics?.breadthTrend,
+
+breadthAcceleration:
+data.historyMetrics?.breadthAcceleration,
+
+participationDecay:
+data.historyMetrics?.participationDecay,
+
+leadershipDecay:
+data.historyMetrics?.leadershipDecay,
+
+relativeBreadthWeakness:
+data.historyMetrics?.relativeBreadthWeakness,
 });
 
 /* =====================================================
@@ -843,7 +860,10 @@ rotationConfirm,
 rotationDecay,
 
 executionState,
-regimeSync
+regimeSync,
+
+historyMetrics:
+data.historyMetrics
 });
 
 /* =====================================================
