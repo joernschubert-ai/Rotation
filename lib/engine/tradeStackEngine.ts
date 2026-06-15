@@ -111,12 +111,8 @@ HISTORY FLAGS
 const deterioratingBreadth =
 breadthTrend < -10;
 
-if (
-acceleratingBreadthDecay &&
-type === "LONG"
-) {
-strength -= 6;
-}
+const acceleratingBreadthDecay =
+breadthAcceleration < -5;
 
 const participationErosion =
 participationDecay > 10;
@@ -124,12 +120,8 @@ participationDecay > 10;
 const severeParticipationErosion =
 participationDecay > 20;
 
-if (
-leadershipConcentration &&
-type === "LONG"
-) {
-strength -= 5;
-}
+const leadershipConcentration =
+leadershipDecay < -5;
 
 const risingCrashRisk =
 crashTrend > 5;
@@ -371,6 +363,36 @@ ROTATION QUALITY
 ====================================================== */
 
 if (type === "LONG") {
+
+if (
+deterioratingBreadth
+) {
+strength -= 8;
+}
+
+if (
+acceleratingBreadthDecay
+) {
+strength -= 6;
+}
+
+if (
+participationErosion
+) {
+strength -= 12;
+}
+
+if (
+risingCrashRisk
+) {
+strength -= 10;
+}
+
+if (
+prolongedDistribution
+) {
+strength -= 10;
+}
 
 if (rotationState === "CONFIRMED") {
 strength += 8;
