@@ -888,11 +888,11 @@ const current = closes[closes.length - 1];
 // 🔥 WICHTIG: echtes Lookback (ohne aktuellen Wert)
 const history = closes.slice(-252, -1);
 
-// const marketHistory =
-// await loadMarketHistory();
+const marketHistory =
+await loadMarketHistory();
 
-// const historyMetrics =
-// historyEngine(marketHistory);
+const historyMetrics =
+historyEngine(marketHistory);
 const high252 = Math.max(...history);
 const low252 = Math.min(...history);
 
