@@ -9,7 +9,8 @@ master,
 rotationConfirm,
 rotationDecay,
 executionState,
-regimeSync
+regimeSync,
+historyMetrics
 }: any) {
 
 /* ======================================================
@@ -82,6 +83,65 @@ const decayScore =
 Number(rotationDecay?.score ?? 20);
 
 /* ======================================================
+HISTORY
+====================================================== */
+
+const breadthTrend =
+Number(historyMetrics?.breadthTrend ?? 0);
+
+const breadthAcceleration =
+Number(historyMetrics?.breadthAcceleration ?? 0);
+
+const participationDecay =
+Number(historyMetrics?.participationDecay ?? 0);
+
+const leadershipDecay =
+Number(historyMetrics?.leadershipDecay ?? 0);
+
+const crashTrend =
+Number(historyMetrics?.crashTrend ?? 0);
+
+const phasePersistence =
+Number(historyMetrics?.phasePersistence ?? 0);
+
+/* ======================================================
+HISTORY FLAGS
+====================================================== */
+
+const deterioratingBreadth =
+breadthTrend < -10;
+
+if (
+acceleratingBreadthDecay &&
+type === "LONG"
+) {
+strength -= 6;
+}
+
+const participationErosion =
+participationDecay > 10;
+
+const severeParticipationErosion =
+participationDecay > 20;
+
+if (
+leadershipConcentration &&
+type === "LONG"
+) {
+strength -= 5;
+}
+
+const risingCrashRisk =
+crashTrend > 5;
+
+const severeRisingCrashRisk =
+crashTrend > 10;
+
+const prolongedDistribution =
+phasePersistence >= 6;
+
+
+/* ======================================================
 BASE
 ====================================================== */
 
@@ -101,6 +161,14 @@ type = "SHORT";
 strength = 75;
 driver = "PUT_FLOW";
 
+if (
+severeParticipationErosion ||
+severeRisingCrashRisk
+) {
+strength += 10;
+}
+
+
 } else if (putDecision === "ADD") {
 
 state = "SHORT_BUILDING";
@@ -108,12 +176,27 @@ type = "SHORT";
 strength = 60;
 driver = "PUT_FLOW";
 
+if (
+participationErosion ||
+risingCrashRisk
+) {
+strength += 8;
+}
+
+
 } else if (putDecision === "BUILD") {
 
 state = "DEFENSIVE_SHORT";
 type = "SHORT";
 strength = 45;
 driver = "PUT_FLOW";
+
+if (
+deterioratingBreadth ||
+participationErosion
+) {
+strength += 6;
+}
 
 } else if (
 putDecision === "EARLY" &&
@@ -127,6 +210,29 @@ state = "EARLY_DEFENSIVE_SHORT";
 type = "SHORT";
 strength = 30;
 driver = "EARLY_BREAKDOWN";
+}
+
+else if (
+
+phase === "PHASE_3_DISTRIBUTION"
+
+&&
+
+(
+participationErosion ||
+risingCrashRisk ||
+prolongedDistribution
+)
+
+) {
+
+state = "EARLY_DEFENSIVE_SHORT";
+
+type = "SHORT";
+
+strength = 35;
+
+driver = "HISTORICAL_DETERIORATION";
 }
 
 /* ======================================================
@@ -179,11 +285,75 @@ MODE OVERLAY
 if (mode === "RISK") {
 
 if (type === "SHORT") {
+
+if (
+deterioratingBreadth
+) {
+strength += 5;
+}
+
+if (
+participationErosion
+) {
+strength += 8;
+}
+
+if (
+risingCrashRisk
+) {
+strength += 8;
+}
+
+if (
+prolongedDistribution
+) {
+strength += 6;
+}
+
+if (
+severeParticipationErosion
+) {
+strength += 8;
+}
+
+if (
+severeRisingCrashRisk
+) {
+strength += 8;
+}
+
+
 strength += 10;
 }
 
 if (type === "LONG") {
+
+if (
+deterioratingBreadth
+) {
+strength -= 8;
+}
+
+if (
+participationErosion
+) {
+strength -= 12;
+}
+
+if (
+risingCrashRisk
+) {
+strength -= 10;
+}
+
+if (
+prolongedDistribution
+) {
+strength -= 10;
+}
+
 strength -= 15;
+
 }
 
 }
@@ -437,7 +607,35 @@ decayScore,
 executionMode,
 regimeAligned,
 institutionalAligned
+},
+
+history: {
+
+breadthTrend,
+breadthAcceleration,
+
+participationDecay,
+leadershipDecay,
+
+crashTrend,
+
+phasePersistence,
+
+deterioratingBreadth,
+acceleratingBreadthDecay,
+
+participationErosion,
+severeParticipationErosion,
+
+leadershipConcentration,
+
+risingCrashRisk,
+severeRisingCrashRisk,
+
+prolongedDistribution
+
 }
+
 };
 
 }
