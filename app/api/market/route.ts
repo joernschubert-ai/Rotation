@@ -4034,6 +4034,9 @@ rty: rty[rty.length - 1]
 await saveMarketSnapshot({
 timestamp: Date.now(),
 
+phase: finalPhase,
+
+breadth20: breadth20Data.breadth20,
 breadth50,
 breadth200,
 
@@ -4042,13 +4045,19 @@ advanceDecline: adData.adValue,
 newHighs: highLowData.newHighs,
 newLows: highLowData.newLows,
 
+rotationStrength,
+
 crashProbability: crashRisk.probability,
 
 marketStressScore: marketStress.score,
 
-rotationStrength,
+concentrationScore: concentration.score,
 
-concentrationScore: concentration.score
+liquidityScore: liquidityData.liquidityScore,
+
+fragilityScore: fragilityData.fragility,
+
+vix: marketData.vix
 });
 
 
