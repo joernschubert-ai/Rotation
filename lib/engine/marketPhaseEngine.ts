@@ -24,6 +24,34 @@ const internalDivergence =
 engine.internalDivergence ?? {};
 
 /* =====================================================
+HISTORY METRICS
+===================================================== */
+
+const historyMetrics =
+engine.historyMetrics ?? {};
+
+const breadthTrend =
+Number(historyMetrics.breadthTrend ?? 0);
+
+const breadthAcceleration =
+Number(historyMetrics.breadthAcceleration ?? 0);
+
+const participationDecay =
+Number(historyMetrics.participationDecay ?? 0);
+
+const leadershipDecay =
+Number(historyMetrics.leadershipDecay ?? 0);
+
+const relativeBreadthWeakness =
+Number(historyMetrics.relativeBreadthWeakness ?? 0);
+
+const crashTrend =
+Number(historyMetrics.crashTrend ?? 0);
+
+const phasePersistence =
+Number(historyMetrics.phasePersistence ?? 0);
+
+/* =====================================================
 SAFE
 ===================================================== */
 
@@ -184,6 +212,56 @@ const severePersistentWeakness =
 bearishPersistence &&
 persistenceScore >= 75
 );
+
+/* =====================================================
+HISTORY FLAGS
+===================================================== */
+
+const deterioratingBreadth =
+breadthTrend < -10;
+
+const acceleratingBreadthDecay =
+breadthAcceleration < -5;
+
+const participationErosion =
+participationDecay > 10;
+
+const severeParticipationErosion =
+participationDecay > 20;
+
+const leadershipConcentration =
+leadershipDecay < -5;
+
+const risingCrashRisk =
+crashTrend > 5;
+
+const severeRisingCrashRisk =
+crashTrend > 10;
+
+const prolongedDistribution =
+phasePersistence >= 6;
+
+const structuralDeterioration =
+
+(
+deterioratingBreadth &&
+participationErosion
+)
+
+||
+
+(
+acceleratingBreadthDecay &&
+risingCrashRisk
+)
+
+||
+
+(
+leadershipConcentration &&
+deterioratingBreadth
+);
+
 
 /* =====================================================
 FLAGS
@@ -482,6 +560,24 @@ severePersistentDistribution
 crashScore > 55
 )
 
+||
+
+structuralDeterioration
+
+||
+
+(
+prolongedDistribution &&
+participationErosion
+)
+
+||
+
+(
+severeParticipationErosion &&
+risingCrashRisk
+)
+
 ) {
 
 phase =
@@ -658,6 +754,22 @@ breadthImpulseBreak
 persistentDistribution ||
 
 hiddenInstitutionalDistribution
+
+||
+
+deterioratingBreadth
+
+||
+
+participationErosion
+
+||
+
+risingCrashRisk
+
+||
+
+prolongedDistribution
 
 ) {
 
@@ -872,7 +984,17 @@ ANTI SNAPBACK FILTER
 
 if (
 
-persistentWeakness &&
+(
+persistentWeakness ||
+
+deterioratingBreadth ||
+
+participationErosion ||
+
+risingCrashRisk
+)
+
+&&
 
 phase === "PHASE_1_EXPANSION"
 
@@ -979,7 +1101,35 @@ persistentDistribution,
 severePersistentDistribution,
 
 equalWeightWeakness,
-smallCapWeakness
+smallCapWeakness,
+
+breadthTrend,
+breadthAcceleration,
+
+participationDecay,
+leadershipDecay,
+
+relativeBreadthWeakness,
+
+crashTrend,
+
+phasePersistence,
+
+deterioratingBreadth,
+acceleratingBreadthDecay,
+
+participationErosion,
+severeParticipationErosion,
+
+leadershipConcentration,
+
+risingCrashRisk,
+severeRisingCrashRisk,
+
+prolongedDistribution,
+
+structuralDeterioration
+
 }
 };
 
