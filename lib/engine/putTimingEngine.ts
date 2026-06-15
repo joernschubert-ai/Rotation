@@ -19,6 +19,9 @@ breadthVelocity,
 regimePersistence
 } = engine;
 
+const historyMetrics =
+engine.historyMetrics ?? {};
+
 /* =====================================================
 INPUT NORMALIZATION
 ===================================================== */
@@ -144,6 +147,57 @@ const persistentWeakness =
 
 bearishPersistence &&
 persistenceScore >= 60;
+
+/* =====================================================
+HISTORY METRICS
+===================================================== */
+
+const breadthTrend =
+Number(historyMetrics?.breadthTrend ?? 0);
+
+const breadthAcceleration =
+Number(historyMetrics?.breadthAcceleration ?? 0);
+
+const participationDecay =
+Number(historyMetrics?.participationDecay ?? 0);
+
+const leadershipDecay =
+Number(historyMetrics?.leadershipDecay ?? 0);
+
+const crashTrend =
+Number(historyMetrics?.crashTrend ?? 0);
+
+const phasePersistence =
+Number(historyMetrics?.phasePersistence ?? 0);
+
+/* =====================================================
+HISTORY FLAGS
+===================================================== */
+
+const deterioratingBreadth =
+breadthTrend < -10;
+
+const acceleratingBreadthDecay =
+breadthAcceleration < -5;
+
+const participationErosion =
+participationDecay > 10;
+
+const severeParticipationErosion =
+participationDecay > 20;
+
+const leadershipConcentration =
+leadershipDecay < -5;
+
+const risingCrashRisk =
+crashTrend > 5;
+
+const severeRisingCrashRisk =
+crashTrend > 10;
+
+const prolongedDistribution =
+phasePersistence >= 6;
+
 
 /* =====================================================
 STRUCTURAL FLAGS
@@ -333,6 +387,55 @@ narrowLeadership
 structuralScore += 1;
 }
 
+if (
+deterioratingBreadth
+) {
+structuralScore += 1;
+}
+
+if (
+acceleratingBreadthDecay
+) {
+structuralScore += 1;
+}
+
+if (
+participationErosion
+) {
+structuralScore += 1;
+}
+
+if (
+severeParticipationErosion
+) {
+structuralScore += 1;
+}
+
+if (
+leadershipConcentration
+) {
+structuralScore += 1;
+}
+
+if (
+risingCrashRisk
+) {
+structuralScore += 1;
+}
+
+if (
+severeRisingCrashRisk
+) {
+structuralScore += 1;
+}
+
+if (
+prolongedDistribution
+) {
+structuralScore += 1;
+}
+
+
 structuralScore =
 Math.min(structuralScore, 10);
 
@@ -485,6 +588,31 @@ contradictionPenalty += 1;
 /* =====================================================
 INTERNAL OFFSET
 ===================================================== */
+
+if (
+participationErosion
+) {
+contradictionPenalty -= 1;
+}
+
+if (
+acceleratingBreadthDecay
+) {
+contradictionPenalty -= 1;
+}
+
+if (
+risingCrashRisk
+) {
+contradictionPenalty -= 1;
+}
+
+if (
+prolongedDistribution
+) {
+contradictionPenalty -= 1;
+}
+
 
 if (
 participationScore < 40
@@ -854,6 +982,34 @@ decision === "STRUCTURAL_BUILD"
 : "DEFENSIVE_SHORT"
 
 },
+
+historyState: {
+
+breadthTrend,
+breadthAcceleration,
+
+participationDecay,
+leadershipDecay,
+
+crashTrend,
+
+phasePersistence,
+
+deterioratingBreadth,
+acceleratingBreadthDecay,
+
+participationErosion,
+severeParticipationErosion,
+
+leadershipConcentration,
+
+risingCrashRisk,
+severeRisingCrashRisk,
+
+prolongedDistribution
+
+},
+
 
 components: {
 
