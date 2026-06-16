@@ -4043,9 +4043,18 @@ rty: rty[rty.length - 1]
 });
 
 await saveMarketSnapshot({
+
 timestamp: Date.now(),
 
+/* =================
+PHASE
+================= */
+
 phase: finalPhase,
+
+/* =================
+BREADTH
+================= */
 
 breadth20: breadth20Data.breadth20,
 breadth50,
@@ -4056,20 +4065,146 @@ advanceDecline: adData.adValue,
 newHighs: highLowData.newHighs,
 newLows: highLowData.newLows,
 
+/* =================
+ROTATION
+================= */
+
 rotationStrength,
 
-crashProbability: crashRisk.probability,
+rsSmall20,
+rsSmall60,
 
-marketStressScore: marketStress.score,
+rsGrowth20,
+rsGrowth60,
 
-concentrationScore: concentration.score,
+rsShiftSmall,
+rsShiftGrowth,
 
-liquidityScore: liquidityData.liquidityScore,
+/* =================
+PARTICIPATION
+================= */
 
-fragilityScore: fragilityData.fragility,
+// participationScore:
+// participation.score,
 
-vix: marketData.vix
+// leadershipBreadth:
+// participation.leadershipBreadth,
+
+// institutionalParticipation:
+// participation.institutionalParticipation,
+
+// passiveDependence:
+// participation.passiveDependence,
+
+/* =================
+CRASH / RISK
+================= */
+
+crashProbability:
+crashRisk.probability,
+
+marketStressScore:
+marketStress.score,
+
+fragilityScore:
+fragilityData.fragility,
+
+concentrationScore:
+concentration.score,
+
+breadthDivergence,
+
+correlationScore:
+correlationSpike.score,
+
+regimeStabilityScore:
+regimeStability.score,
+
+crashMomentum:
+crashMomentumData.score,
+
+/* =================
+LIQUIDITY
+================= */
+
+liquidityScore:
+liquidityData.liquidityScore,
+
+marketLiquidityScore:
+marketLiquidity.score,
+
+creditRatio:
+creditData.creditRatio,
+
+gammaExposure:
+gamma.gammaBillions,
+
+vixTermRatio:
+vixTermRatio.ratio,
+
+/* =================
+MARKET QUALITY
+================= */
+
+// marketQualityScore:
+// marketQuality.score,
+
+// breadthVelocityScore:
+// breadthVelocity.score,
+
+/* =================
+REGIME
+================= */
+
+// persistenceScore:
+// phaseData.drivers?.persistenceScore,
+
+// regimeSyncScore:
+// regimeSync.score,
+
+// regimeSyncAligned:
+// regimeSync.aligned,
+
+// dangerZoneLevel:
+// dangerZone.level,
+
+// executionRiskState:
+// executionState.riskState,
+
+/* =================
+VOLATILITY
+================= */
+
+vix: marketData.vix,
+
+/* =================
+INDEXES
+================= */
+
+spx: spCurrent,
+
+ndx:
+qqq.length
+? qqq[qqq.length - 1]
+: 0,
+
+rut:
+iwm.length
+? iwm[iwm.length - 1]
+: 0,
+
+dxy,
+
+move,
+
+distributionScore:
+distributionData.distributionScore,
+
+shockScore:
+shockData.shockScore
+
 });
+
 
 
 const testHistory =
