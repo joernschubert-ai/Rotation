@@ -35,6 +35,18 @@ const breadthVelocity = engine.breadthVelocity ?? {};
 const regimePersistence = engine.regimePersistence ?? {};
 const marketQuality = engine.marketQuality ?? {};
 
+/* ================= HISTORY ================= */
+
+const phasePersistence =
+Number(
+engine.historyMetrics?.phasePersistence ?? 0
+);
+
+const participationDecay =
+Number(
+engine.historyMetrics?.participationDecay ?? 0
+);
+
 /* ================= BASE SIZE ================= */
 
 let base = 40;
@@ -477,6 +489,18 @@ edge -= 2;
 }
 
 if (
+phasePersistence >= 10
+) {
+edge -= 1;
+}
+
+if (
+participationDecay > 15
+) {
+edge -= 1;
+}
+
+if (
 narrowLeadership
 ) {
 edge -= 2;
@@ -665,6 +689,18 @@ size *= 0.8;
 }
 
 if (
+phasePersistence >= 10
+) {
+size *= 0.9;
+}
+
+if (
+participationDecay > 15
+) {
+size *= 0.9;
+}
+
+if (
 poorMarketQuality
 ) {
 size *= 0.8;
@@ -727,6 +763,14 @@ fragileExpansion
 ) {
 
 size = Math.min(size, 40);
+}
+
+if (
+phasePersistence >= 12 &&
+participationDecay > 20
+) {
+
+size = Math.min(size, 35);
 }
 
 /* =====================================================
