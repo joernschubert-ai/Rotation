@@ -21,6 +21,7 @@ const regimeSync = engine.regimeSync ?? {};
 const breadthVelocity = engine.breadthVelocity ?? {};
 const regimePersistence = engine.regimePersistence ?? {};
 const marketQuality = engine.marketQuality ?? {};
+const historyMetrics = engine.historyMetrics ?? {};
 const dangerZone = engine.dangerZone ?? {};
 const marketDrivers = engine.marketDrivers ?? {};
 const executionState = engine.executionState ?? {};
@@ -90,6 +91,16 @@ Number(
 breadthVelocity?.score ?? 50
 );
 
+const phasePersistence =
+Number(
+historyMetrics?.phasePersistence ?? 0
+);
+
+const participationDecay =
+Number(
+historyMetrics?.participationDecay ?? 0
+);
+
 /* =====================================================
 EXECUTION LAYER
 ===================================================== */
@@ -118,7 +129,11 @@ breadthVelocityScore < 45 ||
 
 marketQualityScore < 45 ||
 
-rotationDecayScore > 45
+rotationDecayScore > 45 ||
+
+phasePersistence >= 10 ||
+
+participationDecay > 15
 
 );
 
@@ -172,6 +187,30 @@ score -= 10;
 
 if (fragilityScore > 60) {
 score -= 8;
+}
+
+if (
+phasePersistence >= 8
+) {
+score -= 4;
+}
+
+if (
+phasePersistence >= 12
+) {
+score -= 6;
+}
+
+if (
+participationDecay > 15
+) {
+score -= 4;
+}
+
+if (
+participationDecay > 25
+) {
+score -= 6;
 }
 
 /* -------------------------------------------------
@@ -376,7 +415,9 @@ narrowLeadership,
 rotationDecayScore,
 marketQualityScore,
 participationScore,
-breadthVelocityScore
+breadthVelocityScore,
+phasePersistence,
+participationDecay
 },
 
 components: {
