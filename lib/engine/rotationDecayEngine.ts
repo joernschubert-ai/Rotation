@@ -22,7 +22,15 @@ creditRatio,
 marketLiquidityScore,
 concentrationScore,
 
-internalDivergence
+internalDivergence,
+
+breadthTrend,
+breadthAcceleration,
+participationDecay,
+leadershipDecay,
+relativeBreadthWeakness,
+phasePersistence
+
 }: any) {
 
 /* =====================================================
@@ -197,6 +205,24 @@ Number(creditRatio ?? 1);
 
 const concentration =
 Number(concentrationScore ?? 50);
+
+const historyBreadthTrend =
+Number(breadthTrend ?? 0);
+
+const historyBreadthAcceleration =
+Number(breadthAcceleration ?? 0);
+
+const historyParticipationDecay =
+Number(participationDecay ?? 0);
+
+const historyLeadershipDecay =
+Number(leadershipDecay ?? 0);
+
+const historyRelativeBreadthWeakness =
+Number(relativeBreadthWeakness ?? 0);
+
+const historyPhasePersistence =
+Number(phasePersistence ?? 0);
 
 /* =====================================================
 INTERNAL DIVERGENCE
@@ -481,6 +507,63 @@ rawDecay += 6;
 if (decayPersistence >= 14) {
 rawDecay += 8;
 }
+
+/* =====================================================
+HISTORY DECAY
+===================================================== */
+
+if (historyBreadthTrend < -5) {
+rawDecay += 4;
+}
+
+if (historyBreadthTrend < -10) {
+rawDecay += 6;
+}
+
+if (historyBreadthAcceleration < -5) {
+rawDecay += 4;
+}
+
+if (historyBreadthAcceleration < -10) {
+rawDecay += 8;
+}
+
+if (historyParticipationDecay > 10) {
+rawDecay += 5;
+}
+
+if (historyParticipationDecay > 20) {
+rawDecay += 8;
+}
+
+if (historyLeadershipDecay > 10) {
+rawDecay += 4;
+}
+
+if (historyLeadershipDecay > 20) {
+rawDecay += 8;
+}
+
+if (historyRelativeBreadthWeakness > 10) {
+rawDecay += 3;
+}
+
+if (historyRelativeBreadthWeakness > 20) {
+rawDecay += 6;
+}
+
+if (historyPhasePersistence >= 6) {
+rawDecay += 4;
+}
+
+if (historyPhasePersistence >= 10) {
+rawDecay += 8;
+}
+
+if (historyPhasePersistence >= 14) {
+rawDecay += 12;
+}
+
 
 /* =====================================================
 LEADERSHIP
