@@ -3,6 +3,9 @@
 import { getMarketStructureFlags } from "./marketStructureFlags";
 
 export interface LiquidityEngineInput {
+
+history?: any[]
+
 marketLiquidityScore?: number
 
 gammaExposure?: number
@@ -178,6 +181,61 @@ const participationCollapse =
 input.participationCollapse ?? false
 
 /* =====================================================
+HISTORY
+===================================================== */
+
+const history =
+input.history ?? []
+
+const h5 =
+history.length >= 5
+? history[history.length - 5]
+: null
+
+const h10 =
+history.length >= 10
+? history[history.length - 10]
+: null
+
+const h20 =
+history.length >= 20
+? history[history.length - 20]
+: null
+
+/* =====================================================
+LIQUIDITY TRENDS
+===================================================== */
+
+const liquidityTrend =
+liquidity -
+Number(
+h10?.marketLiquidityScore ??
+liquidity
+)
+
+const creditTrend =
+credit -
+Number(
+h10?.creditRatio ??
+credit
+)
+
+const gammaTrend =
+rawGamma -
+Number(
+h10?.gammaExposure ??
+rawGamma
+)
+
+const breadthTrend =
+breadth50 -
+Number(
+h10?.breadth50 ??
+breadth50
+)
+
+
+/* =====================================================
 STRUCTURAL FLAGS
 ===================================================== */
 
@@ -340,6 +398,25 @@ if (dealerCompression) {
 marketQualityScore -= 8
 }
 
+/* =====================================================
+TREND DETERIORATION
+===================================================== */
+
+if (liquidityTrend < -8) {
+marketQualityScore -= 6
+}
+
+if (breadthTrend < -8) {
+marketQualityScore -= 6
+}
+
+if (
+gammaTrend < -15 &&
+breadthTrend < 0
+) {
+marketQualityScore -= 4
+}
+
 marketQualityScore = clamp(
 Math.round(marketQualityScore)
 )
@@ -492,6 +569,32 @@ if (
 marketQuality === "INTERNALLY_WEAK"
 ) {
 score -= 22
+}
+
+/* =====================================================
+HISTORICAL LIQUIDITY DECAY
+===================================================== */
+
+if (liquidityTrend < -10) {
+score -= 8
+}
+
+if (liquidityTrend < -20) {
+score -= 8
+}
+
+if (
+breadthTrend < -10 &&
+liquidityTrend < 0
+) {
+score -= 6
+}
+
+if (
+gammaTrend < -20 &&
+breadthTrend < 0
+) {
+score -= 5
 }
 
 score = clamp(
@@ -732,6 +835,11 @@ fragility:
 fragilityScore,
 
 marketQualityScore,
+
+// liquidityTrend,
+// creditTrend,
+// gammaTrend,
+// breadthTrend,
 
 narrowLeadership,
 weakParticipation,
