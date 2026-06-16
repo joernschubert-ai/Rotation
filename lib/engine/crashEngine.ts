@@ -126,6 +126,61 @@ data.structure?.distribution?.value ??
 );
 
 /* =====================================================
+ROTATION DECAY
+===================================================== */
+
+const rotationDecayScore = Number(
+data.rotationDecay?.score ?? 0
+);
+
+const rotationDecayState =
+data.rotationDecay?.state ??
+"HEALTHY_ROTATION";
+
+/* =====================================================
+INTERNAL DIVERGENCE
+===================================================== */
+
+const divergenceSeverity = Number(
+data.internalDivergence?.severity ?? 0
+);
+
+const hiddenDistribution =
+Boolean(
+data.internalDivergence?.hiddenDistribution
+);
+
+const participationCollapse =
+Boolean(
+data.internalDivergence?.participationCollapse
+);
+
+/* =====================================================
+HISTORY
+===================================================== */
+
+const breadthTrend = Number(
+data.historyMetrics?.breadthTrend ?? 0
+);
+
+const breadthAcceleration = Number(
+data.historyMetrics?.breadthAcceleration ?? 0
+);
+
+const participationDecay = Number(
+data.historyMetrics?.participationDecay ?? 0
+);
+
+const leadershipDecay = Number(
+data.historyMetrics?.leadershipDecay ?? 0
+);
+
+const phasePersistence = Number(
+data.historyMetrics?.phasePersistence ?? 0
+);
+
+
+/* =====================================================
 CENTRAL MARKET STRUCTURE FLAGS
 ===================================================== */
 
@@ -320,6 +375,21 @@ breadth50 > 55
 structuralFragility += 5;
 }
 
+/* ---------- INTERNAL DIVERGENCES ---------- */
+
+structuralFragility += Math.round(
+divergenceSeverity * 0.15
+);
+
+if (hiddenDistribution) {
+structuralFragility += 8;
+}
+
+if (participationCollapse) {
+structuralFragility += 10;
+}
+
+
 /* =====================================================
 STRUCTURAL INSTABILITY BOOST
 ===================================================== */
@@ -350,6 +420,73 @@ structuralFragility += 6;
 }
 
 structuralFragility += hlScore;
+
+structuralFragility = Math.min(
+structuralFragility,
+100
+);
+
+/* ---------- ROTATION DECAY ---------- */
+
+if (rotationDecayScore > 45) {
+structuralFragility += 4;
+}
+
+if (rotationDecayScore > 60) {
+structuralFragility += 6;
+}
+
+if (rotationDecayScore > 75) {
+structuralFragility += 8;
+}
+
+if (
+rotationDecayState ===
+"DISTRIBUTION_ROTATION"
+) {
+structuralFragility += 5;
+}
+
+if (
+rotationDecayState ===
+"EXHAUSTED_ROTATION"
+) {
+structuralFragility += 8;
+}
+
+/* ---------- HISTORY DECAY ---------- */
+
+if (breadthTrend < -10) {
+structuralFragility += 4;
+}
+
+if (breadthAcceleration < -5) {
+structuralFragility += 4;
+}
+
+if (participationDecay > 10) {
+structuralFragility += 5;
+}
+
+if (participationDecay > 20) {
+structuralFragility += 8;
+}
+
+if (leadershipDecay > 10) {
+structuralFragility += 4;
+}
+
+if (leadershipDecay > 20) {
+structuralFragility += 8;
+}
+
+if (phasePersistence >= 6) {
+structuralFragility += 4;
+}
+
+if (phasePersistence >= 10) {
+structuralFragility += 8;
+}
 
 structuralFragility = Math.min(
 structuralFragility,
@@ -611,6 +748,37 @@ probability < 28
 ) {
 
 probability = 28;
+}
+
+probability = Math.max(
+0,
+Math.min(100, probability)
+);
+
+if (
+
+rotationDecayScore > 70 &&
+
+hiddenDistribution &&
+
+probability < 35
+
+) {
+
+probability = 35;
+}
+
+if (
+
+phasePersistence >= 10 &&
+
+participationDecay > 15 &&
+
+probability < 40
+
+) {
+
+probability = 40;
 }
 
 probability = Math.max(
