@@ -3,6 +3,9 @@
 import { getMarketStructureFlags } from "./marketStructureFlags";
 
 export interface ParticipationEngineInput {
+
+history?: any[]
+
 breadth20?: number
 breadth50?: number
 breadth200?: number
@@ -205,30 +208,56 @@ input.rotation?.score ??
 )
 
 /* =====================================================
+HISTORY
+===================================================== */
+
+const history =
+input.history ?? []
+
+const h5 =
+history.length >= 5
+? history[history.length - 5]
+: null
+
+const h10 =
+history.length >= 10
+? history[history.length - 10]
+: null
+
+const h20 =
+history.length >= 20
+? history[history.length - 20]
+: null
+
+/* =====================================================
 RELATIVE BREADTH SYSTEM
 ===================================================== */
 
 const previousBreadth50 =
 Number(
 input.previousBreadth50 ??
+h5?.breadth50 ??
 breadth50
 )
 
 const previousBreadth50_10d =
 Number(
 input.previousBreadth50_10d ??
+h10?.breadth50 ??
 previousBreadth50
 )
 
 const previousBreadth200 =
 Number(
 input.previousBreadth200 ??
+h10?.breadth200 ??
 breadth200
 )
 
 const previousBreadth200_20d =
 Number(
 input.previousBreadth200_20d ??
+h20?.breadth200 ??
 previousBreadth200
 )
 
@@ -506,18 +535,21 @@ VELOCITY / DECAY
 const previousParticipationScore =
 Number(
 input.previousParticipationScore ??
+h5?.participationScore ??
 score
 )
 
 const previousParticipation10d =
 Number(
 input.previousParticipation10d ??
+h10?.participationScore ??
 previousParticipationScore
 )
 
 const previousParticipation20d =
 Number(
 input.previousParticipation20d ??
+h20?.participationScore ??
 previousParticipation10d
 )
 
