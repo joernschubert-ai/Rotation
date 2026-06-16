@@ -15,6 +15,75 @@ const breadth200 = Number(data.breadth200 ?? 0) * 100;
 
 const concentration = Number(data.concentrationScore ?? 0);
 
+/* ================= ROTATION DECAY ================= */
+
+const rotationDecayScore =
+Number(
+data.rotationDecay?.score ?? 0
+);
+
+const rotationDecayState =
+data.rotationDecay?.state ??
+"HEALTHY_ROTATION";
+
+/* ================= ROTATION CONFIRM ================= */
+
+const rotationConfidence =
+Number(
+data.rotationConfirm?.confidence ?? 50
+);
+
+const rotationQuality =
+Number(
+data.rotationConfirm?.quality ?? 50
+);
+
+const falseBreakRisk =
+Number(
+data.rotationConfirm?.falseBreakRisk ?? 50
+);
+
+/* ================= PARTICIPATION ================= */
+
+const participationScore =
+Number(
+data.participation?.score ?? 50
+);
+
+/* ================= DIVERGENCES ================= */
+
+const divergenceSeverity =
+Number(
+data.internalDivergence?.severity ?? 0
+);
+
+const hiddenDistribution =
+Boolean(
+data.internalDivergence?.hiddenDistribution
+);
+
+const participationCollapse =
+Boolean(
+data.internalDivergence?.participationCollapse
+);
+
+/* ================= HISTORY ================= */
+
+const breadthTrend =
+Number(data.historyMetrics?.breadthTrend ?? 0);
+
+const breadthAcceleration =
+Number(data.historyMetrics?.breadthAcceleration ?? 0);
+
+const participationDecay =
+Number(data.historyMetrics?.participationDecay ?? 0);
+
+const leadershipDecay =
+Number(data.historyMetrics?.leadershipDecay ?? 0);
+
+const phasePersistence =
+Number(data.historyMetrics?.phasePersistence ?? 0);
+
 /* ================= STRUCTURE ================= */
 
 // Small Caps vs Large
@@ -33,6 +102,23 @@ if (breadth50 > 60) structureScore += 1;
 // Concentration
 if (concentration <= 1) structureScore += 2;
 else if (concentration >= 3) structureScore -= 1;
+
+/* ================= ROTATION QUALITY ================= */
+
+if (rotationConfidence >= 75)
+structureScore += 1;
+
+if (rotationQuality >= 75)
+structureScore += 1;
+
+if (participationScore < 50)
+structureScore -= 1;
+
+if (participationScore < 40)
+structureScore -= 1;
+
+if (falseBreakRisk > 70)
+structureScore -= 1;
 
 structureScore = Math.max(0, Math.min(structureScore, 5));
 
@@ -54,7 +140,63 @@ if (data.crash?.probability > 85) riskScore -= 3;
 if (data.vix < 20) riskScore += 1;
 if (data.vix > 25) riskScore -= 1;
 
-riskScore = Math.max(-2, Math.min(riskScore, 2));
+/* ================= ROTATION DECAY RISK ================= */
+
+if (rotationDecayScore > 45)
+riskScore -= 1;
+
+if (rotationDecayScore > 60)
+riskScore -= 1;
+
+if (rotationDecayScore > 75)
+riskScore -= 1;
+
+if (
+rotationDecayState ===
+"DISTRIBUTION_ROTATION"
+) {
+riskScore -= 1;
+}
+
+if (
+rotationDecayState ===
+"EXHAUSTED_ROTATION"
+) {
+riskScore -= 2;
+}
+
+/* ================= DIVERGENCE RISK ================= */
+
+if (divergenceSeverity > 40)
+riskScore -= 1;
+
+if (hiddenDistribution)
+riskScore -= 1;
+
+if (participationCollapse)
+riskScore -= 1;
+
+/* ================= HISTORY RISK ================= */
+
+if (breadthTrend < -10)
+riskScore -= 1;
+
+if (breadthAcceleration < -5)
+riskScore -= 1;
+
+if (participationDecay > 10)
+riskScore -= 1;
+
+if (leadershipDecay > 10)
+riskScore -= 1;
+
+if (phasePersistence >= 6)
+riskScore -= 1;
+
+if (phasePersistence >= 10)
+riskScore -= 1;
+
+riskScore = Math.max(-5, Math.min(riskScore, 2));
 
 /* ================= TOTAL ================= */
 
@@ -80,6 +222,23 @@ if (data.crash?.probability > 70) {
 return "NO_TRADE";
 }
 
+if (
+rotationDecayScore >= 75 &&
+(
+hiddenDistribution ||
+participationCollapse
+)
+) {
+return "NO_TRADE";
+}
+
+if (
+phasePersistence >= 10 &&
+participationDecay > 15
+) {
+return "NO_TRADE";
+}
+
 if (totalScore >= 2 && totalScore < 4) return "EARLY";
 if (totalScore >= 4 && totalScore < 6) return "BUILD";
 if (totalScore >= 6 && totalScore < 8) return "ADD";
@@ -89,6 +248,13 @@ return "NO_TRADE";
 }
 
 const decision = getRussellDecision();
+
+const confidence =
+
+decision === "NO_TRADE"
+? Math.min(totalScore * 5, 40)
+: totalScore * 10;
+
 
 /* ================= RETURN ================= */
 
@@ -101,7 +267,7 @@ value: totalScore,
 max: 10
 },
 
-confidence: totalScore * 10,
+confidence,
 
 components: {
 structure: {
@@ -113,8 +279,8 @@ value: regimeScore,
 max: 3
 },
 risk: {
-value: riskScore + 2,
-max: 4
+value: riskScore + 5,
+max: 7
 }
 }
 };
