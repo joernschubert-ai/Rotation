@@ -19,6 +19,14 @@ data.participationScore ??
 
 const phase = data.phase;
 
+const phasePersistence = Number(data.phasePersistence ?? 0);
+
+const breadthTrend = Number(data.breadthTrend ?? 0);
+
+const breadthAcceleration = Number(data.breadthAcceleration ?? 0);
+
+const participationDecay = Number(data.participationDecay ?? 0);
+
 /* ================= INTERNAL DIVERGENCE ================= */
 
 const internalDivergence =
@@ -128,6 +136,32 @@ internalDivergenceScore += 1;
 internalDivergenceScore =
 Math.min(internalDivergenceScore, 3);
 
+/* ================= HISTORY SIGNALS ================= */
+
+let historyScore = 0;
+
+/* ---------- BREADTH TREND ---------- */
+
+if (breadthTrend < -5) historyScore += 1;
+if (breadthTrend < -10) historyScore += 1;
+
+/* ---------- ACCELERATION ---------- */
+
+if (breadthAcceleration < -3) historyScore += 1;
+
+/* ---------- PARTICIPATION DECAY ---------- */
+
+if (participationDecay > 10) historyScore += 1;
+if (participationDecay > 20) historyScore += 1;
+
+/* ---------- PHASE PERSISTENCE ---------- */
+
+if (phasePersistence >= 6) historyScore += 1;
+if (phasePersistence >= 10) historyScore += 1;
+
+/* clamp */
+historyScore = Math.min(historyScore, 3);
+
 /* ================= TOTAL ================= */
 
 let total =
@@ -136,7 +170,8 @@ distributionScore +
 concentrationScore +
 liquidityAdj +
 participationScore +
-internalDivergenceScore;
+internalDivergenceScore +
+historyScore;
 
 /* ================= PHASE CONTEXT ================= */
 
@@ -247,7 +282,14 @@ hiddenDistribution,
 participationCollapse,
 narrowLeadership,
 
-participation
+participation,
+
+historyScore,
+breadthTrend,
+breadthAcceleration,
+participationDecay,
+phasePersistence
+
 }
 };
 }
