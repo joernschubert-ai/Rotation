@@ -100,6 +100,11 @@ fragility: number
 
 marketQualityScore: number
 
+liquidityTrend: number
+creditTrend: number
+gammaTrend: number
+breadthTrend: number
+
 narrowLeadership: boolean
 weakParticipation: boolean
 breadthFailure: boolean
@@ -836,10 +841,10 @@ fragilityScore,
 
 marketQualityScore,
 
-// liquidityTrend,
-// creditTrend,
-// gammaTrend,
-// breadthTrend,
+liquidityTrend,
+creditTrend,
+gammaTrend,
+breadthTrend,
 
 narrowLeadership,
 weakParticipation,
