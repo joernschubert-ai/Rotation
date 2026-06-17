@@ -179,6 +179,65 @@ const phasePersistence = Number(
 data.historyMetrics?.phasePersistence ?? 0
 );
 
+const history =
+data.history ?? []
+
+const h5 =
+history.length >= 5
+? history[history.length - 5]
+: null
+
+const h10 =
+history.length >= 10
+? history[history.length - 10]
+: null
+
+const participationTrend =
+participationScore -
+Number(
+h10?.participationScore ??
+participationScore
+)
+
+const breadth50TrendHistory =
+breadth50 -
+Number(
+h10?.breadth50 ??
+breadth50
+)
+
+const breadth200TrendHistory =
+breadth200 -
+Number(
+h10?.breadth200 ??
+breadth200
+)
+
+const liquidityTrend =
+marketLiquidityScore -
+Number(
+h10?.marketLiquidityScore ??
+marketLiquidityScore
+)
+
+const fragilityTrend =
+Number(
+h10?.fragilityScore ??
+0
+)
+
+const participationErosion =
+participationTrend < -10
+
+const breadthErosion =
+breadth50TrendHistory < -10
+
+const liquidityErosion =
+liquidityTrend < -10
+
+const structuralErosion =
+participationErosion &&
+breadthErosion
 
 /* =====================================================
 CENTRAL MARKET STRUCTURE FLAGS
@@ -488,6 +547,26 @@ if (phasePersistence >= 10) {
 structuralFragility += 8;
 }
 
+/* =====================================================
+NEW HISTORY EROSION
+===================================================== */
+
+if (participationErosion) {
+structuralFragility += 6;
+}
+
+if (breadthErosion) {
+structuralFragility += 6;
+}
+
+if (liquidityErosion) {
+structuralFragility += 4;
+}
+
+if (structuralErosion) {
+structuralFragility += 12;
+}
+
 structuralFragility = Math.min(
 structuralFragility,
 100
@@ -769,16 +848,18 @@ probability = 35;
 }
 
 if (
-
 phasePersistence >= 10 &&
-
 participationDecay > 15 &&
-
 probability < 40
-
 ) {
-
 probability = 40;
+}
+
+if (
+structuralErosion &&
+probability < 45
+) {
+probability = 45;
 }
 
 probability = Math.max(
