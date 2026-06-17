@@ -19,13 +19,25 @@ data.participationScore ??
 
 const phase = data.phase;
 
-const phasePersistence = Number(data.phasePersistence ?? 0);
+const phasePersistence = Number(
+data.historyMetrics?.phasePersistence ?? 0
+);
 
-const breadthTrend = Number(data.breadthTrend ?? 0);
+const breadthTrend = Number(
+data.historyMetrics?.breadthTrend ?? 0
+);
 
-const breadthAcceleration = Number(data.breadthAcceleration ?? 0);
+const breadthAcceleration = Number(
+data.historyMetrics?.breadthAcceleration ?? 0
+);
 
-const participationDecay = Number(data.participationDecay ?? 0);
+const participationDecay = Number(
+data.historyMetrics?.participationDecay ?? 0
+);
+
+const leadershipDecay = Number(
+data.historyMetrics?.leadershipDecay ?? 0
+);
 
 /* ================= INTERNAL DIVERGENCE ================= */
 
@@ -153,6 +165,16 @@ if (breadthAcceleration < -3) historyScore += 1;
 
 if (participationDecay > 10) historyScore += 1;
 if (participationDecay > 20) historyScore += 1;
+
+/* ---------- LEADERSHIP DECAY ---------- */
+
+if (leadershipDecay > 10) {
+historyScore += 1;
+}
+
+if (leadershipDecay > 20) {
+historyScore += 1;
+}
 
 /* ---------- PHASE PERSISTENCE ---------- */
 
@@ -285,9 +307,13 @@ narrowLeadership,
 participation,
 
 historyScore,
+
 breadthTrend,
 breadthAcceleration,
+
 participationDecay,
+leadershipDecay,
+
 phasePersistence
 
 }
