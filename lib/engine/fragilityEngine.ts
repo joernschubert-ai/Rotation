@@ -3,6 +3,9 @@
 import { getMarketStructureFlags } from "./marketStructureFlags";
 
 export interface FragilityEngineInput {
+
+history?: any[]
+
 crash?: any
 
 breadth50?: number
@@ -89,6 +92,18 @@ rotationDecayScore: number
 
 marketQualityScore: number
 
+participationTrend: number
+breadthTrend: number
+liquidityTrend: number
+marketQualityTrend: number
+
+participationErosion: boolean
+breadthErosion: boolean
+liquidityErosion: boolean
+qualityErosion: boolean
+
+persistentErosion: boolean
+
 narrowLeadership: boolean
 megaCapOnlyTape: boolean
 
@@ -109,6 +124,14 @@ min = 0,
 max = 100
 ) {
 return Math.max(min, Math.min(max, value))
+}
+
+function scoreSafe(
+value: any
+) {
+return Number.isFinite(Number(value))
+? Number(value)
+: 50
 }
 
 export function fragilityEngine(
@@ -204,6 +227,67 @@ Boolean(
 input.marketQuality?.internalSynchronization ??
 false
 )
+
+/* =====================================================
+HISTORY
+===================================================== */
+
+const history =
+input.history ?? []
+
+const h5 =
+history.length >= 5
+? history[history.length - 5]
+: null
+
+const h10 =
+history.length >= 10
+? history[history.length - 10]
+: null
+
+const h20 =
+history.length >= 20
+? history[history.length - 20]
+: null
+
+/* =====================================================
+FRAGILITY TRENDS
+===================================================== */
+
+const participationTrend =
+participationScore -
+Number(
+h10?.participationScore ??
+participationScore
+)
+
+const breadthTrend =
+breadth50 -
+Number(
+h10?.breadth50 ??
+breadth50
+)
+
+const liquidityTrend =
+liquidity -
+Number(
+h10?.liquidityScore ??
+liquidity
+)
+
+const marketQualityTrend =
+marketQualityScore -
+Number(
+h10?.marketQualityScore ??
+marketQualityScore
+)
+
+const fragilityTrend =
+scoreSafe(
+h10?.fragilityScore
+)
+
+
 
 /* =====================================================
 CENTRAL MARKET STRUCTURE FLAGS
@@ -336,6 +420,34 @@ failedRotation ||
 narrowLeadership ||
 synchronizationFailure
 )
+)
+
+/* =====================================================
+HISTORICAL EROSION
+===================================================== */
+
+const participationErosion =
+participationTrend < -8
+
+const breadthErosion =
+breadthTrend < -8
+
+const liquidityErosion =
+liquidityTrend < -10
+
+const qualityErosion =
+marketQualityTrend < -10
+
+const persistentErosion = (
+
+participationErosion &&
+breadthErosion
+
+) || (
+
+breadthErosion &&
+qualityErosion
+
 )
 
 /* =====================================================
@@ -522,6 +634,31 @@ score += 20
 if (latentFragility) {
 score += 10
 }
+
+/* =====================================================
+HISTORY OVERLAYS
+===================================================== */
+
+if (participationErosion) {
+score += 8
+}
+
+if (breadthErosion) {
+score += 8
+}
+
+if (liquidityErosion) {
+score += 6
+}
+
+if (qualityErosion) {
+score += 8
+}
+
+if (persistentErosion) {
+score += 15
+}
+
 
 /* =====================================================
 NEW OVERLAYS
@@ -760,6 +897,17 @@ if (marketQualityScore < 35) {
 breakdownRisk += 15
 }
 
+if (persistentErosion) {
+breakdownRisk += 20
+}
+
+if (
+participationErosion &&
+breadthErosion
+) {
+breakdownRisk += 10
+}
+
 breakdownRisk = clamp(
 Math.round(breakdownRisk)
 )
@@ -890,6 +1038,18 @@ rotationScore,
 rotationDecayScore,
 
 marketQualityScore,
+
+participationTrend,
+breadthTrend,
+liquidityTrend,
+marketQualityTrend,
+
+participationErosion,
+breadthErosion,
+liquidityErosion,
+qualityErosion,
+
+persistentErosion,
 
 narrowLeadership,
 megaCapOnlyTape,
