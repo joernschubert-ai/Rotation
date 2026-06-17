@@ -24,12 +24,7 @@ concentrationScore,
 
 internalDivergence,
 
-breadthTrend,
-breadthAcceleration,
-participationDecay,
-leadershipDecay,
-relativeBreadthWeakness,
-phasePersistence
+historyMetrics
 
 }: any) {
 
@@ -207,22 +202,39 @@ const concentration =
 Number(concentrationScore ?? 50);
 
 const historyBreadthTrend =
-Number(breadthTrend ?? 0);
+Number(
+historyMetrics?.breadthTrend ?? 0
+);
 
 const historyBreadthAcceleration =
-Number(breadthAcceleration ?? 0);
+Number(
+historyMetrics?.breadthAcceleration ?? 0
+);
 
 const historyParticipationDecay =
-Number(participationDecay ?? 0);
+Number(
+historyMetrics?.participationDecay ?? 0
+);
 
 const historyLeadershipDecay =
-Number(leadershipDecay ?? 0);
+Number(
+historyMetrics?.leadershipDecay ?? 0
+);
 
 const historyRelativeBreadthWeakness =
-Number(relativeBreadthWeakness ?? 0);
+Number(
+historyMetrics?.relativeBreadthWeakness ?? 0
+);
 
 const historyPhasePersistence =
-Number(phasePersistence ?? 0);
+Number(
+historyMetrics?.phasePersistence ?? 0
+);
+
+const historyRegimePersistence =
+Number(
+historyMetrics?.regimePersistence ?? 0
+);
 
 /* =====================================================
 INTERNAL DIVERGENCE
@@ -562,6 +574,14 @@ rawDecay += 8;
 
 if (historyPhasePersistence >= 14) {
 rawDecay += 12;
+}
+
+if (historyRegimePersistence >= 5) {
+rawDecay += 4;
+}
+
+if (historyRegimePersistence >= 10) {
+rawDecay += 8;
 }
 
 
@@ -1003,6 +1023,19 @@ healthyInternals,
 stableParticipation,
 calmTape,
 noPanic
+},
+
+history: {
+breadthTrend: historyBreadthTrend,
+breadthAcceleration: historyBreadthAcceleration,
+participationDecay: historyParticipationDecay,
+leadershipDecay: historyLeadershipDecay,
+relativeBreadthWeakness:
+historyRelativeBreadthWeakness,
+phasePersistence:
+historyPhasePersistence,
+regimePersistence:
+historyRegimePersistence
 },
 
 summary
