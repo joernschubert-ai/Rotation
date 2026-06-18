@@ -387,6 +387,18 @@ strength -= 10;
 }
 
 if (
+leadershipConcentration
+) {
+strength += 5;
+}
+
+if (
+acceleratingBreadthDecay
+) {
+strength -= 6;
+}
+
+if (
 prolongedDistribution
 ) {
 strength -= 10;
@@ -416,6 +428,12 @@ if (
 deterioratingBreadth
 ) {
 strength -= 8;
+}
+
+if (
+leadershipConcentration
+) {
+strength -= 6;
 }
 
 if (
