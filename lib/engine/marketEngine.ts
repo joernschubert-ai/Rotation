@@ -415,6 +415,9 @@ crash,
 vix
 });
 
+const historyMetrics =
+data.historyMetrics ?? {};
+
 /* =====================================================
 PHASE
 ===================================================== */
@@ -430,8 +433,8 @@ earlyWarning,
 structure,
 
 russell: russellTemp,
-historyMetrics:
-data.historyMetrics
+historyMetrics
+
 });
 
 const phase =
@@ -667,19 +670,19 @@ marketLiquidityScore:
 Number(data.marketLiquidityScore ?? 50),
 
 breadthTrend:
-data.historyMetrics?.breadthTrend,
+historyMetrics?.breadthTrend,
 
 breadthAcceleration:
-data.historyMetrics?.breadthAcceleration,
+historyMetrics?.breadthAcceleration,
 
 participationDecay:
-data.historyMetrics?.participationDecay,
+historyMetrics?.participationDecay,
 
 leadershipDecay:
-data.historyMetrics?.leadershipDecay,
+historyMetrics?.leadershipDecay,
 
 relativeBreadthWeakness:
-data.historyMetrics?.relativeBreadthWeakness,
+historyMetrics?.relativeBreadthWeakness,
 });
 
 /* =====================================================
@@ -780,7 +783,10 @@ liquidity,
 fragility,
 
 rotationDecay,
-regimeSync
+regimeSync,
+
+historyMetrics:
+historyMetrics
 });
 
 /* =====================================================
@@ -862,8 +868,7 @@ rotationDecay,
 executionState,
 regimeSync,
 
-historyMetrics:
-data.historyMetrics
+historyMetrics
 });
 
 /* =====================================================
