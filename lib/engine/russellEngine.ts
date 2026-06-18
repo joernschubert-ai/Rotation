@@ -84,6 +84,22 @@ Number(data.historyMetrics?.leadershipDecay ?? 0);
 const phasePersistence =
 Number(data.historyMetrics?.phasePersistence ?? 0);
 
+const relativeBreadthWeakness =
+Number(
+data.historyMetrics?.relativeBreadthWeakness ?? 0
+);
+
+const regimePersistence =
+Number(
+data.historyMetrics?.regimePersistence ?? 0
+);
+
+const crashTrend =
+Number(
+data.historyMetrics?.crashTrend ?? 0
+);
+
+
 /* ================= STRUCTURE ================= */
 
 // Small Caps vs Large
@@ -196,6 +212,24 @@ riskScore -= 1;
 if (phasePersistence >= 10)
 riskScore -= 1;
 
+if (relativeBreadthWeakness > 10)
+riskScore -= 1;
+
+if (relativeBreadthWeakness > 20)
+riskScore -= 1;
+
+if (regimePersistence >= 5)
+riskScore -= 1;
+
+if (regimePersistence >= 10)
+riskScore -= 1;
+
+if (crashTrend > 5)
+riskScore -= 1;
+
+if (crashTrend > 10)
+riskScore -= 1;
+
 riskScore = Math.max(-5, Math.min(riskScore, 2));
 
 /* ================= TOTAL ================= */
@@ -239,6 +273,20 @@ participationDecay > 15
 return "NO_TRADE";
 }
 
+if (
+regimePersistence >= 10 &&
+relativeBreadthWeakness > 20
+) {
+return "NO_TRADE";
+}
+
+if (
+crashTrend > 10 &&
+participationDecay > 15
+) {
+return "NO_TRADE";
+}
+
 if (totalScore >= 2 && totalScore < 4) return "EARLY";
 if (totalScore >= 4 && totalScore < 6) return "BUILD";
 if (totalScore >= 6 && totalScore < 8) return "ADD";
@@ -268,6 +316,23 @@ max: 10
 },
 
 confidence,
+
+history: {
+
+breadthTrend,
+breadthAcceleration,
+
+participationDecay,
+leadershipDecay,
+
+relativeBreadthWeakness,
+
+phasePersistence,
+regimePersistence,
+
+crashTrend
+
+},
 
 components: {
 structure: {
