@@ -104,6 +104,16 @@ Number(historyMetrics?.crashTrend ?? 0);
 const phasePersistence =
 Number(historyMetrics?.phasePersistence ?? 0);
 
+const regimePersistence =
+Number(
+historyMetrics?.regimePersistence ?? 0
+);
+
+const relativeBreadthWeakness =
+Number(
+historyMetrics?.relativeBreadthWeakness ?? 0
+);
+
 /* ======================================================
 HISTORY FLAGS
 ====================================================== */
@@ -131,6 +141,18 @@ crashTrend > 10;
 
 const prolongedDistribution =
 phasePersistence >= 6;
+
+const prolongedBearRegime =
+regimePersistence >= 5;
+
+const severeBearRegime =
+regimePersistence >= 10;
+
+const broadParticipationFailure =
+relativeBreadthWeakness > 10;
+
+const severeParticipationFailure =
+relativeBreadthWeakness > 20;
 
 
 /* ======================================================
@@ -213,7 +235,9 @@ phase === "PHASE_3_DISTRIBUTION"
 (
 participationErosion ||
 risingCrashRisk ||
-prolongedDistribution
+prolongedDistribution ||
+prolongedBearRegime ||
+broadParticipationFailure
 )
 
 ) {
@@ -300,6 +324,30 @@ if (
 prolongedDistribution
 ) {
 strength += 6;
+}
+
+if (
+prolongedBearRegime
+) {
+strength += 6;
+}
+
+if (
+severeBearRegime
+) {
+strength += 8;
+}
+
+if (
+broadParticipationFailure
+) {
+strength += 6;
+}
+
+if (
+severeParticipationFailure
+) {
+strength += 8;
 }
 
 if (
@@ -394,6 +442,30 @@ prolongedDistribution
 strength -= 10;
 }
 
+if (
+prolongedBearRegime
+) {
+strength -= 10;
+}
+
+if (
+severeBearRegime
+) {
+strength -= 15;
+}
+
+if (
+broadParticipationFailure
+) {
+strength -= 8;
+}
+
+if (
+severeParticipationFailure
+) {
+strength -= 12;
+}
+
 if (rotationState === "CONFIRMED") {
 strength += 8;
 }
@@ -475,6 +547,30 @@ strength += 5;
 
 if (falseBreakRisk >= 80) {
 strength += 5;
+}
+
+if (
+prolongedBearRegime
+) {
+strength += 5;
+}
+
+if (
+severeBearRegime
+) {
+strength += 8;
+}
+
+if (
+broadParticipationFailure
+) {
+strength += 5;
+}
+
+if (
+severeParticipationFailure
+) {
+strength += 8;
 }
 
 }
@@ -642,6 +738,15 @@ leadershipDecay,
 crashTrend,
 
 phasePersistence,
+regimePersistence,
+
+relativeBreadthWeakness,
+
+prolongedBearRegime,
+severeBearRegime,
+
+broadParticipationFailure,
+severeParticipationFailure,
 
 deterioratingBreadth,
 acceleratingBreadthDecay,
