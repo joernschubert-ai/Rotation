@@ -47,6 +47,31 @@ Number(
 engine.historyMetrics?.participationDecay ?? 0
 );
 
+const breadthTrend =
+Number(
+engine.historyMetrics?.breadthTrend ?? 0
+);
+
+const breadthAcceleration =
+Number(
+engine.historyMetrics?.breadthAcceleration ?? 0
+);
+
+const leadershipDecay =
+Number(
+engine.historyMetrics?.leadershipDecay ?? 0
+);
+
+const relativeBreadthWeakness =
+Number(
+engine.historyMetrics?.relativeBreadthWeakness ?? 0
+);
+
+const regimePersistenceHistory =
+Number(
+engine.historyMetrics?.regimePersistence ?? 0
+);
+
 /* ================= BASE SIZE ================= */
 
 let base = 40;
@@ -262,6 +287,27 @@ persistentWeakness
 breadthVelocityNegative &&
 rotationDecayScore > 70
 );
+
+const deterioratingBreadthTrend =
+breadthTrend < -10;
+
+const acceleratingBreadthDamage =
+breadthAcceleration < -5;
+
+const severeBreadthDamage =
+breadthAcceleration < -10;
+
+const leadershipConcentration =
+leadershipDecay > 10;
+
+const severeLeadershipConcentration =
+leadershipDecay > 20;
+
+const persistentBreadthWeakness =
+relativeBreadthWeakness > 15;
+
+const chronicRegimeWeakness =
+regimePersistenceHistory >= 10;
 
 /* =====================================================
 VALIDATED LIQUIDITY
@@ -530,6 +576,49 @@ severeInternalBreakdown
 edge -= 5;
 }
 
+if (
+deterioratingBreadthTrend
+) {
+edge -= 1;
+}
+
+if (
+acceleratingBreadthDamage
+) {
+edge -= 1;
+}
+
+if (
+severeBreadthDamage
+) {
+edge -= 1;
+}
+
+if (
+leadershipConcentration
+) {
+edge -= 1;
+}
+
+if (
+severeLeadershipConcentration
+) {
+edge -= 1;
+}
+
+if (
+persistentBreadthWeakness
+) {
+edge -= 1;
+}
+
+if (
+chronicRegimeWeakness
+) {
+edge -= 1;
+}
+
+
 /* =====================================================
 DIVERGENCE
 ===================================================== */
@@ -603,7 +692,13 @@ persistentWeakness ||
 poorMarketQuality ||
 breadthVelocityNegative ||
 narrowLeadership ||
-syntheticLiquidityRegime
+syntheticLiquidityRegime ||
+
+deterioratingBreadthTrend ||
+acceleratingBreadthDamage ||
+persistentBreadthWeakness ||
+leadershipConcentration ||
+chronicRegimeWeakness
 ) {
 
 opportunity = Math.min(opportunity, 2);
@@ -701,6 +796,37 @@ size *= 0.9;
 }
 
 if (
+deterioratingBreadthTrend
+) {
+size *= 0.95;
+}
+
+if (
+acceleratingBreadthDamage
+) {
+size *= 0.9;
+}
+
+if (
+persistentBreadthWeakness
+) {
+size *= 0.9;
+}
+
+if (
+leadershipConcentration
+) {
+size *= 0.9;
+}
+
+if (
+chronicRegimeWeakness
+) {
+size *= 0.85;
+}
+
+
+if (
 poorMarketQuality
 ) {
 size *= 0.8;
@@ -771,6 +897,30 @@ participationDecay > 20
 ) {
 
 size = Math.min(size, 35);
+}
+
+if (
+chronicRegimeWeakness &&
+persistentBreadthWeakness
+)
+{
+size = Math.min(size, 35);
+}
+
+if (
+acceleratingBreadthDamage &&
+leadershipConcentration
+)
+{
+size = Math.min(size, 30);
+}
+
+if (
+severeBreadthDamage &&
+participationDecay > 20
+)
+{
+size = Math.min(size, 25);
 }
 
 /* =====================================================
