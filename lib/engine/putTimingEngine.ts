@@ -170,6 +170,16 @@ Number(historyMetrics?.crashTrend ?? 0);
 const phasePersistence =
 Number(historyMetrics?.phasePersistence ?? 0);
 
+const regimePersistenceHistory =
+Number(
+historyMetrics?.regimePersistence ?? 0
+);
+
+const relativeBreadthWeakness =
+Number(
+historyMetrics?.relativeBreadthWeakness ?? 0
+);
+
 /* =====================================================
 HISTORY FLAGS
 ===================================================== */
@@ -198,6 +208,17 @@ crashTrend > 10;
 const prolongedDistribution =
 phasePersistence >= 6;
 
+const prolongedRegimeWeakness =
+regimePersistenceHistory >= 5;
+
+const severeRegimeWeakness =
+regimePersistenceHistory >= 10;
+
+const breadthStructureDamage =
+relativeBreadthWeakness > 10;
+
+const severeBreadthStructureDamage =
+relativeBreadthWeakness > 20;
 
 /* =====================================================
 STRUCTURAL FLAGS
@@ -435,6 +456,29 @@ prolongedDistribution
 structuralScore += 1;
 }
 
+if (
+prolongedRegimeWeakness
+) {
+structuralScore += 1;
+}
+
+if (
+severeRegimeWeakness
+) {
+structuralScore += 1;
+}
+
+if (
+breadthStructureDamage
+) {
+structuralScore += 1;
+}
+
+if (
+severeBreadthStructureDamage
+) {
+structuralScore += 1;
+}
 
 structuralScore =
 Math.min(structuralScore, 10);
@@ -613,6 +657,17 @@ prolongedDistribution
 contradictionPenalty -= 1;
 }
 
+if (
+prolongedRegimeWeakness
+) {
+contradictionPenalty -= 1;
+}
+
+if (
+breadthStructureDamage
+) {
+contradictionPenalty -= 1;
+}
 
 if (
 participationScore < 40
@@ -994,6 +1049,17 @@ leadershipDecay,
 crashTrend,
 
 phasePersistence,
+
+regimePersistence:
+regimePersistenceHistory,
+
+relativeBreadthWeakness,
+
+prolongedRegimeWeakness,
+severeRegimeWeakness,
+
+breadthStructureDamage,
+severeBreadthStructureDamage,
 
 deterioratingBreadth,
 acceleratingBreadthDecay,
