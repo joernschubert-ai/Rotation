@@ -51,6 +51,16 @@ Number(historyMetrics.crashTrend ?? 0);
 const phasePersistence =
 Number(historyMetrics.phasePersistence ?? 0);
 
+const regimePersistenceHistory =
+Number(
+historyMetrics.regimePersistence ?? 0
+);
+
+const relativeBreadthWeaknessHistory =
+Number(
+historyMetrics.relativeBreadthWeakness ?? 0
+);
+
 /* =====================================================
 SAFE
 ===================================================== */
@@ -241,6 +251,18 @@ crashTrend > 10;
 const prolongedDistribution =
 phasePersistence >= 6;
 
+const prolongedBearRegime =
+regimePersistenceHistory >= 5;
+
+const severeBearRegime =
+regimePersistenceHistory >= 10;
+
+const broadParticipationFailure =
+relativeBreadthWeaknessHistory > 10;
+
+const severeParticipationFailure =
+relativeBreadthWeaknessHistory > 20;
+
 const structuralDeterioration =
 
 (
@@ -260,7 +282,22 @@ risingCrashRisk
 (
 leadershipConcentration &&
 deterioratingBreadth
+)
+
+||
+
+(
+broadParticipationFailure &&
+participationErosion
+)
+
+||
+
+(
+prolongedBearRegime &&
+deterioratingBreadth
 );
+
 
 
 /* =====================================================
@@ -578,6 +615,22 @@ severeParticipationErosion &&
 risingCrashRisk
 )
 
+||
+(
+prolongedBearRegime &&
+broadParticipationFailure
+)
+
+||
+(
+severeBearRegime
+)
+
+||
+(
+severeParticipationFailure
+)
+
 ) {
 
 phase =
@@ -615,6 +668,12 @@ severeBreadthImpulseBreak
 
 (
 crashScore > 62
+)
+
+||
+(
+severeBearRegime &&
+severeParticipationFailure
 )
 
 ) {
@@ -770,6 +829,12 @@ risingCrashRisk
 ||
 
 prolongedDistribution
+
+||
+prolongedBearRegime
+
+||
+broadParticipationFailure
 
 ) {
 
@@ -991,7 +1056,11 @@ deterioratingBreadth ||
 
 participationErosion ||
 
-risingCrashRisk
+risingCrashRisk ||
+
+prolongedBearRegime ||
+
+broadParticipationFailure
 )
 
 &&
@@ -1114,6 +1183,15 @@ relativeBreadthWeakness,
 crashTrend,
 
 phasePersistence,
+
+regimePersistenceHistory,
+relativeBreadthWeaknessHistory,
+
+prolongedBearRegime,
+severeBearRegime,
+
+broadParticipationFailure,
+severeParticipationFailure,
 
 deterioratingBreadth,
 acceleratingBreadthDecay,
