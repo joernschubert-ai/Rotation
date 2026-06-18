@@ -101,6 +101,37 @@ Number(
 historyMetrics?.participationDecay ?? 0
 );
 
+const breadthTrend =
+Number(
+historyMetrics?.breadthTrend ?? 0
+);
+
+const breadthAcceleration =
+Number(
+historyMetrics?.breadthAcceleration ?? 0
+);
+
+const leadershipDecay =
+Number(
+historyMetrics?.leadershipDecay ?? 0
+);
+
+const crashTrend =
+Number(
+historyMetrics?.crashTrend ?? 0
+);
+
+const relativeBreadthWeakness =
+Number(
+historyMetrics?.relativeBreadthWeakness ?? 0
+);
+
+const regimePersistenceHistory =
+Number(
+historyMetrics?.regimePersistence ?? 0
+);
+
+
 /* =====================================================
 EXECUTION LAYER
 ===================================================== */
@@ -121,6 +152,24 @@ executionState?.marketMode ??
 STRUCTURAL FLAGS
 ===================================================== */
 
+const deterioratingBreadth =
+breadthTrend < -10;
+
+const acceleratingBreadthDecay =
+breadthAcceleration < -5;
+
+const leadershipConcentration =
+leadershipDecay < -5;
+
+const risingCrashRisk =
+crashTrend > 5;
+
+const broadParticipationFailure =
+relativeBreadthWeakness > 10;
+
+const prolongedBearRegime =
+regimePersistenceHistory >= 5;
+
 const weakInternals = (
 
 participationScore < 50 ||
@@ -133,7 +182,17 @@ rotationDecayScore > 45 ||
 
 phasePersistence >= 10 ||
 
-participationDecay > 15
+participationDecay > 15 ||
+
+deterioratingBreadth ||
+
+acceleratingBreadthDecay ||
+
+leadershipConcentration ||
+
+broadParticipationFailure ||
+
+prolongedBearRegime
 
 );
 
@@ -144,6 +203,7 @@ rotation?.rsSmall < 0.995 &&
 rotation?.rsEqual < 0.995
 
 );
+
 
 /* =====================================================
 SCORE
@@ -213,6 +273,43 @@ participationDecay > 25
 score -= 6;
 }
 
+if (
+deterioratingBreadth
+) {
+score -= 4;
+}
+
+if (
+acceleratingBreadthDecay
+) {
+score -= 5;
+}
+
+if (
+leadershipConcentration
+) {
+score -= 4;
+}
+
+if (
+risingCrashRisk
+) {
+score -= 4;
+}
+
+if (
+broadParticipationFailure
+) {
+score -= 5;
+}
+
+if (
+prolongedBearRegime
+) {
+score -= 4;
+}
+
+
 /* -------------------------------------------------
 NARROW LEADERSHIP
 ------------------------------------------------- */
@@ -223,6 +320,42 @@ weakInternals
 ) {
 score -= 12;
 }
+
+if (
+
+deterioratingBreadth &&
+
+participationDecay > 15 &&
+
+rotationDecayScore > 60
+
+) {
+
+score -= 8;
+}
+
+if (
+
+acceleratingBreadthDecay &&
+
+risingCrashRisk
+
+) {
+
+score -= 8;
+}
+
+if (
+
+broadParticipationFailure &&
+
+leadershipConcentration
+
+) {
+
+score -= 8;
+}
+
 
 
 /* =====================================================
@@ -303,6 +436,28 @@ weakInternals &&
 phase !== "PHASE_1_EXPANSION"
 ) {
 mode = "NEUTRAL";
+}
+
+if (
+
+prolongedBearRegime &&
+
+broadParticipationFailure
+
+) {
+
+mode = "RISK";
+}
+
+if (
+
+acceleratingBreadthDecay &&
+
+risingCrashRisk
+
+) {
+
+mode = "RISK";
 }
 
 /* =====================================================
@@ -417,7 +572,24 @@ marketQualityScore,
 participationScore,
 breadthVelocityScore,
 phasePersistence,
-participationDecay
+participationDecay,
+breadthTrend,
+breadthAcceleration,
+
+leadershipDecay,
+crashTrend,
+
+relativeBreadthWeakness,
+regimePersistenceHistory,
+
+deterioratingBreadth,
+acceleratingBreadthDecay,
+
+leadershipConcentration,
+risingCrashRisk,
+
+broadParticipationFailure,
+prolongedBearRegime
 },
 
 components: {
