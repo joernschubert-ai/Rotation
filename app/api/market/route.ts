@@ -4042,6 +4042,16 @@ rty: rty[rty.length - 1]
 }
 });
 
+console.log(
+"SNAPSHOT SAMPLE",
+{
+breadth50,
+rotationStrength,
+liquidityScore: liquidityData.liquidityScore,
+fragilityScore: fragilityData.fragility
+}
+);
+
 await saveMarketSnapshot({
 
 timestamp: Date.now(),
@@ -4209,6 +4219,13 @@ shockData.shockScore
 
 const testHistory =
 await loadMarketHistory();
+
+console.log(
+"LATEST SNAPSHOT",
+testHistory[0]
+);
+
+
 
 console.log(
 "HISTORY KEYS:",
