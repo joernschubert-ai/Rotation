@@ -4211,6 +4211,11 @@ const testHistory =
 await loadMarketHistory();
 
 console.log(
+"HISTORY KEYS:",
+Object.keys(testHistory[0] ?? {})
+);
+
+console.log(
 "HISTORY SAMPLE",
 testHistory[0]
 );
