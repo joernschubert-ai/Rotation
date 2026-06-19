@@ -4211,6 +4211,11 @@ const testHistory =
 await loadMarketHistory();
 
 console.log(
+"HISTORY SAMPLE",
+testHistory[0]
+);
+
+console.log(
 "MARKET HISTORY SIZE:",
 testHistory.length
 );
