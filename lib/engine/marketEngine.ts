@@ -1025,8 +1025,10 @@ participation
 });
 
 const signal =
-signalResult?.signal ??
-{ active: false };
+{
+...(signalResult?.signal ?? { active:false }),
+phase
+};
 
 /* =====================================================
 SUPER SIGNAL
