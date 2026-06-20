@@ -1115,18 +1115,6 @@ historicalReplay(replaySnapshots);
 RETURN
 ===================================================== */
 
-console.log("MARKET PHASE RAW:", phase);
-console.log(
-"PHASE FOR SIGNAL:",
-phase
-);
-
-console.log(
-"PHASE OBJECT:",
-marketPhase
-);
-
-
 return {
 
 crash,
