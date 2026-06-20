@@ -153,16 +153,14 @@ Number(breadthThrust?.score ?? 50);
 BASE SIGNAL
 ===================================================== */
 
-let signal = {
+let signal: any = {
 active: false,
 type: "NONE",
 strength: 0,
 message: "",
 priority: "LOW",
 timestamp: Date.now(),
-
 quality: "LOW",
-
 context: {
 tradeStack,
 divergence,
@@ -173,6 +171,8 @@ rotationConfirm,
 rotationDecay
 }
 };
+
+
 
 /* =====================================================
 HARD BLOCKERS
@@ -812,6 +812,7 @@ signal.strength = Math.max(
 Math.min(100, signal.strength)
 );
 
+
 /* =====================================================
 ANTI SPAM
 ===================================================== */
@@ -827,7 +828,10 @@ lastSignal.message === signal.message
 ) {
 
 return {
-signal: lastSignal,
+signal: {
+...signal,
+phase
+},
 history
 };
 }
@@ -849,8 +853,10 @@ RETURN
 ===================================================== */
 
 return {
-signal,
+signal: {
+...signal,
+phase
+},
 history
 };
-
 }
