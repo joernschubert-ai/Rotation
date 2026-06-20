@@ -163,6 +163,19 @@ history.filter(
 h => h.phase === newest.phase
 ).length;
 
+console.log("HISTORY DEBUG", {
+newestRotation: newest.rotationStrength,
+oldestRotation: oldest.rotationStrength,
+
+newestFragility: newest.fragilityScore,
+oldestFragility: oldest.fragilityScore,
+
+newestBreadth: newest.breadth50,
+oldestBreadth: oldest.breadth50,
+
+historyLength: history.length
+});
+
 return {
 breadthTrend,
 breadthAcceleration,
