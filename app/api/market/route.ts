@@ -4244,12 +4244,16 @@ console.log(
 "HISTORY ORDER CHECK",
 {
 first: testHistory[0]?.timestamp,
-breadth50: testHistory[0]?.breadth50,
-breadth20: testHistory[0]?.breadth20,
-rotationStrength: testHistory[0]?.rotationStrength,
-liquidityScore: testHistory[0]?.liquidityScore,
-fragilityScore: testHistory[0]?.fragilityScore,
-phase: testHistory[0]?.phase
+second: testHistory[1]?.timestamp,
+
+breadth50_0: testHistory[0]?.breadth50,
+breadth50_1: testHistory[1]?.breadth50,
+
+rotation_0: testHistory[0]?.rotationStrength,
+rotation_1: testHistory[1]?.rotationStrength,
+
+phase_0: testHistory[0]?.phase,
+phase_1: testHistory[1]?.phase,
 }
 );
 
