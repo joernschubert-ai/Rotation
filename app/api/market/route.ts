@@ -4240,12 +4240,18 @@ console.log(
 testHistory.length
 );
 
-console.log("HISTORY ORDER CHECK", {
+console.log(
+"HISTORY ORDER CHECK",
+{
 first: testHistory[0]?.timestamp,
-second: testHistory[1]?.timestamp,
-third: testHistory[2]?.timestamp,
-last: testHistory[testHistory.length - 1]?.timestamp,
-});
+breadth50: testHistory[0]?.breadth50,
+breadth20: testHistory[0]?.breadth20,
+rotationStrength: testHistory[0]?.rotationStrength,
+liquidityScore: testHistory[0]?.liquidityScore,
+fragilityScore: testHistory[0]?.fragilityScore,
+phase: testHistory[0]?.phase
+}
+);
 
 
 // Cache nur wenn Futures valide
