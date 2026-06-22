@@ -153,13 +153,14 @@ const crashTrend =
 PERSISTENCE
 ===================================== */
 
-const persistenceScore =
-phasePersistence;
-
 const phasePersistence =
 history.filter(
 h => h.phase === newest.phase
 ).length;
+
+const persistenceScore =
+phasePersistence;
+
 
 console.log("HISTORY DEBUG", {
 newestRotation: newest.rotationStrength,
