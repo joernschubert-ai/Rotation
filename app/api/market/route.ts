@@ -4225,8 +4225,6 @@ console.log(
 testHistory[0]
 );
 
-
-
 console.log(
 "HISTORY KEYS:",
 Object.keys(testHistory[0] ?? {})
@@ -4241,6 +4239,13 @@ console.log(
 "MARKET HISTORY SIZE:",
 testHistory.length
 );
+
+console.log("HISTORY ORDER CHECK", {
+first: testHistory[0]?.timestamp,
+second: testHistory[1]?.timestamp,
+third: testHistory[2]?.timestamp,
+last: testHistory[testHistory.length - 1]?.timestamp,
+});
 
 
 // Cache nur wenn Futures valide
