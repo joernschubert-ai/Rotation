@@ -7,6 +7,9 @@ import { marketEngine } from "@/lib/engine/marketEngine";
 import { mapBackendToEngine } from "@/lib/adapters/mapBackendToEngine";
 import { validateEngineData } from "@/lib/engine/validateEngineData";
 
+import { createMarketSnapshot } from "@/lib/history/snapshotEngine";
+import { saveMarketSnapshot } from "@/lib/history/marketHistory";
+
 /* ================= COMPONENTS ================= */
 
 import MarketDrivers from "@/components/MarketDrivers";
@@ -85,6 +88,7 @@ await res.json();
 const mapped =
 mapBackendToEngine(json);
 
+
 /* ================= VALIDATION ================= */
 
 if (!validateEngineData(mapped)) {
@@ -102,7 +106,18 @@ return;
 const e =
 marketEngine(mapped);
 
+/* SNAPSHOT */
+
+const snapshot =
+createMarketSnapshot({
+map: mapped,
+engine: e
+});
+
+await saveMarketSnapshot(snapshot);
+
 setEngine(e);
+
 
 /* ================= AUTO SAVE SIGNAL ================= */
 
@@ -650,6 +665,5 @@ engine={engine}
 );
 
 }
-
 
 
