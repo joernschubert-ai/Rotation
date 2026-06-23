@@ -58,18 +58,23 @@ let history: any[] = [];
 if (Array.isArray(data)) {
 history = data;
 }
-else if (typeof data === "string") {
-history = JSON.parse(data);
-}
 
 history.unshift(snapshot);
 
 history = history.slice(0, MAX_ITEMS);
 
-await redis.set(
-KEY,
-JSON.stringify(history)
+console.log(
+"HISTORY LENGTH:",
+history.length
 );
+
+console.log(
+"LATEST SNAPSHOT:",
+history[0]?.timestamp
+);
+
+
+await redis.set(KEY, history);
 
 } catch (e) {
 console.error(
