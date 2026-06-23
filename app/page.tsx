@@ -114,6 +114,11 @@ map: mapped,
 engine: e
 });
 
+console.log(
+"SNAPSHOT CREATED",
+snapshot.timestamp
+);
+
 await saveMarketSnapshot(snapshot);
 
 setEngine(e);
