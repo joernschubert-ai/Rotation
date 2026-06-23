@@ -4052,6 +4052,11 @@ fragilityScore: fragilityData.fragility
 }
 );
 
+console.log(
+"API SNAPSHOT PHASE",
+finalPhase
+);
+
 await saveMarketSnapshot({
 
 timestamp: Date.now(),
