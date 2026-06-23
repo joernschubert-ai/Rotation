@@ -87,8 +87,8 @@ PARTICIPATION
 ===================================== */
 
 const participationTrend =
-(newest.newHighs ?? 0) -
-(oldest.newHighs ?? 0);
+(newest.participationScore ?? 0) -
+(oldest.participationScore ?? 0);
 
 const participationDecay =
 (oldest.newHighs ?? 0) -
@@ -124,22 +124,24 @@ LEADERSHIP
 ===================================== */
 
 const leadershipTrend =
-(newest.breadth50 ?? 0) -
-(oldest.breadth50 ?? 0);
+(newest.leadershipBreadth ?? 0) -
+(oldest.leadershipBreadth ?? 0);
 
 /* =====================================
 RELATIVE STRENGTH
 ===================================== */
 
 const rsSmallTrend =
-(newest.rsSmall20 ?? 0) -
-(oldest.rsSmall20 ?? 0);
+(newest.rsSmall ?? 0) -
+(oldest.rsSmall ?? 0);
 
-const rsEqualTrend = 0;
+const rsEqualTrend =
+(newest.rsEqual ?? 0) -
+(oldest.rsEqual ?? 0);
 
 const rsGrowthTrend =
-(newest.rsGrowth20 ?? 0) -
-(oldest.rsGrowth20 ?? 0);
+(newest.rsGrowth ?? 0) -
+(oldest.rsGrowth ?? 0);
 
 /* =====================================
 CRASH
@@ -153,14 +155,13 @@ const crashTrend =
 PERSISTENCE
 ===================================== */
 
+const persistenceScore =
+(newest.persistenceScore ?? 0);
+
 const phasePersistence =
 history.filter(
 h => h.phase === newest.phase
 ).length;
-
-const persistenceScore =
-phasePersistence;
-
 
 console.log("HISTORY DEBUG", {
 newestRotation: newest.rotationStrength,
