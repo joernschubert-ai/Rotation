@@ -8,7 +8,6 @@ import { mapBackendToEngine } from "@/lib/adapters/mapBackendToEngine";
 import { validateEngineData } from "@/lib/engine/validateEngineData";
 
 import { createMarketSnapshot } from "@/lib/history/snapshotEngine";
-import { saveMarketSnapshot } from "@/lib/history/marketHistory";
 
 /* ================= COMPONENTS ================= */
 
@@ -144,7 +143,18 @@ hasFragility:
 }
 );
 
-await saveMarketSnapshot(snapshot);
+await fetch("/api/history", {
+method: "POST",
+
+headers: {
+"Content-Type":
+"application/json"
+},
+
+body: JSON.stringify({
+snapshot
+})
+});
 
 setEngine(e);
 
