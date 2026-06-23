@@ -119,6 +119,31 @@ console.log(
 snapshot.timestamp
 );
 
+console.log(
+"SNAPSHOT CHECK",
+{
+phase: snapshot.phase,
+
+hasRotationDecay:
+!!snapshot.rotationDecay,
+
+hasRegimeSync:
+!!snapshot.regimeSync,
+
+hasTradeStack:
+!!snapshot.tradeStack,
+
+hasExecutionState:
+!!snapshot.executionState,
+
+hasLiquidity:
+!!snapshot.liquidity,
+
+hasFragility:
+!!snapshot.fragility
+}
+);
+
 await saveMarketSnapshot(snapshot);
 
 setEngine(e);
