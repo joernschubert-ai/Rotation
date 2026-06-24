@@ -75,6 +75,26 @@ const data = await redis.get(KEY);
 
 let history: any[] = [];
 
+console.log(
+"FIRST SNAPSHOT KEYS:",
+Object.keys(data?.[0] ?? {})
+);
+
+console.log(
+"FIRST SNAPSHOT ROTATION DECAY:",
+data?.[0]?.rotationDecay
+);
+
+console.log(
+"FIRST SNAPSHOT REGIME SYNC:",
+data?.[0]?.regimeSync
+);
+
+console.log(
+"FIRST SNAPSHOT EXECUTION STATE:",
+data?.[0]?.executionState
+);
+
 if (Array.isArray(data)) {
 history = data;
 }
