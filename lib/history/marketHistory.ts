@@ -25,6 +25,26 @@ const data = await redis.get(KEY);
 console.log("RAW MARKET DATA:", data);
 
 if (Array.isArray(data)) {
+
+console.log(
+"FIRST SNAPSHOT CHECK",
+{
+phase: (data as any[])?.[0]?.phase,
+
+hasRotationDecay:
+!!(data as any[])?.[0]?.rotationDecay,
+
+hasRegimeSync:
+!!(data as any[])?.[0]?.regimeSync,
+
+hasExecutionState:
+!!(data as any[])?.[0]?.executionState,
+
+hasLiquidity:
+!!(data as any[])?.[0]?.liquidity
+}
+);
+
 return data;
 }
 
