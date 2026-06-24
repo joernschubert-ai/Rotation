@@ -43,6 +43,11 @@ export async function GET() {
 const history =
 await loadMarketHistory();
 
+console.log(
+"HISTORY LENGTH",
+history.length
+);
+
 return NextResponse.json(
 history
 );
