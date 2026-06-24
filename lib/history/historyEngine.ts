@@ -11,18 +11,83 @@ fragilityTrend: number;
 
 leadershipTrend: number;
 
-rsSmallTrend: number;
-rsEqualTrend: number;
-rsGrowthTrend: number;
-
 relativeBreadthWeakness: number;
 
 crashTrend: number;
 
 persistenceScore: number;
-
 phasePersistence: number;
 }
+
+/* =====================================================
+HELPERS
+===================================================== */
+
+function getBreadth50(snapshot: any): number {
+return Number(
+snapshot?.structure?.breadth?.b50?.value ?? 0
+);
+}
+
+function getBreadth20(snapshot: any): number {
+return Number(
+snapshot?.structure?.breadth?.b20?.value ?? 0
+);
+}
+
+function getParticipation(snapshot: any): number {
+return Number(
+snapshot?.participation?.score ?? 0
+);
+}
+
+function getRotation(snapshot: any): number {
+return Number(
+snapshot?.rotation?.score ?? 0
+);
+}
+
+function getLiquidity(snapshot: any): number {
+return Number(
+snapshot?.liquidity?.score ?? 0
+);
+}
+
+function getFragility(snapshot: any): number {
+return Number(
+snapshot?.fragility?.score ?? 0
+);
+}
+
+function getLeadership(snapshot: any): number {
+return Number(
+snapshot?.participation?.leadershipBreadth ??
+snapshot?.rotation?.leadershipBreadth ??
+0
+);
+}
+
+function getCrash(snapshot: any): number {
+return Number(
+snapshot?.crash?.probability ?? 0
+);
+}
+
+function getPersistence(snapshot: any): number {
+return Number(
+snapshot?.master?.score ?? 0
+);
+}
+
+function getNewHighs(snapshot: any): number {
+return Number(
+snapshot?.structure?.highsLows?.highs ?? 0
+);
+}
+
+/* =====================================================
+ENGINE
+===================================================== */
 
 export function historyEngine(
 history: any[]
@@ -33,27 +98,22 @@ return {
 breadthTrend: 0,
 breadthAcceleration: 0,
 
-participationTrend: 0,
-participationDecay: 0,
+  participationTrend: 0,
+  participationDecay: 0,
 
-rotationTrend: 0,
-liquidityTrend: 0,
-fragilityTrend: 0,
+  rotationTrend: 0,
+  liquidityTrend: 0,
+  fragilityTrend: 0,
 
-leadershipTrend: 0,
+  leadershipTrend: 0,
+  relativeBreadthWeakness: 0,
 
-rsSmallTrend: 0,
-rsEqualTrend: 0,
-rsGrowthTrend: 0,
+  crashTrend: 0,
 
-relativeBreadthWeakness: 0,
-
-crashTrend: 0,
-
-persistenceScore: 0,
-
-phasePersistence: 0
+  persistenceScore: 0,
+  phasePersistence: 0
 };
+
 }
 
 const newest = history[0];
@@ -66,117 +126,131 @@ history.length - 1,
 )
 ];
 
+const mid =
+history[
+Math.min(
+history.length - 1,
+5
+)
+];
+
 /* =====================================
 BREADTH
 ===================================== */
 
 const breadthTrend =
-(newest.breadth50 ?? 0) -
-(oldest.breadth50 ?? 0);
+getBreadth50(newest) -
+getBreadth50(oldest);
 
 const breadthAcceleration =
-(history[0]?.breadth50 ?? 0) -
-(history[5]?.breadth50 ?? 0);
+getBreadth50(newest) -
+getBreadth50(mid);
 
 const relativeBreadthWeakness =
-(newest.breadth50 ?? 0) -
-(newest.breadth20 ?? 0);
+getBreadth50(newest) -
+getBreadth20(newest);
 
 /* =====================================
 PARTICIPATION
 ===================================== */
 
 const participationTrend =
-(newest.participationScore ?? 0) -
-(oldest.participationScore ?? 0);
+getParticipation(newest) -
+getParticipation(oldest);
 
 const participationDecay =
-(oldest.newHighs ?? 0) -
-(newest.newHighs ?? 0);
+getNewHighs(oldest) -
+getNewHighs(newest);
 
 /* =====================================
 ROTATION
 ===================================== */
 
 const rotationTrend =
-(newest.rotationScore ??
-newest.rotationStrength ??
-0)
--
-(oldest.rotationScore ??
-oldest.rotationStrength ??
-0);
+getRotation(newest) -
+getRotation(oldest);
 
 /* =====================================
-LIQUIDITY / FRAGILITY
+LIQUIDITY
 ===================================== */
 
 const liquidityTrend =
-(newest.liquidityScore ?? 0) -
-(oldest.liquidityScore ?? 0);
+getLiquidity(newest) -
+getLiquidity(oldest);
+
+/* =====================================
+FRAGILITY
+===================================== */
 
 const fragilityTrend =
-(newest.fragilityScore ?? 0) -
-(oldest.fragilityScore ?? 0);
+getFragility(newest) -
+getFragility(oldest);
 
 /* =====================================
 LEADERSHIP
 ===================================== */
 
 const leadershipTrend =
-(newest.leadershipBreadth ?? 0) -
-(oldest.leadershipBreadth ?? 0);
-
-/* =====================================
-RELATIVE STRENGTH
-===================================== */
-
-const rsSmallTrend =
-(newest.rsSmall ?? 0) -
-(oldest.rsSmall ?? 0);
-
-const rsEqualTrend =
-(newest.rsEqual ?? 0) -
-(oldest.rsEqual ?? 0);
-
-const rsGrowthTrend =
-(newest.rsGrowth ?? 0) -
-(oldest.rsGrowth ?? 0);
+getLeadership(newest) -
+getLeadership(oldest);
 
 /* =====================================
 CRASH
 ===================================== */
 
 const crashTrend =
-(newest.crashProbability ?? 0) -
-(oldest.crashProbability ?? 0);
+getCrash(newest) -
+getCrash(oldest);
 
 /* =====================================
 PERSISTENCE
 ===================================== */
 
 const persistenceScore =
-(newest.persistenceScore ?? 0);
+getPersistence(newest);
 
 const phasePersistence =
 history.filter(
 h => h.phase === newest.phase
 ).length;
 
+/* =====================================
+DEBUG
+===================================== */
+
 console.log("HISTORY DEBUG", {
-newestRotation: newest.rotationStrength,
-oldestRotation: oldest.rotationStrength,
 
-newestFragility: newest.fragilityScore,
-oldestFragility: oldest.fragilityScore,
+newestRotation:
+  getRotation(newest),
 
-newestBreadth: newest.breadth50,
-oldestBreadth: oldest.breadth50,
+oldestRotation:
+  getRotation(oldest),
 
-historyLength: history.length
+newestFragility:
+  getFragility(newest),
+
+oldestFragility:
+  getFragility(oldest),
+
+newestBreadth:
+  getBreadth50(newest),
+
+oldestBreadth:
+  getBreadth50(oldest),
+
+newestParticipation:
+  getParticipation(newest),
+
+oldestParticipation:
+  getParticipation(oldest),
+
+historyLength:
+  history.length
+
 });
 
 return {
+
 breadthTrend,
 breadthAcceleration,
 
@@ -189,16 +263,14 @@ fragilityTrend,
 
 leadershipTrend,
 
-rsSmallTrend,
-rsEqualTrend,
-rsGrowthTrend,
-
 relativeBreadthWeakness,
+
 
 crashTrend,
 
 persistenceScore,
 
 phasePersistence
+
 };
 }
