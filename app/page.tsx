@@ -7,6 +7,16 @@ import { marketEngine } from "@/lib/engine/marketEngine";
 import { mapBackendToEngine } from "@/lib/adapters/mapBackendToEngine";
 import { validateEngineData } from "@/lib/engine/validateEngineData";
 
+import {
+loadMarketHistory
+} from "@/lib/history/marketHistory";
+
+import {
+historyEngine
+} from "@/lib/history/historyEngine";
+
+
+
 import { createMarketSnapshot } from "@/lib/history/snapshotEngine";
 
 /* ================= COMPONENTS ================= */
@@ -87,6 +97,16 @@ await res.json();
 const mapped =
 mapBackendToEngine(json);
 
+if (!mapped) {
+
+console.error(
+"MAP FAILED",
+json
+);
+
+return;
+}
+
 
 /* ================= VALIDATION ================= */
 
@@ -101,6 +121,20 @@ return;
 }
 
 /* ================= ENGINE ================= */
+
+const history =
+await loadMarketHistory();
+
+const historyMetrics =
+historyEngine(history);
+
+mapped.historyMetrics =
+historyMetrics;
+
+console.log(
+"HISTORY METRICS",
+historyMetrics
+);
 
 const e =
 marketEngine(mapped);
