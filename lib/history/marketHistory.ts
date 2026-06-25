@@ -107,9 +107,8 @@ firstSnapshot.executionState
 
 history = history.filter(
 (item) =>
-item.rotationDecay &&
-item.regimeSync &&
-item.tradeStack
+item &&
+item.timestamp
 );
 
 history.unshift(snapshot);
