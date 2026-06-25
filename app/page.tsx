@@ -32,7 +32,7 @@ import PhaseBar from "@/components/PhaseBar";
 import IndicesPanel from "@/components/IndicesPanel";
 import SystemHeatPanel from "@/components/SystemHeatPanel";
 import SystemDotsPanel from "@/components/SystemDotsPanel";
-import RotationInternalsPanel from "@/components/RotationInternalsPanel";
+
 import EarlyWarningPanel from "@/components/EarlyWarningPanel";
 import PositioningPanel from "@/components/PositioningPanel";
 import ExitPanel from "@/components/ExitPanel";
@@ -56,7 +56,7 @@ import HistoricalReplayPanel from "@/components/HistoricalReplayPanel";
 
 /* ================= 🔥 NEW ROTATION DECAY ================= */
 
-import RotationDecayPanel from "@/components/RotationDecayPanel";
+
 
 export default function Home() {
 const router = useRouter();
@@ -251,147 +251,15 @@ function copySnapshot() {
 
 if (!engine) return;
 
-const snapshot = {
-
-timestamp:
-new Date().toISOString(),
-
-/* ================= CORE ================= */
-
-phase:
-engine.phase,
-
-phaseData:
-engine.phaseData,
-
-regime:
-engine.regime,
-
-master:
-engine.master,
-
-decision:
-engine.decision,
-
-confidence:
-engine.confidence,
-
-/* ================= SIGNAL STACK ================= */
-
-signal:
-engine.signal,
-
-superSignal:
-engine.superSignal,
-
-execution:
-engine.execution,
-
-risk:
-engine.risk,
-
-/* ================= ENGINES ================= */
-
-crash:
-engine.crash,
-
-putTiming:
-engine.putTiming,
-
-russell:
-engine.russell,
-
-nasdaq:
-engine.nasdaq,
-
-sizing:
-engine.sizing,
-
-exit:
-engine.exit,
-
-position:
-engine.position,
-
-positioning:
-engine.positioning,
-
-state:
-engine.state,
-
-systemHeat:
-engine.systemHeat,
-
-/* ================= INTERNALS ================= */
-
-rotation:
-engine.rotation,
-
-rotationConfirm:
-engine.rotationConfirm,
-
-rotationDecay:
-engine.rotationDecay,
-
-structure:
-engine.structure,
-
-earlyWarning:
-engine.earlyWarning,
-
-edgeState:
-engine.edgeState,
-
-tradeStack:
-engine.tradeStack,
-
-divergence:
-engine.divergence,
-
-/* ================= FLOW ================= */
-
-executionState:
-engine.executionState,
-
-dangerZone:
-engine.dangerZone,
-
-regimeSync:
-engine.regimeSync,
-
-/* ================= INSTITUTIONAL ================= */
-
-liquidity:
-engine.liquidity,
-
-fragility:
-engine.fragility,
-
-participation:
-engine.participation,
-
-breadthThrust:
-engine.breadthThrust,
-
-squeeze:
-engine.squeeze,
-
-/* ================= DRIVERS ================= */
-
-driversCore:
-engine.driversCore,
-
-marketDrivers:
-engine.marketDrivers,
-
-/* ================= MARKETS ================= */
-
-indices:
-engine.indices,
-
-futures:
-engine.futures
-};
+const snapshot =
+createMarketSnapshot({
+map: {
+indices: engine.indices,
+futures: engine.futures,
+historyMetrics: engine.historyMetrics
+},
+engine
+});
 
 navigator.clipboard.writeText(
 JSON.stringify(snapshot, null, 2)
