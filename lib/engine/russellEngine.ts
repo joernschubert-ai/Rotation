@@ -1,5 +1,22 @@
 export function russellEngine(data: any) {
 
+/* ================= ABSOLUTE PERFORMANCE ================= */
+
+const nasdaq5dReturn =
+Number(
+data.historyMetrics?.nasdaq5dReturn ?? 0
+);
+
+const russell5dReturn =
+Number(
+data.historyMetrics?.russell5dReturn ?? 0
+);
+
+const sp5005dReturn =
+Number(
+data.historyMetrics?.sp500_5dReturn ?? 0
+);
+
 /* ================= COMPONENTS ================= */
 
 let structureScore = 0; // max 5
@@ -99,6 +116,23 @@ Number(
 data.historyMetrics?.crashTrend ?? 0
 );
 
+/* ================= ABSOLUTE MARKET STATE ================= */
+
+const absoluteRiskOff =
+
+russell5dReturn < -3 &&
+nasdaq5dReturn < -5;
+
+const broadMarketWeakness =
+
+russell5dReturn < 0 &&
+nasdaq5dReturn < 0 &&
+sp5005dReturn < 0;
+
+const severeMarketBreakdown =
+
+russell5dReturn < -5 &&
+nasdaq5dReturn < -8;
 
 /* ================= STRUCTURE ================= */
 
@@ -106,6 +140,22 @@ data.historyMetrics?.crashTrend ?? 0
 if (rsSmall > 1.02) structureScore += 3;
 else if (rsSmall > 1.0) structureScore += 1;
 else if (rsSmall < 0.98) structureScore -= 2;
+
+/* ================= ABSOLUTE PERFORMANCE FILTER ================= */
+
+if (
+rsSmall > 1 &&
+russell5dReturn < 0
+) {
+structureScore -= 2;
+}
+
+if (
+rsSmall > 1 &&
+russell5dReturn < -3
+) {
+structureScore -= 3;
+}
 
 // Growth Bias
 if (rsGrowth > 1.02) structureScore += 1;
@@ -155,6 +205,17 @@ if (data.crash?.probability > 85) riskScore -= 3;
 
 if (data.vix < 20) riskScore += 1;
 if (data.vix > 25) riskScore -= 1;
+
+/* ================= ABSOLUTE PERFORMANCE RISK ================= */
+
+if (broadMarketWeakness)
+riskScore -= 1;
+
+if (absoluteRiskOff)
+riskScore -= 2;
+
+if (severeMarketBreakdown)
+riskScore -= 3;
 
 /* ================= ROTATION DECAY RISK ================= */
 
@@ -239,9 +300,25 @@ const totalScore = Math.max(
 Math.min(structureScore + regimeScore + riskScore, 10)
 );
 
+const marketState = {
+absoluteRiskOff,
+broadMarketWeakness,
+severeMarketBreakdown
+};
+
 /* ================= DECISION ================= */
 
 function getRussellDecision() {
+
+/* ================= ABSOLUTE MARKET FILTER ================= */
+
+if (absoluteRiskOff) {
+return "NO_TRADE";
+}
+
+if (severeMarketBreakdown) {
+return "NO_TRADE";
+}
 
 if (
 data.phase === "PHASE_4_RISK" ||
@@ -330,9 +407,15 @@ relativeBreadthWeakness,
 phasePersistence,
 regimePersistence,
 
-crashTrend
+crashTrend,
+
+nasdaq5dReturn,
+russell5dReturn,
+sp5005dReturn
 
 },
+
+marketState,
 
 components: {
 structure: {
