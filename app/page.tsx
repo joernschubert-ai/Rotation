@@ -128,8 +128,10 @@ await loadMarketHistory();
 const historyMetrics =
 historyEngine(history);
 
-mapped.historyMetrics =
-historyMetrics;
+const mappedWithHistory = {
+...mapped,
+historyMetrics
+};
 
 console.log(
 "HISTORY METRICS",
@@ -137,13 +139,13 @@ historyMetrics
 );
 
 const e =
-marketEngine(mapped);
+marketEngine(mappedWithHistory);
 
 /* SNAPSHOT */
 
 const snapshot =
 createMarketSnapshot({
-map: mapped,
+map: mappedWithHistory,
 engine: e
 });
 
