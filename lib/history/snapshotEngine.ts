@@ -8,6 +8,8 @@ engine: any;
 return {
 timestamp: new Date().toISOString(),
 
+historyMetrics: map.historyMetrics,
+
 phase: engine.phase,
 phaseData: engine.phaseData,
 
@@ -45,6 +47,20 @@ regimeSync: engine.regimeSync,
 
 executionState: engine.executionState,
 
+decision: engine.decision,
+
+confidence: engine.confidence,
+
+execution: engine.execution,
+
+risk: engine.risk,
+
+exit: engine.exit,
+
+edgeState: engine.edgeState,
+
+state: engine.state,
+
 structure: engine.structure,
 
 indices: map.indices,
@@ -55,5 +71,6 @@ marketDrivers: engine.marketDrivers,
 driversCore: engine.driversCore,
 
 systemHeat: engine.systemHeat
+
 };
 }
