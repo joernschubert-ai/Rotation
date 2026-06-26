@@ -5,6 +5,17 @@ let redis: RedisType | undefined;
 
 try {
 redis = Redis.fromEnv();
+
+console.log(
+"UPSTASH URL",
+process.env.UPSTASH_REDIS_REST_URL
+);
+
+console.log(
+"TOKEN EXISTS",
+!!process.env.UPSTASH_REDIS_REST_TOKEN
+);
+
 } catch {
 console.log("Redis not available");
 }
@@ -17,7 +28,12 @@ LOAD
 ===================================================== */
 
 export async function loadMarketHistory() {
-if (!redis) return [];
+
+
+if (!redis) return [];if (process.env.NODE_ENV === "development") {
+console.log("DEV MODE → market history disabled");
+return [];
+}
 
 try {
 const data = await redis.get(KEY);
@@ -68,6 +84,12 @@ SAVE
 export async function saveMarketSnapshot(
 snapshot: any
 ) {
+
+if (process.env.NODE_ENV === "development") {
+console.log("DEV MODE → snapshot save disabled");
+return;
+}
+
 if (!redis) return;
 
 try {
