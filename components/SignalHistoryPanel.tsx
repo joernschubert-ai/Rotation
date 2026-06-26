@@ -10,21 +10,42 @@ console.log("SIGNALS STATE:", signals);
 /* ================= LOAD ================= */
 
 useEffect(() => {
+console.log("SignalHistoryPanel mounted");
+
 load();
+
+return () => {
+console.log("SignalHistoryPanel unmounted");
+};
 }, []);
 
 async function load() {
+
+console.log("LOAD START");
+
 try {
+
 const res = await fetch("/api/signal");
+
+console.log("FETCH STATUS", res.status);
+
 const json = await res.json();
 
-console.log("SIGNAL API RESPONSE:", json);
+console.log("FETCH JSON", json);
 
 setSignals(json || []);
+
+console.log("SET SIGNALS", json?.length);
+
 } catch (e) {
-console.error("LOAD SIGNAL HISTORY ERROR", e);
+
+console.error(e);
+
 }
+
 }
+
+
 
 /* ================= HELPERS ================= */
 
@@ -61,17 +82,21 @@ border: "1px solid #222",
 padding: "16px"
 }}>
 
-<h3 style={{ color: "#888", marginBottom: "12px" }}>
-SIGNAL HISTORY
+<h3 style={{ color: "red", fontSize: 28 }}>
+ICH BIN DAS RICHTIGE PANEL
 </h3>
 
 <div style={{ color: "red" }}>
-COUNT: {signals.length}
+COUNT TEST 4711: {signals.length}
 </div>
 
 {signals.length === 0 && (
-<div style={{ color: "#666" }}>No signals yet</div>
+<div>No signals yet</div>
 )}
+
+<pre style={{ color: "white", fontSize: 12 }}>
+{JSON.stringify(signals, null, 2)}
+</pre>
 
 {signals.map((s, i) => {
 
