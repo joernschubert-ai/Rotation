@@ -94,10 +94,6 @@ COUNT TEST 4711: {signals.length}
 <div>No signals yet</div>
 )}
 
-<pre style={{ color: "white", fontSize: 12 }}>
-{JSON.stringify(signals, null, 2)}
-</pre>
-
 {signals.map((s, i) => {
 
 const color = getColor(s.type);
