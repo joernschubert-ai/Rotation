@@ -8,10 +8,6 @@ import { mapBackendToEngine } from "@/lib/adapters/mapBackendToEngine";
 import { validateEngineData } from "@/lib/engine/validateEngineData";
 
 import {
-loadMarketHistory
-} from "@/lib/history/marketHistory";
-
-import {
 historyEngine
 } from "@/lib/history/historyEngine";
 
@@ -122,8 +118,11 @@ return;
 
 /* ================= ENGINE ================= */
 
+const historyRes =
+await fetch("/api/history");
+
 const history =
-await loadMarketHistory();
+await historyRes.json();
 
 const historyMetrics =
 historyEngine(history);
