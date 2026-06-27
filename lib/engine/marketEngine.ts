@@ -94,6 +94,9 @@ Number(
 data.marketData?.["^VIX"]?.current ?? 20
 );
 
+const historyMetrics =
+data.historyMetrics ?? {};
+
 /* =====================================================
 DIVERGENCE
 ===================================================== */
@@ -355,6 +358,8 @@ CRASH
 const crash = crashEngine({
 ...data,
 
+historyMetrics,
+
 vix,
 
 vixTermRatio:
@@ -376,9 +381,7 @@ Number(data.gammaExposure ?? 0),
 correlationScore:
 Number(data.correlationScore ?? 0),
 
-drivers: driversCore,
-
-historyMetrics
+drivers: driversCore
 });
 
 /* =====================================================
@@ -386,7 +389,13 @@ EARLY WARNING
 ===================================================== */
 
 const earlyWarning =
-earlyWarningEngine(data);
+earlyWarningEngine({
+
+...data,
+
+historyMetrics
+
+});
 
 /* =====================================================
 TEMP PUT / RUSSELL
@@ -420,8 +429,7 @@ historyMetrics
 
 });
 
-const historyMetrics =
-data.historyMetrics ?? {};
+
 
 
 /* =====================================================
