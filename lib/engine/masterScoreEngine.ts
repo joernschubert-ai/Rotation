@@ -91,45 +91,43 @@ Number(
 breadthVelocity?.score ?? 50
 );
 
-const phasePersistence =
-Number(
-historyMetrics?.phasePersistence ?? 0
-);
+const {
 
-const participationDecay =
-Number(
-historyMetrics?.participationDecay ?? 0
-);
+phasePersistence = 0,
 
-const breadthTrend =
-Number(
-historyMetrics?.breadthTrend ?? 0
-);
+daysInPhase = 0,
 
-const breadthAcceleration =
-Number(
-historyMetrics?.breadthAcceleration ?? 0
-);
+participationDecay = 0,
 
-const leadershipDecay =
-Number(
-historyMetrics?.leadershipDecay ?? 0
-);
+breadthTrend = 0,
 
-const crashTrend =
-Number(
-historyMetrics?.crashTrend ?? 0
-);
+breadthAcceleration = 0,
 
-const relativeBreadthWeakness =
-Number(
-historyMetrics?.relativeBreadthWeakness ?? 0
-);
+leadershipDecay = 0,
 
-const regimePersistenceHistory =
-Number(
-historyMetrics?.regimePersistence ?? 0
-);
+crashTrend = 0,
+
+relativeBreadthWeakness = 0,
+
+institutionalPressure = 0,
+
+marketCharacter = "EXPANSION",
+
+averageBreadth = 0,
+averageParticipation = 0,
+averageRotation = 0,
+averageLiquidity = 0,
+averageFragility = 0,
+
+acceleratingWeakness = false,
+
+regimePersistence: regimePersistenceHistory = 0,
+
+persistentDistribution: historyPersistentDistribution = false,
+
+prolongedBearRegime = false,
+
+} = historyMetrics;
 
 
 /* =====================================================
@@ -167,8 +165,8 @@ crashTrend > 5;
 const broadParticipationFailure =
 relativeBreadthWeakness > 10;
 
-const prolongedBearRegime =
-regimePersistenceHistory >= 5;
+const prolongedBearHistory =
+prolongedBearRegime;
 
 const weakInternals = (
 
@@ -180,7 +178,29 @@ marketQualityScore < 45 ||
 
 rotationDecayScore > 45 ||
 
-phasePersistence >= 10 ||
+daysInPhase >= 10
+
+||
+
+institutionalPressure > 65
+
+||
+
+averageBreadth < 55
+
+||
+
+averageParticipation < 55
+
+||
+
+averageLiquidity < 50
+
+||
+
+averageFragility > 60
+
+||
 
 participationDecay > 15 ||
 
@@ -219,6 +239,30 @@ if (marketQualityScore > 60) score += 8;
 if (participationScore > 55) score += 6;
 if (breadthVelocityScore > 55) score += 6;
 if (liquidityScore > 55) score += 4;
+if (
+
+averageBreadth > 65 &&
+
+averageParticipation > 65
+
+) {
+
+score += 5;
+
+}
+
+if (
+
+averageLiquidity > 60 &&
+
+averageFragility < 45
+
+) {
+
+score += 4;
+
+}
+
 
 /* =====================================================
 NEGATIVE
@@ -304,10 +348,41 @@ score -= 5;
 }
 
 if (
-prolongedBearRegime
+
+prolongedBearHistory &&
+
+institutionalPressure > 70
+
 ) {
-score -= 4;
+
+score -= 6;
+
 }
+
+if (averageBreadth < 50) {
+
+score -= 5;
+
+}
+
+if (averageParticipation < 50) {
+
+score -= 5;
+
+}
+
+if (averageLiquidity < 45) {
+
+score -= 4;
+
+}
+
+if (averageFragility > 65) {
+
+score -= 6;
+
+}
+
 
 
 /* -------------------------------------------------
@@ -580,6 +655,19 @@ leadershipDecay,
 crashTrend,
 
 relativeBreadthWeakness,
+
+daysInPhase,
+
+institutionalPressure,
+
+marketCharacter,
+
+averageBreadth,
+averageParticipation,
+averageRotation,
+averageLiquidity,
+averageFragility,
+
 regimePersistenceHistory,
 
 deterioratingBreadth,
