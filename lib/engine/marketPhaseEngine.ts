@@ -17,11 +17,11 @@ engine.breadthVelocity ?? {};
 
 /* ================= NEW ================= */
 
-const regimePersistence =
-engine.regimePersistence ?? {};
-
 const internalDivergence =
 engine.internalDivergence ?? {};
+
+const regimePersistence =
+engine.regimePersistence ?? {};
 
 /* =====================================================
 HISTORY METRICS
@@ -30,36 +30,37 @@ HISTORY METRICS
 const historyMetrics =
 engine.historyMetrics ?? {};
 
-const breadthTrend =
-Number(historyMetrics.breadthTrend ?? 0);
+const {
 
-const breadthAcceleration =
-Number(historyMetrics.breadthAcceleration ?? 0);
+breadthTrend = 0,
+breadthAcceleration = 0,
 
-const participationDecay =
-Number(historyMetrics.participationDecay ?? 0);
+participationDecay = 0,
 
-const leadershipDecay =
-Number(historyMetrics.leadershipDecay ?? 0);
+relativeBreadthWeakness = 0,
 
-const relativeBreadthWeakness =
-Number(historyMetrics.relativeBreadthWeakness ?? 0);
+crashTrend = 0,
 
-const crashTrend =
-Number(historyMetrics.crashTrend ?? 0);
+phasePersistence = 0,
 
-const phasePersistence =
-Number(historyMetrics.phasePersistence ?? 0);
+daysInPhase = 0,
 
-const regimePersistenceHistory =
-Number(
-historyMetrics.regimePersistence ?? 0
-);
+institutionalPressure = 0,
 
-const relativeBreadthWeaknessHistory =
-Number(
-historyMetrics.relativeBreadthWeakness ?? 0
-);
+marketCharacter = "EXPANSION",
+
+prolongedBearRegime = false,
+
+acceleratingWeakness = false,
+
+averageBreadth = 0,
+averageParticipation = 0,
+averageRotation = 0,
+averageLiquidity = 0,
+averageFragility = 0,
+
+} = historyMetrics;
+
 
 /* =====================================================
 SAFE
@@ -211,6 +212,36 @@ const persistenceTrend =
 regimePersistence?.trend ??
 "STABLE";
 
+const regimeAge =
+Number(
+regimePersistence?.regimeAge ?? 0
+);
+
+const distributionRisk =
+Number(
+regimePersistence?.distributionRisk ?? 0
+);
+
+const recoveryQuality =
+Number(
+regimePersistence?.recoveryQuality ?? 0
+);
+
+const falseRecoveryRisk =
+Number(
+regimePersistence?.falseRecoveryRisk ?? 0
+);
+
+const trendStability =
+Number(
+regimePersistence?.trendStability ?? 50
+);
+
+const marketFatigue =
+Number(
+regimePersistence?.marketFatigue ?? 0
+);
+
 const persistentWeakness =
 (
 bearishPersistence &&
@@ -239,9 +270,6 @@ participationDecay > 10;
 const severeParticipationErosion =
 participationDecay > 20;
 
-const leadershipConcentration =
-leadershipDecay < -5;
-
 const risingCrashRisk =
 crashTrend > 5;
 
@@ -251,17 +279,20 @@ crashTrend > 10;
 const prolongedDistribution =
 phasePersistence >= 6;
 
-const prolongedBearRegime =
-regimePersistenceHistory >= 5;
+const prolongedBearHistory =
+prolongedBearRegime;
 
 const severeBearRegime =
-regimePersistenceHistory >= 10;
+
+prolongedBearRegime &&
+
+institutionalPressure > 75;
 
 const broadParticipationFailure =
-relativeBreadthWeaknessHistory > 10;
+relativeBreadthWeakness > 10;
 
 const severeParticipationFailure =
-relativeBreadthWeaknessHistory > 20;
+relativeBreadthWeakness > 20;
 
 const structuralDeterioration =
 
@@ -275,13 +306,6 @@ participationErosion
 (
 acceleratingBreadthDecay &&
 risingCrashRisk
-)
-
-||
-
-(
-leadershipConcentration &&
-deterioratingBreadth
 )
 
 ||
@@ -631,6 +655,18 @@ severeBearRegime
 severeParticipationFailure
 )
 
+||
+
+distributionRisk > 65
+
+||
+
+falseRecoveryRisk > 70
+
+||
+
+marketFatigue > 75
+
 ) {
 
 phase =
@@ -836,6 +872,15 @@ prolongedBearRegime
 ||
 broadParticipationFailure
 
+||
+
+distributionRisk > 55
+
+||
+
+marketFatigue > 60
+
+
 ) {
 
 phase =
@@ -922,7 +967,11 @@ else if (
 rotationActive &&
 rotationScore >= 40 &&
 crashScore < 30 &&
-!persistentWeakness
+!persistentWeakness &&
+
+trendStability > 60 &&
+
+recoveryQuality > 55
 
 ) {
 
@@ -1176,16 +1225,14 @@ breadthTrend,
 breadthAcceleration,
 
 participationDecay,
-leadershipDecay,
 
-relativeBreadthWeakness,
 
 crashTrend,
 
 phasePersistence,
 
-regimePersistenceHistory,
-relativeBreadthWeaknessHistory,
+regimeAge,
+relativeBreadthWeakness,
 
 prolongedBearRegime,
 severeBearRegime,
@@ -1199,14 +1246,39 @@ acceleratingBreadthDecay,
 participationErosion,
 severeParticipationErosion,
 
-leadershipConcentration,
-
 risingCrashRisk,
 severeRisingCrashRisk,
 
 prolongedDistribution,
 
-structuralDeterioration
+structuralDeterioration,
+
+distributionRisk,
+
+recoveryQuality,
+
+falseRecoveryRisk,
+
+trendStability,
+
+marketFatigue,
+
+averageBreadth,
+
+averageParticipation,
+
+averageRotation,
+
+averageLiquidity,
+
+averageFragility,
+
+daysInPhase,
+
+institutionalPressure,
+
+marketCharacter
+
 
 }
 };
