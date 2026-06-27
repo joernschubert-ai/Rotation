@@ -376,7 +376,9 @@ Number(data.gammaExposure ?? 0),
 correlationScore:
 Number(data.correlationScore ?? 0),
 
-drivers: driversCore
+drivers: driversCore,
+
+historyMetrics
 });
 
 /* =====================================================
@@ -395,7 +397,8 @@ putTimingEngine({
 phase: "TEMP",
 rotation,
 crash,
-earlyWarning
+earlyWarning,
+historyMetrics
 });
 
 const russellTemp =
@@ -412,7 +415,9 @@ Number(data.concentrationScore ?? 0),
 phase: "TEMP",
 
 crash,
-vix
+vix,
+historyMetrics
+
 });
 
 const historyMetrics =
@@ -455,7 +460,8 @@ putTimingEngine({
 phase,
 rotation,
 crash,
-earlyWarning
+earlyWarning,
+historyMetrics
 });
 
 /* =====================================================
@@ -476,7 +482,9 @@ Number(data.concentrationScore ?? 0),
 phase,
 
 crash,
-vix
+vix,
+
+historyMetrics
 });
 
 /* =====================================================
