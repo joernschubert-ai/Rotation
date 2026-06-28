@@ -51,10 +51,53 @@ Number(
 historyMetrics?.phasePersistence ?? 0
 );
 
-const historyRegimePersistence =
-Number(
-historyMetrics?.regimePersistence ?? 0
-);
+const participationDecayHistory =
+Number(historyMetrics?.participationDecay ?? 0);
+
+const breadthTrend =
+Number(historyMetrics?.breadthTrend ?? 0);
+
+const breadthAcceleration =
+Number(historyMetrics?.breadthAcceleration ?? 0);
+
+const leadershipDecay =
+Number(historyMetrics?.leadershipDecay ?? 0);
+
+const crashTrend =
+Number(historyMetrics?.crashTrend ?? 0);
+
+const relativeBreadthWeakness =
+Number(historyMetrics?.relativeBreadthWeakness ?? 0);
+
+const institutionalPressure =
+Number(historyMetrics?.institutionalPressure ?? 0);
+
+const daysInPhase =
+Number(historyMetrics?.daysInPhase ?? 0);
+
+const averageBreadth =
+Number(historyMetrics?.averageBreadth ?? 50);
+
+const averageParticipation =
+Number(historyMetrics?.averageParticipation ?? 50);
+
+const averageRotation =
+Number(historyMetrics?.averageRotation ?? 50);
+
+const averageLiquidity =
+Number(historyMetrics?.averageLiquidity ?? 50);
+
+const averageFragility =
+Number(historyMetrics?.averageFragility ?? 50);
+
+const prolongedBearRegime =
+Boolean(historyMetrics?.prolongedBearRegime);
+
+const persistentDistribution =
+Boolean(historyMetrics?.persistentDistribution);
+
+const acceleratingWeakness =
+Boolean(historyMetrics?.acceleratingWeakness);
 
 /* =====================================================
 NORMALIZATION
@@ -105,13 +148,80 @@ if (historyPhasePersistence >= 10) {
 score += 6;
 }
 
-if (historyRegimePersistence >= 5) {
-score += 4;
-}
-
-if (historyRegimePersistence >= 10) {
+if (
+prolongedBearRegime &&
+historyPhasePersistence >= 20
+) {
 score += 6;
 }
+
+if (daysInPhase >= 20)
+score += 3;
+
+if (daysInPhase >= 40)
+score += 5;
+
+if (daysInPhase >= 60)
+score += 7;
+
+if (persistentDistribution)
+score += 6;
+
+if (prolongedBearRegime)
+score += 6;
+
+if (institutionalPressure > 55)
+score += 3;
+
+if (institutionalPressure > 70)
+score += 6;
+
+if (participationDecayHistory > 15)
+score += 4;
+
+if (participationDecayHistory > 25)
+score += 6;
+
+if (breadthTrend < -5)
+score += 3;
+
+if (breadthTrend < -10)
+score += 5;
+
+if (breadthAcceleration < -5)
+score += 5;
+
+if (leadershipDecay < -5)
+score += 4;
+
+if (relativeBreadthWeakness > 8)
+score += 3;
+
+if (relativeBreadthWeakness > 15)
+score += 5;
+
+if (crashTrend > 5)
+score += 4;
+
+if (acceleratingWeakness)
+score += 6;
+
+if (averageBreadth < 55)
+score += 3;
+
+if (averageParticipation < 55)
+score += 3;
+
+if (averageRotation < 60)
+score += 2;
+
+if (averageLiquidity < 55)
+score += 2;
+
+if (averageFragility > 60)
+score += 4;
+
+
 
 score =
 Math.max(
@@ -213,12 +323,41 @@ divergenceScore,
 decayPersistence,
 
 history: {
+
 phasePersistence:
 historyPhasePersistence,
 
-regimePersistence:
-historyRegimePersistence
+daysInPhase,
+
+participationDecay:
+participationDecayHistory,
+
+breadthTrend,
+
+breadthAcceleration,
+
+leadershipDecay,
+
+crashTrend,
+
+relativeBreadthWeakness,
+
+institutionalPressure,
+
+averageBreadth,
+averageParticipation,
+averageRotation,
+averageLiquidity,
+averageFragility,
+
+persistentDistribution,
+
+prolongedBearRegime,
+
+acceleratingWeakness
+
 },
+
 
 summary
 };
