@@ -655,6 +655,8 @@ ROTATION DECAY
 const rotationDecay =
 rotationDecayEngine({
 
+historyMetrics,
+
 rotation,
 
 structure,
