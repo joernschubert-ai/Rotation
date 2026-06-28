@@ -170,6 +170,8 @@ FRAGILITY
 const fragility =
 fragilityEngine({
 
+historyMetrics,
+
 crash: {
 probability:
 Number(data.crashProbability ?? 0)

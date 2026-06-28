@@ -6,6 +6,8 @@ export interface FragilityEngineInput {
 
 history?: any[]
 
+historyMetrics?: any
+
 crash?: any
 
 breadth50?: number
@@ -115,6 +117,31 @@ latentFragility: boolean
 
 passiveFragility: boolean
 dealerCompression: boolean
+
+phasePersistence: number
+
+daysInPhase: number
+
+institutionalPressure: number
+
+participationDecay: number
+
+breadthTrendHistory: number
+
+breadthAcceleration: number
+
+crashTrend: number
+
+relativeBreadthWeakness: number
+
+averageFragility: number
+
+persistentDistribution: boolean
+
+prolongedBearRegime: boolean
+
+acceleratingWeakness: boolean
+
 }
 }
 
@@ -235,6 +262,9 @@ HISTORY
 const history =
 input.history ?? []
 
+const historyMetrics =
+input.historyMetrics ?? {};
+
 const h5 =
 history.length >= 5
 ? history[history.length - 5]
@@ -282,11 +312,46 @@ h10?.marketQualityScore ??
 marketQualityScore
 )
 
-const fragilityTrend =
-scoreSafe(
-h10?.fragilityScore
-)
 
+/* =====================================================
+HISTORY METRICS
+===================================================== */
+
+const phasePersistence =
+Number(historyMetrics?.phasePersistence ?? 0);
+
+const daysInPhase =
+Number(historyMetrics?.daysInPhase ?? 0);
+
+const institutionalPressure =
+Number(historyMetrics?.institutionalPressure ?? 0);
+
+const participationDecayHistory =
+Number(historyMetrics?.participationDecay ?? 0);
+
+const breadthTrendHistory =
+Number(historyMetrics?.breadthTrend ?? 0);
+
+const breadthAcceleration =
+Number(historyMetrics?.breadthAcceleration ?? 0);
+
+const crashTrend =
+Number(historyMetrics?.crashTrend ?? 0);
+
+const relativeBreadthWeakness =
+Number(historyMetrics?.relativeBreadthWeakness ?? 0);
+
+const averageFragility =
+Number(historyMetrics?.averageFragility ?? 50);
+
+const prolongedBearRegime =
+Boolean(historyMetrics?.prolongedBearRegime);
+
+const persistentDistribution =
+Boolean(historyMetrics?.persistentDistribution);
+
+const acceleratingWeakness =
+Boolean(historyMetrics?.acceleratingWeakness);
 
 
 /* =====================================================
@@ -765,6 +830,53 @@ score += Math.round(
 crashProbability * 0.10
 )
 
+/* =====================================================
+HISTORY METRIC OVERLAY
+===================================================== */
+
+if (phasePersistence >= 30)
+score += 3;
+
+if (phasePersistence >= 50)
+score += 5;
+
+if (daysInPhase >= 40)
+score += 3;
+
+if (daysInPhase >= 60)
+score += 5;
+
+if (persistentDistribution)
+score += 6;
+
+if (prolongedBearRegime)
+score += 6;
+
+if (institutionalPressure > 60)
+score += 4;
+
+if (participationDecayHistory > 20)
+score += 5;
+
+if (breadthTrendHistory < -1)
+score += 3;
+
+if (breadthAcceleration < -1)
+score += 5;
+
+if (relativeBreadthWeakness > 10)
+score += 3;
+
+if (crashTrend > 5)
+score += 4;
+
+if (acceleratingWeakness)
+score += 6;
+
+if (averageFragility > 65)
+score += 4;
+
+
 score = clamp(
 Math.round(score)
 )
@@ -907,6 +1019,18 @@ breadthErosion
 ) {
 breakdownRisk += 10
 }
+
+if (persistentDistribution)
+breakdownRisk += 8;
+
+if (prolongedBearRegime)
+breakdownRisk += 6;
+
+if (institutionalPressure > 60)
+breakdownRisk += 5;
+
+if (acceleratingWeakness)
+breakdownRisk += 8;
 
 breakdownRisk = clamp(
 Math.round(breakdownRisk)
@@ -1062,7 +1186,33 @@ liquidityIllusion,
 latentFragility,
 
 passiveFragility,
-dealerCompression
+dealerCompression,
+
+phasePersistence,
+
+daysInPhase,
+
+institutionalPressure,
+
+participationDecay:
+participationDecayHistory,
+
+breadthTrendHistory,
+
+breadthAcceleration,
+
+crashTrend,
+
+relativeBreadthWeakness,
+
+averageFragility,
+
+persistentDistribution,
+
+prolongedBearRegime,
+
+acceleratingWeakness
+
 }
 }
 }
