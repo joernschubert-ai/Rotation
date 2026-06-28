@@ -148,13 +148,6 @@ if (historyPhasePersistence >= 10) {
 score += 6;
 }
 
-if (
-prolongedBearRegime &&
-historyPhasePersistence >= 20
-) {
-score += 6;
-}
-
 if (daysInPhase >= 20)
 score += 3;
 
@@ -182,13 +175,13 @@ score += 4;
 if (participationDecayHistory > 25)
 score += 6;
 
-if (breadthTrend < -5)
+if (breadthTrend < -1)
 score += 3;
 
-if (breadthTrend < -10)
+if (breadthTrend < -3)
 score += 5;
 
-if (breadthAcceleration < -5)
+if (breadthAcceleration < -1)
 score += 5;
 
 if (leadershipDecay < -5)
