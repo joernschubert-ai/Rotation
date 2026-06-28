@@ -112,13 +112,13 @@ CORE DECAY
 
 let score = 0;
 
-score += participationDecay * 0.40;
+score += participationDecay * 0.55;
 
-score += breadthVelocityScore * 0.25;
+score += breadthVelocityScore * 0.35;
 
-score += divergenceScore * 0.25;
+score += divergenceScore * 0.40;
 
-score += decayPersistence * 0.60;
+score += decayPersistence * 0.45;
 
 /* =====================================================
 CONTEXT
@@ -140,52 +140,65 @@ score += 6;
 PERSISTENCE
 ===================================================== */
 
-if (historyPhasePersistence >= 6) {
-score += 4;
+if (historyPhasePersistence >= 15) {
+score += 2;
 }
 
-if (historyPhasePersistence >= 10) {
-score += 6;
+if (historyPhasePersistence >= 30) {
+score += 3;
+}
+
+if (historyPhasePersistence >= 50) {
+score += 4;
 }
 
 if (daysInPhase >= 20)
-score += 3;
+score += 1;
 
 if (daysInPhase >= 40)
-score += 5;
+score += 2;
 
 if (daysInPhase >= 60)
-score += 7;
+score += 3;
 
 if (persistentDistribution)
-score += 6;
-
-if (prolongedBearRegime)
-score += 6;
-
-if (institutionalPressure > 55)
-score += 3;
-
-if (institutionalPressure > 70)
-score += 6;
-
-if (participationDecayHistory > 15)
 score += 4;
 
-if (participationDecayHistory > 25)
-score += 6;
-
-if (breadthTrend < -1)
+if (prolongedBearRegime)
 score += 3;
 
+if (institutionalPressure > 55)
+score += 4;
+
+if (institutionalPressure > 70)
+score += 8;
+
+if (participationDecayHistory > 10)
+score += 3;
+
+if (participationDecayHistory > 20)
+score += 6;
+
+if (participationDecayHistory > 30)
+score += 8;
+
+if (breadthTrend < -1)
+score += 4;
+
 if (breadthTrend < -3)
-score += 5;
+score += 7;
 
 if (breadthAcceleration < -1)
 score += 5;
 
-if (leadershipDecay < -5)
-score += 4;
+if (breadthAcceleration < -2)
+score += 8;
+
+if (leadershipDecay < -3)
+score += 3;
+
+if (leadershipDecay < -7)
+score += 7;
 
 if (relativeBreadthWeakness > 8)
 score += 3;
