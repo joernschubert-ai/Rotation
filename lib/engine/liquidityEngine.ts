@@ -6,6 +6,14 @@ export interface LiquidityEngineInput {
 
 history?: any[]
 
+historyMetrics?: any
+
+marketDrivers?: any
+
+systemHeat?: any
+
+driversCore?: any
+
 marketLiquidityScore?: number
 
 gammaExposure?: number
@@ -114,6 +122,23 @@ smallCapWeakness: boolean
 passiveFragility: boolean
 liquidityIllusion: boolean
 dealerCompression: boolean
+
+liquidityAcceleration:number
+
+averageLiquidity:number
+
+liquidityPersistence:number
+
+institutionalPressure:number
+
+passiveFlowRisk:number
+
+dealerCompressionRaw:number
+
+driversLiquidity:number
+
+systemHeatCredit:number
+
 }
 }
 
@@ -179,18 +204,53 @@ Number(input.rotationDecayScore ?? 0)
 const fragilityScore =
 Number(input.fragilityScore ?? 50)
 
-const hiddenDistribution =
-input.hiddenDistribution ?? false
-
-const participationCollapse =
-input.participationCollapse ?? false
-
 /* =====================================================
 HISTORY
 ===================================================== */
 
 const history =
 input.history ?? []
+
+const historyMetrics =
+input.historyMetrics ?? {}
+
+const marketDrivers =
+input.marketDrivers ?? {}
+
+const systemHeat =
+input.systemHeat ?? {}
+
+const driversCore =
+input.driversCore ?? {}
+
+
+const passiveFlowRisk =
+Number(marketDrivers.passiveFlowRisk ?? 0)
+
+const dealerCompressionRaw =
+Number(marketDrivers.dealerCompression ?? 0)
+
+const systemHeatCredit =
+Number(systemHeat.components?.credit ?? 1)
+
+const driversLiquidity =
+Number(driversCore.score ?? 0)
+
+const liquidityPersistence =
+Number(historyMetrics.liquidityPersistence ?? 50)
+
+const averageLiquidity =
+Number(historyMetrics.averageLiquidity ?? liquidity)
+
+const institutionalPressure =
+Number(historyMetrics.institutionalPressure ?? 0)
+
+const hiddenDistribution =
+input.hiddenDistribution ?? false
+
+const participationCollapse =
+input.participationCollapse ?? false
+
 
 const h5 =
 history.length >= 5
@@ -239,6 +299,23 @@ h10?.breadth50 ??
 breadth50
 )
 
+
+const liquidityAcceleration =
+liquidityTrend -
+Number(
+h20?.marketLiquidityScore
+? (
+Number(
+h10?.marketLiquidityScore ??
+liquidity
+) -
+Number(
+h20?.marketLiquidityScore ??
+liquidity
+)
+)
+: 0
+)
 
 /* =====================================================
 STRUCTURAL FLAGS
@@ -375,6 +452,16 @@ Math.round(
 (rotationScore - 50) * 0.18
 )
 
+marketQualityScore +=
+Math.round(
+(driversLiquidity - 5) * 2
+)
+
+marketQualityScore +=
+Math.round(
+(systemHeatCredit - 1) * 8
+)
+
 if (narrowLeadership) {
 marketQualityScore -= 10
 }
@@ -421,6 +508,31 @@ breadthTrend < 0
 ) {
 marketQualityScore -= 4
 }
+
+if (
+liquidityPersistence < 40
+){
+marketQualityScore -=8
+}
+
+if(
+averageLiquidity <60
+){
+marketQualityScore -=5
+}
+
+if(
+institutionalPressure>55
+){
+marketQualityScore-=6
+}
+
+if(
+passiveFlowRisk>25
+){
+marketQualityScore-=8
+}
+
 
 marketQualityScore = clamp(
 Math.round(marketQualityScore)
@@ -469,6 +581,16 @@ let score = 55
 score +=
 Math.round(
 (liquidity - 50) * 0.45
+)
+
+score +=
+Math.round(
+(systemHeatCredit - 1) * 10
+)
+
+score +=
+Math.round(
+(driversLiquidity - 5)
 )
 
 /*
@@ -601,6 +723,37 @@ breadthTrend < 0
 ) {
 score -= 5
 }
+
+if(
+liquidityPersistence<40
+){
+score-=6
+}
+
+if(
+averageLiquidity<60
+){
+score-=4
+}
+
+if(
+institutionalPressure>55
+){
+score-=6
+}
+
+if(
+passiveFlowRisk>25
+){
+score-=8
+}
+
+if(
+dealerCompressionRaw>25
+){
+score-=6
+}
+
 
 score = clamp(
 Math.round(score)
@@ -736,10 +889,21 @@ INSTITUTIONAL LIQUIDITY
 ===================================================== */
 
 const institutionalLiquidity = (
+
 stableCredit &&
+
 healthyTermStructure &&
+
+systemHeatCredit>1 &&
+
+driversLiquidity>=5 &&
+
+liquidityPersistence>=45 &&
+
 !liquidityIllusion &&
+
 !passiveFragility
+
 )
 
 /* =====================================================
@@ -845,6 +1009,23 @@ liquidityTrend,
 creditTrend,
 gammaTrend,
 breadthTrend,
+
+liquidityAcceleration,
+
+averageLiquidity,
+
+liquidityPersistence,
+
+institutionalPressure,
+
+passiveFlowRisk,
+
+dealerCompressionRaw,
+
+driversLiquidity,
+
+systemHeatCredit,
+
 
 narrowLeadership,
 weakParticipation,

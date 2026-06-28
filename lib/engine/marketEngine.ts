@@ -138,6 +138,8 @@ LIQUIDITY
 
 const liquidity =
 liquidityEngine({
+
+
 marketLiquidityScore:
 Number(data.marketLiquidityScore ?? 50),
 
@@ -160,7 +162,12 @@ breadth50,
 breadth200,
 
 correlationScore:
-Number(data.correlationScore ?? 0)
+Number(data.correlationScore ?? 0),
+
+
+
+historyMetrics,
+
 });
 
 /* =====================================================
