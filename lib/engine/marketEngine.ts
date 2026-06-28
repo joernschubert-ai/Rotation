@@ -730,7 +730,8 @@ squeeze,
 participation,
 breadthThrust,
 
-rotationDecay
+rotationDecay,
+historyMetrics
 });
 
 /* =====================================================

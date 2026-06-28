@@ -17,7 +17,8 @@ squeeze,
 participation,
 breadthThrust,
 
-rotationDecay
+rotationDecay,
+historyMetrics
 }: any) {
 
 /* =====================================================
@@ -120,6 +121,44 @@ rotationDecay?.state ??
 "HEALTHY_ROTATION";
 
 /* =====================================================
+HISTORY
+===================================================== */
+
+const breadthTrend =
+Number(historyMetrics?.breadthTrend ?? 0);
+
+const breadthAcceleration =
+Number(historyMetrics?.breadthAcceleration ?? 0);
+
+const participationDecayHistory =
+Number(historyMetrics?.participationDecay ?? 0);
+
+const crashTrend =
+Number(historyMetrics?.crashTrend ?? 0);
+
+const phasePersistence =
+Number(historyMetrics?.phasePersistence ?? 0);
+
+const relativeBreadthWeakness =
+Number(historyMetrics?.relativeBreadthWeakness ?? 0);
+
+const institutionalPressure =
+Number(historyMetrics?.institutionalPressure ?? 0);
+
+const daysInPhase =
+Number(historyMetrics?.daysInPhase ?? 0);
+
+const prolongedBearRegime =
+Boolean(historyMetrics?.prolongedBearRegime);
+
+const persistentDistribution =
+Boolean(historyMetrics?.persistentDistribution);
+
+const acceleratingWeakness =
+Boolean(historyMetrics?.acceleratingWeakness);
+
+
+/* =====================================================
 FLAGS
 ===================================================== */
 
@@ -185,6 +224,41 @@ quality += 4;
 if (calmVolatility) {
 quality += 4;
 }
+
+/* =====================================================
+HISTORICAL QUALITY
+===================================================== */
+
+if (phasePersistence >= 20)
+quality -= 2;
+
+if (phasePersistence >= 40)
+quality -= 3;
+
+if (persistentDistribution)
+quality -= 5;
+
+if (prolongedBearRegime)
+quality -= 5;
+
+if (institutionalPressure > 60)
+quality -= 4;
+
+if (participationDecayHistory > 20)
+quality -= 4;
+
+if (breadthTrend < -1)
+quality -= 3;
+
+if (breadthAcceleration < -1)
+quality -= 4;
+
+if (relativeBreadthWeakness > 10)
+quality -= 3;
+
+if (acceleratingWeakness)
+quality -= 5;
+
 
 /* =====================================================
 NEGATIVE
@@ -273,6 +347,21 @@ if (rotationDecayScore > 60) {
 sustainability -= 12;
 }
 
+if (persistentDistribution)
+sustainability -= 6;
+
+if (prolongedBearRegime)
+sustainability -= 5;
+
+if (participationDecayHistory > 20)
+sustainability -= 4;
+
+if (breadthTrend < -1)
+sustainability -= 3;
+
+if (acceleratingWeakness)
+sustainability -= 6;
+
 sustainability = Math.max(
 0,
 Math.min(
@@ -306,6 +395,21 @@ falseBreakRisk += 10;
 if (gamma < 0) {
 falseBreakRisk += 8;
 }
+
+if (persistentDistribution)
+falseBreakRisk += 8;
+
+if (prolongedBearRegime)
+falseBreakRisk += 6;
+
+if (crashTrend > 5)
+falseBreakRisk += 4;
+
+if (breadthAcceleration < -1)
+falseBreakRisk += 5;
+
+if (acceleratingWeakness)
+falseBreakRisk += 6;
 
 falseBreakRisk = Math.max(
 0,
@@ -431,7 +535,30 @@ participation:
 participationScore,
 
 rotationDecay:
-rotationDecayScore
+rotationDecayScore,
+
+breadthTrend,
+
+breadthAcceleration,
+
+participationDecay:
+participationDecayHistory,
+
+crashTrend,
+
+phasePersistence,
+
+relativeBreadthWeakness,
+
+institutionalPressure,
+
+daysInPhase,
+
+persistentDistribution,
+
+prolongedBearRegime,
+
+acceleratingWeakness
 }
 };
 
