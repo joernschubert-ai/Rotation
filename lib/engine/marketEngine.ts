@@ -261,6 +261,8 @@ PARTICIPATION
 
 const participation =
 participationEngine({
+historyMetrics,
+
 breadth20,
 breadth50,
 breadth200,

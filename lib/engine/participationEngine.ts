@@ -6,6 +6,14 @@ export interface ParticipationEngineInput {
 
 history?: any[]
 
+historyMetrics?: any
+
+marketDrivers?: any
+
+systemHeat?: any
+
+driversCore?: any
+
 breadth20?: number
 breadth50?: number
 breadth200?: number
@@ -229,6 +237,40 @@ history.length >= 20
 ? history[history.length - 20]
 : null
 
+const historyMetrics =
+input.historyMetrics ?? {}
+
+const marketDrivers =
+input.marketDrivers ?? {}
+
+const systemHeat =
+input.systemHeat ?? {}
+
+const driversCore =
+input.driversCore ?? {}
+
+const participationPersistence =
+Number(historyMetrics.participationPersistence ?? 50)
+
+const averageParticipation =
+Number(historyMetrics.averageParticipation ?? 50)
+
+const institutionalParticipationTrend =
+Number(historyMetrics.institutionalParticipation ?? 50)
+
+const participationAccelerationHistory =
+Number(historyMetrics.participationAcceleration ?? 0)
+
+const passiveFlowRisk =
+Number(marketDrivers.passiveFlowRisk ?? 0)
+
+const systemHeatBreadth =
+Number(systemHeat.components?.breadth ?? 1)
+
+const driversParticipation =
+Number(driversCore.score ?? 0)
+
+
 /* =====================================================
 RELATIVE BREADTH SYSTEM
 ===================================================== */
@@ -403,6 +445,10 @@ BASE SCORE
 ===================================================== */
 
 let score = 60
+
+score += Math.round((driversParticipation - 5))
+
+score += Math.round((systemHeatBreadth - 1) * 8)
 
 score +=
 Math.round(
@@ -724,6 +770,21 @@ decayPersistence += 3
 decayPersistence =
 Math.min(20, decayPersistence)
 
+if (participationPersistence < 40)
+score -= 6
+
+if (averageParticipation < 55)
+score -= 4
+
+if (institutionalParticipationTrend < 45)
+score -= 5
+
+if (participationAccelerationHistory < -10)
+score -= 5
+
+if (passiveFlowRisk > 25)
+score -= 6
+
 /* =====================================================
 FINAL SCORE
 ===================================================== */
@@ -794,7 +855,9 @@ highs > lows &&
 rsEqual >= 1 &&
 rsSmall >= 1 &&
 
-!narrowLeadership
+!narrowLeadership &&
+participationPersistence >= 55 &&
+driversParticipation >= 5
 
 /* =====================================================
 SUMMARY
@@ -924,7 +987,20 @@ rotationScore,
 
 institutionalParticipation,
 passiveDependence,
-leadershipBreadth
+leadershipBreadth,
+participationPersistence,
+
+averageParticipation,
+
+institutionalParticipationTrend,
+
+participationAccelerationHistory,
+
+driversParticipation,
+
+systemHeatBreadth,
+
+passiveFlowRisk
 }
 }
 }
