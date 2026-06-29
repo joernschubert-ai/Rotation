@@ -11,6 +11,26 @@ return Math.max(min, Math.min(max, value))
 }
 
 export interface DangerZoneInput {
+
+history?: {
+phasePersistence?: number
+
+prolongedDistribution?: boolean
+prolongedBearRegime?: boolean
+
+institutionalPressure?: number
+
+averageBreadth?: number
+averageParticipation?: number
+averageRotation?: number
+averageLiquidity?: number
+averageFragility?: number
+
+breadthTrend?: number
+participationDecay?: number
+crashTrend?: number
+}
+
 crashProbability: number
 crashMomentum: number
 
@@ -92,6 +112,7 @@ concentration: number
 decay: number
 
 marketQuality: number
+history: number
 }
 
 clusters: {
@@ -103,6 +124,7 @@ crashExpansionCluster: number
 passiveFragilityCluster: number
 liquidityIllusionCluster: number
 dealerCompressionCluster: number
+historicalWeaknessCluster: number
 }
 
 meta: {
@@ -121,6 +143,11 @@ acceleratingDecay: boolean
 liquidityIllusion: boolean
 dealerCompression: boolean
 passiveFragility: boolean
+
+prolongedDistribution: boolean
+prolongedBearRegime: boolean
+phasePersistence: number
+institutionalPressure: number
 
 effectiveGamma: number
 }
@@ -210,6 +237,44 @@ effectiveGamma,
 
 const marketQualityScore =
 Number(marketQuality?.score ?? 50)
+
+const history = input.history ?? {}
+
+const phasePersistence =
+Number(history.phasePersistence ?? 0)
+
+const prolongedDistribution =
+history.prolongedDistribution ?? false
+
+const prolongedBearRegime =
+history.prolongedBearRegime ?? false
+
+const institutionalPressure =
+Number(history.institutionalPressure ?? 0)
+
+const averageBreadth =
+Number(history.averageBreadth ?? 70)
+
+const averageParticipation =
+Number(history.averageParticipation ?? 70)
+
+const averageRotation =
+Number(history.averageRotation ?? 70)
+
+const averageLiquidity =
+Number(history.averageLiquidity ?? 70)
+
+const averageFragility =
+Number(history.averageFragility ?? 50)
+
+const breadthTrendHistory =
+Number(history.breadthTrend ?? 0)
+
+const participationDecayHistory =
+Number(history.participationDecay ?? 0)
+
+const crashTrendHistory =
+Number(history.crashTrend ?? 0)
 
 const institutionalQuality =
 Number(
@@ -813,6 +878,42 @@ dealerCompressionCluster += 12
 dealerCompressionCluster =
 clamp(dealerCompressionCluster)
 
+let historicalWeaknessCluster = 0
+
+if (phasePersistence > 45)
+historicalWeaknessCluster += 8
+
+if (phasePersistence > 70)
+historicalWeaknessCluster += 10
+
+if (prolongedDistribution)
+historicalWeaknessCluster += 12
+
+if (prolongedBearRegime)
+historicalWeaknessCluster += 12
+
+if (institutionalPressure > 45)
+historicalWeaknessCluster += 10
+
+if (averageBreadth < 65)
+historicalWeaknessCluster += 10
+
+if (averageParticipation < 72)
+historicalWeaknessCluster += 8
+
+if (averageRotation < 75)
+historicalWeaknessCluster += 8
+
+if (averageLiquidity < 75)
+historicalWeaknessCluster += 8
+
+if (averageFragility > 60)
+historicalWeaknessCluster += 12
+
+historicalWeaknessCluster =
+clamp(historicalWeaknessCluster)
+
+
 /* =====================================================
 FINAL SCORE
 ===================================================== */
@@ -831,7 +932,9 @@ let danger = Math.round(
 
 (liquidityIllusionCluster * 0.10) +
 
-(dealerCompressionCluster * 0.08)
+(dealerCompressionCluster * 0.06) +
+
+(historicalWeaknessCluster * 0.10)
 
 )
 
@@ -893,6 +996,13 @@ danger >= 60 ||
 weakInternals &&
 acceleratingDecay
 )
+
+||
+
+(
+historicalWeaknessCluster > 40 &&
+danger > 50
+)
 ) {
 level = "HIGH"
 }
@@ -928,6 +1038,13 @@ liquidityIllusion &&
 hiddenDistribution
 )
 
+||
+
+(
+historicalWeaknessCluster > 55 &&
+crashTrendHistory > 3
+)
+
 )
 
 return {
@@ -957,7 +1074,10 @@ decay:
 Math.round(decayRisk),
 
 marketQuality:
-Math.round(marketQualityRisk)
+Math.round(marketQualityRisk),
+
+history:
+Math.round(historicalWeaknessCluster)
 },
 
 clusters: {
@@ -980,7 +1100,10 @@ liquidityIllusionCluster:
 Math.round(liquidityIllusionCluster),
 
 dealerCompressionCluster:
-Math.round(dealerCompressionCluster)
+Math.round(dealerCompressionCluster),
+
+historicalWeaknessCluster:
+Math.round(historicalWeaknessCluster)
 },
 
 meta: {
@@ -995,6 +1118,11 @@ synchronizedBreakdown,
 volatilityExpansion,
 liquidityFragility,
 acceleratingDecay,
+
+prolongedDistribution,
+prolongedBearRegime,
+phasePersistence,
+institutionalPressure,
 
 liquidityIllusion,
 dealerCompression,

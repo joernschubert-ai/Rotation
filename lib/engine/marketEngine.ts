@@ -603,7 +603,8 @@ Number(data.volOfVolRatio ?? 1),
 creditRatio:
 Number(data.creditRatio ?? 1),
 
-vix
+vix,
+history: historyMetrics
 });
 
 /* =====================================================
