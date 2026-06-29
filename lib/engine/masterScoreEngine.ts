@@ -151,16 +151,16 @@ STRUCTURAL FLAGS
 ===================================================== */
 
 const deterioratingBreadth =
-breadthTrend < -10;
+breadthTrend <= -2;
 
 const acceleratingBreadthDecay =
-breadthAcceleration < -5;
+breadthAcceleration <= -1;
 
 const leadershipConcentration =
-leadershipDecay < -5;
+leadershipDecay <= -2;
 
 const risingCrashRisk =
-crashTrend > 5;
+crashTrend >= 3;
 
 const broadParticipationFailure =
 relativeBreadthWeakness > 10;
@@ -277,16 +277,16 @@ ROTATION DECAY
 Phase-3 Distribution Penalty
 ------------------------------------------------- */
 
-if (rotationDecayScore > 60) {
-score -= 8;
-}
-
-if (rotationDecayScore >= 60) {
-score -= 5;
+if (rotationDecayScore >= 80) {
+score -= 15;
 }
 
 if (rotationDecayScore >= 70) {
 score -= 10;
+}
+
+if (rotationDecayScore >= 60) {
+score -= 5;
 }
 
 if (fragilityScore > 60) {
@@ -294,15 +294,19 @@ score -= 8;
 }
 
 if (
-phasePersistence >= 8
+phasePersistence >= 60
 ) {
+
 score -= 4;
+
 }
 
 if (
-phasePersistence >= 12
+phasePersistence >= 85
 ) {
+
 score -= 6;
+
 }
 
 if (
