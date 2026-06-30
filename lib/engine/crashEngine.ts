@@ -220,12 +220,6 @@ h10?.marketLiquidityScore ??
 marketLiquidityScore
 )
 
-const fragilityTrend =
-Number(
-h10?.fragilityScore ??
-0
-)
-
 const participationErosion =
 participationTrend < -10
 
@@ -320,6 +314,28 @@ if (highLowDelta < -25) {
 hlScore += 6;
 }
 
+const hlTrend =
+
+Number(
+
+h5?.highLowDelta ??
+
+highLowDelta
+
+);
+
+if(
+
+highLowDelta<0 &&
+
+hlTrend<0
+
+){
+
+hlScore+=1;
+
+}
+
 hlScore = Math.min(
 hlScore,
 MAX
@@ -372,12 +388,14 @@ structuralFragility += 6;
 
 /* ---------- PARTICIPATION ---------- */
 
-if (weakParticipation) {
-structuralFragility += 8;
-}
-
 if (collapsingParticipation) {
-structuralFragility += 8;
+
+structuralFragility += 10;
+
+} else if (weakParticipation) {
+
+structuralFragility += 6;
+
 }
 
 /* ---------- INTERNALS ---------- */
@@ -392,22 +410,26 @@ structuralFragility += 8;
 
 /* ---------- BREADTH FAILURE ---------- */
 
-if (breadthFailure) {
-structuralFragility += 6;
-}
-
 if (severeBreadthFailure) {
-structuralFragility += 8;
+
+structuralFragility += 10;
+
+} else if (breadthFailure) {
+
+structuralFragility += 6;
+
 }
 
 /* ---------- LEADERSHIP ---------- */
 
-if (narrowLeadership) {
-structuralFragility += 5;
-}
-
 if (severeNarrowLeadership) {
-structuralFragility += 8;
+
+structuralFragility += 10;
+
+} else if (narrowLeadership) {
+
+structuralFragility += 5;
+
 }
 
 /* =====================================================
@@ -436,8 +458,12 @@ structuralFragility += 5;
 
 /* ---------- INTERNAL DIVERGENCES ---------- */
 
-structuralFragility += Math.round(
-divergenceSeverity * 0.15
+structuralFragility += Math.min(
+
+8,
+
+Math.round(divergenceSeverity * 0.12)
+
 );
 
 if (hiddenDistribution) {
@@ -480,37 +506,39 @@ structuralFragility += 6;
 
 structuralFragility += hlScore;
 
-structuralFragility = Math.min(
-structuralFragility,
-100
-);
 
 /* ---------- ROTATION DECAY ---------- */
 
-if (rotationDecayScore > 45) {
-structuralFragility += 4;
-}
-
-if (rotationDecayScore > 60) {
-structuralFragility += 6;
-}
-
 if (rotationDecayScore > 75) {
-structuralFragility += 8;
+
+structuralFragility += 10;
+
+}
+
+else if (rotationDecayScore > 60) {
+
+structuralFragility += 6;
+
+}
+
+else if (rotationDecayScore > 45) {
+
+structuralFragility += 3;
+
 }
 
 if (
 rotationDecayState ===
 "DISTRIBUTION_ROTATION"
 ) {
-structuralFragility += 5;
+structuralFragility += 4;
 }
 
 if (
 rotationDecayState ===
 "EXHAUSTED_ROTATION"
 ) {
-structuralFragility += 8;
+structuralFragility += 6;
 }
 
 /* ---------- HISTORY DECAY ---------- */
@@ -551,20 +579,32 @@ structuralFragility += 8;
 NEW HISTORY EROSION
 ===================================================== */
 
+if (structuralErosion) {
+
+structuralFragility += 14;
+
+}
+
+else {
+
 if (participationErosion) {
+
 structuralFragility += 6;
+
 }
 
 if (breadthErosion) {
+
 structuralFragility += 6;
+
 }
 
 if (liquidityErosion) {
+
 structuralFragility += 4;
+
 }
 
-if (structuralErosion) {
-structuralFragility += 12;
 }
 
 structuralFragility = Math.min(
@@ -595,15 +635,15 @@ crashTrigger += 10;
 }
 
 if (
-marketLiquidityScore < 35
+marketLiquidityScore < 25
 ) {
-crashTrigger += 8;
+crashTrigger += 10;
 }
 
 if (
-marketLiquidityScore < 25
+marketLiquidityScore < 35
 ) {
-crashTrigger += 8;
+crashTrigger += 6;
 }
 
 /* ---------- CREDIT ---------- */
@@ -750,6 +790,18 @@ move > 120
 panicState += 10;
 }
 
+if (gamma < 0) {
+panicState += 5;
+}
+
+if (creditRatio < 0.95) {
+panicState += 6;
+}
+
+if (marketLiquidityScore < 30) {
+panicState += 6;
+}
+
 panicState = Math.min(
 panicState,
 100
@@ -758,6 +810,14 @@ panicState,
 /* =====================================================
 FINAL SCORE
 ===================================================== */
+
+if (
+rotationDecayScore > 75 &&
+participationScore < 40 &&
+rotationScore < 40
+){
+crashTrigger += 6;
+}
 
 const finalScore = Math.round(
 
@@ -800,50 +860,28 @@ STRUCTURAL FLOOR
 ===================================================== */
 
 if (
-
 rotationScore < 30 &&
-
 participationScore < 50 &&
-
 narrowLeadership &&
-
 probability < 25
-
-) {
-
+){
 probability = 25;
 }
 
 if (
-
 severeNarrowLeadership &&
-
 weakParticipation &&
-
 breadth50 < 55 &&
-
 probability < 28
-
-) {
-
+){
 probability = 28;
 }
 
-probability = Math.max(
-0,
-Math.min(100, probability)
-);
-
 if (
-
 rotationDecayScore > 70 &&
-
 hiddenDistribution &&
-
 probability < 35
-
-) {
-
+){
 probability = 35;
 }
 
@@ -851,14 +889,14 @@ if (
 phasePersistence >= 10 &&
 participationDecay > 15 &&
 probability < 40
-) {
+){
 probability = 40;
 }
 
 if (
 structuralErosion &&
 probability < 45
-) {
+){
 probability = 45;
 }
 
