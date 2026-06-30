@@ -289,25 +289,25 @@ rotationDecayScore > 70
 );
 
 const deterioratingBreadthTrend =
-breadthTrend < -10;
+breadthTrend <= -2;
 
 const acceleratingBreadthDamage =
-breadthAcceleration < -5;
+breadthAcceleration <= -1;
 
 const severeBreadthDamage =
-breadthAcceleration < -10;
+breadthAcceleration <= -3;
 
 const leadershipConcentration =
-leadershipDecay > 10;
+leadershipDecay <= -2;
 
 const severeLeadershipConcentration =
-leadershipDecay > 20;
+leadershipDecay <= -5;
 
 const persistentBreadthWeakness =
 relativeBreadthWeakness > 15;
 
 const chronicRegimeWeakness =
-regimePersistenceHistory >= 10;
+regimePersistenceHistory >= 85;
 
 /* =====================================================
 VALIDATED LIQUIDITY
@@ -535,7 +535,7 @@ edge -= 2;
 }
 
 if (
-phasePersistence >= 10
+phasePersistence >= 60
 ) {
 edge -= 1;
 }
@@ -784,7 +784,7 @@ size *= 0.8;
 }
 
 if (
-phasePersistence >= 10
+phasePersistence >= 60
 ) {
 size *= 0.9;
 }
@@ -892,7 +892,7 @@ size = Math.min(size, 40);
 }
 
 if (
-phasePersistence >= 12 &&
+phasePersistence >= 85 &&
 participationDecay > 20
 ) {
 
