@@ -255,22 +255,22 @@ riskScore -= 1;
 
 /* ================= HISTORY RISK ================= */
 
-if (breadthTrend < -10)
+if (breadthTrend <= -2)
 riskScore -= 1;
 
-if (breadthAcceleration < -5)
+if (breadthAcceleration <= -1)
 riskScore -= 1;
 
 if (participationDecay > 10)
 riskScore -= 1;
 
-if (leadershipDecay > 10)
+if (leadershipDecay >= -2)
 riskScore -= 1;
 
-if (phasePersistence >= 6)
+if (phasePersistence >= 60)
 riskScore -= 1;
 
-if (phasePersistence >= 10)
+if (phasePersistence >= 85)
 riskScore -= 1;
 
 if (relativeBreadthWeakness > 10)
@@ -279,16 +279,16 @@ riskScore -= 1;
 if (relativeBreadthWeakness > 20)
 riskScore -= 1;
 
-if (regimePersistence >= 5)
+if (regimePersistence >= 60)
 riskScore -= 1;
 
-if (regimePersistence >= 10)
+if (regimePersistence >= 85)
 riskScore -= 1;
 
-if (crashTrend > 5)
+if (crashTrend >= 3)
 riskScore -= 1;
 
-if (crashTrend > 10)
+if (crashTrend >= 6)
 riskScore -= 1;
 
 riskScore = Math.max(-5, Math.min(riskScore, 2));
@@ -344,21 +344,21 @@ return "NO_TRADE";
 }
 
 if (
-phasePersistence >= 10 &&
+phasePersistence >= 85 &&
 participationDecay > 15
 ) {
 return "NO_TRADE";
 }
 
 if (
-regimePersistence >= 10 &&
+regimePersistence >= 85 &&
 relativeBreadthWeakness > 20
 ) {
 return "NO_TRADE";
 }
 
 if (
-crashTrend > 10 &&
+crashTrend >= 6 &&
 participationDecay > 15
 ) {
 return "NO_TRADE";
