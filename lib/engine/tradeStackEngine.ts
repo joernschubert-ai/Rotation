@@ -119,10 +119,10 @@ HISTORY FLAGS
 ====================================================== */
 
 const deterioratingBreadth =
-breadthTrend < -10;
+breadthTrend <= -2;
 
 const acceleratingBreadthDecay =
-breadthAcceleration < -5;
+breadthAcceleration <= -1;
 
 const participationErosion =
 participationDecay > 10;
@@ -131,22 +131,22 @@ const severeParticipationErosion =
 participationDecay > 20;
 
 const leadershipConcentration =
-leadershipDecay < -5;
+leadershipDecay <= -2;
 
 const risingCrashRisk =
-crashTrend > 5;
+crashTrend >= 3;
 
 const severeRisingCrashRisk =
-crashTrend > 10;
+crashTrend >= 6;
 
 const prolongedDistribution =
-phasePersistence >= 6;
+phasePersistence >= 60;
 
 const prolongedBearRegime =
-regimePersistence >= 5;
+regimePersistence >= 60;
 
 const severeBearRegime =
-regimePersistence >= 10;
+regimePersistence >= 85;
 
 const broadParticipationFailure =
 relativeBreadthWeakness > 10;
