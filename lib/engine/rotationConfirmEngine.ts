@@ -251,7 +251,7 @@ if (breadthTrend < -1)
 quality -= 3;
 
 if (breadthAcceleration < -1)
-quality -= 4;
+quality -= 3;
 
 if (relativeBreadthWeakness > 10)
 quality -= 3;
