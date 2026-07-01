@@ -635,7 +635,20 @@ score -= 16
 
 if (weakBreadth) {
 score -= 4
+
 }
+
+if (liquidityAcceleration < -8)
+score -= 4;
+
+if (liquidityAcceleration < -15)
+score -= 6;
+
+if (creditTrend > 0.08)
+score -= 4;
+
+if (creditTrend > 0.15)
+score -= 6;
 
 /* =====================================================
 NEW PENALTIES
