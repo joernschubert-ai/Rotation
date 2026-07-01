@@ -627,36 +627,6 @@ structuralDeterioration
 
 ||
 
-(
-prolongedDistribution &&
-participationErosion
-)
-
-||
-
-(
-severeParticipationErosion &&
-risingCrashRisk
-)
-
-||
-(
-prolongedBearRegime &&
-broadParticipationFailure
-)
-
-||
-(
-severeBearRegime
-)
-
-||
-(
-severeParticipationFailure
-)
-
-||
-
 distributionRisk > 65
 
 ||
@@ -789,7 +759,7 @@ rotationScore < 52 &&
 subPhase =
 "PASSIVE_LIQUIDITY_TRAP";
 
-confidence = 76;
+confidence = 73;
 }
 
 /* =====================================================
@@ -850,27 +820,6 @@ persistentDistribution ||
 
 hiddenInstitutionalDistribution
 
-||
-
-deterioratingBreadth
-
-||
-
-participationErosion
-
-||
-
-risingCrashRisk
-
-||
-
-prolongedDistribution
-
-||
-prolongedBearRegime
-
-||
-broadParticipationFailure
 
 ||
 
@@ -1074,12 +1023,12 @@ else {
 phase =
 persistentWeakness
 ? "PHASE_3_DISTRIBUTION"
-: "PHASE_1_EXPANSION";
+: "PHASE_2_WARNING";
 
 regimeState =
 persistentWeakness
 ? "TRANSITION"
-: "TRANSITION";
+: "RISK_ON";
 
 subPhase =
 persistentWeakness
@@ -1101,20 +1050,15 @@ if (
 (
 persistentWeakness ||
 
-deterioratingBreadth ||
+persistentDistribution ||
 
-participationErosion ||
+structuralDeterioration
 
-risingCrashRisk ||
-
-prolongedBearRegime ||
-
-broadParticipationFailure
 )
 
 &&
 
-phase === "PHASE_1_EXPANSION"
+phase==="PHASE_1_EXPANSION"
 
 ) {
 
