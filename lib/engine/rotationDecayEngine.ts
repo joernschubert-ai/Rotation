@@ -189,10 +189,10 @@ if (breadthTrend < -3)
 score += 7;
 
 if (breadthAcceleration < -1)
-score += 5;
+score += 3;
 
 if (breadthAcceleration < -2)
-score += 8;
+score += 5;
 
 if (leadershipDecay < -3)
 score += 3;
@@ -213,19 +213,19 @@ if (acceleratingWeakness)
 score += 6;
 
 if (averageBreadth < 55)
-score += 3;
+score += 1;
 
 if (averageParticipation < 55)
-score += 3;
+score += 1;
 
 if (averageRotation < 60)
-score += 2;
+score += 1;
 
 if (averageLiquidity < 55)
-score += 2;
+score += 1;
 
 if (averageFragility > 60)
-score += 4;
+score += 2;
 
 
 
