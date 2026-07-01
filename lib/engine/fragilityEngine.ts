@@ -856,13 +856,13 @@ if (institutionalPressure > 60)
 score += 4;
 
 if (participationDecayHistory > 20)
-score += 5;
+score += 2;
 
 if (breadthTrendHistory < -1)
-score += 3;
+score += 1;
 
 if (breadthAcceleration < -1)
-score += 5;
+score += 3;
 
 if (relativeBreadthWeakness > 10)
 score += 3;
@@ -874,7 +874,7 @@ if (acceleratingWeakness)
 score += 6;
 
 if (averageFragility > 65)
-score += 4;
+score += 2;
 
 
 score = clamp(
