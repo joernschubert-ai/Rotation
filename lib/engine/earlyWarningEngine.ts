@@ -159,7 +159,17 @@ if (breadthTrend < -10) historyScore += 1;
 
 /* ---------- ACCELERATION ---------- */
 
-if (breadthAcceleration < -3) historyScore += 1;
+if (breadthAcceleration < -8) {
+
+historyScore +=2;
+
+}
+
+else if (breadthAcceleration < -3){
+
+historyScore +=1;
+
+}
 
 /* ---------- PARTICIPATION DECAY ---------- */
 
@@ -182,7 +192,7 @@ if (phasePersistence >= 6) historyScore += 1;
 if (phasePersistence >= 10) historyScore += 1;
 
 /* clamp */
-historyScore = Math.min(historyScore, 3);
+historyScore = Math.min(historyScore, 5);
 
 /* ================= TOTAL ================= */
 
@@ -197,28 +207,10 @@ historyScore;
 
 /* ================= PHASE CONTEXT ================= */
 
-if (
-phase === "PHASE_1_EXPANSION" ||
-phase === "PHASE_2_WARNING"
-) {
-total += 1;
-}
-
-if (
-phase === "PHASE_5_BREAKDOWN" ||
-phase === "PHASE_6_ACCELERATION"
-) {
-total -= 1;
-}
 
 /* ================= INTERNAL DIVERGENCE BOOST ================= */
 
-if (
-divergenceState ===
-"HIDDEN_DISTRIBUTION"
-) {
-total += 1;
-}
+
 
 /* ================= CLAMP ================= */
 
@@ -227,16 +219,18 @@ total = Math.max(
 Math.min(total, 14)
 );
 
+total = Math.round(total);
+
 /* ================= STATE ================= */
 
 let state = "CLEAN";
 let color = "#52c41a";
 
-if (total >= 8) {
+if (total >= 10) {
 state = "HIGH RISK";
 color = "#ff4d4f";
 }
-else if (total >= 6) {
+else if (total >= 7) {
 state = "WARNING";
 color = "#fa8c16";
 }
@@ -292,7 +286,13 @@ max: 3
 internalDivergence: {
 value: internalDivergenceScore,
 max: 3
+},
+
+history: {
+value: historyScore,
+max: 6
 }
+
 },
 
 meta: {
