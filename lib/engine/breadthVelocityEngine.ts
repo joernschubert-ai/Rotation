@@ -268,18 +268,6 @@ if (b50Slope5d < 0) {
 breadthParticipationDecay += 5
 }
 
-if (b50Slope10d < 0) {
-breadthParticipationDecay += 6
-}
-
-if (b200Slope10d < 0) {
-breadthParticipationDecay += 4
-}
-
-if (b200Slope20d < 0) {
-breadthParticipationDecay += 4
-}
-
 if (adSlope5d < 0) {
 breadthParticipationDecay += 3
 }
@@ -303,25 +291,18 @@ PERSISTENCE
 
 let decayPersistence = 0
 
-if (b20Slope5d < 0) {
-decayPersistence += 3
-}
-
-if (b50Slope5d < 0) {
-decayPersistence += 4
-}
-
 if (b50Slope10d < 0) {
 decayPersistence += 4
+}
+
+if (b200Slope10d < 0) {
+decayPersistence += 3
 }
 
 if (b200Slope20d < 0) {
 decayPersistence += 3
 }
 
-if (adSlope5d < 0) {
-decayPersistence += 2
-}
 
 decayPersistence =
 Math.min(20, decayPersistence)
@@ -347,12 +328,12 @@ INSTITUTIONAL DIVERGENCE
 ===================================================== */
 
 const spxBreadthDivergence = (
-spxSlope5d > 0 &&
-b50Slope5d < 0
+spxSlope5d > 1 &&
+b50Slope5d < -2
 )
 
 const severeDivergence = (
-spxSlope5d > 1 &&
+spxSlope5d > 2 &&
 b50Slope5d < -3 &&
 adSlope5d < 0
 )
@@ -364,10 +345,13 @@ adDeterioration
 )
 
 const internalBreakdown = (
+
 b20Slope5d < -5 &&
 b50Slope5d < -4 &&
 b200Slope10d < -2 &&
-adSlope5d < 0
+adSlope5d < 0 &&
+breadth50 < 45
+
 )
 
 const institutionalDivergence = (
@@ -380,7 +364,7 @@ severeDivergence
 SCORE
 ===================================================== */
 
-let score = 15
+let score = 0
 
 if (shortTermWeakness) {
 score += 10
@@ -459,36 +443,31 @@ let state:
 
 if (score >= 75) {
 
-state =
-"INTERNAL_BREAKDOWN"
+state = "INTERNAL_BREAKDOWN"
 
 }
 
 else if (score >= 55) {
 
-state =
-"DISTRIBUTION"
+state = "DISTRIBUTION"
 
 }
 
 else if (score >= 35) {
 
-state =
-"DIVERGING"
+state = "DIVERGING"
 
 }
 
-else if (score >= 20) {
+else if (score >= 15) {
 
-state =
-"STABLE"
+state = "STABLE"
 
 }
 
 else {
 
-state =
-"EXPANDING"
+state = "EXPANDING"
 
 }
 
