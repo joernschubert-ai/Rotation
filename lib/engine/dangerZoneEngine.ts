@@ -29,6 +29,8 @@ averageFragility?: number
 breadthTrend?: number
 participationDecay?: number
 crashTrend?: number
+
+fragilityScore?: number
 }
 
 crashProbability: number
@@ -120,6 +122,7 @@ internalWeaknessCluster: number
 distributionCluster: number
 liquidityFragilityCluster: number
 crashExpansionCluster: number
+structuralFragilityCluster: number
 
 passiveFragilityCluster: number
 liquidityIllusionCluster: number
@@ -407,6 +410,8 @@ liquiditySupportedStability &&
 )
 )
 
+const fragilityScore =
+history.fragilityScore ?? 50
 /* =====================================================
 NEW CLUSTER CONDITIONS
 ===================================================== */
@@ -592,6 +597,21 @@ creditRisk += 25
 }
 
 creditRisk = clamp(creditRisk)
+
+
+let structuralFragilityCluster = 0
+
+if (fragilityScore > 70)
+structuralFragilityCluster += 12
+
+if (fragilityScore > 85)
+structuralFragilityCluster += 16
+
+if (fragilityScore > 95)
+structuralFragilityCluster += 20
+
+
+
 
 let participationRisk = 0
 
@@ -880,19 +900,28 @@ clamp(dealerCompressionCluster)
 
 let historicalWeaknessCluster = 0
 
-if (phasePersistence > 45)
-historicalWeaknessCluster += 8
+if (phasePersistence > 30)
+historicalWeaknessCluster += 6
 
-if (phasePersistence > 70)
+if (phasePersistence > 60)
 historicalWeaknessCluster += 10
 
-if (prolongedDistribution)
+if (phasePersistence > 90)
 historicalWeaknessCluster += 12
+
+if (prolongedDistribution)
+historicalWeaknessCluster += 16
 
 if (prolongedBearRegime)
-historicalWeaknessCluster += 12
+historicalWeaknessCluster += 16
 
 if (institutionalPressure > 45)
+historicalWeaknessCluster += 10
+
+if (institutionalPressure > 60)
+historicalWeaknessCluster += 8
+
+if (institutionalPressure > 75)
 historicalWeaknessCluster += 10
 
 if (averageBreadth < 65)
@@ -926,6 +955,8 @@ let danger = Math.round(
 
 (liquidityFragilityCluster * 0.16) +
 
+(structuralFragilityCluster * 0.12) +
+
 (crashExpansionCluster * 0.16) +
 
 (passiveFragilityCluster * 0.12) +
@@ -934,7 +965,7 @@ let danger = Math.round(
 
 (dealerCompressionCluster * 0.06) +
 
-(historicalWeaknessCluster * 0.10)
+(historicalWeaknessCluster * 0.18)
 
 )
 
@@ -1089,6 +1120,9 @@ Math.round(distributionCluster),
 
 liquidityFragilityCluster:
 Math.round(liquidityFragilityCluster),
+
+structuralFragilityCluster:
+Math.round(structuralFragilityCluster),
 
 crashExpansionCluster:
 Math.round(crashExpansionCluster),
