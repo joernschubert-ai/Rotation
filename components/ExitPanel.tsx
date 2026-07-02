@@ -7,16 +7,41 @@ if (!exit) return null;
 /* ================= HELPERS ================= */
 
 function getColor(action: string) {
-if (!action) return "#999";
 
-const a = action.toLowerCase();
+if (!action)
+return "#888";
 
-if (a.includes("exit")) return "#ff4d4f";
-if (a.includes("reduce") || a.includes("trim")) return "#faad14";
-if (a.includes("hold")) return "#52c41a";
+const a =
+action.toLowerCase();
+
+if (
+a.includes("force") ||
+a.includes("exit")
+)
+return "#ff4d4f";
+
+if (
+a.includes("reduce") ||
+a.includes("trim") ||
+a.includes("lock") ||
+a.includes("take")
+)
+return "#faad14";
+
+if (
+a.includes("hold")
+)
+return "#52c41a";
+
+if (
+a.includes("manage")
+)
+return "#40a9ff";
 
 return "#999";
+
 }
+
 
 function renderBlock(title: string, data: any) {
 if (!data) return null;
@@ -39,14 +64,29 @@ marginTop: "4px"
 {data.action}
 </div>
 
-<div style={{
+<div
+style={{
 fontSize: "12px",
 color: "#faad14"
-}}>
-{data.sizeReduction ?? 0}%
+}}
+>
+Reduction: {Math.round(data.sizeReduction ?? 0)}%
 </div>
 
+{data.reason && (
+<div
+style={{
+marginTop: "5px",
+fontSize: "11px",
+color: "#777"
+}}
+>
+{data.reason}
 </div>
+)}
+
+</div>
+
 );
 }
 
@@ -61,6 +101,10 @@ else if (phase === "PHASE_3_DISTRIBUTION") context = "TOP FORMATION";
 /* ================= NET ================= */
 
 const net = exit.net ?? exit;
+
+const bias =
+exit.bias ??
+"NEUTRAL";
 
 /* ================= RENDER ================= */
 
@@ -93,9 +137,39 @@ fontSize: "18px"
 {net.action}
 </div>
 
-<div style={{ color: "#faad14", fontSize: "12px" }}>
-Reduction: {net.sizeReduction ?? 0}%
+<div
+style={{
+fontSize: "11px",
+color: "#888",
+marginTop: "4px"
+}}
+>
+Bias: {bias}
 </div>
+
+<div style={{ color: "#faad14", fontSize: "12px" }}>
+Reduction:
+
+{Math.round(net.sizeReduction ?? 0)}%
+
+</div>
+
+{net.reason && (
+
+<div
+style={{
+marginTop: "6px",
+fontSize: "11px",
+color: "#888"
+}}
+>
+
+{net.reason}
+
+</div>
+
+)}
+
 </div>
 
 {/* 🔥 SPLIT VIEW */}
@@ -127,13 +201,37 @@ border: "1px solid #222",
 fontSize: "12px",
 color: "#aaa"
 }}>
-{net.sizeReduction >= 70
-? "Aggressive de-risking → regime shift"
+{bias === "SYSTEM_EXIT"
+
+? "Systemic exit triggered."
+
+: bias === "SYSTEM_REDUCE"
+
+? "Broad defensive reduction."
+
+: bias === "SHORT_EXIT"
+
+? "Short exposure dominates."
+
+: bias === "LONG_EXIT"
+
+? "Long exposure dominates."
+
+: net.sizeReduction >= 70
+
+? "Aggressive portfolio reduction."
+
 : net.sizeReduction >= 40
-? "Significant reduction → volatility rising"
+
+? "Risk is increasing."
+
 : net.sizeReduction > 0
-? "Active management → trimming exposure"
-: "No reduction → trend intact"}
+
+? "Partial exposure reduction."
+
+: "Current regime remains intact."
+}
+
 </div>
 
 </div>
