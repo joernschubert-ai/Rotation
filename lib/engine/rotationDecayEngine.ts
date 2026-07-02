@@ -281,6 +281,72 @@ Math.round(
 );
 
 /* =====================================================
+BREADTH EXHAUSTION
+===================================================== */
+
+const breadthExhaustion =
+
+score >= 75 ||
+
+(
+
+breadthVelocityScore > 70 &&
+
+participationScore < 45
+
+);
+
+const breadthExhaustionScore = Math.min(
+
+100,
+
+Math.round(
+
+breadthVelocityScore * 0.55 +
+
+participationDecay * 0.45
+
+)
+
+);
+
+/* =====================================================
+NARROW LEADERSHIP
+===================================================== */
+
+const narrowLeadershipRisk =
+
+state === "NARROW_ROTATION" ||
+
+state === "DISTRIBUTION_ROTATION" ||
+
+state === "EXHAUSTED_ROTATION" ||
+
+leadershipDecay < -5;
+
+const narrowLeadershipScore = Math.min(
+
+100,
+
+Math.max(
+
+0,
+
+Math.round(
+
+score * 0.45 +
+
+Math.abs(leadershipDecay) * 5
+
+)
+
+)
+
+);
+
+
+
+/* =====================================================
 SUMMARY
 ===================================================== */
 
@@ -363,7 +429,13 @@ prolongedBearRegime,
 acceleratingWeakness
 
 },
+breadthExhaustion,
 
+breadthExhaustionScore,
+
+narrowLeadershipRisk,
+
+narrowLeadershipScore,
 
 summary
 };
