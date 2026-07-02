@@ -3,18 +3,29 @@
 export function exitLongEngine(input: any) {
 
 const {
-position,
-russell,
-rotation = {},
-rotationConfirm = {},
+
+marketPhase,
+
+master = {},
+
+tradeStack = {},
+
+dangerZone = {},
+
 rotationDecay = {},
+
+rotationConfirm = {},
+
 crash = {},
-phase,
-pnl,
 
 fragility = {},
-liquidity = {},
-participation = {}
+
+systemHeat = {},
+
+participation = {},
+
+liquidity = {}
+
 } = input;
 
 /* =====================================================
@@ -39,61 +50,28 @@ Number(fragility?.score ?? 50);
 const liquidityScore =
 Number(liquidity?.score ?? 50);
 
+const masterScore =
+Number(master?.score ?? 50);
+
+const tradeStrength =
+Number(tradeStack?.tradeStrength ?? 50);
+
+const dangerScore =
+Number(dangerZone?.score ?? 0);
+
+const heat =
+Number(systemHeat?.value ?? 0);
+
+const phase =
+marketPhase ??
+"PHASE_3_DISTRIBUTION";
+
 const participationScore =
 Number(participation?.score ?? 50);
 
 const crashProbability =
 Number(crash?.probability ?? 0);
 
-/* =====================================================
-NO POSITION
-===================================================== */
-
-if (
-!position ||
-position.size <= 0
-) {
-
-return {
-action: "NO POSITION",
-sizeReduction: 0,
-reason: "No long exposure"
-};
-}
-
-/* =====================================================
-EXTREME PROFIT
-===================================================== */
-
-if (pnl >= 140) {
-
-return {
-action: "LOCK MAJORITY",
-sizeReduction: 85,
-reason:
-"Extreme upside extension"
-};
-}
-
-if (pnl >= 100) {
-
-return {
-action: "TAKE MAJORITY",
-sizeReduction: 75,
-reason:
-"Late-stage upside extension"
-};
-}
-
-if (pnl >= 80) {
-
-return {
-action: "TAKE PROFITS",
-sizeReduction: 65,
-reason:
-"Strong upside move"
-};
-}
 
 /* =====================================================
 FULL EXIT REGIME
@@ -102,15 +80,18 @@ FULL EXIT REGIME
 if (
 
 phase === "PHASE_5_BREAKDOWN" ||
-phase === "PHASE_6_PANIC" ||
+
+phase === "PHASE_6_ACCELERATION" ||
+
 phase === "PHASE_7_CAPITULATION" ||
 
-crashProbability >= 65 ||
+dangerScore >= 90 ||
 
-(
-decayScore >= 85 &&
-fragilityScore >= 80
-)
+masterScore <= 20 ||
+
+heat <= -2 ||
+
+crashProbability >= 70
 
 ) {
 
@@ -128,15 +109,17 @@ HEAVY REDUCTION
 
 if (
 
-decayScore >= 72 ||
+dangerScore >= 70 ||
+
+masterScore <= 35 ||
+
+tradeStrength <= 35 ||
+
+decayScore >= 70 ||
 
 fragilityScore >= 75 ||
 
-liquidityScore <= 30 ||
-
-participationScore <= 28 ||
-
-rotationState === "FAILED"
+heat <= -1
 
 ) {
 
@@ -153,6 +136,10 @@ EARLY DECAY
 ===================================================== */
 
 if (
+
+dangerScore >= 50 ||
+
+masterScore <= 45 ||
 
 decayState === "EARLY_DECAY" ||
 
@@ -172,33 +159,18 @@ reason:
 }
 
 /* =====================================================
-WEAK ROTATION
-===================================================== */
-
-if (
-
-russell?.score?.value < 4 &&
-
-rotationState !== "CONFIRMED"
-
-) {
-
-return {
-action: "LIGHTEN LONG",
-sizeReduction: 25,
-reason:
-"Weak broad participation"
-};
-}
-
-/* =====================================================
 HOLD HEALTHY ROTATION
 ===================================================== */
 
 if (
 
-rotationState === "EARLY" ||
-rotationState === "CONFIRMED"
+masterScore >= 60 &&
+
+dangerScore < 40 &&
+
+tradeStrength >= 60 &&
+
+heat > -0.4
 
 ) {
 
