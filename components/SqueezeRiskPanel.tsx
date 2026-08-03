@@ -14,19 +14,19 @@ const squeeze =
 data?.squeeze ?? {};
 
 const score =
-Number(squeeze?.score ?? 0);
+Number(squeeze?.risk ?? 0);
 
 const state =
 squeeze?.state ?? "NORMAL";
 
 const gamma =
-squeeze?.negativeGamma ?? false;
+(squeeze?.effectiveGamma ?? 0) < 0;
 
 const volatility =
-squeeze?.volatilityExpansion ?? false;
+(squeeze?.metrics?.vix ?? 0) > 25;
 
 const unstable =
-squeeze?.unstablePositioning ?? false;
+(squeeze?.instability ?? 0) > 60;
 
 const color =
 score >= 70
