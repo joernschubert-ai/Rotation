@@ -153,6 +153,8 @@ phasePersistence: number
 institutionalPressure: number
 
 effectiveGamma: number
+fragilityScore: number
+
 }
 }
 
@@ -601,14 +603,44 @@ creditRisk = clamp(creditRisk)
 
 let structuralFragilityCluster = 0
 
+if (fragilityScore > 60)
+structuralFragilityCluster += 8
+
 if (fragilityScore > 70)
 structuralFragilityCluster += 12
 
-if (fragilityScore > 85)
+if (fragilityScore > 80)
 structuralFragilityCluster += 16
 
-if (fragilityScore > 95)
+if (fragilityScore > 90)
 structuralFragilityCluster += 20
+
+if (fragilityScore > 97)
+structuralFragilityCluster += 24
+
+/* zusätzliche Verstärkung */
+
+if (
+fragilityScore > 80 &&
+liquidityFragility
+)
+structuralFragilityCluster += 8
+
+if (
+fragilityScore > 85 &&
+acceleratingDecay
+)
+structuralFragilityCluster += 6
+
+if (
+fragilityScore > 90 &&
+weakInternals
+)
+structuralFragilityCluster += 8
+
+structuralFragilityCluster =
+clamp(structuralFragilityCluster)
+
 
 
 
@@ -955,7 +987,7 @@ let danger = Math.round(
 
 (liquidityFragilityCluster * 0.16) +
 
-(structuralFragilityCluster * 0.12) +
+(structuralFragilityCluster * 0.18) +
 
 (crashExpansionCluster * 0.16) +
 
@@ -978,6 +1010,26 @@ danger += Math.round(
 (liquidityScore * 0.05)
 
 )
+
+
+/* =====================================================
+DIRECT FRAGILITY PENALTY
+===================================================== */
+
+if (fragilityScore > 70)
+danger += 3
+
+if (fragilityScore > 80)
+danger += 5
+
+if (fragilityScore > 90)
+danger += 8
+
+if (
+fragilityScore > 90 &&
+liquidityFragility
+)
+danger += 6
 
 if (institutionalStability) {
 danger -= 12
@@ -1162,7 +1214,8 @@ liquidityIllusion,
 dealerCompression,
 passiveFragility,
 
-effectiveGamma
+effectiveGamma,
+fragilityScore
 }
 }
 }
