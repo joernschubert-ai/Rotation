@@ -17,12 +17,13 @@ import { earlyWarningEngine } from "./earlyWarningEngine";
 import { riskLoopEngine } from "./riskLoopEngine";
 import { signalEngine } from "./signalEngine";
 import { superSignalEngine } from "./superSignalEngine";
-
+import { phaseConfirmationEngine } from "./phaseConfirmationEngine";
 import { nasdaqEngine } from "./nasdaqEngine";
 import { driversEngine } from "./driversEngine";
 import { marketDriversEngine } from "./marketDriversEngine";
 import { structureEngine } from "./structureEngine";
 import { marketPhaseEngine } from "./marketPhaseEngine";
+
 import { edgeStateEngine } from "./edgeStateEngine";
 import { tradeStackEngine } from "./tradeStackEngine";
 
@@ -471,6 +472,15 @@ score: crash.score
 };
 
 /* =====================================================
+PHASE STAGE
+===================================================== */
+
+const phaseStage = {
+phase,
+phaseData
+};
+
+/* =====================================================
 FINAL PUT
 ===================================================== */
 
@@ -749,6 +759,38 @@ historyMetrics
 });
 
 /* =====================================================
+PHASE CONFIRMATION
+===================================================== */
+
+const phaseConfirmation =
+phaseConfirmationEngine({
+
+phase,
+
+phaseData,
+
+rotation,
+
+crash,
+
+earlyWarning,
+
+participation,
+
+breadthThrust,
+
+liquidity,
+
+fragility,
+
+rotationDecay,
+
+historyMetrics
+
+});
+
+
+/* =====================================================
 FINAL REGIME SYNC
 ===================================================== */
 
@@ -815,7 +857,10 @@ liquidity,
 fragility,
 
 rotationDecay,
+phaseConfirmation,
 regimeSync,
+
+phaseStage,
 
 historyMetrics:
 historyMetrics
@@ -1153,7 +1198,7 @@ crash,
 
 phase,
 phaseData,
-
+phaseConfirmation,
 regime,
 
 rotation,
