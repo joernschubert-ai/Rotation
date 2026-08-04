@@ -57,6 +57,16 @@ const phase =
 phaseData?.phase ??
 "PHASE_1_EXPANSION";
 
+const phaseConfidence =
+Number(
+phaseConfirmation?.confidence ?? 50
+);
+
+const phaseConfirmed =
+Boolean(
+phaseConfirmation?.confirmed ?? false
+);
+
 const participationScore =
 Number(
 participation?.score ?? 50
@@ -85,16 +95,6 @@ rotationDecay?.score ?? 0
 const marketQualityScore =
 Number(
 marketQuality?.score ?? 50
-);
-
-const phaseConfidence =
-Number(
-phaseConfirmation?.confidence ?? 50
-);
-
-const phaseConfirmed =
-Boolean(
-phaseConfirmation?.confirmed ?? true
 );
 
 const breadthVelocityScore =
@@ -247,9 +247,13 @@ POSITIVE
 ===================================================== */
 
 if (marketQualityScore > 60) score += 8;
-if (phaseConfidence > 70) {
-score += 3;
+if (
+phaseConfirmed &&
+phaseConfidence > 70
+) {
+score += 6;
 }
+
 if (participationScore > 55) score += 6;
 if (breadthVelocityScore > 55) score += 6;
 if (liquidityScore > 55) score += 4;
@@ -284,12 +288,11 @@ NEGATIVE
 
 if (marketQualityScore < 45) score -= 10;
 
-if (!phaseConfirmed) {
+if (
+!phaseConfirmed &&
+phaseConfidence < 40
+) {
 score -= 8;
-}
-
-if (phaseConfidence < 40) {
-score -= 6;
 }
 
 if (participationScore < 45) score -= 10;
