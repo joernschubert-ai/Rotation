@@ -25,6 +25,7 @@ const historyMetrics = engine.historyMetrics ?? {};
 const dangerZone = engine.dangerZone ?? {};
 const marketDrivers = engine.marketDrivers ?? {};
 const executionState = engine.executionState ?? {};
+const phaseConfirmation = engine.phaseConfirmation ?? {};
 
 /* =====================================================
 SAFE VALUES
@@ -84,6 +85,16 @@ rotationDecay?.score ?? 0
 const marketQualityScore =
 Number(
 marketQuality?.score ?? 50
+);
+
+const phaseConfidence =
+Number(
+phaseConfirmation?.confidence ?? 50
+);
+
+const phaseConfirmed =
+Boolean(
+phaseConfirmation?.confirmed ?? true
 );
 
 const breadthVelocityScore =
@@ -236,6 +247,9 @@ POSITIVE
 ===================================================== */
 
 if (marketQualityScore > 60) score += 8;
+if (phaseConfidence > 70) {
+score += 3;
+}
 if (participationScore > 55) score += 6;
 if (breadthVelocityScore > 55) score += 6;
 if (liquidityScore > 55) score += 4;
@@ -269,6 +283,14 @@ NEGATIVE
 ===================================================== */
 
 if (marketQualityScore < 45) score -= 10;
+
+if (!phaseConfirmed) {
+score -= 8;
+}
+
+if (phaseConfidence < 40) {
+score -= 6;
+}
 
 if (participationScore < 45) score -= 10;
 
@@ -642,6 +664,9 @@ meta: {
 riskState,
 marketMode,
 executionMode,
+
+phaseConfirmed,
+phaseConfidence,
 
 weakInternals,
 narrowLeadership,
