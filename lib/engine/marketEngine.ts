@@ -866,6 +866,7 @@ historyMetrics:
 historyMetrics
 });
 
+
 /* =====================================================
 EDGE
 ===================================================== */
@@ -938,6 +939,7 @@ russell,
 putTiming,
 edgeState,
 master,
+phaseConfirmation,
 
 rotationConfirm,
 rotationDecay,
