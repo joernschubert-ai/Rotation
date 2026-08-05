@@ -76,6 +76,14 @@ Number(rotationConfirm?.quality ?? 50);
 const sustainability =
 Number(rotationConfirm?.sustainability ?? 50);
 
+const phaseConfirmed =
+rotationConfirm?.phaseConfirmed ?? true;
+
+const phaseConfidence =
+Number(
+rotationConfirm?.phaseConfidence ?? 50
+);
+
 const participationValue =
 Number(rotationConfirm?.participation ?? 50);
 
@@ -265,6 +273,14 @@ rotationState ===
 qualityBoost += 8;
 }
 
+if (phaseConfirmed) {
+qualityBoost += 6;
+}
+
+if (phaseConfidence >= 70) {
+qualityBoost += 6;
+}
+
 if (
 rotationState ===
 "INSTITUTIONAL_CONFIRMATION"
@@ -340,6 +356,14 @@ qualityPenalty += 25;
 
 if (rotationQuality < 50) {
 qualityPenalty += 20;
+}
+
+if (!phaseConfirmed) {
+qualityPenalty += 12;
+}
+
+if (phaseConfidence < 40) {
+qualityPenalty += 8;
 }
 
 if (falseBreakRisk >= 65) {
@@ -560,6 +584,9 @@ else if (
 !hardRiskBlock &&
 !dangerousLongEnvironment &&
 !lowQualityRotation &&
+
+phaseConfirmed &&
+phaseConfidence >= 60 &&
 !severeDecay &&
 !internalBreakdown &&
 !institutionalBreakdown &&
@@ -636,6 +663,7 @@ else if (
 
 !hardRiskBlock &&
 !dangerousLongEnvironment &&
+phaseConfidence >= 45 &&
 !severeDecay &&
 
 decayScore < 42 &&
