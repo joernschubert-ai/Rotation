@@ -1,6 +1,8 @@
 export interface SuperSignalInput {
 signal?: any;
 
+phaseConfirmation?: any;
+
 rotationConfirm?: any;
 rotationDecay?: any;
 
@@ -81,6 +83,8 @@ input: SuperSignalInput
 
 const {
 signal,
+
+phaseConfirmation,
 rotationConfirm,
 rotationDecay,
 
@@ -129,12 +133,17 @@ const sustainability =
 Number(rotationConfirm?.sustainability ?? 50);
 
 const phaseConfirmed =
-rotationConfirm?.phaseConfirmed ?? true;
+phaseConfirmation?.confirmed ?? true;
 
 const phaseConfidence =
 Number(
-rotationConfirm?.phaseConfidence ?? 50
+phaseConfirmation?.confidence ?? 50
 );
+
+const phaseState =
+phaseConfirmation?.state ??
+"UNCONFIRMED";
+
 
 const participationScore =
 Number(

@@ -6,6 +6,7 @@ let history: any[] = [];
 
 export function signalEngine({
 phase,
+phaseConfirmation,
 crash,
 putTiming,
 rotation,

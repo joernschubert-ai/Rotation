@@ -1076,6 +1076,9 @@ SIGNAL
 const signalResult =
 signalEngine({
 phase,
+
+phaseConfirmation,
+
 crash,
 putTiming,
 rotation,
@@ -1116,6 +1119,8 @@ SUPER SIGNAL
 const superSignal =
 superSignalEngine({
 signal,
+
+phaseConfirmation,
 
 rotationConfirm,
 rotationDecay,
