@@ -49,6 +49,9 @@ institutionalScore: number;
 
 confirmation: {
 regimeAligned: boolean;
+
+phaseConfirmed: boolean;
+phaseConfidence: number;
 breadthConfirmed: boolean;
 liquiditySupported: boolean;
 participationHealthy: boolean;
@@ -124,6 +127,14 @@ Number(rotationConfirm?.quality ?? 50);
 
 const sustainability =
 Number(rotationConfirm?.sustainability ?? 50);
+
+const phaseConfirmed =
+rotationConfirm?.phaseConfirmed ?? true;
+
+const phaseConfidence =
+Number(
+rotationConfirm?.phaseConfidence ?? 50
+);
 
 const participationScore =
 Number(
@@ -364,6 +375,15 @@ liquiditySupport * 0.12;
 institutionalScore +=
 regimeScore * 0.10;
 
+/* ---------- PHASE CONFIRMATION ---------- */
+
+if (phaseConfirmed) {
+institutionalScore += 6;
+}
+
+institutionalScore +=
+phaseConfidence * 0.06;
+
 /* ---------- STRUCTURE ---------- */
 
 if (breadthConfirmed) {
@@ -432,6 +452,14 @@ institutionalScore -= 20;
 
 if (!breadthConfirmed) {
 institutionalScore -= 15;
+}
+
+if (!phaseConfirmed) {
+institutionalScore -= 12;
+}
+
+if (phaseConfidence < 40) {
+institutionalScore -= 8;
 }
 
 if (!liquidityConfirmed) {
@@ -713,6 +741,10 @@ institutionalScore,
 
 confirmation: {
 regimeAligned,
+
+phaseConfirmed,
+phaseConfidence,
+
 breadthConfirmed,
 
 liquiditySupported:
