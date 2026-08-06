@@ -7,6 +7,10 @@ rotation?: any
 breadthThrust?: any
 rotationDecay?: any
 
+liquidity?: any
+fragility?: any
+phaseConfirmation?: any
+
 breadth50?: number
 breadth200?: number
 
@@ -87,6 +91,10 @@ rotationDecayScore: number
 
 divergenceScore: number
 regimeSyncScore: number
+
+liquidityScore: number
+fragilityScore: number
+phaseConfidence: number
 
 participationIntegrity: number
 breadthIntegrity: number
@@ -192,6 +200,24 @@ input.internalDivergence?.score ??
 const regimeSyncScore =
 Number(
 input.regimeSync?.score ??
+50
+)
+
+const liquidityScore =
+Number(
+input.liquidity?.score ??
+50
+)
+
+const fragilityScore =
+Number(
+input.fragility?.score ??
+50
+)
+
+const phaseConfidence =
+Number(
+input.phaseConfirmation?.confidence ??
 50
 )
 
@@ -412,17 +438,19 @@ LIQUIDITY
 let liquidityIntegrity = 55
 
 liquidityIntegrity +=
-Math.round((regimeSyncScore - 50) * 0.20)
+Math.round((liquidityScore - 50) * 0.45)
+
+liquidityIntegrity +=
+Math.round((regimeSyncScore - 50) * 0.15)
+
+liquidityIntegrity +=
+Math.round((phaseConfidence - 50) * 0.15)
 
 liquidityIntegrity -=
-Math.round(divergenceScore * 0.20)
+Math.round((fragilityScore - 50) * 0.35)
 
-liquidityIntegrity -=
-Math.round(passiveDependence * 0.20)
-
-if (passiveDependence >= 70) {
-liquidityIntegrity -= 14
-}
+if (passiveDependence >= 70)
+liquidityIntegrity -= 10
 
 liquidityIntegrity =
 clamp(liquidityIntegrity)
@@ -469,6 +497,18 @@ leadershipBreadth >= 65
 marketIntegrity += 6
 }
 
+if (
+phaseConfidence >= 80
+) {
+marketIntegrity += 6
+}
+
+if (
+fragilityScore >= 80
+) {
+marketIntegrity -= 12
+}
+
 /*
 =====================================================
 PHASE 8 FIX
@@ -495,8 +535,17 @@ const internalSynchronization = (
 
 breadth50 >= 60 &&
 breadth200 >= 55 &&
+
 participationScore >= 58 &&
+
 rotationScore >= 55 &&
+
+phaseConfidence >= 65 &&
+
+liquidityScore >= 55 &&
+
+fragilityScore < 60 &&
+
 !narrowLeadership
 
 )
@@ -536,6 +585,12 @@ else if (
 weakParticipation
 ) {
 liquidityCharacter = "FRAGILE"
+}
+
+else if (
+fragilityScore >= 75
+) {
+liquidityCharacter = "ILLUSION"
 }
 
 else {
@@ -697,6 +752,10 @@ rotationDecayScore,
 
 divergenceScore,
 regimeSyncScore,
+
+liquidityScore,
+fragilityScore,
+phaseConfidence,
 
 participationIntegrity,
 breadthIntegrity,
