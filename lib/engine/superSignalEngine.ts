@@ -90,7 +90,6 @@ rotationConfirm,
 rotationDecay,
 
 tradeStack,
-marketQuality,
 
 regimeSync,
 dangerZone,

@@ -23,7 +23,7 @@ import { driversEngine } from "./driversEngine";
 import { marketDriversEngine } from "./marketDriversEngine";
 import { structureEngine } from "./structureEngine";
 import { marketPhaseEngine } from "./marketPhaseEngine";
-
+import { marketQualityEngine } from "./marketQualityEngine";
 import { edgeStateEngine } from "./edgeStateEngine";
 import { tradeStackEngine } from "./tradeStackEngine";
 
@@ -791,6 +791,40 @@ historyMetrics
 
 
 /* =====================================================
+MARKET QUALITY
+===================================================== */
+
+const marketQuality =
+marketQualityEngine({
+
+structure,
+
+participation,
+
+rotation,
+
+breadthThrust,
+
+rotationDecay,
+
+liquidity,
+
+fragility,
+
+phaseConfirmation,
+
+internalDivergence:
+divergence,
+
+regimeSync:
+regimeSyncTemp,
+
+concentrationScore:
+Number(data.concentrationScore ?? 50)
+
+});
+
+/* =====================================================
 FINAL REGIME SYNC
 ===================================================== */
 
@@ -819,7 +853,9 @@ breadth200,
 
 fragility,
 participation,
-breadthThrust
+breadthThrust,
+
+marketQuality
 });
 
 
@@ -856,6 +892,8 @@ breadthThrust,
 liquidity,
 fragility,
 
+marketQuality,
+
 rotationDecay,
 phaseConfirmation,
 regimeSync,
@@ -880,6 +918,7 @@ earlyWarning,
 crash,
 
 master,
+marketQuality,
 rotationDecay,
 rotationConfirm,
 participation,
@@ -939,6 +978,7 @@ russell,
 putTiming,
 edgeState,
 master,
+marketQuality,
 phaseConfirmation,
 
 rotationConfirm,
@@ -1003,6 +1043,7 @@ rotationDecay,
 liquidity,
 breadthThrust,
 fragility,
+marketQuality,
 squeeze,
 participation
 });
@@ -1103,7 +1144,8 @@ liquidity,
 breadthThrust,
 fragility,
 squeeze,
-participation
+participation,
+marketQuality
 });
 
 const signal =
@@ -1143,7 +1185,8 @@ liquidity,
 breadthThrust,
 fragility,
 squeeze,
-participation
+participation,
+marketQuality
 });
 
 /* =====================================================
@@ -1154,7 +1197,7 @@ const execution =
 executionEngine({
 
 superSignal,
-
+marketQuality,
 vix,
 
 breadth20,
@@ -1228,6 +1271,7 @@ breadthThrust,
 fragility,
 squeeze,
 participation,
+marketQuality,
 
 position,
 positioning,
