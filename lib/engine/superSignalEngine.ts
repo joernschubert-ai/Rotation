@@ -7,6 +7,7 @@ rotationConfirm?: any;
 rotationDecay?: any;
 
 tradeStack?: any;
+marketQuality?: any;
 
 regimeSync?: any;
 dangerZone?: any;
@@ -89,6 +90,7 @@ rotationConfirm,
 rotationDecay,
 
 tradeStack,
+marketQuality,
 
 regimeSync,
 dangerZone,
