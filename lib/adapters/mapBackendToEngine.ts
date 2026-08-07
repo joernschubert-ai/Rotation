@@ -4,23 +4,53 @@ if (!data) return null;
 /* ================= INDICES ================= */
 
 const indices = {
+
 dow: {
-value: data.marketData?.["^DJI"]?.current ?? 0,
-change: data.marketData?.["^DJI"]?.change ?? 0,
+value:
+data.marketData?.["^DJI"]?.current ?? 0,
+
+change:
+data.marketData?.["^DJI"]?.change ?? 0,
+
+priceMetrics:
+data.marketData?.["^DJI"] ?? {}
 },
+
 ndx: {
-value: data.marketData?.["^NDX"]?.current ?? 0,
-change: data.marketData?.["^NDX"]?.change ?? 0,
+value:
+data.marketData?.["^NDX"]?.current ?? 0,
+
+change:
+data.marketData?.["^NDX"]?.change ?? 0,
+
+priceMetrics:
+data.marketData?.["^NDX"] ?? {}
 },
+
 spx: {
-value: data.marketData?.["^GSPC"]?.current ?? 0,
-change: data.marketData?.["^GSPC"]?.change ?? 0,
+value:
+data.marketData?.["^GSPC"]?.current ?? 0,
+
+change:
+data.marketData?.["^GSPC"]?.change ?? 0,
+
+priceMetrics:
+data.marketData?.["^GSPC"] ?? {}
 },
+
 rut: {
-value: data.marketData?.["^RUT"]?.current ?? 0,
-change: data.marketData?.["^RUT"]?.change ?? 0,
-},
+value:
+data.marketData?.["^RUT"]?.current ?? 0,
+
+change:
+data.marketData?.["^RUT"]?.change ?? 0,
+
+priceMetrics:
+data.marketData?.["^RUT"] ?? {}
+}
+
 };
+
 
 /* ================= FUTURES ================= */
 
@@ -123,5 +153,7 @@ marketData: data.marketData ?? {},
 
 indices,
 futures,
+historyMetrics:
+data.historyMetrics ?? {},
 };
 }
