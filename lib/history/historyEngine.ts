@@ -14,6 +14,33 @@ rotationTrend: number;
 liquidityTrend: number;
 fragilityTrend: number;
 
+/* =====================================================
+PRICE / INDEX MOMENTUM
+===================================================== */
+
+ndxPriceTrend: number;
+ndxMomentum5D: number;
+ndxMomentum20D: number;
+ndxAcceleration: number;
+
+spxPriceTrend: number;
+spxMomentum5D: number;
+spxMomentum20D: number;
+
+rutPriceTrend: number;
+rutMomentum5D: number;
+rutMomentum20D: number;
+
+priceMomentumScore: number;
+
+priceTrend:
+| "STRONG_BULLISH"
+| "BULLISH"
+| "NEUTRAL"
+| "BEARISH"
+| "STRONG_BEARISH";
+
+
 leadershipTrend: number;
 
 relativeBreadthWeakness: number;
@@ -155,6 +182,46 @@ function getPhase(snapshot: any): string {
 return snapshot?.phase ?? "";
 }
 
+/* =====================================================
+PRICE HELPERS
+===================================================== */
+
+function getNDXPrice(snapshot: any): number {
+return Number(
+snapshot?.indices?.ndx?.value ?? 0
+);
+}
+
+function getSPXPrice(snapshot: any): number {
+return Number(
+snapshot?.indices?.spx?.value ?? 0
+);
+}
+
+function getRUTPrice(snapshot: any): number {
+return Number(
+snapshot?.indices?.rut?.value ?? 0
+);
+}
+
+function priceReturn(
+newestPrice: number,
+oldPrice: number
+): number {
+
+if (
+!Number.isFinite(newestPrice) ||
+!Number.isFinite(oldPrice) ||
+oldPrice <= 0
+) {
+return 0;
+}
+
+return (
+(newestPrice / oldPrice) - 1
+) * 100;
+}
+
 
 /* =====================================================
 ENGINE
@@ -176,6 +243,25 @@ participationDecay: 0,
 rotationTrend: 0,
 liquidityTrend: 0,
 fragilityTrend: 0,
+
+/* PRICE / INDEX MOMENTUM */
+
+ndxPriceTrend: 0,
+ndxMomentum5D: 0,
+ndxMomentum20D: 0,
+ndxAcceleration: 0,
+
+spxPriceTrend: 0,
+spxMomentum5D: 0,
+spxMomentum20D: 0,
+
+rutPriceTrend: 0,
+rutMomentum5D: 0,
+rutMomentum20D: 0,
+
+priceMomentumScore: 50,
+
+priceTrend: "NEUTRAL",
 
 leadershipTrend: 0,
 
@@ -241,6 +327,234 @@ Math.min(20, historyLength - 1);
 
 const mid = history[shortWindow];
 const oldest = history[longWindow];
+
+/* =====================================
+PRICE SNAPSHOTS
+===================================== */
+
+const ndxNewest =
+getNDXPrice(newest);
+
+const ndxMid =
+getNDXPrice(mid);
+
+const ndxOldest =
+getNDXPrice(oldest);
+
+const spxNewest =
+getSPXPrice(newest);
+
+const spxMid =
+getSPXPrice(mid);
+
+const spxOldest =
+getSPXPrice(oldest);
+
+const rutNewest =
+getRUTPrice(newest);
+
+const rutMid =
+getRUTPrice(mid);
+
+const rutOldest =
+getRUTPrice(oldest);
+
+/* =====================================
+PRICE RETURNS
+===================================== */
+
+const ndxMomentum5D =
+priceReturn(
+ndxNewest,
+ndxMid
+);
+
+const ndxMomentum20D =
+priceReturn(
+ndxNewest,
+ndxOldest
+);
+
+const spxMomentum5D =
+priceReturn(
+spxNewest,
+spxMid
+);
+
+const spxMomentum20D =
+priceReturn(
+spxNewest,
+spxOldest
+);
+
+const rutMomentum5D =
+priceReturn(
+rutNewest,
+rutMid
+);
+
+const rutMomentum20D =
+priceReturn(
+rutNewest,
+rutOldest
+);
+
+/* =====================================
+PRICE TREND
+===================================== */
+
+const ndxPriceTrend =
+ndxMomentum20D;
+
+const spxPriceTrend =
+spxMomentum20D;
+
+const rutPriceTrend =
+rutMomentum20D;
+
+/* =====================================
+NASDAQ ACCELERATION
+===================================== */
+
+/*
+Vergleicht kurzfristiges Momentum
+mit dem längerfristigen Momentum.
+
+Beispiel:
+
+5D = +10%
+20D = +4%
+
+=> klar beschleunigender Aufwärtsmarkt
+*/
+
+const ndxAcceleration =
+ndxMomentum5D -
+(ndxMomentum20D / 4);
+
+/* =====================================
+PRICE MOMENTUM SCORE
+===================================== */
+
+let priceMomentumScore = 50;
+
+/* NASDAQ */
+
+priceMomentumScore +=
+Math.max(
+-20,
+Math.min(
+20,
+ndxMomentum5D * 2
+)
+);
+
+priceMomentumScore +=
+Math.max(
+-15,
+Math.min(
+15,
+ndxMomentum20D
+)
+);
+
+/* S&P CONFIRMATION */
+
+priceMomentumScore +=
+Math.max(
+-10,
+Math.min(
+10,
+spxMomentum5D
+)
+);
+
+/* RUSSELL */
+
+priceMomentumScore +=
+Math.max(
+-5,
+Math.min(
+5,
+rutMomentum5D
+)
+);
+
+/* ACCELERATION */
+
+if (ndxAcceleration > 5) {
+priceMomentumScore += 10;
+}
+
+if (ndxAcceleration < -5) {
+priceMomentumScore -= 10;
+}
+
+priceMomentumScore =
+Math.max(
+0,
+Math.min(
+100,
+Math.round(priceMomentumScore)
+)
+);
+
+/* =====================================
+PRICE TREND CLASSIFICATION
+===================================== */
+
+let priceTrend:
+"STRONG_BULLISH"
+| "BULLISH"
+| "NEUTRAL"
+| "BEARISH"
+| "STRONG_BEARISH";
+
+if (
+priceMomentumScore >= 75 &&
+ndxMomentum5D >= 5
+) {
+
+priceTrend =
+"STRONG_BULLISH";
+
+}
+
+else if (
+priceMomentumScore >= 60
+) {
+
+priceTrend =
+"BULLISH";
+
+}
+
+else if (
+priceMomentumScore <= 25 &&
+ndxMomentum5D <= -5
+) {
+
+priceTrend =
+"STRONG_BEARISH";
+
+}
+
+else if (
+priceMomentumScore <= 40
+) {
+
+priceTrend =
+"BEARISH";
+
+}
+
+else {
+
+priceTrend =
+"NEUTRAL";
+
+}
+
 
 /* =====================================
 ROLLING STATISTICS
@@ -509,6 +823,22 @@ DEBUG
 
 console.log("HISTORY DEBUG", {
 
+newestNDX:
+ndxNewest,
+
+ndxMomentum5D,
+ndxMomentum20D,
+ndxAcceleration,
+
+spxMomentum5D,
+spxMomentum20D,
+
+rutMomentum5D,
+rutMomentum20D,
+
+priceMomentumScore,
+priceTrend,
+
 newestRotation:
   getRotation(newest),
 
@@ -542,6 +872,25 @@ return {
 
 breadthTrend,
 breadthAcceleration,
+
+/* PRICE / INDEX MOMENTUM */
+
+ndxPriceTrend,
+ndxMomentum5D,
+ndxMomentum20D,
+ndxAcceleration,
+
+spxPriceTrend,
+spxMomentum5D,
+spxMomentum20D,
+
+rutPriceTrend,
+rutMomentum5D,
+rutMomentum20D,
+
+priceMomentumScore,
+priceTrend,
+
 
 participationTrend,
 participationDecay,
