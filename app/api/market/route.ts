@@ -2513,22 +2513,32 @@ const indices = [
 ];
 
 const indexResults = await Promise.all(
-indices.map(i => fetchIndex(i.key,"5d"))
+indices.map(i => fetchIndex(i.key,"2y"))
 );
 
 indices.forEach((idx, i) => {
 
-const closes = indexResults[i];
+const closes =
+indexResults[i];
 
 if (closes.length < 2) return;
 
-const current = closes[closes.length - 1];
-const previous = closes[closes.length - 2];
+const metrics =
+buildPriceMetrics(closes);
 
 marketData[idx.key] = {
-current,
-previous,
-change: percentChange(current, previous)
+
+...metrics,
+
+current:
+metrics.current,
+
+previous:
+metrics.previous,
+
+change:
+metrics.return1D
+
 };
 
 });
@@ -2823,6 +2833,246 @@ return [];
 
 }
 }
+
+function buildPriceMetrics(closes: number[]) {
+
+if (!closes || closes.length < 2) {
+return {
+current: 0,
+previous: 0,
+
+return1D: 0,
+return3D: 0,
+return5D: 0,
+return10D: 0,
+return20D: 0,
+
+return50D: 0,
+
+ma20: 0,
+ma50: 0,
+ma200: 0,
+
+momentum5D: 0,
+momentum10D: 0,
+momentum20D: 0,
+
+acceleration: 0,
+
+distanceFromMA20: 0,
+distanceFromMA50: 0,
+distanceFromMA200: 0,
+
+drawdown20D: 0,
+
+trend: "NEUTRAL"
+};
+}
+
+const current =
+closes[closes.length - 1];
+
+const previous =
+closes[closes.length - 2];
+
+const returnFrom =
+(days: number) => {
+
+if (closes.length <= days) {
+return 0;
+}
+
+const base =
+closes[closes.length - 1 - days];
+
+return percentChange(
+current,
+base
+);
+};
+
+const return1D =
+returnFrom(1);
+
+const return3D =
+returnFrom(3);
+
+const return5D =
+returnFrom(5);
+
+const return10D =
+returnFrom(10);
+
+const return20D =
+returnFrom(20);
+
+const return50D =
+returnFrom(50);
+
+const ma20 =
+movingAverage(closes, 20) ?? 0;
+
+const ma50 =
+movingAverage(closes, 50) ?? 0;
+
+const ma200 =
+movingAverage(closes, 200) ?? 0;
+
+const momentum5D =
+return5D;
+
+const momentum10D =
+return10D;
+
+const momentum20D =
+return20D;
+
+/*
+* Beschleunigung:
+*
+* 5D Momentum vs. 10D Momentum
+*
+* Beispiel:
+*
+* 5D +10%
+* 10D +11%
+*
+* => keine extreme Beschleunigung
+*
+* 5D +10%
+* 10D +3%
+*
+* => starke kurzfristige Beschleunigung
+*/
+
+const acceleration =
+momentum5D -
+(momentum10D / 2);
+
+const distanceFromMA20 =
+ma20 > 0
+? ((current / ma20) - 1) * 100
+: 0;
+
+const distanceFromMA50 =
+ma50 > 0
+? ((current / ma50) - 1) * 100
+: 0;
+
+const distanceFromMA200 =
+ma200 > 0
+? ((current / ma200) - 1) * 100
+: 0;
+
+/*
+* 20-Tage Drawdown
+*/
+
+const window20 =
+closes.slice(
+Math.max(0, closes.length - 20)
+);
+
+const high20 =
+window20.length
+? Math.max(...window20)
+: current;
+
+const drawdown20D =
+high20 > 0
+? ((current / high20) - 1) * 100
+: 0;
+
+/*
+* Trend
+*/
+
+let trend:
+| "STRONG_BULLISH"
+| "BULLISH"
+| "NEUTRAL"
+| "BEARISH"
+| "STRONG_BEARISH";
+
+if (
+current > ma20 &&
+ma20 > ma50 &&
+ma50 > ma200 &&
+return20D > 5
+) {
+
+trend = "STRONG_BULLISH";
+
+}
+
+else if (
+current > ma20 &&
+return20D > 0
+) {
+
+trend = "BULLISH";
+
+}
+
+else if (
+current < ma20 &&
+ma20 < ma50 &&
+ma50 < ma200 &&
+return20D < -5
+) {
+
+trend = "STRONG_BEARISH";
+
+}
+
+else if (
+current < ma20 &&
+return20D < 0
+) {
+
+trend = "BEARISH";
+
+}
+
+else {
+
+trend = "NEUTRAL";
+
+}
+
+return {
+
+current,
+previous,
+
+return1D,
+return3D,
+return5D,
+return10D,
+return20D,
+
+return50D,
+
+ma20,
+ma50,
+ma200,
+
+momentum5D,
+momentum10D,
+momentum20D,
+
+acceleration,
+
+distanceFromMA20,
+distanceFromMA50,
+distanceFromMA200,
+
+drawdown20D,
+
+trend
+};
+}
+
 
 const spClosesFull = await fetchIndex("^GSPC","5y");
 
