@@ -33,6 +33,16 @@ EXECUTION / ALIGNMENT
 const executionMode =
 executionState?.executionMode ?? "WAIT";
 
+const phaseConfirmed =
+Boolean(
+master?.meta?.phaseConfirmed ?? true
+);
+
+const phaseConfidence =
+Number(
+master?.meta?.phaseConfidence ?? 100
+);
+
 const regimeAligned =
 Boolean(regimeSync?.aligned);
 
@@ -593,6 +603,20 @@ strength += 8;
 
 }
 
+if (
+!phaseConfirmed &&
+phase === "PHASE_4_RISK"
+) {
+strength -= 10;
+}
+
+if (
+phaseConfirmed &&
+phaseConfidence > 70
+) {
+strength += 5;
+}
+
 /* ======================================================
 EXECUTION FILTER
 ====================================================== */
@@ -602,6 +626,20 @@ type === "LONG" &&
 executionMode === "WAIT"
 ) {
 strength -= 20;
+}
+
+if (
+type === "LONG" &&
+!phaseConfirmed
+) {
+strength -= 25;
+}
+
+if (
+type === "LONG" &&
+phaseConfidence < 55
+) {
+strength -= 15;
 }
 
 /* ======================================================
@@ -732,6 +770,9 @@ meta: {
 putDecision,
 russellDecision,
 mode,
+
+phaseConfirmed,
+phaseConfidence,
 rotationState,
 rotationConfidence,
 rotationQuality,
