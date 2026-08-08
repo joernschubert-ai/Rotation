@@ -13,6 +13,8 @@ historyMetrics: map.historyMetrics,
 phase: engine.phase,
 phaseData: engine.phaseData,
 
+priceMomentum: engine.priceMomentum,
+
 master: engine.master,
 
 crash: engine.crash,
