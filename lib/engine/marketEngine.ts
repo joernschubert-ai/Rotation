@@ -39,6 +39,7 @@ import { breadthThrustEngine } from "./breadthThrustEngine";
 import { fragilityEngine } from "./fragilityEngine";
 import { squeezeEngine } from "./squeezeEngine";
 import { participationEngine } from "./participationEngine";
+import { priceMomentumEngine } from "./priceMomentumEngine";
 
 /* =====================================================
 NEW
@@ -97,6 +98,20 @@ data.marketData?.["^VIX"]?.current ?? 20
 
 const historyMetrics =
 data.historyMetrics ?? {};
+
+/* =====================================================
+PRICE MOMENTUM
+===================================================== */
+
+const priceMomentum =
+priceMomentumEngine({
+historyMetrics,
+
+indices:
+data.indices ?? {},
+
+});
+
 
 /* =====================================================
 DIVERGENCE
@@ -459,7 +474,9 @@ earlyWarning,
 structure,
 
 russell: russellTemp,
-historyMetrics
+historyMetrics,
+
+priceMomentum
 
 });
 
@@ -901,7 +918,9 @@ regimeSync,
 phaseStage,
 
 historyMetrics:
-historyMetrics
+historyMetrics,
+
+priceMomentum
 });
 
 
@@ -1145,7 +1164,8 @@ breadthThrust,
 fragility,
 squeeze,
 participation,
-marketQuality
+marketQuality,
+priceMomentum
 });
 
 const signal =
@@ -1248,6 +1268,7 @@ crash,
 
 phase,
 phaseData,
+priceMomentum,
 phaseConfirmation,
 regime,
 
