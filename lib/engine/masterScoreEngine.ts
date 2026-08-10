@@ -26,6 +26,7 @@ const dangerZone = engine.dangerZone ?? {};
 const marketDrivers = engine.marketDrivers ?? {};
 const executionState = engine.executionState ?? {};
 const phaseConfirmation = engine.phaseConfirmation ?? {};
+const priceMomentum = engine.priceMomentum ?? {};
 
 /* =====================================================
 SAFE VALUES
@@ -100,6 +101,24 @@ marketQuality?.score ?? 50
 const breadthVelocityScore =
 Number(
 breadthVelocity?.score ?? 50
+);
+
+/* =====================================================
+PRICE MOMENTUM
+===================================================== */
+
+const priceMomentumScore =
+Number(
+priceMomentum?.score ?? 50
+);
+
+const priceMomentumTrend =
+priceMomentum?.trend ??
+"NEUTRAL";
+
+const priceMomentumAcceleration =
+Number(
+priceMomentum?.acceleration ?? 0
 );
 
 const {
@@ -241,6 +260,39 @@ SCORE
 ===================================================== */
 
 let score = 50;
+
+/* =====================================================
+PRICE MOMENTUM
+-----------------------------------------------------
+Price Momentum acts as a bounded confirmation factor.
+
+It must influence the Master Score,
+but must NOT dominate structural engines.
+
+Maximum influence: +/- 8 points.
+===================================================== */
+
+if (priceMomentumScore >= 70) {
+
+score += 8;
+
+}
+else if (priceMomentumScore >= 60) {
+
+score += 4;
+
+}
+else if (priceMomentumScore <= 30) {
+
+score -= 8;
+
+}
+else if (priceMomentumScore <= 40) {
+
+score -= 4;
+
+}
+
 
 /* =====================================================
 POSITIVE
@@ -671,6 +723,10 @@ executionMode,
 phaseConfirmed,
 phaseConfidence,
 
+priceMomentumScore,
+priceMomentumTrend,
+priceMomentumAcceleration,
+
 weakInternals,
 narrowLeadership,
 
@@ -719,6 +775,9 @@ Math.round(crashScore),
 
 rotation:
 Math.round(rotationScore),
+
+priceMomentum:
+Math.round(priceMomentumScore),
 
 timing:
 Math.round(timingScore),
