@@ -1,16 +1,81 @@
 // /lib/engine/signalEngine.ts
 
-// 🔥 GLOBAL STATE
+// =====================================================
+// SIGNAL ENGINE V2
+// =====================================================
+//
+// Architecture:
+//
+// 1. Regime / Risk
+// 2. Rotation Confirmation
+// 3. Rotation Decay
+// 4. Price Momentum
+// 5. Market Flow
+// 6. Signal Construction
+// 7. Priority / Quality
+// 8. Anti Spam / History
+//
+// V1 is intentionally kept separately as backup.
+// Existing imports remain unchanged.
+//
+// =====================================================
+
+
+// =====================================================
+// GLOBAL STATE
+// =====================================================
+
 let lastSignal: any = null;
 let history: any[] = [];
 
+
+// =====================================================
+// HELPERS
+// =====================================================
+
+const clamp = (
+value: number,
+min = 0,
+max = 100
+) =>
+Math.max(
+min,
+Math.min(max, Number(value) || 0)
+);
+
+
+const num = (
+value: any,
+fallback = 50
+) =>
+Number.isFinite(Number(value))
+? Number(value)
+: fallback;
+
+
+const bool = (
+value: any,
+fallback = false
+) =>
+typeof value === "boolean"
+? value
+: fallback;
+
+
+// =====================================================
+// ENGINE
+// =====================================================
+
 export function signalEngine({
+
 phase,
 phaseConfirmation,
+
 crash,
 putTiming,
 rotation,
 earlyWarning,
+
 exit,
 decision,
 tradeStack,
@@ -20,19 +85,52 @@ sizing,
 regimeSync,
 dangerZone,
 executionState,
-rotationConfirm,
 
+rotationConfirm,
 rotationDecay,
+
 liquidity,
 breadthThrust,
 fragility,
 squeeze,
-participation
+participation,
+
+// ===================================================
+// NEW V2 INPUT
+// ===================================================
+//
+// The engine accepts the Price Momentum Engine in a
+// deliberately flexible way so the integration does
+// not break if the exact backend naming differs.
+//
+priceMomentum,
+priceMomentumEngine,
+
+// Optional Master Score object. This allows V2 to use
+// the already integrated momentum component without
+// forcing a second implementation.
+master,
+masterScore
+
 }: any) {
 
-/* =====================================================
-INPUTS
-===================================================== */
+// ===================================================
+// PRICE MOMENTUM SOURCE
+// ===================================================
+
+const momentumSource =
+priceMomentum ??
+priceMomentumEngine ??
+master?.priceMomentum ??
+masterScore?.priceMomentum ??
+master?.components?.priceMomentum ??
+masterScore?.components?.priceMomentum ??
+null;
+
+
+// ===================================================
+// REGIME SYNC
+// ===================================================
 
 const syncAligned =
 regimeSync?.aligned ??
@@ -40,17 +138,26 @@ regimeSync?.regimeAlignment ??
 false;
 
 const syncScore =
+num(
 regimeSync?.score ??
-regimeSync?.regimeSyncScore ??
-50;
+regimeSync?.regimeSyncScore,
+50
+);
+
+
+// ===================================================
+// DANGER / EXECUTION
+// ===================================================
 
 const dangerLevel =
 dangerZone?.level ??
 "NORMAL";
 
 const dangerEscalation =
-dangerZone?.escalation ??
-false;
+bool(
+dangerZone?.escalation,
+false
+);
 
 const executionMode =
 executionState?.executionMode ??
@@ -60,107 +167,261 @@ const riskState =
 executionState?.riskState ??
 "STABLE";
 
-/* =====================================================
-ROTATION CONFIRM
-===================================================== */
+
+// ===================================================
+// ROTATION CONFIRM
+// ===================================================
 
 const rotationState =
 rotationConfirm?.state ??
 "EARLY";
 
 const rotationConfidence =
-Number(rotationConfirm?.confidence ?? 40);
+num(
+rotationConfirm?.confidence,
+40
+);
 
 const rotationQuality =
-Number(rotationConfirm?.quality ?? 50);
+num(
+rotationConfirm?.quality,
+50
+);
 
 const sustainability =
-Number(rotationConfirm?.sustainability ?? 50);
+num(
+rotationConfirm?.sustainability,
+50
+);
 
 const phaseConfirmed =
-rotationConfirm?.phaseConfirmed ?? true;
+bool(
+rotationConfirm?.phaseConfirmed,
+true
+);
 
 const phaseConfidence =
-Number(
-rotationConfirm?.phaseConfidence ?? 50
+num(
+rotationConfirm?.phaseConfidence,
+50
 );
 
 const participationValue =
-Number(rotationConfirm?.participation ?? 50);
+num(
+rotationConfirm?.participation,
+50
+);
 
 const liquiditySupport =
-Number(rotationConfirm?.liquiditySupport ?? 50);
+num(
+rotationConfirm?.liquiditySupport,
+50
+);
 
 const falseBreakRisk =
-Number(rotationConfirm?.falseBreakRisk ?? 50);
+num(
+rotationConfirm?.falseBreakRisk,
+50
+);
 
 const squeezeRisk =
-Boolean(rotationConfirm?.squeezeRisk ?? false);
+bool(
+rotationConfirm?.squeezeRisk,
+false
+);
 
 const megaCapOnly =
-Boolean(rotationConfirm?.megaCapOnly ?? false);
+bool(
+rotationConfirm?.megaCapOnly,
+false
+);
 
 const fragileStructure =
-Boolean(rotationConfirm?.fragileStructure ?? false);
+bool(
+rotationConfirm?.fragileStructure,
+false
+);
 
-/* =====================================================
-ROTATION DECAY
-===================================================== */
+
+// ===================================================
+// ROTATION DECAY
+// ===================================================
 
 const decayState =
 rotationDecay?.state ??
 "HEALTHY_ROTATION";
 
 const decayScore =
-Number(rotationDecay?.score ?? 0);
+num(
+rotationDecay?.score,
+0
+);
 
-const momentumQuality =
-Number(
-rotationDecay?.momentumQuality ?? 70
+const rotationMomentumQuality =
+num(
+rotationDecay?.momentumQuality,
+70
 );
 
 const narrowLeadership =
-Boolean(
+bool(
 rotationDecay?.signals?.narrowLeadership
 );
 
 const hiddenDistribution =
-Boolean(
+bool(
 rotationDecay?.signals?.hiddenDistribution
 );
 
 const structuralDeterioration =
-Boolean(
+bool(
 rotationDecay?.signals?.structuralDeterioration
 );
 
 const thrustFailure =
-Boolean(
+bool(
 rotationDecay?.signals?.thrustFailure
 );
 
-/* =====================================================
-OVERLAYS
-===================================================== */
+
+// ===================================================
+// FLOW OVERLAYS
+// ===================================================
 
 const liquidityScore =
-Number(liquidity?.score ?? 50);
+num(
+liquidity?.score,
+50
+);
 
 const fragilityScore =
-Number(fragility?.score ?? 50);
+num(
+fragility?.score,
+50
+);
 
 const squeezeRiskScore =
-Number(squeeze?.score ?? 50);
+num(
+squeeze?.score,
+50
+);
 
 const participationScore =
-Number(participation?.score ?? 50);
+num(
+participation?.score,
+50
+);
 
 const breadthThrustScore =
-Number(breadthThrust?.score ?? 50);
+num(
+breadthThrust?.score,
+50
+);
 
-/* =====================================================
-BASE SIGNAL
-===================================================== */
+
+// ===================================================
+// PRICE MOMENTUM V2
+// ===================================================
+//
+// IMPORTANT:
+//
+// Price momentum is not treated as an independent
+// trading system.
+//
+// It is a confirmation / veto layer.
+//
+// This prevents:
+//
+// strong price momentum + weak structure
+//
+// from automatically becoming a long signal.
+//
+// ===================================================
+
+const priceMomentumScore =
+clamp(
+num(
+momentumSource?.score ??
+momentumSource?.priceMomentumScore ??
+momentumSource?.momentumScore ??
+momentumSource?.value ??
+momentumSource?.totalScore,
+50
+)
+);
+
+
+const priceMomentumState =
+momentumSource?.state ??
+momentumSource?.momentumState ??
+(
+priceMomentumScore >= 72
+? "STRONG"
+: priceMomentumScore >= 55
+? "POSITIVE"
+: priceMomentumScore <= 28
+? "STRONG_NEGATIVE"
+: priceMomentumScore <= 45
+? "NEGATIVE"
+: "NEUTRAL"
+);
+
+
+const priceMomentumTrend =
+momentumSource?.trend ??
+momentumSource?.direction ??
+momentumSource?.momentumDirection ??
+"NEUTRAL";
+
+
+const priceMomentumAcceleration =
+num(
+momentumSource?.acceleration ??
+momentumSource?.momentumAcceleration ??
+momentumSource?.velocity,
+50
+);
+
+
+const priceMomentumConfirmedLong =
+priceMomentumScore >= 65 &&
+(
+priceMomentumState === "STRONG" ||
+priceMomentumState === "POSITIVE" ||
+priceMomentumTrend === "UP" ||
+priceMomentumTrend === "BULLISH"
+);
+
+
+const priceMomentumConfirmedShort =
+priceMomentumScore <= 35 &&
+(
+priceMomentumState === "STRONG_NEGATIVE" ||
+priceMomentumState === "NEGATIVE" ||
+priceMomentumTrend === "DOWN" ||
+priceMomentumTrend === "BEARISH"
+);
+
+
+const priceMomentumWeakLong =
+priceMomentumScore < 45;
+
+
+const priceMomentumWeakShort =
+priceMomentumScore > 55;
+
+
+const priceMomentumDeteriorating =
+priceMomentumAcceleration < 40;
+
+
+const priceMomentumImproving =
+priceMomentumAcceleration > 60;
+
+
+// ===================================================
+// BASE SIGNAL
+// ===================================================
 
 let signal: any = {
 active: false,
@@ -170,30 +431,48 @@ message: "",
 priority: "LOW",
 timestamp: Date.now(),
 quality: "LOW",
+
 context: {
+
+phase,
+
 tradeStack,
 divergence,
+sizing,
+
 regimeSync,
 dangerZone,
 executionState,
+
 rotationConfirm,
-rotationDecay
+rotationDecay,
+
+priceMomentum:
+momentumSource
+? {
+score: priceMomentumScore,
+state: priceMomentumState,
+trend: priceMomentumTrend,
+acceleration:
+priceMomentumAcceleration
+}
+: null
 }
 };
 
 
-
-/* =====================================================
-HARD BLOCKERS
-===================================================== */
+// ===================================================
+// HARD RISK BLOCK
+// ===================================================
 
 const hardRiskBlock =
 dangerLevel === "EXTREME" ||
 riskState === "CRISIS";
 
-/* =====================================================
-LONG ENVIRONMENT FILTERS
-===================================================== */
+
+// ===================================================
+// LONG ENVIRONMENT
+// ===================================================
 
 const lowQualityRotation =
 rotationQuality < 52;
@@ -216,9 +495,10 @@ liquidityScore <= 38 ||
 
 participationScore <= 42;
 
-/* =====================================================
-ROTATION DECAY FILTERS
-===================================================== */
+
+// ===================================================
+// ROTATION DECAY
+// ===================================================
 
 const severeDecay =
 
@@ -226,15 +506,17 @@ decayState === "ROTATION_FAILURE" ||
 
 decayScore >= 72;
 
+
 const internalBreakdown =
 
-decayState ===
-"INTERNAL_BREAKDOWN" ||
+decayState === "INTERNAL_BREAKDOWN" ||
 
 decayScore >= 52;
 
-const weakMomentum =
-momentumQuality < 52;
+
+const weakRotationMomentum =
+rotationMomentumQuality < 52;
+
 
 const institutionalBreakdown =
 
@@ -246,19 +528,23 @@ narrowLeadership ||
 
 thrustFailure;
 
-/* =====================================================
-QUALITY BOOST
-===================================================== */
+
+// ===================================================
+// QUALITY BOOST
+// ===================================================
 
 let qualityBoost = 0;
+
 
 if (syncAligned) {
 qualityBoost += 10;
 }
 
+
 if (syncScore >= 78) {
 qualityBoost += 8;
 }
+
 
 if (
 executionMode ===
@@ -267,6 +553,7 @@ executionMode ===
 qualityBoost += 8;
 }
 
+
 if (
 rotationState ===
 "CONFIRMED"
@@ -274,13 +561,16 @@ rotationState ===
 qualityBoost += 8;
 }
 
+
 if (phaseConfirmed) {
 qualityBoost += 6;
 }
 
+
 if (phaseConfidence >= 70) {
 qualityBoost += 6;
 }
+
 
 if (
 rotationState ===
@@ -289,29 +579,36 @@ rotationState ===
 qualityBoost += 18;
 }
 
+
 if (rotationConfidence >= 82) {
 qualityBoost += 8;
 }
+
 
 if (rotationQuality >= 78) {
 qualityBoost += 12;
 }
 
+
 if (sustainability >= 72) {
 qualityBoost += 8;
 }
+
 
 if (participationValue >= 72) {
 qualityBoost += 8;
 }
 
+
 if (liquiditySupport >= 72) {
 qualityBoost += 8;
 }
 
+
 if (!fragileStructure) {
 qualityBoost += 5;
 }
+
 
 if (
 decayState ===
@@ -321,11 +618,13 @@ decayScore < 18
 qualityBoost += 15;
 }
 
+
 if (
-momentumQuality >= 82
+rotationMomentumQuality >= 82
 ) {
 qualityBoost += 10;
 }
+
 
 if (
 breadthThrustScore >= 78
@@ -333,141 +632,226 @@ breadthThrustScore >= 78
 qualityBoost += 8;
 }
 
-/* =====================================================
-QUALITY PENALTIES
-===================================================== */
+
+// ===================================================
+// PRICE MOMENTUM QUALITY BOOST
+// ===================================================
+
+//
+// Momentum gets a controlled boost.
+//
+// It does NOT override structure.
+//
+
+if (priceMomentumConfirmedLong) {
+qualityBoost += 10;
+}
+
+
+if (priceMomentumImproving) {
+qualityBoost += 5;
+}
+
+
+// ===================================================
+// QUALITY PENALTIES
+// ===================================================
 
 let qualityPenalty = 0;
+
 
 if (dangerLevel === "HIGH") {
 qualityPenalty += 15;
 }
 
+
 if (dangerEscalation) {
 qualityPenalty += 20;
 }
+
 
 if (riskState === "BREAKDOWN") {
 qualityPenalty += 25;
 }
 
-if (rotationState === "FAILING") {
+
+if (
+rotationState ===
+"FAILING"
+) {
 qualityPenalty += 25;
 }
+
 
 if (rotationQuality < 50) {
 qualityPenalty += 20;
 }
 
+
 if (!phaseConfirmed) {
 qualityPenalty += 12;
 }
+
 
 if (phaseConfidence < 40) {
 qualityPenalty += 8;
 }
 
+
 if (falseBreakRisk >= 65) {
 qualityPenalty += 15;
 }
+
 
 if (falseBreakRisk >= 80) {
 qualityPenalty += 25;
 }
 
+
 if (squeezeRisk) {
 qualityPenalty += 15;
 }
+
 
 if (megaCapOnly) {
 qualityPenalty += 20;
 }
 
+
 if (participationValue < 55) {
 qualityPenalty += 15;
 }
+
 
 if (fragileStructure) {
 qualityPenalty += 15;
 }
 
-/* =====================================================
-DECAY PENALTIES
-===================================================== */
 
-if (decayState === "EARLY_DECAY") {
+// ===================================================
+// DECAY PENALTIES
+// ===================================================
+
+if (
+decayState ===
+"EARLY_DECAY"
+) {
 qualityPenalty += 15;
 }
+
 
 if (internalBreakdown) {
 qualityPenalty += 30;
 }
 
+
 if (severeDecay) {
 qualityPenalty += 45;
 }
 
-if (weakMomentum) {
+
+if (weakRotationMomentum) {
 qualityPenalty += 20;
 }
+
 
 if (narrowLeadership) {
 qualityPenalty += 20;
 }
 
+
 if (hiddenDistribution) {
 qualityPenalty += 25;
 }
+
 
 if (structuralDeterioration) {
 qualityPenalty += 25;
 }
 
+
 if (thrustFailure) {
 qualityPenalty += 20;
 }
 
-/* =====================================================
-FLOW PENALTIES
-===================================================== */
+
+// ===================================================
+// FLOW PENALTIES
+// ===================================================
 
 if (fragilityScore >= 70) {
 qualityPenalty += 15;
 }
 
+
 if (liquidityScore <= 40) {
 qualityPenalty += 15;
 }
+
 
 if (squeezeRiskScore >= 75) {
 qualityPenalty += 15;
 }
 
+
 if (participationScore <= 45) {
 qualityPenalty += 15;
 }
+
 
 if (fragilityScore >= 85) {
 qualityPenalty += 25;
 }
 
+
 if (liquidityScore <= 30) {
 qualityPenalty += 25;
 }
+
 
 if (participationScore <= 35) {
 qualityPenalty += 20;
 }
 
-/* =====================================================
-SHORT ATTACK
-===================================================== */
+
+// ===================================================
+// PRICE MOMENTUM PENALTIES
+// ===================================================
+
+//
+// Weak momentum is particularly important for longs.
+//
+
+if (priceMomentumWeakLong) {
+qualityPenalty += 18;
+}
+
+
+if (
+priceMomentumScore < 35
+) {
+qualityPenalty += 12;
+}
+
+
+if (
+priceMomentumDeteriorating &&
+priceMomentumScore < 55
+) {
+qualityPenalty += 10;
+}
+
+
+// ===================================================
+// SHORT ATTACK
+// ===================================================
 
 if (
 
 !hardRiskBlock &&
 
-tradeStack?.type === "SHORT" &&
+tradeStack?.type ===
+"SHORT" &&
 
 tradeStack?.strength >= 3 &&
 
@@ -486,47 +870,86 @@ let strength =
 qualityBoost -
 qualityPenalty;
 
+
+//
+// Downside price momentum is a major confirmation.
+//
+
+if (
+priceMomentumConfirmedShort
+) {
+strength += 8;
+}
+
+
 signal = {
+
 active: true,
+
 type: "PUT_ATTACK",
 
 strength:
-Math.max(
-0,
-Math.min(100, strength)
-),
+clamp(strength),
 
 priority: "HIGH",
 
 message:
-"Downside momentum confirmed → attack shorts aggressively",
+priceMomentumConfirmedShort
+? "Downside price momentum confirmed → attack shorts aggressively"
+: "Downside structure confirmed → attack shorts",
 
-timestamp: Date.now(),
+timestamp:
+Date.now(),
 
 quality:
-syncAligned
+syncAligned &&
+priceMomentumConfirmedShort
 ? "INSTITUTIONAL"
+: priceMomentumConfirmedShort
+? "CONFIRMED"
 : "TACTICAL",
 
 context: {
+
 tradeStack,
 divergence,
+
 regimeSync,
 dangerZone,
 executionState,
+
 rotationConfirm,
-rotationDecay
+rotationDecay,
+
+priceMomentum: {
+score:
+priceMomentumScore,
+
+state:
+priceMomentumState,
+
+trend:
+priceMomentumTrend,
+
+acceleration:
+priceMomentumAcceleration,
+
+confirmed:
+priceMomentumConfirmedShort
+}
 }
 };
 }
 
-/* =====================================================
-SHORT BUILD
-===================================================== */
+
+// ===================================================
+// SHORT BUILD
+// ===================================================
 
 else if (
 
-tradeStack?.type === "SHORT" &&
+tradeStack?.type ===
+"SHORT" &&
 
 tradeStack?.strength >= 2 &&
 
@@ -539,15 +962,22 @@ let strength =
 qualityBoost -
 qualityPenalty;
 
+
+if (
+priceMomentumConfirmedShort
+) {
+strength += 8;
+}
+
+
 signal = {
+
 active: true,
+
 type: "PUT_BUILD",
 
 strength:
-Math.max(
-0,
-Math.min(100, strength)
-),
+clamp(strength),
 
 priority:
 syncAligned
@@ -555,41 +985,74 @@ syncAligned
 : "MEDIUM",
 
 message:
-"Risk building → scale into puts",
+priceMomentumConfirmedShort
+? "Risk building + downside price momentum → scale into puts"
+: "Risk building → scale into puts",
 
-timestamp: Date.now(),
+timestamp:
+Date.now(),
 
 quality:
-syncAligned
+syncAligned &&
+priceMomentumConfirmedShort
+? "INSTITUTIONAL"
+: syncAligned
 ? "CONFIRMED"
 : "TACTICAL",
 
 context: {
+
 tradeStack,
 divergence,
+
 regimeSync,
 dangerZone,
 executionState,
+
 rotationConfirm,
-rotationDecay
+rotationDecay,
+
+priceMomentum: {
+score:
+priceMomentumScore,
+
+state:
+priceMomentumState,
+
+trend:
+priceMomentumTrend,
+
+acceleration:
+priceMomentumAcceleration,
+
+confirmed:
+priceMomentumConfirmedShort
+}
 }
 };
 }
 
-/* =====================================================
-LONG ATTACK
-===================================================== */
+
+// ===================================================
+// LONG ATTACK
+// ===================================================
 
 else if (
 
 !hardRiskBlock &&
+
 !dangerousLongEnvironment &&
+
 !lowQualityRotation &&
 
 phaseConfirmed &&
+
 phaseConfidence >= 60 &&
+
 !severeDecay &&
+
 !internalBreakdown &&
+
 !institutionalBreakdown &&
 
 decayScore < 28 &&
@@ -598,17 +1061,28 @@ syncAligned &&
 
 dangerLevel !== "EXTREME" &&
 
-tradeStack?.type === "LONG" &&
+tradeStack?.type ===
+"LONG" &&
 
 tradeStack?.strength >= 3 &&
 
 rotation?.score > 74 &&
 
 (
-rotationState === "CONFIRMED" ||
+rotationState ===
+"CONFIRMED" ||
+
 rotationState ===
 "INSTITUTIONAL_CONFIRMATION"
-)
+) &&
+
+//
+// NEW V2:
+// price momentum must not contradict the
+// institutional long setup.
+//
+
+!priceMomentumWeakLong
 
 ) {
 
@@ -617,59 +1091,93 @@ let strength =
 qualityBoost -
 qualityPenalty;
 
+
+if (
+priceMomentumConfirmedLong
+) {
+strength += 8;
+}
+
+
 signal = {
+
 active: true,
+
 type: "LONG_ATTACK",
 
 strength:
-Math.max(
-0,
-Math.min(100, strength)
-),
+clamp(strength),
 
 priority: "HIGH",
 
 message:
-executionMode ===
-"ADD_ON_PULLBACKS"
-? "Institutional rotation alignment → aggressively add longs"
-: "Rotation confirmed → push long exposure",
+priceMomentumConfirmedLong
+? "Institutional rotation + price momentum confirmed → aggressively add longs"
+: "Institutional rotation confirmed → push long exposure",
 
-timestamp: Date.now(),
+timestamp:
+Date.now(),
 
 quality:
-rotationQuality >= 78
+rotationQuality >= 78 &&
+priceMomentumConfirmedLong
 ? "INSTITUTIONAL"
-: syncAligned
+: syncAligned &&
+priceMomentumConfirmedLong
 ? "CONFIRMED"
 : "TACTICAL",
 
 context: {
+
 tradeStack,
 divergence,
+
 regimeSync,
 dangerZone,
 executionState,
+
 rotationConfirm,
-rotationDecay
+rotationDecay,
+
+priceMomentum: {
+score:
+priceMomentumScore,
+
+state:
+priceMomentumState,
+
+trend:
+priceMomentumTrend,
+
+acceleration:
+priceMomentumAcceleration,
+
+confirmed:
+priceMomentumConfirmedLong
+}
 }
 };
 }
 
-/* =====================================================
-LONG BUILD
-===================================================== */
+
+// ===================================================
+// LONG BUILD / ROTATION BUILD
+// ===================================================
 
 else if (
 
 !hardRiskBlock &&
+
 !dangerousLongEnvironment &&
+
 phaseConfidence >= 45 &&
+
 !severeDecay &&
 
 decayScore < 42 &&
 
-tradeStack?.type === "LONG" &&
+tradeStack?.type ===
+"LONG" &&
 
 tradeStack?.strength >= 3 &&
 
@@ -679,60 +1187,124 @@ rotationState !== "FAILING"
 
 ) {
 
+//
+// NEW V2:
+//
+// A developing long setup with negative price
+// momentum is downgraded heavily.
+//
+
 let strength =
 55 +
 qualityBoost -
 qualityPenalty;
 
+
+if (
+priceMomentumConfirmedLong
+) {
+strength += 8;
+}
+
+
+if (
+priceMomentumWeakLong
+) {
+strength -= 15;
+}
+
+
 signal = {
+
 active: true,
-type: "ROTATION_BUILD",
+
+type:
+priceMomentumWeakLong
+? "ROTATION_BUILD"
+: "ROTATION_BUILD",
 
 strength:
-Math.max(
-0,
-Math.min(100, strength)
-),
+clamp(strength),
 
 priority:
-rotationQuality >= 75
+priceMomentumConfirmedLong
+? "HIGH"
+: rotationQuality >= 75
 ? "HIGH"
 : syncAligned
 ? "HIGH"
 : "MEDIUM",
 
 message:
-executionMode ===
+
+priceMomentumWeakLong
+
+? "Rotation developing, but price momentum is weak → build longs cautiously"
+
+: executionMode ===
 "ADD_ON_PULLBACKS"
-? "Aligned regime → add on pullbacks"
+
+? "Aligned regime + price momentum → add on pullbacks"
+
+: priceMomentumConfirmedLong
+
+? "Rotation developing + price momentum confirmed → build longs"
+
 : "Rotation developing → build longs gradually",
 
-timestamp: Date.now(),
+timestamp:
+Date.now(),
 
 quality:
-rotationQuality >= 75
+
+rotationQuality >= 75 &&
+priceMomentumConfirmedLong
+
 ? "INSTITUTIONAL"
-: syncAligned
+
+: syncAligned &&
+priceMomentumConfirmedLong
+
 ? "CONFIRMED"
+
 : "EARLY",
 
 context: {
+
 tradeStack,
 divergence,
+
 regimeSync,
 dangerZone,
 executionState,
+
 rotationConfirm,
-rotationDecay
+rotationDecay,
+
+priceMomentum: {
+score:
+priceMomentumScore,
+
+state:
+priceMomentumState,
+
+trend:
+priceMomentumTrend,
+
+acceleration:
+priceMomentumAcceleration,
+
+confirmed:
+priceMomentumConfirmedLong
+}
 }
 };
 }
 
 
-/* =====================================================
-EARLY REDUCE
-PHASE 3 DISTRIBUTION
-===================================================== */
+// ===================================================
+// EARLY REDUCE
+// ===================================================
 
 else if (
 
@@ -747,6 +1319,7 @@ participationScore <= 50 &&
 ) {
 
 signal = {
+
 active: true,
 
 type: "EARLY_REDUCE",
@@ -756,29 +1329,47 @@ strength: 75,
 priority: "HIGH",
 
 message:
-"Rotation Decay + weak participation detected → reduce exposure early",
+"Rotation decay + weak participation detected → reduce exposure early",
 
-timestamp: Date.now(),
+timestamp:
+Date.now(),
 
-quality: "DEFENSIVE",
+quality:
+"DEFENSIVE",
 
 context: {
+
 tradeStack,
 divergence,
+
 regimeSync,
 dangerZone,
 executionState,
+
 rotationConfirm,
-rotationDecay
+rotationDecay,
+
+priceMomentum: {
+score:
+priceMomentumScore,
+
+state:
+priceMomentumState,
+
+trend:
+priceMomentumTrend,
+
+acceleration:
+priceMomentumAcceleration
+}
 }
 };
 }
 
 
-
-/* =====================================================
-REDUCE SIGNAL
-===================================================== */
+// ===================================================
+// REDUCE
+// ===================================================
 
 else if (
 
@@ -793,10 +1384,13 @@ internalBreakdown
 ) {
 
 signal = {
+
 active: true,
+
 type: "REDUCE",
 
 strength:
+
 severeDecay
 ? 95
 : internalBreakdown
@@ -805,87 +1399,208 @@ severeDecay
 ? 80
 : 65,
 
-priority: "HIGH",
+priority:
+"HIGH",
 
 message:
+
 severeDecay
 ? "Rotation collapse detected → aggressively reduce exposure"
+
 : internalBreakdown
 ? "Internal breakdown detected → reduce exposure"
+
 : dangerEscalation
 ? "Danger escalation → reduce exposure"
+
 : "Risk rising → reduce exposure",
 
-timestamp: Date.now(),
+timestamp:
+Date.now(),
 
-quality: "DEFENSIVE",
+quality:
+"DEFENSIVE",
 
 context: {
+
 tradeStack,
 divergence,
+
 regimeSync,
 dangerZone,
 executionState,
+
 rotationConfirm,
-rotationDecay
+rotationDecay,
+
+priceMomentum: {
+score:
+priceMomentumScore,
+
+state:
+priceMomentumState,
+
+trend:
+priceMomentumTrend,
+
+acceleration:
+priceMomentumAcceleration
+}
 }
 };
 }
 
-/* =====================================================
-CLAMP
-===================================================== */
 
-signal.strength = Math.max(
-0,
-Math.min(100, signal.strength)
+// ===================================================
+// NO SIGNAL
+// ===================================================
+
+//
+// If no actionable path fired, keep NONE.
+//
+// This is intentional.
+// V2 should prefer WAIT over forcing a trade.
+//
+
+
+// ===================================================
+// FINAL STRENGTH
+// ===================================================
+
+signal.strength =
+clamp(
+signal.strength
 );
 
 
-/* =====================================================
-ANTI SPAM
-===================================================== */
+// ===================================================
+// FINAL SIGNAL METADATA
+// ===================================================
+
+signal.context = {
+
+...signal.context,
+
+phase,
+
+priceMomentum:
+momentumSource
+? {
+available: true,
+
+score:
+priceMomentumScore,
+
+state:
+priceMomentumState,
+
+trend:
+priceMomentumTrend,
+
+acceleration:
+priceMomentumAcceleration,
+
+confirmedLong:
+priceMomentumConfirmedLong,
+
+confirmedShort:
+priceMomentumConfirmedShort,
+
+deteriorating:
+priceMomentumDeteriorating,
+
+improving:
+priceMomentumImproving
+}
+: {
+available: false,
+
+score: 50,
+
+state: "UNAVAILABLE",
+
+trend: "NEUTRAL",
+
+acceleration: 50,
+
+confirmedLong: false,
+
+confirmedShort: false,
+
+deteriorating: false,
+
+improving: false
+}
+};
+
+
+// ===================================================
+// ANTI SPAM
+// ===================================================
 
 if (
 
 lastSignal &&
 
-lastSignal.type === signal.type &&
+lastSignal.type ===
+signal.type &&
 
-lastSignal.message === signal.message
+lastSignal.message ===
+signal.message
 
 ) {
 
 return {
+
 signal: {
+
 ...signal,
+
 phase
 },
+
 history
 };
 }
 
-/* =====================================================
-SAVE
-===================================================== */
 
-lastSignal = signal;
+// ===================================================
+// SAVE
+// ===================================================
 
-history.unshift(signal);
+lastSignal =
+signal;
 
-if (history.length > 30) {
-history = history.slice(0, 30);
+history.unshift(
+signal
+);
+
+
+if (
+history.length > 30
+) {
+
+history =
+history.slice(
+0,
+30
+);
 }
 
-/* =====================================================
-RETURN
-===================================================== */
+
+// ===================================================
+// RETURN
+// ===================================================
 
 return {
+
 signal: {
+
 ...signal,
+
 phase
 },
+
 history
 };
 }
