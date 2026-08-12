@@ -877,21 +877,6 @@ marketQuality
 
 
 /* =====================================================
-NASDAQ
-===================================================== */
-
-const nasdaq =
-nasdaqEngine({
-...data,
-
-phase,
-crash,
-rotation,
-putTiming,
-earlyWarning
-});
-
-/* =====================================================
 MASTER
 ===================================================== */
 
@@ -950,6 +935,37 @@ dangerZone,
 marketData: data.marketData ?? {}
 });
 
+/* =====================================================
+NASDAQ CALL
+===================================================== */
+
+const nasdaqCall =
+nasdaqEngine({
+
+...data,
+
+phase,
+phaseData,
+
+crash,
+rotation,
+
+putTiming,
+earlyWarning,
+
+historyMetrics,
+
+marketQuality,
+participation,
+breadthThrust,
+liquidity,
+
+regimeSync,
+executionState,
+
+master
+
+});
 
 /* =====================================================
 POSITIONING
@@ -991,10 +1007,26 @@ TRADE STACK
 
 const tradeStack =
 tradeStackEngine({
+
 phase,
 
-russell,
+/* ==================================================
+THREE-WAY TRADE STACK
+================================================== */
+
+// 1. NASDAQ PUT
 putTiming,
+
+// 2. NASDAQ CALL
+nasdaqCall,
+
+// 3. RUSSELL CALL
+russell,
+
+/* ==================================================
+CENTRAL SYSTEM
+================================================== */
+
 edgeState,
 master,
 marketQuality,
@@ -1007,7 +1039,9 @@ executionState,
 regimeSync,
 
 historyMetrics
+
 });
+
 
 /* =====================================================
 STATE
@@ -1303,7 +1337,7 @@ risk,
 
 putTiming,
 russell,
-nasdaq,
+nasdaqCall,
 
 master,
 confidence,
