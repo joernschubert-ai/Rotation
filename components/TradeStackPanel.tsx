@@ -16,8 +16,32 @@ SAFE ACCESS
 
 const stack = tradeStack ?? {};
 
+const primary =
+stack?.primaryFlow ?? {
+instrument: "NONE",
+direction: "NONE",
+state: "NEUTRAL",
+strength: 0,
+driver: "NONE"
+};
+
+const candidates =
+Array.isArray(stack?.candidates)
+? stack.candidates
+: [
+stack?.nasdaqPut,
+stack?.nasdaqCall,
+stack?.russellCall
+].filter(Boolean);
+
 const edge =
 stack?.edge ?? {};
+
+const meta =
+stack?.meta ?? {};
+
+const history =
+stack?.history ?? {};
 
 const edgeScore =
 Number(edge?.score ?? 0);
@@ -25,22 +49,20 @@ Number(edge?.score ?? 0);
 const edgeTier =
 edge?.tier ?? "NO_EDGE";
 
-const meta =
-stack?.meta ?? {};
-
 const size =
 Number(sizing?.size ?? 0);
 
 const sizingMode =
 sizing?.mode ?? "DEFENSIVE";
 
+
 /* ======================================================
 COLORS
 ====================================================== */
 
-function getTypeColor(type: string) {
+function getDirectionColor(direction: string) {
 
-switch (type) {
+switch (direction) {
 
 case "SHORT":
 return "#ff4d4f";
@@ -53,25 +75,78 @@ return "#666";
 }
 }
 
-function getEdgeColor(score: number) {
 
-if (score >= 80) return "#ff4d4f";
-if (score >= 60) return "#fa8c16";
-if (score >= 40) return "#fadb14";
-if (score >= 20) return "#73d13d";
+function getStrengthColor(strength: number) {
+
+if (strength >= 75)
+return "#ff4d4f";
+
+if (strength >= 60)
+return "#fa8c16";
+
+if (strength >= 40)
+return "#fadb14";
+
+if (strength >= 20)
+return "#73d13d";
 
 return "#666";
 }
 
+
+function getStrengthLabel(strength: number) {
+
+if (strength >= 75)
+return "HIGH CONVICTION";
+
+if (strength >= 60)
+return "STRONG";
+
+if (strength >= 40)
+return "BUILDING";
+
+if (strength >= 20)
+return "EARLY";
+
+return "NO TRADE";
+}
+
+
+function getEdgeColor(score: number) {
+
+if (score >= 80)
+return "#ff4d4f";
+
+if (score >= 60)
+return "#fa8c16";
+
+if (score >= 40)
+return "#fadb14";
+
+if (score >= 20)
+return "#73d13d";
+
+return "#666";
+}
+
+
 function getEdgeLabel(score: number) {
 
-if (score >= 80) return "EXTREME ASYMMETRY";
-if (score >= 60) return "STRONG EDGE";
-if (score >= 40) return "TRADEABLE";
-if (score >= 20) return "EARLY EDGE";
+if (score >= 80)
+return "EXTREME ASYMMETRY";
+
+if (score >= 60)
+return "STRONG EDGE";
+
+if (score >= 40)
+return "TRADEABLE";
+
+if (score >= 20)
+return "EARLY EDGE";
 
 return "NO EDGE";
 }
+
 
 function getModeColor(mode: string) {
 
@@ -94,6 +169,7 @@ return "#666";
 }
 }
 
+
 function getRotationColor(state: string) {
 
 switch (state) {
@@ -110,27 +186,57 @@ return "#faad14";
 case "EARLY":
 return "#999";
 
+case "INTERNAL_BREAKDOWN":
+return "#ff7875";
+
+case "ROTATION_FAILURE":
+return "#ff4d4f";
+
 default:
 return "#666";
 }
 }
 
+
+/* ======================================================
+INSTRUMENT LABEL
+====================================================== */
+
+function getInstrumentLabel(instrument: string) {
+
+switch (instrument) {
+
+case "NASDAQ_PUT":
+return "NASDAQ PUT";
+
+case "NASDAQ_CALL":
+return "NASDAQ CALL";
+
+case "RUSSELL_CALL":
+return "RUSSELL CALL";
+
+default:
+return "NONE";
+}
+}
+
+
 /* ======================================================
 FLOW BAR
 ====================================================== */
 
-function renderFlowBar() {
+function renderFlowBar(
+direction: string,
+strength: number
+) {
 
 const totalBars = 5;
-
-const strength =
-Number(stack?.strength ?? 0);
 
 const activeBars =
 Math.max(
 0,
 Math.min(
-5,
+totalBars,
 Math.round(strength / 20)
 )
 );
@@ -141,11 +247,11 @@ for (let i = 0; i < totalBars; i++) {
 
 let active = false;
 
-if (stack.type === "SHORT") {
+if (direction === "SHORT") {
 active = i < activeBars;
 }
 
-if (stack.type === "LONG") {
+if (direction === "LONG") {
 active =
 i >= totalBars - activeBars;
 }
@@ -156,10 +262,10 @@ bars.push(
 key={i}
 style={{
 flex: 1,
-height: "10px",
+height: "8px",
 background:
 active
-? getTypeColor(stack.type)
+? getDirectionColor(direction)
 : "#222",
 marginRight:
 i < totalBars - 1
@@ -186,21 +292,24 @@ marginTop: "10px"
 );
 }
 
+
 /* ======================================================
-EXECUTION TEXT
+EXECUTION EXPLANATION
 ====================================================== */
 
 function getExecutionExplanation() {
 
 if (edgeScore < 20) {
+
 return {
 text:
-"No statistical edge → no meaningful exposure",
+"No statistical edge → exposure should remain minimal",
 color: "#666"
 };
 }
 
 if (edgeScore < 40) {
+
 return {
 text:
 "Early edge detected → probing size only",
@@ -209,6 +318,7 @@ color: "#73d13d"
 }
 
 if (edgeScore < 60) {
+
 return {
 text:
 "Tradeable setup → controlled exposure",
@@ -217,6 +327,7 @@ color: "#fadb14"
 }
 
 if (edgeScore < 80) {
+
 return {
 text:
 "Strong asymmetric setup → active positioning",
@@ -226,13 +337,25 @@ color: "#fa8c16"
 
 return {
 text:
-"Extreme asymmetry → aggressive execution allowed",
+"Extreme asymmetry → aggressive execution possible",
 color: "#ff4d4f"
 };
 }
 
+
 const executionExplanation =
 getExecutionExplanation();
+
+
+/* ======================================================
+PRIMARY COLOR
+====================================================== */
+
+const primaryColor =
+getDirectionColor(
+primary.direction
+);
+
 
 /* ======================================================
 RENDER
@@ -248,7 +371,9 @@ padding: "16px"
 }}
 >
 
-{/* HEADER */}
+{/* ==================================================
+HEADER
+================================================== */}
 
 <div
 style={{
@@ -281,13 +406,17 @@ fontWeight: "bold"
 
 </div>
 
-{/* PRIMARY FLOW */}
+
+{/* ==================================================
+PRIMARY FLOW
+================================================== */}
 
 <div
 style={{
 marginBottom: "16px",
 padding: "14px",
-border: `1px solid ${getTypeColor(stack.type)}`,
+border:
+`1px solid ${primaryColor}`,
 background: "#111"
 }}
 >
@@ -304,44 +433,282 @@ PRIMARY FLOW
 
 <div
 style={{
-color: getTypeColor(stack.type),
+display: "flex",
+justifyContent: "space-between",
+alignItems: "center"
+}}
+>
+
+<div>
+
+<div
+style={{
+color: primaryColor,
 fontWeight: "bold",
 fontSize: "18px"
 }}
 >
-{stack.state}
+{getInstrumentLabel(
+primary.instrument
+)}
 </div>
 
 <div
 style={{
 color: "#888",
-fontSize: "12px"
+fontSize: "12px",
+marginTop: "3px"
 }}
 >
-{stack.driver}
+{primary.state}
 </div>
 
-{renderFlowBar()}
+</div>
 
 <div
 style={{
+textAlign: "right"
+}}
+>
+
+<div
+style={{
+color: getStrengthColor(
+Number(primary.strength ?? 0)
+),
+fontWeight: "bold",
+fontSize: "24px"
+}}
+>
+{primary.strength ?? 0}
+</div>
+
+<div
+style={{
+color: "#666",
+fontSize: "10px"
+}}
+>
+CONVICTION
+</div>
+
+</div>
+
+</div>
+
+
+{renderFlowBar(
+primary.direction,
+Number(primary.strength ?? 0)
+)}
+
+
+<div
+style={{
+display: "flex",
+justifyContent: "space-between",
 marginTop: "8px",
 color: "#666",
 fontSize: "11px"
 }}
 >
-Trade Strength: {stack.strength ?? 0}/100
+
+<span>
+{primary.direction}
+</span>
+
+<span>
+{getStrengthLabel(
+Number(primary.strength ?? 0)
+)}
+</span>
+
+</div>
+
+
+<div
+style={{
+marginTop: "6px",
+color: "#555",
+fontSize: "10px"
+}}
+>
+DRIVER: {primary.driver}
 </div>
 
 </div>
 
-{/* EDGE */}
+
+{/* ==================================================
+THREE-WAY CANDIDATES
+================================================== */}
+
+<div
+style={{
+marginBottom: "16px"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "11px",
+marginBottom: "8px"
+}}
+>
+THREE-WAY TRADE MATRIX
+</div>
+
+
+<div
+style={{
+display: "grid",
+gridTemplateColumns:
+"repeat(3, 1fr)",
+gap: "8px"
+}}
+>
+
+{candidates.map(
+(candidate: any) => {
+
+if (!candidate)
+return null;
+
+const strength =
+Number(
+candidate.strength ?? 0
+);
+
+const isPrimary =
+candidate.instrument ===
+primary.instrument;
+
+const color =
+getStrengthColor(strength);
+
+return (
+
+<div
+key={candidate.instrument}
+style={{
+background: "#111",
+border:
+`1px solid ${
+isPrimary
+? color
+: "#222"
+}`,
+padding: "10px",
+minWidth: 0
+}}
+>
+
+<div
+style={{
+color: "#777",
+fontSize: "10px",
+marginBottom: "6px"
+}}
+>
+{getInstrumentLabel(
+candidate.instrument
+)}
+</div>
+
+<div
+style={{
+color,
+fontSize: "20px",
+fontWeight: "bold"
+}}
+>
+{strength}
+</div>
+
+<div
+style={{
+color: "#666",
+fontSize: "9px"
+}}
+>
+/ 100
+</div>
+
+<div
+style={{
+color: color,
+fontSize: "10px",
+marginTop: "6px",
+fontWeight: "bold"
+}}
+>
+{getStrengthLabel(
+strength
+)}
+</div>
+
+<div
+style={{
+color:
+candidate.direction ===
+"SHORT"
+? "#ff7875"
+: "#73d13d",
+fontSize: "10px",
+marginTop: "4px"
+}}
+>
+{candidate.direction}
+</div>
+
+<div
+style={{
+color: "#555",
+fontSize: "9px",
+marginTop: "5px",
+lineHeight: 1.3
+}}
+>
+{candidate.state}
+</div>
+
+{isPrimary && (
+
+<div
+style={{
+color: "#40a9ff",
+fontSize: "9px",
+marginTop: "7px",
+fontWeight: "bold"
+}}
+>
+★ PRIMARY
+</div>
+
+)}
+
+</div>
+
+);
+}
+)}
+
+</div>
+
+</div>
+
+
+{/* ==================================================
+CENTRAL EDGE
+================================================== */}
 
 <div
 style={{
 marginBottom: "16px",
 padding: "14px",
-border: `1px solid ${getEdgeColor(edgeScore)}`,
+border:
+`1px solid ${getEdgeColor(edgeScore)}`,
 background: "#111"
 }}
 >
@@ -354,6 +721,14 @@ fontSize: "11px"
 >
 CENTRAL EDGE SYSTEM
 </div>
+
+<div
+style={{
+display: "flex",
+alignItems: "baseline",
+gap: "8px"
+}}
+>
 
 <div
 style={{
@@ -374,11 +749,13 @@ fontSize: "13px"
 {getEdgeLabel(edgeScore)}
 </div>
 
+</div>
+
 <div
 style={{
-color: "#888",
-fontSize: "11px",
-marginTop: "4px"
+color: "#777",
+fontSize: "10px",
+marginTop: "3px"
 }}
 >
 {edgeTier}
@@ -387,7 +764,8 @@ marginTop: "4px"
 <div
 style={{
 marginTop: "10px",
-color: executionExplanation.color,
+color:
+executionExplanation.color,
 fontSize: "12px"
 }}
 >
@@ -396,7 +774,10 @@ fontSize: "12px"
 
 </div>
 
-{/* ROTATION */}
+
+{/* ==================================================
+ROTATION CONFIRMATION
+================================================== */}
 
 {rotationConfirm && (
 
@@ -404,7 +785,12 @@ fontSize: "12px"
 style={{
 marginBottom: "16px",
 padding: "12px",
-border: `1px solid ${getRotationColor(rotationConfirm.state)}`,
+border:
+`1px solid ${
+getRotationColor(
+rotationConfirm.state
+)
+}`,
 background: "#111"
 }}
 >
@@ -420,7 +806,10 @@ ROTATION CONFIRMATION
 
 <div
 style={{
-color: getRotationColor(rotationConfirm.state),
+color:
+getRotationColor(
+rotationConfirm.state
+),
 fontWeight: "bold",
 fontSize: "16px"
 }}
@@ -435,66 +824,167 @@ fontSize: "12px",
 color: "#888"
 }}
 >
-Confidence: {rotationConfirm.confidence ?? 0}%
+Confidence:
+{" "}
+{rotationConfirm.confidence ?? 0}%
 </div>
 
 </div>
 
 )}
 
-{/* NEW INSTITUTIONAL OVERLAY */}
+
+{/* ==================================================
+INSTITUTIONAL OVERLAY
+================================================== */}
 
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "repeat(2, 1fr)",
+gridTemplateColumns:
+"repeat(2, 1fr)",
 gap: "12px",
 marginBottom: "16px"
 }}
 >
 
-<div style={{ background: "#111", padding: "12px", border: "1px solid #222" }}>
-<div style={{ color: "#666", fontSize: "11px" }}>ROTATION CONF.</div>
-<div style={{ color: "#40a9ff", fontWeight: "bold" }}>
+<div
+style={{
+background: "#111",
+padding: "12px",
+border: "1px solid #222"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "11px"
+}}
+>
+ROTATION CONF.
+</div>
+
+<div
+style={{
+color: "#40a9ff",
+fontWeight: "bold"
+}}
+>
 {meta.rotationConfidence ?? 0}%
 </div>
+
 </div>
 
-<div style={{ background: "#111", padding: "12px", border: "1px solid #222" }}>
-<div style={{ color: "#666", fontSize: "11px" }}>ROTATION DECAY</div>
-<div style={{ color: "#ff7875", fontWeight: "bold" }}>
+
+<div
+style={{
+background: "#111",
+padding: "12px",
+border: "1px solid #222"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "11px"
+}}
+>
+ROTATION DECAY
+</div>
+
+<div
+style={{
+color: "#ff7875",
+fontWeight: "bold"
+}}
+>
 {meta.decayScore ?? 0}
 </div>
+
 </div>
 
-<div style={{ background: "#111", padding: "12px", border: "1px solid #222" }}>
-<div style={{ color: "#666", fontSize: "11px" }}>REGIME ALIGNMENT</div>
-<div style={{
-color: meta.regimeAligned ? "#52c41a" : "#ff4d4f",
+
+<div
+style={{
+background: "#111",
+padding: "12px",
+border: "1px solid #222"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "11px"
+}}
+>
+REGIME ALIGNMENT
+</div>
+
+<div
+style={{
+color:
+meta.regimeAligned
+? "#52c41a"
+: "#ff4d4f",
 fontWeight: "bold"
-}}>
-{meta.regimeAligned ? "YES" : "NO"}
-</div>
+}}
+>
+{meta.regimeAligned
+? "YES"
+: "NO"}
 </div>
 
-<div style={{ background: "#111", padding: "12px", border: "1px solid #222" }}>
-<div style={{ color: "#666", fontSize: "11px" }}>INSTITUTIONAL</div>
-<div style={{
-color: meta.institutionalAligned ? "#52c41a" : "#ff4d4f",
+</div>
+
+
+<div
+style={{
+background: "#111",
+padding: "12px",
+border: "1px solid #222"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "11px"
+}}
+>
+INSTITUTIONAL
+</div>
+
+<div
+style={{
+color:
+meta.institutionalAligned
+? "#52c41a"
+: "#ff4d4f",
 fontWeight: "bold"
-}}>
-{meta.institutionalAligned ? "ALIGNED" : "MISALIGNED"}
-</div>
+}}
+>
+{meta.institutionalAligned
+? "ALIGNED"
+: "MISALIGNED"}
 </div>
 
 </div>
 
-{/* POSITIONING */}
+</div>
+
+
+{/* ==================================================
+POSITIONING
+================================================== */}
 
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "repeat(2, 1fr)",
+gridTemplateColumns:
+"repeat(2, 1fr)",
 gap: "12px"
 }}
 >
@@ -528,6 +1018,7 @@ fontSize: "22px"
 
 </div>
 
+
 <div
 style={{
 border: "1px solid #222",
@@ -538,26 +1029,93 @@ padding: "12px"
 
 <div
 style={{
-color: "#666",
-fontSize: "11px"
-}}
->
-DIRECTION
-</div>
-
-<div
-style={{
-color: getTypeColor(stack.type),
+color: primaryColor,
 fontWeight: "bold",
 fontSize: "18px"
 }}
 >
-{stack.type}
+{primary.direction}
+</div>
+
+<div
+style={{
+color: "#666",
+fontSize: "11px",
+marginTop: "3px"
+}}
+>
+PRIMARY DIRECTION
 </div>
 
 </div>
 
 </div>
+
+
+{/* ==================================================
+HISTORY FLAGS
+================================================== */}
+
+{(history.prolongedBearRegime ||
+history.severeBearRegime ||
+history.broadParticipationFailure) && (
+
+<div
+style={{
+marginTop: "16px",
+padding: "10px",
+border: "1px solid #3a2222",
+background: "#120d0d"
+}}
+>
+
+<div
+style={{
+color: "#ff7875",
+fontSize: "10px",
+fontWeight: "bold",
+marginBottom: "6px"
+}}
+>
+STRUCTURAL HISTORY FLAGS
+</div>
+
+{history.prolongedBearRegime && (
+<div
+style={{
+color: "#aaa",
+fontSize: "10px"
+}}
+>
+• Prolonged bear regime
+</div>
+)}
+
+{history.severeBearRegime && (
+<div
+style={{
+color: "#aaa",
+fontSize: "10px"
+}}
+>
+• Severe bear regime
+</div>
+)}
+
+{history.broadParticipationFailure && (
+<div
+style={{
+color: "#aaa",
+fontSize: "10px"
+}}
+>
+• Broad participation failure
+</div>
+)}
+
+</div>
+
+)}
 
 </div>
 );
