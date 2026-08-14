@@ -1,5 +1,20 @@
 // /lib/engine/putTimingEngine.ts
 
+export type PutTimingDecision =
+| "NO_TRADE"
+| "DEFENSIVE_BUILD"
+| "STRUCTURAL_BUILD"
+| "TRANSITIONAL_SHORT"
+| "PANIC_SHORT";
+
+export type PutTiming =
+| "WAIT"
+| "EARLY"
+| "BUILD"
+| "STRONG"
+| "MAX";
+
+
 export function putTimingEngine(engine: any) {
 
 const {
@@ -16,11 +31,13 @@ regimeSync,
 breadthThrust,
 marketQuality,
 breadthVelocity,
-regimePersistence
+regimePersistence,
+priceMomentum
 } = engine;
 
 const historyMetrics =
 engine.historyMetrics ?? {};
+
 
 /* =====================================================
 INPUT NORMALIZATION
@@ -36,33 +53,23 @@ const rsGrowth =
 Number(rotation?.rsGrowth ?? 1);
 
 const decay =
-Number(
-rotationDecay?.score ?? 0
-);
+Number(rotationDecay?.score ?? 0);
 
 const decayState =
 rotationDecay?.state ??
 "HEALTHY_ROTATION";
 
 const participationScore =
-Number(
-participation?.score ?? 50
-);
+Number(participation?.score ?? 50);
 
 const crashProbability =
-Number(
-crash?.probability ?? 0
-);
+Number(crash?.probability ?? 0);
 
 const liquidityScore =
-Number(
-liquidity?.score ?? 50
-);
+Number(liquidity?.score ?? 50);
 
 const dangerScore =
-Number(
-dangerZone?.score ?? 0
-);
+Number(dangerZone?.score ?? 0);
 
 const breadthThrustScore =
 Number(
@@ -103,20 +110,17 @@ marketQuality?.score ?? 50
 
 const syntheticStrength =
 Boolean(
-marketQuality?.syntheticStrength ??
-false
+marketQuality?.syntheticStrength ?? false
 );
 
 const unhealthyLiquidity =
 Boolean(
-marketQuality?.unhealthyLiquidity ??
-false
+marketQuality?.unhealthyLiquidity ?? false
 );
 
 const liquidityTrap =
 Boolean(
-marketQuality?.liquidityTrap ??
-false
+marketQuality?.liquidityTrap ?? false
 );
 
 const breadthVelocityScore =
@@ -128,9 +132,6 @@ const breadthVelocityDelta =
 Number(
 breadthVelocity?.delta ?? 0
 );
-
-const breadthVelocityNegative =
-breadthVelocityDelta < 0;
 
 const bearishPersistence =
 Boolean(
@@ -144,31 +145,124 @@ regimePersistence?.score ?? 50
 );
 
 const persistentWeakness =
-
 bearishPersistence &&
 persistenceScore >= 60;
 
+
 /* =====================================================
-HISTORY METRICS
+PRICE MOMENTUM
+===================================================== */
+
+const priceScore =
+Number(
+priceMomentum?.score ?? 50
+);
+
+const priceMomentum5D =
+Number(
+priceMomentum?.momentum5D ?? 0
+);
+
+const priceMomentum20D =
+Number(
+priceMomentum?.momentum20D ?? 0
+);
+
+const priceAcceleration =
+Number(
+priceMomentum?.acceleration ?? 0
+);
+
+const priceState =
+priceMomentum?.state ??
+"NEUTRAL";
+
+const priceAlignment =
+priceMomentum?.structureAlignment ??
+"UNKNOWN";
+
+const earlyBearishPrice =
+Boolean(
+priceMomentum?.earlyBearish ??
+false
+);
+
+const bearishImpulse =
+Boolean(
+priceMomentum?.bearishImpulse ??
+false
+);
+
+const bullishImpulse =
+Boolean(
+priceMomentum?.bullishImpulse ??
+false
+);
+
+const priceCooling =
+Boolean(
+priceMomentum?.cooling ??
+false
+);
+
+const priceAccelerating =
+Boolean(
+priceMomentum?.accelerating ??
+false
+);
+
+const priceDecelerating =
+Boolean(
+priceMomentum?.decelerating ??
+false
+);
+
+const priceLeadingStructure =
+Boolean(
+priceMomentum?.priceLeadingStructure ??
+false
+);
+
+const structureLeadingPrice =
+Boolean(
+priceMomentum?.structureLeadingPrice ??
+false
+);
+
+
+/* =====================================================
+HISTORY
 ===================================================== */
 
 const breadthTrend =
-Number(historyMetrics?.breadthTrend ?? 0);
+Number(
+historyMetrics?.breadthTrend ?? 0
+);
 
 const breadthAcceleration =
-Number(historyMetrics?.breadthAcceleration ?? 0);
+Number(
+historyMetrics?.breadthAcceleration ?? 0
+);
 
 const participationDecay =
-Number(historyMetrics?.participationDecay ?? 0);
+Number(
+historyMetrics?.participationDecay ?? 0
+);
 
 const leadershipDecay =
-Number(historyMetrics?.leadershipDecay ?? 0);
+Number(
+historyMetrics?.leadershipDecay ?? 0
+);
 
 const crashTrend =
-Number(historyMetrics?.crashTrend ?? 0);
+Number(
+historyMetrics?.crashTrend ?? 0
+);
 
 const phasePersistence =
-Number(historyMetrics?.phasePersistence ?? 0);
+Number(
+historyMetrics?.phasePersistence ?? 0
+);
 
 const regimePersistenceHistory =
 Number(
@@ -179,6 +273,7 @@ const relativeBreadthWeakness =
 Number(
 historyMetrics?.relativeBreadthWeakness ?? 0
 );
+
 
 /* =====================================================
 HISTORY FLAGS
@@ -220,44 +315,106 @@ relativeBreadthWeakness > 10;
 const severeBreadthStructureDamage =
 relativeBreadthWeakness > 20;
 
+
 /* =====================================================
 STRUCTURAL FLAGS
 ===================================================== */
 
 const narrowLeadership =
-
 rsGrowth > 1.03 &&
 rsSmall < 0.995 &&
 rsEqual < 0.995;
 
 const structuralBreakdown =
-
 decay > 85 &&
 participationScore < 40 &&
 breadthThrustScore < 35;
 
 const internalDeterioration =
-
 decay > 75 &&
 participationScore < 45 &&
 breadthVelocityScore < 40;
 
 const syntheticLiquidityRegime =
-
 syntheticStrength ||
 unhealthyLiquidity ||
 liquidityTrap;
 
 const panicConfirmed =
-
 crashProbability >= 45 &&
 vix > 24 &&
 dangerScore >= 40;
 
 const volatilityExpansion =
-
 vix > 24 ||
 vixTerm < 0.9;
+
+
+/* =====================================================
+PRICE FLAGS
+===================================================== */
+
+/*
+* Bearish price confirmation:
+*
+* Price is moving down AND structural context
+* is not bullish.
+*/
+
+const bearishPriceConfirmation =
+priceScore <= 40 &&
+(
+priceMomentum5D < 0 ||
+priceMomentum20D < 0
+);
+
+/*
+* Strong downside impulse.
+*/
+
+const strongBearishPrice =
+priceScore <= 35 &&
+(
+bearishImpulse ||
+priceAcceleration <= -0.5
+);
+
+/*
+* Bullish counter-move.
+*
+* This does NOT invalidate structural weakness,
+* but it should prevent chasing puts.
+*/
+
+const bullishPriceCounterMove =
+(
+priceScore >= 60 ||
+bullishImpulse
+) &&
+!strongBearishPrice;
+
+/*
+* Price is falling faster than the structural
+* engines have reacted.
+*/
+
+const earlyPriceBreak =
+(
+earlyBearishPrice ||
+priceLeadingStructure
+) &&
+priceScore <= 45;
+
+/*
+* Medium-term bearish but short-term rebound.
+*
+* Important for avoiding bad PUT entries.
+*/
+
+const bearishButRebounding =
+priceMomentum20D < -2 &&
+priceMomentum5D > 0;
+
 
 /* =====================================================
 COMPONENTS
@@ -269,64 +426,98 @@ let crashScore = 0;
 let earlyScore = 0;
 let decayScore = 0;
 
-/*
-NEU:
-Structural Short
-vs
-Panic Short
-*/
-
 let structuralScore = 0;
 let panicScore = 0;
 
+/*
+* NEW:
+* Price timing score
+*/
+
+let priceScoreComponent = 0;
+
 let contradictionPenalty = 0;
+
 
 /* =====================================================
 PHASE
 ===================================================== */
 
-if (phase === "PHASE_1_EXPANSION") phaseScore = 1;
-if (phase === "PHASE_2_WARNING") phaseScore = 3;
-if (phase === "PHASE_3_DISTRIBUTION") phaseScore = 5;
-if (phase === "PHASE_4_RISK") phaseScore = 7;
-if (phase === "PHASE_5_BREAKDOWN") phaseScore = 8;
-if (phase === "PHASE_6_ACCELERATION") phaseScore = 7;
-if (phase === "PHASE_7_CAPITULATION") phaseScore = 5;
+if (phase === "PHASE_1_EXPANSION")
+phaseScore = 1;
+
+if (phase === "PHASE_2_WARNING")
+phaseScore = 3;
+
+if (phase === "PHASE_3_DISTRIBUTION")
+phaseScore = 5;
+
+if (phase === "PHASE_4_RISK")
+phaseScore = 7;
+
+if (phase === "PHASE_5_BREAKDOWN")
+phaseScore = 8;
+
+if (phase === "PHASE_6_ACCELERATION")
+phaseScore = 7;
+
+if (phase === "PHASE_7_CAPITULATION")
+phaseScore = 5;
+
 
 /* =====================================================
 ROTATION
 ===================================================== */
 
-if (rsSmall < 0.99) rotationScore += 1;
-if (rsSmall < 0.97) rotationScore += 2;
-if (rsSmall < 0.95) rotationScore += 1;
+if (rsSmall < 0.99)
+rotationScore += 1;
 
-if (rsEqual < 0.99) rotationScore += 1;
+if (rsSmall < 0.97)
+rotationScore += 2;
+
+if (rsSmall < 0.95)
+rotationScore += 1;
+
+if (rsEqual < 0.99)
+rotationScore += 1;
 
 rotationScore =
 Math.min(rotationScore, 4);
+
 
 /* =====================================================
 ROTATION DECAY
 ===================================================== */
 
-if (decay > 45) decayScore += 1;
-if (decay > 60) decayScore += 2;
-if (decay > 75) decayScore += 1;
+if (decay > 45)
+decayScore += 1;
+
+if (decay > 60)
+decayScore += 2;
+
+if (decay > 75)
+decayScore += 1;
 
 decayScore =
 Math.min(decayScore, 4);
 
+
 /* =====================================================
-CRASH / PANIC
+CRASH
 ===================================================== */
 
-if (crashProbability > 40) crashScore += 2;
-if (crashProbability > 60) crashScore += 2;
-if (crashProbability > 75) crashScore += 2;
+if (crashProbability > 40)
+crashScore += 2;
+
+if (crashProbability > 60)
+crashScore += 2;
+
+if (crashProbability > 75)
+crashScore += 2;
 
 crashScore =
 Math.min(crashScore, 6);
+
 
 /* =====================================================
 EARLY WARNING
@@ -341,208 +532,187 @@ earlyWarning?.score?.value >= 4
 ) {
 earlyScore = 2;
 }
-
 }
+
 
 /* =====================================================
-STRUCTURAL SHORT SCORE
+STRUCTURAL SCORE
 ===================================================== */
 
-if (
-decay > 60
-) {
+if (decay > 60)
 structuralScore += 2;
-}
 
-if (
-decay > 80
-) {
+if (decay > 80)
 structuralScore += 2;
-}
 
-if (
-participationScore < 45
-) {
+if (participationScore < 45)
 structuralScore += 1;
-}
 
-if (
-participationScore < 38
-) {
+if (participationScore < 38)
 structuralScore += 1;
-}
 
-if (
-breadthThrustScore < 40
-) {
+if (breadthThrustScore < 40)
 structuralScore += 1;
-}
 
-if (
-breadthVelocityNegative
-) {
+if (breadthVelocityDelta < 0)
 structuralScore += 1;
-}
 
-if (
-persistentWeakness
-) {
+if (persistentWeakness)
 structuralScore += 1;
-}
 
-if (
-marketQualityScore < 45
-) {
+if (marketQualityScore < 45)
 structuralScore += 1;
-}
 
-if (
-syntheticLiquidityRegime
-) {
+if (syntheticLiquidityRegime)
 structuralScore += 1;
-}
 
-if (
-narrowLeadership
-) {
+if (narrowLeadership)
 structuralScore += 1;
-}
 
-if (
-deterioratingBreadth
-) {
+if (deterioratingBreadth)
 structuralScore += 1;
-}
 
-if (
-acceleratingBreadthDecay
-) {
+if (acceleratingBreadthDecay)
 structuralScore += 1;
-}
 
-if (
-participationErosion
-) {
+if (participationErosion)
 structuralScore += 1;
-}
 
-if (
-severeParticipationErosion
-) {
+if (severeParticipationErosion)
 structuralScore += 1;
-}
 
-if (
-leadershipConcentration
-) {
+if (leadershipConcentration)
 structuralScore += 1;
-}
 
-if (
-risingCrashRisk
-) {
+if (risingCrashRisk)
 structuralScore += 1;
-}
 
-if (
-severeRisingCrashRisk
-) {
+if (severeRisingCrashRisk)
 structuralScore += 1;
-}
 
-if (
-prolongedDistribution
-) {
+if (prolongedDistribution)
 structuralScore += 1;
-}
 
-if (
-prolongedRegimeWeakness
-) {
+if (prolongedRegimeWeakness)
 structuralScore += 1;
-}
 
-if (
-severeRegimeWeakness
-) {
+if (severeRegimeWeakness)
 structuralScore += 1;
-}
 
-if (
-breadthStructureDamage
-) {
+if (breadthStructureDamage)
 structuralScore += 1;
-}
 
-if (
-severeBreadthStructureDamage
-) {
+if (severeBreadthStructureDamage)
 structuralScore += 1;
-}
 
 structuralScore =
 Math.min(structuralScore, 10);
+
+
+/* =====================================================
+PRICE TIMING COMPONENT
+===================================================== */
+
+/*
+* This is intentionally NOT a huge score.
+*
+* Price momentum should improve timing,
+* not replace structural confirmation.
+*/
+
+if (bearishPriceConfirmation)
+priceScoreComponent += 2;
+
+if (strongBearishPrice)
+priceScoreComponent += 2;
+
+if (earlyPriceBreak)
+priceScoreComponent += 2;
+
+if (priceDecelerating)
+priceScoreComponent += 1;
+
+if (
+priceAlignment ===
+"CONFIRMED_BEARISH"
+) {
+priceScoreComponent += 2;
+}
+
+/*
+* Price leading structure is particularly
+* valuable for EARLY entry.
+*/
+
+if (priceLeadingStructure)
+priceScoreComponent += 1;
+
+/*
+* Bullish impulse removes PUT timing quality.
+*/
+
+if (bullishImpulse)
+priceScoreComponent -= 3;
+
+if (
+priceAlignment ===
+"CONFIRMED_BULLISH"
+) {
+priceScoreComponent -= 3;
+}
+
+if (bearishButRebounding)
+priceScoreComponent -= 2;
+
+priceScoreComponent =
+Math.max(
+-5,
+Math.min(
+10,
+priceScoreComponent
+)
+);
+
 
 /* =====================================================
 PANIC SCORE
 ===================================================== */
 
-if (
-vix > 24
-) {
+if (vix > 24)
 panicScore += 2;
-}
 
-if (
-vix > 30
-) {
+if (vix > 30)
 panicScore += 2;
-}
 
-if (
-dangerScore > 40
-) {
+if (dangerScore > 40)
 panicScore += 2;
-}
 
-if (
-dangerScore > 60
-) {
+if (dangerScore > 60)
 panicScore += 2;
-}
 
-if (
-gamma < 0
-) {
+if (gamma < 0)
 panicScore += 1;
-}
 
-if (
-vixTerm < 0.9
-) {
+if (vixTerm < 0.9)
 panicScore += 1;
-}
 
-if (
-credit > 1.05
-) {
+if (credit > 1.05)
 panicScore += 1;
-}
 
 panicScore =
 Math.min(panicScore, 10);
 
+
 /* =====================================================
-NEW INSTITUTIONAL CONTRADICTION LOGIC
+CONTRADICTION PENALTY
 ===================================================== */
 
 /*
-2025–2026:
-Low VIX darf strukturelle Shorts
-NICHT invalidieren.
+* LOW VIX:
+*
+* Still NOT enough to invalidate
+* structural shorts.
 */
-
-/* ================= LOW VIX ================= */
 
 if (
 vix < 20 &&
@@ -559,7 +729,8 @@ vix < 17 &&
 contradictionPenalty += 1;
 }
 
-/* ================= LIQUIDITY SUPPORT ================= */
+
+/* ================= LIQUIDITY ================= */
 
 if (
 liquidityScore > 55 &&
@@ -577,6 +748,7 @@ participationScore > 60 &&
 contradictionPenalty += 1;
 }
 
+
 /* ================= NO PANIC ================= */
 
 if (
@@ -593,6 +765,7 @@ dangerScore < 25 &&
 contradictionPenalty += 1;
 }
 
+
 /* ================= GAMMA ================= */
 
 if (
@@ -601,6 +774,7 @@ gamma >= 0 &&
 ) {
 contradictionPenalty += 1;
 }
+
 
 /* ================= TERM STRUCTURE ================= */
 
@@ -611,6 +785,7 @@ vixTerm > 0.90 &&
 contradictionPenalty += 1;
 }
 
+
 /* ================= CREDIT ================= */
 
 if (
@@ -620,7 +795,8 @@ credit < 1.0 &&
 contradictionPenalty += 1;
 }
 
-/* ================= REGIME MISALIGNMENT ================= */
+
+/* ================= REGIME ================= */
 
 if (
 !regimeAligned &&
@@ -629,51 +805,54 @@ if (
 contradictionPenalty += 1;
 }
 
+
+/* ================= PRICE ================= */
+
+/*
+* Strong bullish price action is a genuine
+* timing contradiction.
+*/
+
+if (
+bullishImpulse &&
+!structuralBreakdown
+) {
+contradictionPenalty += 2;
+}
+
+if (
+priceScore >= 65 &&
+priceMomentum5D > 1 &&
+!strongBearishPrice
+) {
+contradictionPenalty += 1;
+}
+
+
 /* =====================================================
 INTERNAL OFFSET
 ===================================================== */
 
-if (
-participationErosion
-) {
+if (participationErosion)
 contradictionPenalty -= 1;
-}
 
-if (
-acceleratingBreadthDecay
-) {
+if (acceleratingBreadthDecay)
 contradictionPenalty -= 1;
-}
 
-if (
-risingCrashRisk
-) {
+if (risingCrashRisk)
 contradictionPenalty -= 1;
-}
 
-if (
-prolongedDistribution
-) {
+if (prolongedDistribution)
 contradictionPenalty -= 1;
-}
 
-if (
-prolongedRegimeWeakness
-) {
+if (prolongedRegimeWeakness)
 contradictionPenalty -= 1;
-}
 
-if (
-breadthStructureDamage
-) {
+if (breadthStructureDamage)
 contradictionPenalty -= 1;
-}
 
-if (
-participationScore < 40
-) {
+if (participationScore < 40)
 contradictionPenalty -= 1;
-}
 
 if (
 decay > 85 &&
@@ -682,23 +861,25 @@ participationScore < 38
 contradictionPenalty -= 2;
 }
 
-if (
-breadthThrustScore < 35
-) {
+if (breadthThrustScore < 35)
 contradictionPenalty -= 1;
-}
 
-if (
-marketQualityScore < 40
-) {
+if (marketQualityScore < 40)
 contradictionPenalty -= 1;
-}
 
-if (
-syntheticLiquidityRegime
-) {
+if (syntheticLiquidityRegime)
 contradictionPenalty -= 1;
-}
+
+/*
+* Strong bearish price action reduces
+* contradiction.
+*/
+
+if (strongBearishPrice)
+contradictionPenalty -= 1;
+
+if (priceAlignment === "CONFIRMED_BEARISH")
+contradictionPenalty -= 1;
 
 contradictionPenalty =
 Math.max(
@@ -706,45 +887,127 @@ Math.max(
 contradictionPenalty
 );
 
+
 /* =====================================================
-TOTAL
+TOTAL SCORE
 ===================================================== */
 
-let totalScore =
+/*
+* IMPORTANT:
+*
+* Old engine capped the total at 24 although
+* its components could produce substantially
+* more than 24 points.
+*
+* We keep 24 as the normalized timing scale,
+* but explicitly normalize the raw score.
+*/
 
+const rawScore =
 phaseScore +
 rotationScore +
 crashScore +
 earlyScore +
 decayScore +
 structuralScore +
-panicScore -
-
+panicScore +
+priceScoreComponent -
 contradictionPenalty;
 
-totalScore = Math.max(
-0,
-Math.min(24, totalScore)
+
+/*
+* Structural foundation:
+*
+* price cannot create a structural short
+* from nothing.
+*/
+
+let totalScore =
+Math.round(
+rawScore * 24 / 58
 );
+
+totalScore =
+Math.max(
+0,
+Math.min(
+24,
+totalScore
+)
+);
+
 
 /* =====================================================
 TIMING
 ===================================================== */
 
-let timing = "WAIT";
+let timing: PutTiming = "WAIT";
 
-if (totalScore >= 20) {
+if (totalScore >= 20)
 timing = "MAX";
-}
-else if (totalScore >= 16) {
+
+else if (totalScore >= 16)
 timing = "STRONG";
-}
-else if (totalScore >= 11) {
+
+else if (totalScore >= 11)
+timing = "BUILD";
+
+else if (totalScore >= 7)
+timing = "EARLY";
+
+
+/* =====================================================
+PRICE TIMING OVERRIDE
+===================================================== */
+
+/*
+* If the structural picture is already bearish
+* but price suddenly turns strongly bullish,
+* do NOT chase PUTs.
+*/
+
+if (
+bullishImpulse &&
+!panicConfirmed &&
+!structuralBreakdown
+) {
+
+if (
+timing === "MAX" ||
+timing === "STRONG"
+) {
 timing = "BUILD";
 }
-else if (totalScore >= 7) {
+
+else if (
+timing === "BUILD"
+) {
 timing = "EARLY";
 }
+}
+
+
+/*
+* Early bearish price impulse can promote
+* an otherwise EARLY setup.
+*
+* It does NOT create MAX.
+*/
+
+if (
+earlyPriceBreak &&
+(
+phase === "PHASE_3_DISTRIBUTION" ||
+phase === "PHASE_4_RISK" ||
+phase === "PHASE_5_BREAKDOWN"
+) &&
+totalScore >= 7
+) {
+
+if (timing === "EARLY")
+timing = "BUILD";
+}
+
 
 /* =====================================================
 STRUCTURAL OVERRIDE
@@ -757,60 +1020,64 @@ timing === "WAIT" ||
 timing === "EARLY"
 )
 ) {
-
 timing = "BUILD";
 }
+
 
 /* =====================================================
 DECISION TREE
 ===================================================== */
 
-function getDecision() {
+function getDecision(): PutTimingDecision {
 
-/* =====================================================
-STRUCTURAL SHORT REGIME
-===================================================== */
+/* =================================================
+STRUCTURAL BREAKDOWN
+================================================= */
 
-if (
-structuralBreakdown
-) {
+if (structuralBreakdown) {
 
-if (
-panicConfirmed
-) {
+if (panicConfirmed) {
 return "PANIC_SHORT";
 }
 
 return "STRUCTURAL_BUILD";
 }
 
-/* =====================================================
+
+/* =================================================
 INTERNAL DETERIORATION
-===================================================== */
+================================================= */
 
-if (
-internalDeterioration
-) {
+if (internalDeterioration) {
 
-if (
-panicConfirmed
-) {
+if (panicConfirmed) {
 return "TRANSITIONAL_SHORT";
 }
+
+/*
+* Bearish price impulse improves confidence,
+* but internal deterioration remains the
+* dominant structural signal.
+*/
 
 return "DEFENSIVE_BUILD";
 }
 
-/* =====================================================
-PHASE 1
-===================================================== */
 
-if (phase === "PHASE_1_EXPANSION") {
+/* =================================================
+PHASE 1
+================================================= */
+
+if (
+phase ===
+"PHASE_1_EXPANSION"
+) {
 
 if (
 rotationScore >= 3 &&
 earlyWarning?.active &&
-decay >= 60
+decay >= 60 &&
+earlyPriceBreak
 ) {
 return "DEFENSIVE_BUILD";
 }
@@ -818,11 +1085,22 @@ return "DEFENSIVE_BUILD";
 return "NO_TRADE";
 }
 
-/* =====================================================
-PHASE 2
-===================================================== */
 
-if (phase === "PHASE_2_WARNING") {
+/* =================================================
+PHASE 2
+================================================= */
+
+if (
+phase ===
+"PHASE_2_WARNING"
+) {
+
+if (
+timing === "BUILD" &&
+earlyPriceBreak
+) {
+return "STRUCTURAL_BUILD";
+}
 
 if (
 timing === "EARLY"
@@ -830,62 +1108,63 @@ timing === "EARLY"
 return "DEFENSIVE_BUILD";
 }
 
-if (
-timing === "BUILD"
-) {
-return "STRUCTURAL_BUILD";
-}
-
 return "NO_TRADE";
 }
 
-/* =====================================================
-PHASE 3
-===================================================== */
 
-if (phase === "PHASE_3_DISTRIBUTION") {
+/* =================================================
+PHASE 3
+================================================= */
+
+if (
+phase ===
+"PHASE_3_DISTRIBUTION"
+) {
 
 if (
 decay >= 60 &&
 rotationScore >= 3 &&
 earlyWarning?.active
 ) {
-return "STRUCTURAL_BUILD";
-}
 
-if (
-timing === "EARLY"
-) {
-return "DEFENSIVE_BUILD";
+return "STRUCTURAL_BUILD";
 }
 
 if (
 timing === "BUILD"
 ) {
+
 return "STRUCTURAL_BUILD";
 }
 
 if (
 timing === "STRONG"
 ) {
+
 return "TRANSITIONAL_SHORT";
+}
+
+if (
+timing === "EARLY"
+) {
+
+return "DEFENSIVE_BUILD";
 }
 
 return "NO_TRADE";
 }
 
-/* =====================================================
-PHASE 4-5
-===================================================== */
+
+/* =================================================
+PHASE 4 / 5
+================================================= */
 
 if (
 phase === "PHASE_4_RISK" ||
 phase === "PHASE_5_BREAKDOWN"
 ) {
 
-if (
-panicConfirmed
-) {
+if (panicConfirmed) {
 
 if (
 timing === "MAX" ||
@@ -897,43 +1176,54 @@ return "PANIC_SHORT";
 return "TRANSITIONAL_SHORT";
 }
 
+
+/*
+* Strong structural setup + bearish price
+* confirmation.
+*/
+
+if (
+timing === "STRONG" &&
+bearishPriceConfirmation
+) {
+return "TRANSITIONAL_SHORT";
+}
+
+
 if (
 timing === "BUILD"
 ) {
 return "STRUCTURAL_BUILD";
 }
 
-if (
-timing === "STRONG"
-) {
-return "TRANSITIONAL_SHORT";
-}
 
 return "DEFENSIVE_BUILD";
 }
 
-/* =====================================================
-PHASE 6-7
-===================================================== */
+
+/* =================================================
+PHASE 6 / 7
+================================================= */
 
 if (
 phase === "PHASE_6_ACCELERATION" ||
 phase === "PHASE_7_CAPITULATION"
 ) {
 
-if (
-panicConfirmed
-) {
+if (panicConfirmed)
 return "PANIC_SHORT";
-}
 
 return "TRANSITIONAL_SHORT";
 }
 
+
 return "NO_TRADE";
 }
 
-const decision = getDecision();
+
+const decision =
+getDecision();
+
 
 /* =====================================================
 EXECUTION PROFILE
@@ -942,26 +1232,37 @@ EXECUTION PROFILE
 let execution =
 "NONE";
 
-if (
-decision === "DEFENSIVE_BUILD"
-) {
-execution = "SMALL STARTER";
-}
 
 if (
-decision === "STRUCTURAL_BUILD"
+decision ===
+"DEFENSIVE_BUILD"
 ) {
-execution = "PARTIAL SIZE";
+execution =
+"SMALL STARTER";
 }
 
-if (
-decision === "TRANSITIONAL_SHORT"
-) {
-execution = "PARTIAL SIZE";
-}
 
 if (
-decision === "PANIC_SHORT"
+decision ===
+"STRUCTURAL_BUILD"
+) {
+execution =
+"PARTIAL SIZE";
+}
+
+
+if (
+decision ===
+"TRANSITIONAL_SHORT"
+) {
+execution =
+"PARTIAL SIZE";
+}
+
+
+if (
+decision ===
+"PANIC_SHORT"
 ) {
 
 if (
@@ -969,13 +1270,16 @@ timing === "MAX" &&
 panicConfirmed
 ) {
 
-execution = "FULL SIZE";
+execution =
+"FULL SIZE";
 
 } else {
 
-execution = "PARTIAL SIZE";
+execution =
+"PARTIAL SIZE";
 }
 }
+
 
 /* =====================================================
 RETURN
@@ -993,6 +1297,63 @@ score: {
 value: totalScore,
 max: 24
 },
+
+
+/* =================================================
+PRICE CONTEXT
+================================================= */
+
+price: {
+
+score: priceScore,
+
+momentum5D:
+priceMomentum5D,
+
+momentum20D:
+priceMomentum20D,
+
+acceleration:
+priceAcceleration,
+
+state:
+priceState,
+
+structureAlignment:
+priceAlignment,
+
+earlyBearish:
+earlyBearishPrice,
+
+bearishImpulse,
+
+bullishImpulse,
+
+cooling:
+priceCooling,
+
+accelerating:
+priceAccelerating,
+
+decelerating:
+priceDecelerating,
+
+priceLeadingStructure,
+
+structureLeadingPrice,
+
+bearishConfirmation:
+bearishPriceConfirmation,
+
+strongBearish:
+strongBearishPrice,
+
+bullishCounterMove:
+bullishPriceCounterMove,
+
+bearishButRebounding
+},
+
 
 meta: {
 
@@ -1019,31 +1380,28 @@ volatilityExpansion,
 institutionalState:
 
 decision === "PANIC_SHORT"
-
 ? "PANIC_SHORT"
 
-: (
-decision === "TRANSITIONAL_SHORT"
-)
-
+: decision ===
+"TRANSITIONAL_SHORT"
 ? "TRANSITIONAL_SHORT"
 
-: (
-decision === "STRUCTURAL_BUILD"
-)
-
+: decision ===
+"STRUCTURAL_BUILD"
 ? "STRUCTURAL_SHORT"
 
 : "DEFENSIVE_SHORT"
-
 },
+
 
 historyState: {
 
 breadthTrend,
+
 breadthAcceleration,
 
 participationDecay,
+
 leadershipDecay,
 
 crashTrend,
@@ -1056,24 +1414,28 @@ regimePersistenceHistory,
 relativeBreadthWeakness,
 
 prolongedRegimeWeakness,
+
 severeRegimeWeakness,
 
 breadthStructureDamage,
+
 severeBreadthStructureDamage,
 
 deterioratingBreadth,
+
 acceleratingBreadthDecay,
 
 participationErosion,
+
 severeParticipationErosion,
 
 leadershipConcentration,
 
 risingCrashRisk,
+
 severeRisingCrashRisk,
 
 prolongedDistribution
-
 },
 
 
@@ -1109,6 +1471,11 @@ value: structuralScore,
 max: 10
 },
 
+price: {
+value: priceScoreComponent,
+max: 10
+},
+
 panic: {
 value: panicScore,
 max: 10
@@ -1118,7 +1485,6 @@ contradiction: {
 value: contradictionPenalty,
 max: 10
 }
-
 }
 
 };
