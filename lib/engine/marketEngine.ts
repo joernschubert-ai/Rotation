@@ -499,36 +499,6 @@ phaseData
 };
 
 /* =====================================================
-FINAL RUSSELL
-===================================================== */
-
-const russell =
-russellEngine({
-rsSmall: rotation.rsSmall,
-rsGrowth: rotation.rsGrowth,
-
-breadth50,
-breadth200,
-
-concentrationScore:
-Number(data.concentrationScore ?? 0),
-
-phase,
-
-crash,
-vix,
-
-historyMetrics,
-
-participation,
-
-internalDivergence:
-divergence,
-
-priceMomentum
-});
-
-/* =====================================================
 EXECUTION STATE
 ===================================================== */
 
@@ -769,6 +739,56 @@ breadthThrust,
 rotationDecay,
 historyMetrics
 });
+
+/* =====================================================
+FINAL RUSSELL
+===================================================== */
+
+const russell =
+russellEngine({
+rsSmall:
+rotation.rsSmall,
+
+rsGrowth:
+rotation.rsGrowth,
+
+breadth50,
+breadth200,
+
+concentrationScore:
+Number(data.concentrationScore ?? 0),
+
+phase,
+
+crash,
+vix,
+
+historyMetrics,
+
+/* ===================================================
+ROTATION / PARTICIPATION CONTEXT
+=================================================== */
+
+rotationDecay,
+
+rotationConfirm,
+
+participation,
+
+/* ===================================================
+INTERNAL MARKET STRUCTURE
+=================================================== */
+
+internalDivergence:
+divergence,
+
+/* ===================================================
+PRICE MOMENTUM
+=================================================== */
+
+priceMomentum
+});
+
 
 /* =====================================================
 PHASE CONFIRMATION
