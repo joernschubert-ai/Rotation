@@ -518,7 +518,14 @@ phase,
 crash,
 vix,
 
-historyMetrics
+historyMetrics,
+
+participation,
+
+internalDivergence:
+divergence,
+
+priceMomentum
 });
 
 /* =====================================================
