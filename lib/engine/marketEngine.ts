@@ -434,7 +434,8 @@ phase: "TEMP",
 rotation,
 crash,
 earlyWarning,
-historyMetrics
+historyMetrics,
+priceMomentum
 });
 
 const russellTemp =
@@ -496,19 +497,6 @@ const phaseStage = {
 phase,
 phaseData
 };
-
-/* =====================================================
-FINAL PUT
-===================================================== */
-
-const putTiming =
-putTimingEngine({
-phase,
-rotation,
-crash,
-earlyWarning,
-historyMetrics
-});
 
 /* =====================================================
 FINAL RUSSELL
@@ -875,6 +863,30 @@ breadthThrust,
 marketQuality
 });
 
+/* =====================================================
+FINAL PUT
+===================================================== */
+
+const putTiming =
+putTimingEngine({
+phase,
+rotation,
+crash,
+earlyWarning,
+historyMetrics,
+priceMomentum,
+
+participation,
+liquidity,
+dangerZone,
+marketDrivers,
+regimeSync,
+breadthThrust,
+marketQuality,
+rotationDecay
+});
+
+
 
 /* =====================================================
 MASTER
@@ -927,6 +939,7 @@ rotationDecay,
 rotationConfirm,
 participation,
 divergence,
+priceMomentum,
 
 executionState,
 regimeSync,
@@ -954,6 +967,7 @@ putTiming,
 earlyWarning,
 
 historyMetrics,
+priceMomentum,
 
 marketQuality,
 participation,
@@ -1027,6 +1041,7 @@ russell,
 CENTRAL SYSTEM
 ================================================== */
 
+priceMomentum,
 edgeState,
 master,
 marketQuality,
