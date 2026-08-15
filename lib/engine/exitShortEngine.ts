@@ -3,21 +3,30 @@
 export function exitShortEngine(input: any) {
 
 const {
-position,
-crash = {},
-vix,
-breadth50,
-pnl,
 phase,
+marketPhase,
 
+master = {},
+tradeStack = {},
+dangerZone = {},
+crash = {},
 rotationDecay = {},
+rotationConfirm = {},
+systemHeat = {},
 participation = {},
-liquidity = {}
+liquidity = {},
+fragility = {},
+priceMomentum = {}
 } = input;
 
 /* =====================================================
 SAFE INPUTS
 ===================================================== */
+
+const currentPhase =
+phase ??
+marketPhase ??
+"PHASE_3_DISTRIBUTION";
 
 const crashProbability =
 Number(crash?.probability ?? 0);
@@ -25,97 +34,141 @@ Number(crash?.probability ?? 0);
 const decayScore =
 Number(rotationDecay?.score ?? 0);
 
+const decayState =
+rotationDecay?.state ?? "HEALTHY_ROTATION";
+
+const rotationState =
+rotationConfirm?.state ?? "NONE";
+
+const rotationConfidence =
+Number(rotationConfirm?.confidence ?? 0);
+
 const participationScore =
 Number(participation?.score ?? 50);
 
 const liquidityScore =
 Number(liquidity?.score ?? 50);
 
+const fragilityScore =
+Number(fragility?.score ?? 50);
+
+const masterScore =
+Number(master?.score ?? 50);
+
+const dangerScore =
+Number(dangerZone?.score ?? 0);
+
+const heat =
+Number(systemHeat?.value ?? 0);
+
 /* =====================================================
-NO POSITION
+TRADE STACK — ACTUAL NASDAQ PUT STRENGTH
+===================================================== */
+
+const tradeStrength =
+Number(
+tradeStack?.nasdaqPut?.strength ??
+tradeStack?.primaryFlow?.strength ??
+tradeStack?.strength ??
+0
+);
+
+const tradeState =
+tradeStack?.nasdaqPut?.state ??
+"NEUTRAL";
+
+/* =====================================================
+PRICE
+===================================================== */
+
+const ndxPriceScore =
+Number(
+priceMomentum?.ndx?.score ??
+priceMomentum?.score ??
+50
+);
+
+const bearishImpulse =
+Boolean(
+priceMomentum?.bearishImpulse
+);
+
+const bullishImpulse =
+Boolean(
+priceMomentum?.bullishImpulse
+);
+
+const priceDirection =
+priceMomentum?.ndx?.direction ??
+priceMomentum?.direction ??
+"FLAT";
+
+/* =====================================================
+FULL SYSTEM COLLAPSE
 ===================================================== */
 
 if (
-!position ||
-position.size <= 0
+
+currentPhase === "PHASE_7_CAPITULATION" ||
+
+dangerScore >= 90 ||
+
+crashProbability >= 90 ||
+
+heat <= -2.2
+
 ) {
 
 return {
-action: "NO POSITION",
-sizeReduction: 0,
-reason:
-"No short exposure"
-};
-}
 
-/* =====================================================
-EXTREME PROFIT
-===================================================== */
+instrument: "NASDAQ_PUT",
 
-if (pnl >= 140) {
+direction: "SHORT",
 
-return {
-action: "LOCK MAJORITY",
-sizeReduction: 85,
-reason:
-"Extreme downside extension"
-};
-}
-
-/* =====================================================
-PROFIT CORE
-===================================================== */
-
-if (pnl >= 100) {
-
-return {
-action: "LOCK PROFITS",
-sizeReduction: 70,
-reason:
-"Capitulation gains secured"
-};
-}
-
-if (pnl >= 70) {
-
-return {
-action: "TRIM PROFITS",
-sizeReduction: 50,
-reason:
-"Strong downside move"
-};
-}
-
-/* =====================================================
-CAPITULATION EXIT
-===================================================== */
-
-if (
-phase ===
-"PHASE_7_CAPITULATION"
-) {
-
-return {
 action: "EXIT MAJORITY",
+
 sizeReduction: 80,
+
 reason:
-"High reversal probability"
+"Capitulation or systemic reversal risk",
+
+priority: "CRITICAL"
+
 };
 }
 
 /* =====================================================
-CRASH PEAK
+CRASH / PANIC CLIMAX
 ===================================================== */
 
 if (
-crashProbability > 82
+
+crashProbability >= 80 ||
+
+dangerScore >= 80 ||
+
+(
+currentPhase === "PHASE_6_ACCELERATION" &&
+fragilityScore >= 80
+)
+
 ) {
 
 return {
+
+instrument: "NASDAQ_PUT",
+
+direction: "SHORT",
+
 action: "REDUCE HARD",
+
 sizeReduction: 70,
+
 reason:
-"Crash peak zone"
+"Crash climax / high reversal risk",
+
+priority: "HIGH"
+
 };
 }
 
@@ -124,70 +177,229 @@ VOLATILITY CLIMAX
 ===================================================== */
 
 if (
-vix > 34
+
+dangerScore >= 70 &&
+
+fragilityScore >= 75 &&
+
+crashProbability >= 60
+
 ) {
 
 return {
+
+instrument: "NASDAQ_PUT",
+
+direction: "SHORT",
+
 action: "TRIM FAST",
+
 sizeReduction: 50,
+
 reason:
-"Volatility climax"
+"Volatility climax detected",
+
+priority: "HIGH"
+
 };
 }
 
 /* =====================================================
-INTERNAL RECOVERY
+BULLISH REVERSAL AGAINST SHORT
 ===================================================== */
 
 if (
 
-breadth50 > 0.72 &&
+bullishImpulse &&
 
-decayScore < 25 &&
+ndxPriceScore >= 75 &&
+
+priceDirection === "UP"
+
+) {
+
+return {
+
+instrument: "NASDAQ_PUT",
+
+direction: "SHORT",
+
+action: "TRIM",
+
+sizeReduction: 50,
+
+reason:
+"Strong bullish NASDAQ reversal against short",
+
+priority: "HIGH"
+
+};
+}
+
+/* =====================================================
+STRUCTURAL RECOVERY
+===================================================== */
+
+if (
+
+masterScore >= 65 &&
+
+dangerScore < 40 &&
+
+fragilityScore < 55 &&
+
+decayScore < 45 &&
 
 participationScore >= 60 &&
 
-liquidityScore >= 55 &&
+rotationState === "CONFIRMED" &&
 
-pnl > 20
+tradeStrength < 40
 
 ) {
 
 return {
-action: "REDUCE",
-sizeReduction: 40,
+
+instrument: "NASDAQ_PUT",
+
+direction: "SHORT",
+
+action: "TRIM",
+
+sizeReduction: 35,
+
 reason:
-"Market internals stabilizing"
+"Internal market recovery weakening short thesis",
+
+priority: "MEDIUM"
+
 };
 }
 
 /* =====================================================
-SHORT SQUEEZE RISK
+ROTATION RECOVERY
 ===================================================== */
 
 if (
-vix < 18 &&
-breadth50 > 0.8 &&
-pnl > 15
+
+decayState === "HEALTHY_ROTATION" &&
+
+decayScore < 35 &&
+
+rotationState === "CONFIRMED" &&
+
+participationScore >= 65
+
 ) {
 
 return {
+
+instrument: "NASDAQ_PUT",
+
+direction: "SHORT",
+
 action: "TRIM",
-sizeReduction: 35,
+
+sizeReduction: 25,
+
 reason:
-"Squeeze/reversal risk rising"
+"Rotation recovery reduces short edge",
+
+priority: "MEDIUM"
+
 };
 }
 
 /* =====================================================
-HOLD
+PRICE RECOVERY
+===================================================== */
+
+if (
+
+ndxPriceScore >= 65 &&
+
+!bearishImpulse &&
+
+tradeStrength < 45
+
+) {
+
+return {
+
+instrument: "NASDAQ_PUT",
+
+direction: "SHORT",
+
+action: "TRIM",
+
+sizeReduction: 20,
+
+reason:
+"NASDAQ price recovery without sufficient short confirmation",
+
+priority: "LOW"
+
+};
+}
+
+/* =====================================================
+HOLD STRONG SHORT
+===================================================== */
+
+if (
+
+tradeStrength >= 60 &&
+
+(
+currentPhase === "PHASE_4_RISK" ||
+currentPhase === "PHASE_5_BREAKDOWN" ||
+currentPhase === "PHASE_6_ACCELERATION"
+) &&
+
+dangerScore >= 35 &&
+
+fragilityScore >= 55
+
+) {
+
+return {
+
+instrument: "NASDAQ_PUT",
+
+direction: "SHORT",
+
+action: "HOLD SHORT",
+
+sizeReduction: 0,
+
+reason:
+"Short thesis remains structurally supported",
+
+priority: "NORMAL"
+
+};
+}
+
+/* =====================================================
+DEFAULT
 ===================================================== */
 
 return {
-action: "HOLD SHORT",
-sizeReduction: 0,
-reason:
-"Downtrend intact"
-};
 
+instrument: "NASDAQ_PUT",
+
+direction: "SHORT",
+
+action: "HOLD SHORT",
+
+sizeReduction: 0,
+
+reason:
+tradeState !== "NEUTRAL"
+? "Current short structure remains valid"
+: "No confirmed short exit trigger",
+
+priority: "NORMAL"
+
+};
 }
