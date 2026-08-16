@@ -7,7 +7,10 @@ import { getSignalColor } from "@/lib/engine/colorEngine";
 export default function PositionSizingPanel({
 sizing,
 tradeStack,
-decision
+decision,
+master,
+russell,
+nasdaq
 }: any) {
 
 if (!sizing) return null;
@@ -16,86 +19,132 @@ if (!sizing) return null;
 SAFE INPUTS
 ===================================================== */
 
-const meta = sizing?.meta ?? {};
 const components = sizing?.components ?? {};
 const sizingModel = sizing?.sizingModel ?? {};
+const meta = sizing?.meta ?? {};
 
-const candidates =
-sizing?.candidates ??
-sizing?.positions ??
-[];
+const size = Number(sizing?.size ?? 0);
+const mode = sizing?.mode ?? "DEFENSIVE";
+const direction = sizing?.direction ?? "NEUTRAL";
 
-const primary =
-sizing?.primary ??
-sizing?.primaryFlow ??
-null;
+const base = Number(components?.base ?? 0);
+const edge = Number(components?.edge ?? 0);
+const opportunity = Number(components?.opportunity ?? 0);
 
-const sizingDirection =
-sizing?.direction ?? "NEUTRAL";
-
-const sizingMode =
-sizing?.mode ?? "DEFENSIVE";
-
-const finalSize =
-Number(sizing?.size ?? 0);
-
-const rawSize =
-Number(
-sizingModel?.rawSize ??
-components?.rawSize ??
-0
+const rawSize = Number(
+sizingModel?.rawSize ?? 0
 );
 
-const adjustedSize =
-Number(
-sizingModel?.adjustedSize ??
-0
+const adjustedSize = Number(
+sizingModel?.adjustedSize ?? 0
+);
+
+const maxSize = Number(
+sizingModel?.maxSize ?? 0
+);
+
+const tradeStrength = Number(
+meta?.tradeStrength ?? 0
+);
+
+const masterScore = Number(
+master?.score ?? 0
+);
+
+const rotationScore = Number(
+components?.rotationScore ?? 0
+);
+
+const crashProb = Number(
+components?.crashProb ?? 0
+);
+
+const liquidityScore = Number(
+components?.liquidityScore ?? 50
+);
+
+const fragilityScore = Number(
+components?.fragilityScore ?? 50
+);
+
+const participationScore = Number(
+components?.participationScore ?? 50
+);
+
+const marketQualityScore = Number(
+components?.marketQualityScore ?? 50
+);
+
+const rotationDecayScore = Number(
+components?.rotationDecayScore ?? 0
+);
+
+const persistenceScore = Number(
+components?.persistenceScore ?? 50
+);
+
+const regimeSyncScore = Number(
+components?.regimeSyncScore ?? 50
 );
 
 /* =====================================================
-HELPERS
+CONTEXT
 ===================================================== */
 
-function directionColor(direction: string) {
+const riskState =
+meta?.riskState ?? "N/A";
 
-if (direction === "SHORT")
+const dangerLevel =
+meta?.dangerLevel ?? "N/A";
+
+const masterMode =
+meta?.masterMode ?? "N/A";
+
+const healthyLiquidity =
+meta?.healthyLiquidity === true;
+
+const validatedThrust =
+meta?.validatedThrust === true;
+
+const poorMarketQuality =
+meta?.poorMarketQuality === true;
+
+const persistentWeakness =
+meta?.persistentWeakness === true;
+
+const narrowLeadership =
+meta?.narrowLeadership === true;
+
+const syntheticLiquidityRegime =
+meta?.syntheticLiquidityRegime === true;
+
+const internalDeterioration =
+meta?.internalDeterioration === true;
+
+const severeInternalBreakdown =
+meta?.severeInternalBreakdown === true;
+
+const fragileExpansion =
+meta?.fragileExpansion === true;
+
+/* =====================================================
+COLORS
+===================================================== */
+
+function directionColor(value: string) {
+
+if (value === "SHORT")
 return "#ff4d4f";
 
-if (direction === "LONG")
+if (value === "LONG")
 return "#52c41a";
 
 return "#777";
 }
 
-function stateColor(state: string) {
+function modeColor(value: string) {
 
-if (
-state === "SHORT_ATTACK" ||
-state === "SHORT_BUILDING"
-) {
-return "#ff4d4f";
-}
-
-if (
-state === "LONG_ATTACK" ||
-state === "LONG_BUILDING"
-) {
-return "#52c41a";
-}
-
-if (
-state === "EARLY_DEFENSIVE_SHORT" ||
-state === "EARLY_LONG"
-) {
-return "#fadb14";
-}
-
-return "#666";
-}
-
-function modeColor(mode: string) {
-
-switch (mode) {
+switch (value) {
 
 case "AGGRESSIVE":
 return "#ff4d4f";
@@ -117,137 +166,38 @@ return "#777";
 }
 }
 
-function instrumentLabel(instrument: string) {
+function edgeColor(value: number) {
 
-switch (instrument) {
+if (value >= 3)
+return "#52c41a";
 
-case "NASDAQ_PUT":
-return "NASDAQ PUT";
+if (value >= 1)
+return "#fadb14";
 
-case "NASDAQ_CALL":
-return "NASDAQ CALL";
+if (value > -2)
+return "#fa8c16";
 
-case "RUSSELL_CALL":
-return "RUSSELL CALL";
-
-default:
-return instrument;
-}
+return "#ff4d4f";
 }
 
-/* =====================================================
-CANDIDATE NORMALIZATION
-===================================================== */
-
-const normalizedCandidates = [
-
-...(Array.isArray(candidates)
-? candidates
-: []),
-
-sizing?.nasdaqPut,
-sizing?.nasdaqCall,
-sizing?.russellCall
-
-]
-.filter(Boolean)
-.reduce(
-(list: any[], candidate: any) => {
-
-const exists =
-list.some(
-item =>
-item.instrument === candidate.instrument
-);
-
-if (!exists)
-list.push(candidate);
-
-return list;
-
-},
-[]
-);
-
-/* =====================================================
-FALLBACK
-===================================================== */
-
-if (
-normalizedCandidates.length === 0 &&
-sizing?.direction
+function scoreColor(
+value: number,
+inverse = false
 ) {
 
-normalizedCandidates.push({
+if (inverse) {
 
-instrument:
-primary?.instrument ??
-"PRIMARY",
+if (value >= 75)
+return "#ff4d4f";
 
-direction:
-sizingDirection,
+if (value >= 55)
+return "#fa8c16";
 
-state:
-primary?.state ??
-"NEUTRAL",
-
-strength:
-Number(
-primary?.strength ??
-meta?.tradeStrength ??
-0
-),
-
-size:
-finalSize,
-
-recommendedSize:
-finalSize,
-
-role:
-"PRIMARY"
-
-});
-
+return "#52c41a";
 }
 
-/* =====================================================
-SORT
-===================================================== */
-
-normalizedCandidates.sort(
-(a, b) => {
-
-const aSize =
-Number(
-a?.recommendedSize ??
-a?.size ??
-0
-);
-
-const bSize =
-Number(
-b?.recommendedSize ??
-b?.size ??
-0
-);
-
-return bSize - aSize;
+return getSignalColor(value, 100);
 }
-);
-
-/* =====================================================
-PRIMARY INSTRUMENT
-===================================================== */
-
-const primaryInstrument =
-primary?.instrument ??
-sizing?.primaryInstrument ??
-normalizedCandidates.find(
-candidate =>
-candidate?.role === "PRIMARY"
-)?.instrument ??
-null;
 
 /* =====================================================
 ALIGNMENT
@@ -258,8 +208,122 @@ decision?.direction ?? "NEUTRAL";
 
 const aligned =
 decisionDirection === "NEUTRAL" ||
-sizingDirection === "NEUTRAL" ||
-decisionDirection === sizingDirection;
+direction === "NEUTRAL" ||
+decisionDirection === direction;
+
+/* =====================================================
+WHY SIZE IS LOW
+===================================================== */
+
+const blockers: string[] = [];
+
+if (edge <= -4)
+blockers.push("Strong negative edge");
+
+else if (edge < 0)
+blockers.push("Negative edge");
+
+if (crashProb >= 40)
+blockers.push("Elevated crash probability");
+
+if (fragilityScore >= 70)
+blockers.push("High structural fragility");
+
+if (liquidityScore < 40)
+blockers.push("Weak liquidity");
+
+if (participationScore < 40)
+blockers.push("Weak participation");
+
+if (marketQualityScore < 45)
+blockers.push("Poor market quality");
+
+if (rotationDecayScore >= 70)
+blockers.push("Rotation decay");
+
+if (persistentWeakness)
+blockers.push("Persistent weakness");
+
+if (narrowLeadership)
+blockers.push("Narrow leadership");
+
+if (syntheticLiquidityRegime)
+blockers.push("Synthetic liquidity");
+
+if (internalDeterioration)
+blockers.push("Internal deterioration");
+
+if (severeInternalBreakdown)
+blockers.push("Severe internal breakdown");
+
+if (fragileExpansion)
+blockers.push("Fragile expansion");
+
+/* =====================================================
+SIZING INTERPRETATION
+===================================================== */
+
+let sizeLabel = "NO SIZE";
+
+if (size >= 70)
+sizeLabel = "AGGRESSIVE";
+
+else if (size >= 50)
+sizeLabel = "ACTIVE";
+
+else if (size >= 30)
+sizeLabel = "PROBING";
+
+else if (size > 0)
+sizeLabel = "DEFENSIVE";
+
+/* =====================================================
+SMALL METRIC
+===================================================== */
+
+function Metric({
+label,
+value,
+color
+}: {
+label: string;
+value: string | number;
+color?: string;
+}) {
+
+return (
+
+<div
+style={{
+border: "1px solid #222",
+background: "#111",
+padding: "9px"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "9px",
+marginBottom: "5px"
+}}
+>
+{label}
+</div>
+
+<div
+style={{
+color: color ?? "#aaa",
+fontWeight: "bold",
+fontSize: "14px"
+}}
+>
+{value}
+</div>
+
+</div>
+);
+}
 
 /* =====================================================
 RENDER
@@ -271,7 +335,7 @@ return (
 style={{
 background: "#0d0d0d",
 border: "1px solid #222",
-padding: "16px"
+padding: "14px"
 }}
 >
 
@@ -290,9 +354,9 @@ marginBottom: "14px"
 
 <div
 style={{
-color: "#999",
+color: "#aaa",
 fontWeight: "bold",
-fontSize: "14px"
+fontSize: "13px"
 }}
 >
 POSITION SIZING
@@ -304,7 +368,7 @@ color:
 aligned
 ? "#52c41a"
 : "#ff4d4f",
-fontSize: "11px",
+fontSize: "10px",
 fontWeight: "bold"
 }}
 >
@@ -316,26 +380,29 @@ fontWeight: "bold"
 </div>
 
 {/* =================================================
-PRIMARY SUMMARY
+PRIMARY SIZE
 ================================================= */}
 
 <div
 style={{
-border: "1px solid #333",
+border:
+size > 0
+? `1px solid ${modeColor(mode)}`
+: "1px solid #333",
 background: "#111",
 padding: "14px",
-marginBottom: "14px"
+marginBottom: "12px"
 }}
 >
 
 <div
 style={{
 color: "#666",
-fontSize: "10px",
+fontSize: "9px",
 marginBottom: "5px"
 }}
 >
-PRIMARY FLOW
+FINAL ALLOCATION
 </div>
 
 <div
@@ -351,28 +418,23 @@ alignItems: "center"
 <div
 style={{
 color:
-primaryInstrument
-? "#ddd"
-: "#666",
-fontWeight: "bold",
-fontSize: "18px"
+directionColor(direction),
+fontSize: "16px",
+fontWeight: "bold"
 }}
 >
-{primaryInstrument
-? instrumentLabel(primaryInstrument)
-: "NO PRIMARY TRADE"}
+{direction}
 </div>
 
 <div
 style={{
-color: directionColor(
-sizingDirection
-),
-fontSize: "12px",
-marginTop: "4px"
+color: modeColor(mode),
+fontSize: "10px",
+marginTop: "4px",
+fontWeight: "bold"
 }}
 >
-{sizingDirection}
+{sizeLabel}
 </div>
 
 </div>
@@ -386,27 +448,21 @@ textAlign: "right"
 <div
 style={{
 color:
-getSignalColor(
-finalSize,
-100
-),
-fontSize: "28px",
+getSignalColor(size, 100),
+fontSize: "30px",
 fontWeight: "bold"
 }}
 >
-{finalSize}%
+{size}%
 </div>
 
 <div
 style={{
-color:
-modeColor(
-sizingMode
-),
-fontSize: "11px"
+color: "#555",
+fontSize: "9px"
 }}
 >
-{sizingMode}
+MAX {maxSize}%
 </div>
 
 </div>
@@ -416,159 +472,58 @@ fontSize: "11px"
 </div>
 
 {/* =================================================
-THREE-WAY TRADE MAP
+EDGE
 ================================================= */}
 
 <div
 style={{
-color: "#999",
-fontSize: "11px",
-fontWeight: "bold",
-marginBottom: "8px"
-}}
->
-TRADE ALLOCATION
-</div>
-
-<div
-style={{
-display: "grid",
-gridTemplateColumns:
-"repeat(3, 1fr)",
-gap: "8px",
-marginBottom: "16px"
-}}
->
-
-{normalizedCandidates.map(
-(candidate: any) => {
-
-const size =
-Number(
-candidate?.recommendedSize ??
-candidate?.size ??
-0
-);
-
-const strength =
-Number(
-candidate?.strength ??
-0
-);
-
-const instrument =
-candidate?.instrument ??
-"UNKNOWN";
-
-const state =
-candidate?.state ??
-"NEUTRAL";
-
-const isPrimary =
-instrument ===
-primaryInstrument;
-
-return (
-
-<div
-key={instrument}
-style={{
 border:
-isPrimary
-? `1px solid ${stateColor(state)}`
-: "1px solid #222",
-
-background:
-isPrimary
-? "#151515"
-: "#111",
-
-padding: "10px"
+`1px solid ${edgeColor(edge)}`,
+background: "#111",
+padding: "12px",
+marginBottom: "12px"
 }}
 >
-
-<div
-style={{
-color: "#777",
-fontSize: "9px",
-marginBottom: "7px"
-}}
->
-{instrumentLabel(
-instrument
-)}
-</div>
-
-<div
-style={{
-color:
-directionColor(
-candidate?.direction
-),
-fontSize: "11px",
-fontWeight: "bold"
-}}
->
-{candidate?.direction ??
-"NEUTRAL"}
-</div>
-
-<div
-style={{
-color:
-stateColor(state),
-fontSize: "11px",
-marginTop: "3px"
-}}
->
-{state}
-</div>
-
-<div
-style={{
-color:
-size > 0
-? "#ddd"
-: "#555",
-fontSize: "22px",
-fontWeight: "bold",
-marginTop: "8px"
-}}
->
-{size}%
-</div>
 
 <div
 style={{
 color: "#666",
 fontSize: "9px",
-marginTop: "3px"
+marginBottom: "5px"
 }}
 >
-strength {strength}
+CENTRAL EDGE
 </div>
-
-{isPrimary && (
 
 <div
 style={{
-color: "#40a9ff",
-fontSize: "9px",
-marginTop: "6px",
+display: "flex",
+justifyContent: "space-between",
+alignItems: "baseline"
+}}
+>
+
+<div
+style={{
+color: edgeColor(edge),
+fontSize: "24px",
 fontWeight: "bold"
 }}
 >
-PRIMARY
+{edge > 0 ? "+" : ""}
+{edge.toFixed(1)}
 </div>
 
-)}
-
+<div
+style={{
+color: "#777",
+fontSize: "10px"
+}}
+>
+Base {base} / Opportunity +{opportunity}
 </div>
 
-);
-
-}
-)}
+</div>
 
 </div>
 
@@ -581,16 +536,16 @@ style={{
 border: "1px solid #222",
 background: "#111",
 padding: "12px",
-marginBottom: "14px"
+marginBottom: "12px"
 }}
 >
 
 <div
 style={{
 color: "#999",
-fontSize: "11px",
+fontSize: "10px",
 fontWeight: "bold",
-marginBottom: "9px"
+marginBottom: "10px"
 }}
 >
 SIZING PIPELINE
@@ -598,44 +553,270 @@ SIZING PIPELINE
 
 <div
 style={{
-display: "flex",
-justifyContent: "space-between",
-color: "#aaa",
-marginBottom: "5px"
+display: "grid",
+gridTemplateColumns:
+"repeat(3, 1fr)",
+gap: "7px"
 }}
 >
-<span>Raw Size</span>
-<span>{rawSize}%</span>
-</div>
 
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-color: "#aaa",
-marginBottom: "5px"
-}}
->
-<span>Risk Adjusted</span>
-<span>{adjustedSize}%</span>
-</div>
+<Metric
+label="RAW SIZE"
+value={`${rawSize}%`}
+/>
 
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-color: "#ddd",
-fontWeight: "bold"
-}}
->
-<span>Final Size</span>
-<span>{finalSize}%</span>
+<Metric
+label="RISK ADJUSTED"
+value={`${adjustedSize}%`}
+/>
+
+<Metric
+label="FINAL SIZE"
+value={`${size}%`}
+color={getSignalColor(size, 100)}
+/>
+
 </div>
 
 </div>
 
 {/* =================================================
-SYSTEM CONTEXT
+ENGINE COMPONENTS
+================================================= */}
+
+<div
+style={{
+color: "#999",
+fontSize: "10px",
+fontWeight: "bold",
+marginBottom: "8px"
+}}
+>
+ENGINE INPUTS
+</div>
+
+<div
+style={{
+display: "grid",
+gridTemplateColumns:
+"repeat(4, 1fr)",
+gap: "6px",
+marginBottom: "12px"
+}}
+>
+
+<Metric
+label="MASTER"
+value={masterScore}
+color={scoreColor(masterScore)}
+/>
+
+<Metric
+label="ROTATION"
+value={rotationScore}
+color={scoreColor(rotationScore)}
+/>
+
+<Metric
+label="LIQUIDITY"
+value={liquidityScore}
+color={scoreColor(liquidityScore)}
+/>
+
+<Metric
+label="QUALITY"
+value={marketQualityScore}
+color={scoreColor(marketQualityScore)}
+/>
+
+<Metric
+label="PARTICIPATION"
+value={participationScore}
+color={scoreColor(participationScore)}
+/>
+
+<Metric
+label="FRAGILITY"
+value={fragilityScore}
+color={scoreColor(fragilityScore, true)}
+/>
+
+<Metric
+label="ROT. DECAY"
+value={rotationDecayScore}
+color={scoreColor(rotationDecayScore, true)}
+/>
+
+<Metric
+label="PERSISTENCE"
+value={persistenceScore}
+color={scoreColor(persistenceScore, true)}
+/>
+
+</div>
+
+{/* =================================================
+VALIDATION FLAGS
+================================================= */}
+
+<div
+style={{
+border: "1px solid #222",
+background: "#111",
+padding: "10px",
+marginBottom: "12px"
+}}
+>
+
+<div
+style={{
+color: "#999",
+fontSize: "10px",
+fontWeight: "bold",
+marginBottom: "8px"
+}}
+>
+VALIDATION
+</div>
+
+<div
+style={{
+display: "grid",
+gridTemplateColumns:
+"repeat(2, 1fr)",
+gap: "5px",
+fontSize: "9px"
+}}
+>
+
+<Flag
+label="HEALTHY LIQUIDITY"
+active={healthyLiquidity}
+/>
+
+<Flag
+label="VALIDATED THRUST"
+active={validatedThrust}
+/>
+
+<Flag
+label="POOR MARKET QUALITY"
+active={poorMarketQuality}
+negative
+/>
+
+<Flag
+label="PERSISTENT WEAKNESS"
+active={persistentWeakness}
+negative
+/>
+
+<Flag
+label="NARROW LEADERSHIP"
+active={narrowLeadership}
+negative
+/>
+
+<Flag
+label="SYNTHETIC LIQUIDITY"
+active={syntheticLiquidityRegime}
+negative
+/>
+
+<Flag
+label="INTERNAL DETERIORATION"
+active={internalDeterioration}
+negative
+/>
+
+<Flag
+label="SEVERE BREAKDOWN"
+active={severeInternalBreakdown}
+negative
+/>
+
+</div>
+
+</div>
+
+{/* =================================================
+WHY SIZE
+================================================= */}
+
+<div
+style={{
+border:
+blockers.length > 0
+? "1px solid #5a2525"
+: "1px solid #244d2c",
+background: "#111",
+padding: "10px",
+marginBottom: "10px"
+}}
+>
+
+<div
+style={{
+color: "#999",
+fontSize: "10px",
+fontWeight: "bold",
+marginBottom: "7px"
+}}
+>
+SIZING DIAGNOSTIC
+</div>
+
+{blockers.length === 0 ? (
+
+<div
+style={{
+color: "#52c41a",
+fontSize: "10px"
+}}
+>
+No major structural sizing blocker.
+</div>
+
+) : (
+
+<div
+style={{
+display: "flex",
+flexWrap: "wrap",
+gap: "5px"
+}}
+>
+
+{blockers.slice(0, 6).map(
+(blocker) => (
+
+<span
+key={blocker}
+style={{
+border:
+"1px solid #542525",
+background:
+"#1a1010",
+color: "#ff7875",
+padding:
+"4px 6px",
+fontSize: "9px"
+}}
+>
+{blocker}
+</span>
+
+)
+)}
+
+</div>
+
+)}
+
+</div>
+
+{/* =================================================
+FOOTER CONTEXT
 ================================================= */}
 
 <div
@@ -643,77 +824,81 @@ style={{
 display: "grid",
 gridTemplateColumns:
 "repeat(4, 1fr)",
-gap: "8px",
-fontSize: "10px"
+gap: "6px",
+color: "#666",
+fontSize: "9px"
 }}
 >
+
+<Metric
+label="TRADE STRENGTH"
+value={tradeStrength}
+/>
+
+<Metric
+label="REGIME SYNC"
+value={regimeSyncScore}
+/>
+
+<Metric
+label="CRASH PROB."
+value={`${crashProb}%`}
+/>
+
+<Metric
+label="RISK"
+value={riskState}
+/>
+
+</div>
+
+</div>
+);
+}
+
+
+/* =====================================================
+FLAG
+===================================================== */
+
+function Flag({
+label,
+active,
+negative = false
+}: {
+label: string;
+active: boolean;
+negative?: boolean;
+}) {
+
+let color = "#444";
+
+if (active) {
+color = negative
+? "#ff4d4f"
+: "#52c41a";
+}
+
+return (
 
 <div
 style={{
-border: "1px solid #222",
-padding: "8px",
-background: "#111"
+border:
+`1px solid ${color}`,
+padding: "5px 6px",
+color:
+active
+? color
+: "#555",
+background:
+active
+? negative
+? "#180f0f"
+: "#0f1810"
+: "#111"
 }}
 >
-<div style={{ color: "#666" }}>
-EDGE
-</div>
-<div style={{ color: "#aaa" }}>
-{Number(
-meta?.edgeScore ??
-components?.edge ??
-0
-)}
-</div>
-</div>
-
-<div
-style={{
-border: "1px solid #222",
-padding: "8px",
-background: "#111"
-}}
->
-<div style={{ color: "#666" }}>
-RISK
-</div>
-<div style={{ color: "#aaa" }}>
-{meta?.riskState ?? "N/A"}
-</div>
-</div>
-
-<div
-style={{
-border: "1px solid #222",
-padding: "8px",
-background: "#111"
-}}
->
-<div style={{ color: "#666" }}>
-DANGER
-</div>
-<div style={{ color: "#aaa" }}>
-{meta?.dangerLevel ?? "N/A"}
-</div>
-</div>
-
-<div
-style={{
-border: "1px solid #222",
-padding: "8px",
-background: "#111"
-}}
->
-<div style={{ color: "#666" }}>
-MASTER
-</div>
-<div style={{ color: "#aaa" }}>
-{meta?.masterMode ?? "N/A"}
-</div>
-</div>
-
-</div>
-
+{active ? "●" : "○"} {label}
 </div>
 
 );
