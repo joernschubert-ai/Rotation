@@ -1,5 +1,3 @@
-// /components/PositionSizingPanel.tsx
-
 "use client";
 
 import { getSignalColor } from "@/lib/engine/colorEngine";
@@ -13,21 +11,6 @@ decision
 if (!sizing) return null;
 
 /* =====================================================
-SAFE OBJECTS
-===================================================== */
-
-const components = sizing?.components ?? {};
-const meta = sizing?.meta ?? {};
-const sizingModel = sizing?.sizingModel ?? {};
-
-const candidates =
-Array.isArray(sizing?.candidates)
-? sizing.candidates
-: Array.isArray(sizing?.positions)
-? sizing.positions
-: [];
-
-/* =====================================================
 HELPERS
 ===================================================== */
 
@@ -39,237 +22,23 @@ const n = Number(value);
 return Number.isFinite(n) ? n : fallback;
 }
 
-/*
-* IMPORTANT:
-*
-* PositionSizingV2 writes its validated engine values
-* into components.
-*
-* Therefore:
-*
-* components -> meta -> top-level -> fallback
-*
-* We NEVER silently use 50 for a missing engine value.
-*/
+function nullable(
+value: any
+): number | null {
+const n = Number(value);
+return Number.isFinite(n) ? n : null;
+}
 
-function readMetric(
-componentKeys: string[],
-metaKeys: string[] = [],
-topLevelKeys: string[] = [],
-fallback = 0
+function display(
+value: any,
+suffix = ""
 ) {
+const n = nullable(value);
 
-for (const key of componentKeys) {
-if (
-components[key] !== undefined &&
-components[key] !== null
-) {
-return num(components[key], fallback);
+return n === null
+? "—"
+: `${n}${suffix}`;
 }
-}
-
-for (const key of metaKeys) {
-if (
-meta[key] !== undefined &&
-meta[key] !== null
-) {
-return num(meta[key], fallback);
-}
-}
-
-for (const key of topLevelKeys) {
-if (
-sizing[key] !== undefined &&
-sizing[key] !== null
-) {
-return num(sizing[key], fallback);
-}
-}
-
-return fallback;
-}
-
-/* =====================================================
-CORE SIZING VALUES
-===================================================== */
-
-const finalSize =
-num(sizing?.size);
-
-const rawSize =
-num(
-sizingModel?.rawSize,
-num(components?.rawSize)
-);
-
-const adjustedSize =
-num(
-sizingModel?.adjustedSize,
-num(components?.adjustedSize)
-);
-
-const maxSize =
-num(sizingModel?.maxSize);
-
-const edge =
-num(
-components?.edge,
-num(meta?.edgeScore)
-);
-
-const opportunity =
-num(components?.opportunity);
-
-/* =====================================================
-ENGINE INPUTS
-===================================================== */
-
-const masterScore =
-readMetric(
-["masterScore"],
-["masterScore"],
-["masterScore"]
-);
-
-const rotationScore =
-readMetric(
-["rotationScore"],
-[],
-["rotationScore"]
-);
-
-const crashProb =
-readMetric(
-["crashProb"],
-["crashProbability"],
-["crashProb", "crashProbability"]
-);
-
-const liquidityScore =
-readMetric(
-["liquidityScore", "liquidity"],
-["liquidityScore"],
-["liquidityScore"]
-);
-
-const participationScore =
-readMetric(
-["participationScore", "participation"],
-["participationScore"],
-["participationScore"]
-);
-
-const fragilityScore =
-readMetric(
-["fragilityScore", "fragility"],
-["fragilityScore"],
-["fragilityScore"]
-);
-
-const squeezeRisk =
-readMetric(
-["squeezeRisk", "squeeze"],
-["squeezeRisk"],
-["squeezeRisk"]
-);
-
-const rotationDecayScore =
-readMetric(
-["rotationDecayScore", "rotationDecay"],
-["rotationDecayScore"],
-["rotationDecayScore"]
-);
-
-const breadthVelocityScore =
-readMetric(
-["breadthVelocityScore", "breadthVelocity"],
-["breadthVelocityScore"],
-["breadthVelocityScore"]
-);
-
-const marketQualityScore =
-readMetric(
-["marketQualityScore", "marketQuality"],
-["marketQualityScore"],
-["marketQualityScore"]
-);
-
-const persistenceScore =
-readMetric(
-["persistenceScore", "regimePersistence"],
-["persistenceScore"],
-["persistenceScore"]
-);
-
-const thrustStrength =
-readMetric(
-["thrustStrength", "breadthThrust"],
-["thrustStrength"],
-["thrustStrength"]
-);
-
-/* =====================================================
-META / STATE
-===================================================== */
-
-const sizingDirection =
-sizing?.direction ?? "NEUTRAL";
-
-const sizingMode =
-sizing?.mode ?? "DEFENSIVE";
-
-const riskState =
-meta?.riskState ??
-sizing?.riskState ??
-"N/A";
-
-const dangerLevel =
-meta?.dangerLevel ??
-sizing?.dangerLevel ??
-"N/A";
-
-const masterMode =
-meta?.masterMode ??
-"N/A";
-
-const tradeStrength =
-num(
-meta?.tradeStrength,
-num(
-tradeStack?.tradeStrength,
-num(tradeStack?.strength)
-)
-);
-
-const primary =
-sizing?.primary ??
-sizing?.primaryFlow ??
-null;
-
-const primaryInstrument =
-primary?.instrument ??
-sizing?.primaryInstrument ??
-candidates.find(
-(candidate: any) =>
-candidate?.role === "PRIMARY"
-)?.instrument ??
-null;
-
-/* =====================================================
-ALIGNMENT
-===================================================== */
-
-const decisionDirection =
-decision?.direction ?? "NEUTRAL";
-
-const aligned =
-decisionDirection === "NEUTRAL" ||
-sizingDirection === "NEUTRAL" ||
-decisionDirection === sizingDirection;
-
-/* =====================================================
-COLORS
-===================================================== */
 
 function directionColor(
 direction: string
@@ -293,37 +62,48 @@ switch (mode) {
 case "AGGRESSIVE":
 return "#ff4d4f";
 
-case "ACTIVE":
+case "MODERATE":
 return "#fa8c16";
 
-case "PROBING":
-return "#fadb14";
-
 case "DEFENSIVE":
-return "#52c41a";
+return "#fadb14";
 
 case "CAPITAL_PRESERVATION":
 return "#ff7875";
 
+case "STARTER":
+return "#52c41a";
+
+case "NO_TRADE":
+return "#666";
+
 default:
-return "#777";
+return "#aaa";
 }
 }
 
 function metricColor(
-value: number,
+value: any,
 inverse = false
 ) {
 
+const n = nullable(value);
+
+if (n === null)
+return "#555";
+
 const v =
-Math.max(0, Math.min(100, value));
+Math.max(
+0,
+Math.min(100, n)
+);
 
 if (inverse) {
 
-if (v >= 75)
+if (v >= 80)
 return "#ff4d4f";
 
-if (v >= 55)
+if (v >= 60)
 return "#fa8c16";
 
 if (v >= 40)
@@ -364,8 +144,132 @@ return instrument;
 }
 }
 
+function stateLabel(
+state: string
+) {
+
+if (!state)
+return "—";
+
+return state
+.replaceAll("_", " ");
+}
+
+
 /* =====================================================
-METRIC ROW
+V3 ENGINE OBJECTS
+===================================================== */
+
+const portfolio =
+sizing?.portfolio ?? {};
+
+const risk =
+sizing?.risk ?? {};
+
+const components =
+sizing?.components ?? {};
+
+const pipeline =
+sizing?.pipeline ?? {};
+
+const flowPipeline =
+sizing?.flowPipeline ?? {};
+
+const meta =
+sizing?.meta ?? {};
+
+
+/* =====================================================
+THREE INDEPENDENT FLOWS
+
+IMPORTANT:
+
+These come directly from positionSizingV2.
+
+No PRIMARY selection.
+No candidate fallback.
+No recalculation.
+===================================================== */
+
+const nasdaqPut =
+sizing?.nasdaqPut ?? {};
+
+const nasdaqCall =
+sizing?.nasdaqCall ?? {};
+
+const russellCall =
+sizing?.russellCall ?? {};
+
+
+const flows = [
+nasdaqPut,
+nasdaqCall,
+russellCall
+];
+
+
+/* =====================================================
+GLOBAL VALUES
+===================================================== */
+
+const totalSize =
+num(
+sizing?.size,
+num(portfolio?.totalSize)
+);
+
+const direction =
+sizing?.direction ??
+portfolio?.direction ??
+"NEUTRAL";
+
+const mode =
+sizing?.mode ??
+"NO_TRADE";
+
+
+const portfolioRaw =
+num(
+portfolio?.rawSize
+);
+
+const portfolioCap =
+num(
+portfolio?.cap
+);
+
+const portfolioScale =
+num(
+portfolio?.scale,
+1
+);
+
+const activeFlowCount =
+num(
+portfolio?.activeFlows
+);
+
+
+/* =====================================================
+DECISION ALIGNMENT
+
+Only informational.
+
+Position sizing itself remains authoritative.
+===================================================== */
+
+const decisionDirection =
+decision?.direction ??
+"NEUTRAL";
+
+const aligned =
+decisionDirection === "NEUTRAL" ||
+direction === "NEUTRAL" ||
+decisionDirection === direction;
+
+
+/* =====================================================
+METRIC COMPONENT
 ===================================================== */
 
 function Metric({
@@ -374,9 +278,12 @@ value,
 inverse = false
 }: {
 label: string;
-value: number;
+value: any;
 inverse?: boolean;
 }) {
+
+const n =
+nullable(value);
 
 return (
 <div
@@ -390,7 +297,7 @@ padding: "9px"
 <div
 style={{
 color: "#666",
-fontSize: "9px",
+fontSize: "8px",
 marginBottom: "4px"
 }}
 >
@@ -399,54 +306,313 @@ marginBottom: "4px"
 
 <div
 style={{
-color: metricColor(value, inverse),
-fontSize: "18px",
+color:
+metricColor(
+n,
+inverse
+),
+fontSize: "17px",
 fontWeight: "bold"
 }}
 >
-{value}
+{display(n)}
 </div>
 
 </div>
 );
 }
+
 
 /* =====================================================
-CANDIDATES
+FLOW CARD
 ===================================================== */
 
-const normalizedCandidates = [
-...candidates,
-sizing?.nasdaqPut,
-sizing?.nasdaqCall,
-sizing?.russellCall
-]
-.filter(Boolean)
-.reduce(
-(list: any[], candidate: any) => {
+function FlowCard({
+flow
+}: {
+flow: any;
+}) {
 
-if (
-!list.some(
-item =>
-item?.instrument ===
-candidate?.instrument
+const instrument =
+flow?.instrument ??
+"UNKNOWN";
+
+const flowDirection =
+flow?.direction ??
+"NONE";
+
+const eligible =
+flow?.eligible === true;
+
+const size =
+num(flow?.size);
+
+const strength =
+flow?.strength;
+
+const confidence =
+flow?.confidence;
+
+const rawSize =
+flow?.rawSize;
+
+const prePortfolioSize =
+flow?.prePortfolioSize;
+
+const riskMultiplier =
+flow?.riskMultiplier;
+
+const flowMode =
+flow?.mode ??
+"NO_TRADE";
+
+const state =
+flow?.state ??
+"NEUTRAL";
+
+const reason =
+flow?.reason ??
+"—";
+
+
+return (
+
+<div
+style={{
+border:
+eligible && size > 0
+? "1px solid #333"
+: "1px solid #1d1d1d",
+
+background:
+eligible && size > 0
+? "#111"
+: "#0d0d0d",
+
+padding: "12px"
+}}
+>
+
+{/* ---------------------------------------------
+HEADER
+--------------------------------------------- */}
+
+<div
+style={{
+display: "flex",
+justifyContent: "space-between",
+alignItems: "center",
+marginBottom: "9px"
+}}
+>
+
+<div>
+
+<div
+style={{
+color: "#ddd",
+fontSize: "12px",
+fontWeight: "bold"
+}}
+>
+{instrumentLabel(
+instrument
+)}
+</div>
+
+<div
+style={{
+color:
+directionColor(
+flowDirection
+),
+fontSize: "9px",
+fontWeight: "bold",
+marginTop: "3px"
+}}
+>
+{flowDirection}
+</div>
+
+</div>
+
+
+<div
+style={{
+textAlign: "right"
+}}
+>
+
+<div
+style={{
+color:
+size > 0
+? getSignalColor(
+size,
+100
 )
-) {
-list.push(candidate);
+: "#555",
+
+fontSize: "25px",
+fontWeight: "bold"
+}}
+>
+{size}%
+</div>
+
+<div
+style={{
+color:
+modeColor(
+flowMode
+),
+fontSize: "8px",
+fontWeight: "bold"
+}}
+>
+{flowMode}
+</div>
+
+</div>
+
+</div>
+
+
+{/* ---------------------------------------------
+STATUS
+--------------------------------------------- */}
+
+<div
+style={{
+borderTop: "1px solid #222",
+paddingTop: "7px",
+marginBottom: "8px"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "8px"
+}}
+>
+STATE
+</div>
+
+<div
+style={{
+color:
+eligible
+? "#aaa"
+: "#555",
+
+fontSize: "9px",
+fontWeight: "bold",
+marginTop: "2px"
+}}
+>
+{stateLabel(state)}
+</div>
+
+</div>
+
+
+{/* ---------------------------------------------
+FLOW METRICS
+--------------------------------------------- */}
+
+<div
+style={{
+display: "grid",
+gridTemplateColumns:
+"repeat(3, 1fr)",
+gap: "6px"
+}}
+>
+
+<Metric
+label="STRENGTH"
+value={strength}
+/>
+
+<Metric
+label="CONFIDENCE"
+value={confidence}
+/>
+
+<Metric
+label="RISK"
+value={
+riskMultiplier !== undefined
+? Math.round(
+num(
+riskMultiplier
+) * 100
+)
+: null
+}
+/>
+
+<Metric
+label="RAW"
+value={rawSize}
+/>
+
+<Metric
+label="PRE-CAP"
+value={prePortfolioSize}
+/>
+
+<Metric
+label="FINAL"
+value={size}
+/>
+
+</div>
+
+
+{/* ---------------------------------------------
+REASON
+--------------------------------------------- */}
+
+<div
+style={{
+marginTop: "8px",
+paddingTop: "7px",
+borderTop: "1px solid #1d1d1d"
+}}
+>
+
+<div
+style={{
+color: "#555",
+fontSize: "8px"
+}}
+>
+ENGINE
+</div>
+
+<div
+style={{
+color:
+eligible
+? "#777"
+: "#555",
+
+fontSize: "8px",
+lineHeight: "1.4",
+marginTop: "2px"
+}}
+>
+{reason}
+</div>
+
+</div>
+
+</div>
+);
 }
 
-return list;
-
-},
-[]
-);
-
-/*
-* If the new sizing engine does not yet return
-* candidate objects, do NOT invent allocations.
-*
-* We display the primary sizing only.
-*/
 
 /* =====================================================
 RENDER
@@ -482,8 +648,9 @@ fontWeight: "bold",
 fontSize: "13px"
 }}
 >
-POSITION SIZING
+POSITIONIERUNG
 </div>
+
 
 <div
 style={{
@@ -491,7 +658,8 @@ color:
 aligned
 ? "#52c41a"
 : "#ff4d4f",
-fontSize: "10px",
+
+fontSize: "9px",
 fontWeight: "bold"
 }}
 >
@@ -504,7 +672,7 @@ fontWeight: "bold"
 
 
 {/* =================================================
-PRIMARY ALLOCATION
+GLOBAL POSITION
 ================================================= */}
 
 <div
@@ -519,17 +687,20 @@ marginBottom: "12px"
 <div
 style={{
 color: "#666",
-fontSize: "9px",
-marginBottom: "6px"
+fontSize: "8px",
+marginBottom: "7px"
 }}
 >
-FINAL ALLOCATION
+PORTFOLIO POSITION
 </div>
+
 
 <div
 style={{
-display: "flex",
-justifyContent: "space-between",
+display: "grid",
+gridTemplateColumns:
+"2fr 1fr 1fr",
+gap: "10px",
 alignItems: "center"
 }}
 >
@@ -539,34 +710,63 @@ alignItems: "center"
 <div
 style={{
 color:
-primaryInstrument
-? "#ddd"
-: "#666",
-fontWeight: "bold",
-fontSize: "16px"
+directionColor(
+direction
+),
+fontSize: "16px",
+fontWeight: "bold"
 }}
 >
-{primaryInstrument
-? instrumentLabel(
-primaryInstrument
-)
-: "NO PRIMARY TRADE"}
+{direction}
 </div>
 
 <div
 style={{
-color:
-directionColor(
-sizingDirection
-),
-fontSize: "11px",
+color: "#666",
+fontSize: "8px",
 marginTop: "3px"
 }}
 >
-{sizingDirection}
+{activeFlowCount} ACTIVE FLOW
+{activeFlowCount === 1
+? ""
+: "S"}
 </div>
 
 </div>
+
+
+<div
+style={{
+textAlign: "center"
+}}
+>
+
+<div
+style={{
+color:
+getSignalColor(
+totalSize,
+100
+),
+fontSize: "25px",
+fontWeight: "bold"
+}}
+>
+{totalSize}%
+</div>
+
+<div
+style={{
+color: "#666",
+fontSize: "8px"
+}}
+>
+FINAL
+</div>
+
+</div>
+
 
 <div
 style={{
@@ -577,131 +777,26 @@ textAlign: "right"
 <div
 style={{
 color:
-getSignalColor(
-finalSize,
-100
-),
-fontSize: "28px",
-fontWeight: "bold"
-}}
->
-{finalSize}%
-</div>
-
-<div
-style={{
-color:
 modeColor(
-sizingMode
+mode
 ),
-fontSize: "10px"
-}}
->
-{sizingMode}
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-
-{/* =================================================
-SIZING PIPELINE
-================================================= */}
-
-<div
-style={{
-border: "1px solid #222",
-background: "#111",
-padding: "11px",
-marginBottom: "12px"
-}}
->
-
-<div
-style={{
-color: "#999",
 fontSize: "10px",
-fontWeight: "bold",
-marginBottom: "8px"
-}}
->
-SIZING PIPELINE
-</div>
-
-<div
-style={{
-display: "grid",
-gridTemplateColumns:
-"repeat(3, 1fr)",
-gap: "8px"
-}}
->
-
-<div>
-<div
-style={{
-color: "#666",
-fontSize: "8px"
-}}
->
-RAW SIZE
-</div>
-
-<div
-style={{
-color: "#aaa",
 fontWeight: "bold"
 }}
 >
-{rawSize}%
-</div>
-</div>
-
-<div>
-<div
-style={{
-color: "#666",
-fontSize: "8px"
-}}
->
-RISK ADJUSTED
+{mode}
 </div>
 
 <div
 style={{
-color: "#aaa",
-fontWeight: "bold"
+color: "#555",
+fontSize: "8px",
+marginTop: "3px"
 }}
 >
-{adjustedSize}%
-</div>
+SIZING V3
 </div>
 
-<div>
-<div
-style={{
-color: "#ddd",
-fontSize: "8px"
-}}
->
-FINAL
-</div>
-
-<div
-style={{
-color:
-getSignalColor(
-finalSize,
-100
-),
-fontWeight: "bold"
-}}
->
-{finalSize}%
-</div>
 </div>
 
 </div>
@@ -710,7 +805,7 @@ fontWeight: "bold"
 
 
 {/* =================================================
-ENGINE INPUTS
+THREE FLOWS
 ================================================= */}
 
 <div
@@ -721,8 +816,233 @@ fontWeight: "bold",
 marginBottom: "7px"
 }}
 >
-ENGINE INPUTS
+INDEPENDENT FLOWS
 </div>
+
+
+<div
+style={{
+display: "grid",
+gridTemplateColumns:
+"repeat(3, 1fr)",
+gap: "8px",
+marginBottom: "12px"
+}}
+>
+
+{flows.map(
+(
+flow: any,
+index: number
+) => (
+
+<FlowCard
+key={
+flow?.instrument ??
+index
+}
+flow={flow}
+/>
+
+)
+)}
+
+</div>
+
+
+{/* =================================================
+PORTFOLIO LAYER
+================================================= */}
+
+<div
+style={{
+color: "#999",
+fontSize: "10px",
+fontWeight: "bold",
+marginBottom: "7px"
+}}
+>
+PORTFOLIO LAYER
+</div>
+
+
+<div
+style={{
+display: "grid",
+gridTemplateColumns:
+"repeat(4, 1fr)",
+gap: "7px",
+marginBottom: "12px"
+}}
+>
+
+<Metric
+label="RAW TOTAL"
+value={portfolioRaw}
+/>
+
+<Metric
+label="CAP"
+value={portfolioCap}
+/>
+
+<Metric
+label="SCALE"
+value={
+Math.round(
+portfolioScale * 100
+)
+}
+/>
+
+<Metric
+label="FINAL"
+value={totalSize}
+/>
+
+</div>
+
+
+{/* =================================================
+RISK
+================================================= */}
+
+<div
+style={{
+color: "#999",
+fontSize: "10px",
+fontWeight: "bold",
+marginBottom: "7px"
+}}
+>
+GLOBAL RISK
+</div>
+
+
+<div
+style={{
+display: "grid",
+gridTemplateColumns:
+"repeat(4, 1fr)",
+gap: "7px",
+marginBottom: "12px"
+}}
+>
+
+<Metric
+label="GLOBAL RISK"
+value={
+num(
+risk?.globalMultiplier
+) * 100
+}
+/>
+
+<Metric
+label="CRASH PROB"
+value={
+risk?.crashProbability
+}
+inverse
+/>
+
+<Metric
+label="DANGER"
+value={
+risk?.dangerScore
+}
+inverse
+/>
+
+<Metric
+label="HEAT"
+value={
+Math.abs(
+num(
+risk?.heat
+)
+) * 50
+}
+inverse
+/>
+
+<Metric
+label="LIQUIDITY"
+value={
+risk?.liquidityScore
+}
+/>
+
+<Metric
+label="FRAGILITY"
+value={
+risk?.fragilityScore
+}
+inverse
+/>
+
+<Metric
+label="PARTICIPATION"
+value={
+risk?.participationScore
+}
+/>
+
+<Metric
+label="QUALITY"
+value={
+risk?.marketQualityScore
+}
+/>
+
+<Metric
+label="ROT. DECAY"
+value={
+risk?.rotationDecayScore
+}
+inverse
+/>
+
+<Metric
+label="ROT. CONFIRM"
+value={
+risk?.rotationConfidence
+}
+/>
+
+<Metric
+label="REGIME SYNC"
+value={
+risk?.regimeSyncScore
+}
+/>
+
+<Metric
+label="SQUEEZE"
+value={
+risk?.squeezeRisk
+}
+inverse
+/>
+
+</div>
+
+
+{/* =================================================
+PIPELINE INPUTS
+================================================= */}
+
+<div
+style={{
+color: "#999",
+fontSize: "10px",
+fontWeight: "bold",
+marginBottom: "7px"
+}}
+>
+PIPELINE INPUTS
+</div>
+
 
 <div
 style={{
@@ -736,66 +1056,90 @@ marginBottom: "12px"
 
 <Metric
 label="MASTER"
-value={masterScore}
+value={
+pipeline?.master?.score
+}
 />
 
 <Metric
-label="ROTATION"
-value={rotationScore}
-/>
-
-<Metric
-label="CRASH PROB"
-value={crashProb}
+label="CRASH"
+value={
+pipeline?.crash?.score
+}
 inverse
 />
 
 <Metric
+label="EDGE"
+value={
+pipeline?.edge?.score
+}
+/>
+
+<Metric
 label="LIQUIDITY"
-value={liquidityScore}
+value={
+pipeline?.liquidity?.score
+}
 />
 
 <Metric
 label="PARTICIPATION"
-value={participationScore}
+value={
+pipeline?.participation?.score
+}
 />
 
 <Metric
 label="FRAGILITY"
-value={fragilityScore}
+value={
+pipeline?.fragility?.score
+}
 inverse
 />
 
 <Metric
 label="ROT. DECAY"
-value={rotationDecayScore}
+value={
+pipeline?.rotationDecay?.score
+}
 inverse
 />
 
 <Metric
-label="BREADTH VELOCITY"
-value={breadthVelocityScore}
+label="ROT. CONFIRM"
+value={
+pipeline?.rotationConfirm?.confidence
+}
 />
 
 <Metric
-label="MARKET QUALITY"
-value={marketQualityScore}
+label="QUALITY"
+value={
+pipeline?.marketQuality?.score
+}
 />
 
 <Metric
-label="PERSISTENCE"
-value={persistenceScore}
+label="BREADTH THRUST"
+value={
+pipeline?.breadthThrust?.score
+}
+/>
+
+<Metric
+label="DANGER"
+value={
+pipeline?.danger?.score
+}
 inverse
 />
 
 <Metric
-label="THRUST"
-value={thrustStrength}
-/>
-
-<Metric
-label="SQUEEZE RISK"
-value={squeezeRisk}
+label="SQUEEZE"
+value={
+pipeline?.squeeze?.risk
+}
 inverse
 />
 
@@ -803,7 +1147,7 @@ inverse
 
 
 {/* =================================================
-VALIDATION
+STRUCTURE / HISTORY
 ================================================= */}
 
 <div
@@ -814,14 +1158,109 @@ fontWeight: "bold",
 marginBottom: "7px"
 }}
 >
-VALIDATION
+STRUCTURE / HISTORY
 </div>
+
 
 <div
 style={{
 display: "grid",
 gridTemplateColumns:
-"repeat(2, 1fr)",
+"repeat(4, 1fr)",
+gap: "7px",
+marginBottom: "12px"
+}}
+>
+
+<Metric
+label="BREADTH 50"
+value={
+pipeline?.structure?.breadth50
+}
+/>
+
+<Metric
+label="BREADTH 200"
+value={
+pipeline?.structure?.breadth200
+}
+/>
+
+<Metric
+label="BREADTH TREND"
+value={
+pipeline?.history?.breadthTrend
+}
+/>
+
+<Metric
+label="BREADTH ACCEL."
+value={
+pipeline?.history?.breadthAcceleration
+}
+/>
+
+<Metric
+label="PART. DECAY"
+value={
+pipeline?.history?.participationDecay
+}
+/>
+
+<Metric
+label="LEADERSHIP DECAY"
+value={
+pipeline?.history?.leadershipDecay
+}
+/>
+
+<Metric
+label="REL. BREADTH"
+value={
+pipeline?.history?.relativeBreadthWeakness
+}
+inverse
+/>
+
+<Metric
+label="PHASE PERSIST."
+value={
+pipeline?.history?.phasePersistence
+}
+/>
+
+<Metric
+label="REGIME PERSIST."
+value={
+pipeline?.history?.regimePersistence
+}
+inverse
+/>
+
+</div>
+
+
+{/* =================================================
+REGIME
+================================================= */}
+
+<div
+style={{
+color: "#999",
+fontSize: "10px",
+fontWeight: "bold",
+marginBottom: "7px"
+}}
+>
+REGIME
+</div>
+
+
+<div
+style={{
+display: "grid",
+gridTemplateColumns:
+"repeat(4, 1fr)",
 gap: "7px",
 marginBottom: "12px"
 }}
@@ -834,33 +1273,27 @@ background: "#101010",
 padding: "8px"
 }}
 >
-
 <div
 style={{
 color: "#666",
 fontSize: "8px"
 }}
 >
-HEALTHY LIQUIDITY
+PHASE
 </div>
 
 <div
 style={{
-color:
-meta?.healthyLiquidity
-? "#52c41a"
-: "#777",
+color: "#aaa",
+fontSize: "9px",
 fontWeight: "bold",
-fontSize: "10px",
 marginTop: "3px"
 }}
 >
-{meta?.healthyLiquidity
-? "YES"
-: "NO"}
+{meta?.phase ?? "—"}
+</div>
 </div>
 
-</div>
 
 <div
 style={{
@@ -869,33 +1302,27 @@ background: "#101010",
 padding: "8px"
 }}
 >
-
 <div
 style={{
 color: "#666",
 fontSize: "8px"
 }}
 >
-VALIDATED THRUST
+EXECUTION
 </div>
 
 <div
 style={{
-color:
-meta?.validatedThrust
-? "#52c41a"
-: "#777",
+color: "#aaa",
+fontSize: "9px",
 fontWeight: "bold",
-fontSize: "10px",
 marginTop: "3px"
 }}
 >
-{meta?.validatedThrust
-? "YES"
-: "NO"}
+{meta?.executionMode ?? "—"}
+</div>
 </div>
 
-</div>
 
 <div
 style={{
@@ -904,33 +1331,30 @@ background: "#101010",
 padding: "8px"
 }}
 >
-
 <div
 style={{
 color: "#666",
 fontSize: "8px"
 }}
 >
-POOR MARKET QUALITY
+RISK STATE
 </div>
 
 <div
 style={{
 color:
-meta?.poorMarketQuality
+meta?.riskState === "CRISIS"
 ? "#ff4d4f"
-: "#52c41a",
+: "#aaa",
+fontSize: "9px",
 fontWeight: "bold",
-fontSize: "10px",
 marginTop: "3px"
 }}
 >
-{meta?.poorMarketQuality
-? "YES"
-: "NO"}
+{meta?.riskState ?? "—"}
+</div>
 </div>
 
-</div>
 
 <div
 style={{
@@ -939,124 +1363,148 @@ background: "#101010",
 padding: "8px"
 }}
 >
-
 <div
 style={{
 color: "#666",
 fontSize: "8px"
 }}
 >
-STRUCTURAL FRAGILITY
+TACTICAL BIAS
 </div>
 
 <div
 style={{
 color:
-meta?.structurallyFragile
-? "#ff4d4f"
-: "#52c41a",
+directionColor(
+meta?.tacticalBias === "BEARISH"
+? "SHORT"
+: meta?.tacticalBias === "BULLISH"
+? "LONG"
+: "NONE"
+),
+fontSize: "9px",
 fontWeight: "bold",
-fontSize: "10px",
 marginTop: "3px"
 }}
 >
-{meta?.structurallyFragile
-? "YES"
-: "NO"}
+{meta?.tacticalBias ?? "—"}
 </div>
-
 </div>
 
 </div>
 
 
 {/* =================================================
-CONTEXT
+FLOW PIPELINE DEBUG
 ================================================= */}
+
+<details
+style={{
+marginTop: "5px",
+borderTop: "1px solid #1c1c1c",
+paddingTop: "8px"
+}}
+>
+
+<summary
+style={{
+cursor: "pointer",
+color: "#555",
+fontSize: "8px"
+}}
+>
+FLOW PIPELINE / DEBUG
+</summary>
+
 
 <div
 style={{
+marginTop: "8px",
 display: "grid",
 gridTemplateColumns:
-"repeat(4, 1fr)",
-gap: "7px",
-fontSize: "9px"
+"repeat(3, 1fr)",
+gap: "7px"
+}}
+>
+
+{[
+flowPipeline?.nasdaqPut,
+flowPipeline?.nasdaqCall,
+flowPipeline?.russellCall
+].map(
+(
+flow: any,
+index: number
+) => (
+
+<div
+key={index}
+style={{
+border: "1px solid #1c1c1c",
+background: "#0d0d0d",
+padding: "8px"
 }}
 >
 
 <div
 style={{
-border: "1px solid #222",
-padding: "7px",
-background: "#101010"
+color: "#777",
+fontSize: "8px",
+fontWeight: "bold",
+marginBottom: "5px"
 }}
 >
-<div style={{ color: "#666" }}>
-RISK
-</div>
-<div style={{ color: "#aaa" }}>
-{riskState}
-</div>
+{instrumentLabel(
+flow?.instrument ??
+flows[index]?.instrument ??
+"UNKNOWN"
+)}
 </div>
 
 <div
 style={{
-border: "1px solid #222",
-padding: "7px",
-background: "#101010"
+color: "#555",
+fontSize: "8px",
+lineHeight: "1.6"
 }}
 >
-<div style={{ color: "#666" }}>
-DANGER
-</div>
-<div style={{ color: "#aaa" }}>
-{dangerLevel}
-</div>
-</div>
-
-<div
-style={{
-border: "1px solid #222",
-padding: "7px",
-background: "#101010"
-}}
->
-<div style={{ color: "#666" }}>
-MASTER MODE
-</div>
-<div style={{ color: "#aaa" }}>
-{masterMode}
-</div>
-</div>
-
-<div
-style={{
-border: "1px solid #222",
-padding: "7px",
-background: "#101010"
-}}
->
-<div style={{ color: "#666" }}>
-TRADE STRENGTH
-</div>
-<div style={{ color: "#aaa" }}>
-{tradeStrength}
-</div>
+strength: {display(flow?.strength)}
+<br />
+confidence: {display(flow?.confidence)}
+<br />
+raw: {display(flow?.rawSize)}%
+<br />
+pre-cap: {display(flow?.prePortfolioSize)}%
+<br />
+final: {display(flow?.finalSize)}%
+<br />
+risk: {display(
+flow?.riskMultiplier
+)}
+<br />
+eligible: {flow?.eligible ? "YES" : "NO"}
 </div>
 
 </div>
+
+)
+)}
+
+</div>
+
+</details>
 
 
 {/* =================================================
-DEBUG / DATA INTEGRITY
+FOOTER
 ================================================= */}
 
 <div
 style={{
-marginTop: "10px",
+marginTop: "9px",
 paddingTop: "8px",
 borderTop: "1px solid #1c1c1c",
-color: "#555",
+color: "#444",
 fontSize: "8px",
 display: "flex",
 justifyContent: "space-between"
@@ -1064,15 +1512,15 @@ justifyContent: "space-between"
 >
 
 <span>
-SIZING V2
+POSITION SIZING V3
 </span>
 
 <span>
-components:{Object.keys(components).length}
+flows: {flows.length}
 </span>
 
 <span>
-candidates:{normalizedCandidates.length}
+active: {activeFlowCount}
 </span>
 
 </div>
