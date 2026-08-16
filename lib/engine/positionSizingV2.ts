@@ -1,36 +1,38 @@
-// /lib/engine/positionSizingV2.ts
-
 /*
 =============================================================
-POSITION SIZING V2
+POSITION SIZING V3
 =============================================================
 
-ARCHITECTURE
+PURPOSE
+
+Position sizing does NOT decide direction.
 
 tradeStackEngine
 ↓
-three independent trade flows
+independent trade candidates
 ↓
-┌─────────────────┬─────────────────┬─────────────────┐
-│ NASDAQ PUT │ NASDAQ CALL │ RUSSELL CALL │
-│ independent │ independent │ independent │
-└─────────────────┴─────────────────┴─────────────────┘
+positionSizing
 ↓
 individual sizing
 ↓
-portfolio layer
+portfolio cap
 ↓
 final allocation
 
-IMPORTANT:
+THREE INDEPENDENT FLOWS
 
-- No PRIMARY FLOW reduction.
-- No flow overwrites another flow.
-- Each instrument gets its own size.
-- Multiple valid flows may exist simultaneously.
-- Portfolio cap is applied only AFTER individual sizing.
-- Position sizing does NOT make the directional decision.
-tradeStackEngine already does that.
+NASDAQ PUT
+NASDAQ CALL
+RUSSELL CALL
+
+IMPORTANT
+
+- No PRIMARY-flow overwrite
+- No hidden fallback to 50 for existing values
+- All relevant engine inputs are exposed
+- Pipeline values are returned explicitly
+- Individual flow sizing remains independent
+- Portfolio cap is applied only afterwards
 =============================================================
 */
 
@@ -44,25 +46,22 @@ type Direction =
 | "SHORT"
 | "NONE";
 
-type FlowState = {
-instrument: FlowName;
-direction: Direction;
-state?: string;
-strength?: number;
-driver?: string;
-};
-
 type SizedFlow = {
 instrument: FlowName;
 direction: Direction;
 eligible: boolean;
+
 size: number;
 rawSize: number;
+prePortfolioSize: number;
+
 strength: number;
 confidence: number;
 riskMultiplier: number;
+
 mode: string;
 state: string;
+
 reason: string;
 };
 
@@ -71,33 +70,38 @@ reason: string;
 HELPERS
 ========================================================= */
 
-function clamp(
-value: number,
-min = 0,
-max = 100
-) {
-return Math.max(
-min,
-Math.min(max, value)
-);
-}
-
-
 function num(
 value: any,
 fallback = 0
-) {
+): number {
 const n = Number(value);
+
 return Number.isFinite(n)
 ? n
 : fallback;
 }
 
 
-function bool(
+function nullableNum(
 value: any
-) {
-return value === true;
+): number | null {
+const n = Number(value);
+
+return Number.isFinite(n)
+? n
+: null;
+}
+
+
+function clamp(
+value: number,
+min = 0,
+max = 100
+): number {
+return Math.max(
+min,
+Math.min(max, value)
+);
 }
 
 
@@ -110,159 +114,408 @@ engine: any
 ) {
 
 /* =======================================================
-INPUT
+INPUT OBJECTS
 ======================================================= */
 
 const master =
-engine.master ?? {};
+engine?.master ?? {};
 
 const crash =
-engine.crash ?? {};
+engine?.crash ?? {};
 
 const tradeStack =
-engine.tradeStack ?? {};
+engine?.tradeStack ?? {};
 
 const edgeState =
-engine.edgeState ?? {};
+engine?.edgeState ?? {};
 
 const executionState =
-engine.executionState ?? {};
+engine?.executionState ?? {};
 
 const regimeSync =
-engine.regimeSync ?? {};
+engine?.regimeSync ?? {};
 
 const dangerZone =
-engine.dangerZone ?? {};
+engine?.dangerZone ?? {};
 
 const systemHeat =
-engine.systemHeat ?? {};
+engine?.systemHeat ?? {};
 
 const liquidity =
-engine.liquidity ?? {};
+engine?.liquidity ?? {};
 
 const fragility =
-engine.fragility ?? {};
+engine?.fragility ?? {};
 
 const participation =
-engine.participation ?? {};
+engine?.participation ?? {};
 
 const rotationDecay =
-engine.rotationDecay ?? {};
+engine?.rotationDecay ?? {};
 
 const rotationConfirm =
-engine.rotationConfirm ?? {};
+engine?.rotationConfirm ?? {};
 
 const marketQuality =
-engine.marketQuality ?? {};
+engine?.marketQuality ?? {};
 
 const breadthThrust =
-engine.breadthThrust ?? {};
+engine?.breadthThrust ?? {};
 
 const squeeze =
-engine.squeeze ?? {};
+engine?.squeeze ?? {};
 
 const structure =
-engine.structure ?? {};
+engine?.structure ?? {};
+
+const putTiming =
+engine?.putTiming ?? {};
+
+const russell =
+engine?.russell ?? {};
+
+const priceMomentum =
+engine?.priceMomentum ?? {};
 
 const phase =
-engine.phase ??
-"PHASE_3_DISTRIBUTION";
+engine?.phase ??
+"UNKNOWN";
 
 const history =
-engine.historyMetrics ?? {};
+engine?.historyMetrics ?? {};
 
 
 /* =======================================================
-GLOBAL VALUES
+EXPLICIT INPUT EXTRACTION
+=======================================================
+
+IMPORTANT:
+
+No hidden "50" fallbacks here for values that should
+come from another engine.
+
+If an engine doesn't provide a value, we expose null.
 ======================================================= */
 
-const crashProbability =
-num(
-crash?.probability,
-0
-);
+const input = {
+
+/* -----------------------------
+MASTER
+----------------------------- */
+
+masterScore:
+nullableNum(master?.score),
+
+masterMode:
+master?.mode ??
+master?.regime ??
+null,
+
+
+/* -----------------------------
+CRASH
+----------------------------- */
+
+crashScore:
+nullableNum(crash?.score),
+
+crashProbability:
+nullableNum(crash?.probability),
+
+crashState:
+crash?.state ??
+crash?.label ??
+null,
+
+
+/* -----------------------------
+EDGE
+----------------------------- */
+
+edgeScore:
+nullableNum(edgeState?.score),
+
+edgeState:
+edgeState?.state ??
+null,
+
+
+/* -----------------------------
+LIQUIDITY
+----------------------------- */
+
+liquidityScore:
+nullableNum(liquidity?.score),
+
+liquidityState:
+liquidity?.state ??
+null,
+
+
+/* -----------------------------
+FRAGILITY
+----------------------------- */
+
+fragilityScore:
+nullableNum(fragility?.score),
+
+fragilityState:
+fragility?.state ??
+null,
+
+
+/* -----------------------------
+PARTICIPATION
+----------------------------- */
+
+participationScore:
+nullableNum(participation?.score),
+
+participationState:
+participation?.state ??
+null,
+
+
+/* -----------------------------
+ROTATION DECAY
+----------------------------- */
+
+rotationDecayScore:
+nullableNum(rotationDecay?.score),
+
+rotationDecayState:
+rotationDecay?.state ??
+null,
+
+
+/* -----------------------------
+ROTATION CONFIRM
+----------------------------- */
+
+rotationConfidence:
+nullableNum(
+rotationConfirm?.confidence
+),
+
+rotationConfirmState:
+rotationConfirm?.state ??
+null,
+
+
+/* -----------------------------
+MARKET QUALITY
+----------------------------- */
+
+marketQualityScore:
+nullableNum(
+marketQuality?.score
+),
+
+marketQualityState:
+marketQuality?.state ??
+null,
+
+
+/* -----------------------------
+BREADTH THRUST
+----------------------------- */
+
+breadthThrustScore:
+nullableNum(
+breadthThrust?.strength ??
+breadthThrust?.score
+),
+
+
+/* -----------------------------
+SQUEEZE
+----------------------------- */
+
+squeezeRisk:
+nullableNum(
+squeeze?.risk
+),
+
+squeezeState:
+squeeze?.state ??
+null,
+
+
+/* -----------------------------
+REGIME SYNC
+----------------------------- */
+
+regimeSyncScore:
+nullableNum(
+regimeSync?.score
+),
+
+regimeSyncState:
+regimeSync?.state ??
+null,
+
+
+/* -----------------------------
+DANGER
+----------------------------- */
+
+dangerScore:
+nullableNum(
+dangerZone?.score
+),
+
+dangerState:
+dangerZone?.state ??
+null,
+
+
+/* -----------------------------
+SYSTEM HEAT
+----------------------------- */
+
+systemHeat:
+nullableNum(
+systemHeat?.value
+),
+
+
+/* -----------------------------
+STRUCTURE
+----------------------------- */
+
+breadth50:
+nullableNum(
+structure?.breadth?.b50?.value
+),
+
+breadth200:
+nullableNum(
+structure?.breadth?.b200?.value
+),
+
+
+/* -----------------------------
+HISTORY
+----------------------------- */
+
+breadthTrend:
+nullableNum(
+history?.breadthTrend
+),
+
+breadthAcceleration:
+nullableNum(
+history?.breadthAcceleration
+),
+
+participationDecay:
+nullableNum(
+history?.participationDecay
+),
+
+leadershipDecay:
+nullableNum(
+history?.leadershipDecay
+),
+
+relativeBreadthWeakness:
+nullableNum(
+history?.relativeBreadthWeakness
+),
+
+phasePersistence:
+nullableNum(
+history?.phasePersistence
+),
+
+regimePersistence:
+nullableNum(
+history?.regimePersistence
+)
+};
+
+
+/* =======================================================
+SAFE NUMERIC VALUES FOR CALCULATION
+======================================================= */
 
 const masterScore =
-num(
-master?.score,
-50
-);
+num(input.masterScore, 50);
+
+const crashProbability =
+num(input.crashProbability);
 
 const edgeScore =
-num(
-edgeState?.score,
-0
-);
+num(input.edgeScore);
 
 const dangerScore =
-num(
-dangerZone?.score,
-0
-);
+num(input.dangerScore);
 
 const heat =
-num(
-systemHeat?.value,
-0
-);
+num(input.systemHeat);
 
 const liquidityScore =
-num(
-liquidity?.score,
-50
-);
+num(input.liquidityScore, 50);
 
 const fragilityScore =
-num(
-fragility?.score,
-50
-);
+num(input.fragilityScore, 50);
 
 const participationScore =
-num(
-participation?.score,
-50
-);
+num(input.participationScore, 50);
 
 const rotationDecayScore =
-num(
-rotationDecay?.score,
-0
-);
+num(input.rotationDecayScore);
 
 const rotationConfidence =
-num(
-rotationConfirm?.confidence,
-50
-);
+num(input.rotationConfidence, 50);
 
 const marketQualityScore =
-num(
-marketQuality?.score,
-50
-);
+num(input.marketQualityScore, 50);
 
 const breadthThrustScore =
-num(
-breadthThrust?.strength ??
-breadthThrust?.score,
-0
-);
+num(input.breadthThrustScore);
 
 const squeezeRisk =
-num(
-squeeze?.risk,
-0
-);
+num(input.squeezeRisk);
 
 const regimeSyncScore =
-num(
-regimeSync?.score,
-50
-);
+num(input.regimeSyncScore, 50);
+
+const breadth50 =
+num(input.breadth50, 50);
+
+const breadth200 =
+num(input.breadth200, 50);
+
+const breadthTrend =
+num(input.breadthTrend);
+
+const breadthAcceleration =
+num(input.breadthAcceleration);
+
+const participationDecay =
+num(input.participationDecay);
+
+const leadershipDecay =
+num(input.leadershipDecay);
+
+const relativeBreadthWeakness =
+num(input.relativeBreadthWeakness);
+
+const phasePersistence =
+num(input.phasePersistence);
+
+const regimePersistence =
+num(input.regimePersistence);
+
+
+/* =======================================================
+EXECUTION CONTEXT
+======================================================= */
 
 const executionMode =
 executionState?.executionMode ??
+executionState?.mode ??
 "WAIT";
 
 const riskState =
@@ -272,65 +525,6 @@ executionState?.riskState ??
 const tacticalBias =
 executionState?.tacticalBias ??
 "NEUTRAL";
-
-
-/* =======================================================
-STRUCTURE
-======================================================= */
-
-const breadth50 =
-num(
-structure?.breadth?.b50?.value,
-50
-);
-
-const breadth200 =
-num(
-structure?.breadth?.b200?.value,
-50
-);
-
-const breadthTrend =
-num(
-history?.breadthTrend,
-0
-);
-
-const breadthAcceleration =
-num(
-history?.breadthAcceleration,
-0
-);
-
-const participationDecay =
-num(
-history?.participationDecay,
-0
-);
-
-const leadershipDecay =
-num(
-history?.leadershipDecay,
-0
-);
-
-const phasePersistence =
-num(
-history?.phasePersistence,
-0
-);
-
-const relativeBreadthWeakness =
-num(
-history?.relativeBreadthWeakness,
-0
-);
-
-const regimePersistence =
-num(
-history?.regimePersistence,
-0
-);
 
 
 /* =======================================================
@@ -404,7 +598,7 @@ dangerScore >= 80;
 
 
 /* =======================================================
-PHASE CLASSIFICATION
+PHASE
 ======================================================= */
 
 const defensivePhase =
@@ -425,12 +619,6 @@ phase === "PHASE_3_DISTRIBUTION";
 
 /* =======================================================
 GLOBAL RISK MULTIPLIER
-=======================================================
-
-This multiplier does NOT decide direction.
-
-It only determines how much capital can be committed
-to a valid trade.
 ======================================================= */
 
 let globalRiskMultiplier = 1;
@@ -489,36 +677,21 @@ if (severeHeat)
 globalRiskMultiplier *= 0.70;
 
 
-if (
-riskState === "BREAKDOWN"
-) {
+if (riskState === "BREAKDOWN")
 globalRiskMultiplier *= 0.60;
-}
 
-if (
-riskState === "CRISIS"
-) {
+if (riskState === "CRISIS")
 globalRiskMultiplier *= 0.35;
-}
 
 
-if (
-executionMode === "DEFENSIVE"
-) {
+if (executionMode === "DEFENSIVE")
 globalRiskMultiplier *= 0.60;
-}
 
-if (
-executionMode === "REDUCE_RISK"
-) {
+if (executionMode === "REDUCE_RISK")
 globalRiskMultiplier *= 0.75;
-}
 
-if (
-executionMode === "WAIT"
-) {
+if (executionMode === "WAIT")
 globalRiskMultiplier *= 0.75;
-}
 
 
 globalRiskMultiplier =
@@ -531,17 +704,13 @@ globalRiskMultiplier * 100,
 
 /* =======================================================
 BASE SIZE
-=======================================================
-
-40 = normal maximum starting allocation
-before flow-specific adjustments.
 ======================================================= */
 
 const BASE_SIZE = 40;
 
 
 /* =======================================================
-FLOW EXTRACTION
+TRADE STACK FLOWS
 ======================================================= */
 
 const nasdaqPut =
@@ -552,6 +721,7 @@ strength: 0,
 state: "NEUTRAL"
 };
 
+
 const nasdaqCall =
 tradeStack?.nasdaqCall ?? {
 instrument: "NASDAQ_CALL",
@@ -559,6 +729,7 @@ direction: "LONG",
 strength: 0,
 state: "NEUTRAL"
 };
+
 
 const russellCall =
 tradeStack?.russellCall ?? {
@@ -570,16 +741,7 @@ state: "NEUTRAL"
 
 
 /* =======================================================
-DIRECTIONAL CONFLICT
-=======================================================
-
-tradeStackEngine already determines this.
-
-When conflict exists, we do NOT select a winner.
-
-Both directional flows are disabled.
-
-This is deliberately different from PRIMARY selection.
+CONFLICT
 ======================================================= */
 
 const directionalConflict =
@@ -588,7 +750,7 @@ tradeStack?.directionalConflict === true;
 
 
 /* =======================================================
-FLOW CONFIDENCE
+CONFIDENCE
 ======================================================= */
 
 function calculateConfidence(
@@ -598,148 +760,78 @@ strength: number
 
 let confidence = 50;
 
-/*
-TradeStack strength is the dominant input.
-*/
 
 confidence +=
 (strength - 50) * 0.55;
 
 
-/*
-Master confirmation.
-*/
-
 confidence +=
 (masterScore - 50) * 0.10;
 
-
-/*
-Regime synchronization.
-*/
 
 confidence +=
 (regimeSyncScore - 50) * 0.10;
 
 
-/*
-Rotation confirmation.
-*/
-
 confidence +=
 (rotationConfidence - 50) * 0.08;
 
-
-/*
-Market quality.
-*/
 
 confidence +=
 (marketQualityScore - 50) * 0.08;
 
 
-/*
-Flow-specific adjustments.
-*/
+if (flow === "NASDAQ_PUT") {
 
-if (
-flow === "NASDAQ_PUT"
-) {
-
-if (
-defensivePhase
-) {
+if (defensivePhase)
 confidence += 8;
-}
 
-if (
-crashProbability >= 30
-) {
+if (crashProbability >= 30)
 confidence += 5;
-}
 
-if (
-participationFailure
-) {
+if (participationFailure)
 confidence += 5;
-}
 
-if (
-acceleratingBreadthDamage
-) {
+if (acceleratingBreadthDamage)
 confidence += 4;
 }
-}
 
 
-if (
-flow === "NASDAQ_CALL"
-) {
+if (flow === "NASDAQ_CALL") {
 
-if (
-aggressiveLongPhase
-) {
+if (aggressiveLongPhase)
 confidence += 8;
-}
 
-if (
-warningPhase
-) {
+if (warningPhase)
 confidence -= 5;
-}
 
-if (
-defensivePhase
-) {
+if (defensivePhase)
 confidence -= 12;
-}
 
-if (
-participationFailure
-) {
+if (participationFailure)
+confidence -= 8;
+
+if (rotationBroken)
 confidence -= 8;
 }
 
-if (
-rotationBroken
-) {
+
+if (flow === "RUSSELL_CALL") {
+
+if (rotationConfidence >= 75)
+confidence += 8;
+
+if (rotationConfidence < 45)
 confidence -= 8;
-}
-}
 
-
-if (
-flow === "RUSSELL_CALL"
-) {
-
-/*
-Russell needs actual rotation confirmation.
-*/
-
-confidence +=
-rotationConfidence >= 75
-? 8
-: rotationConfidence < 45
-? -8
-: 0;
-
-if (
-rotationBroken
-) {
+if (rotationBroken)
 confidence -= 12;
-}
 
-if (
-rotationExhausted
-) {
+if (rotationExhausted)
 confidence -= 18;
-}
 
-if (
-defensivePhase
-) {
+if (defensivePhase)
 confidence -= 10;
-}
 }
 
 
@@ -750,7 +842,7 @@ Math.round(confidence)
 
 
 /* =======================================================
-FLOW RISK MULTIPLIER
+FLOW RISK
 ======================================================= */
 
 function calculateFlowRiskMultiplier(
@@ -761,66 +853,29 @@ let multiplier =
 globalRiskMultiplier;
 
 
-/*
-NASDAQ PUT
-*/
+if (flow === "NASDAQ_PUT") {
 
-if (
-flow === "NASDAQ_PUT"
-) {
-
-/*
-Defensive phase supports the PUT.
-*/
-
-if (
-defensivePhase
-) {
+if (defensivePhase)
 multiplier *= 1.10;
-}
-
-/*
-Capitulation is not an automatic
-invitation to increase short size.
-*/
 
 if (
-phase === "PHASE_7_CAPITULATION"
-) {
+phase ===
+"PHASE_7_CAPITULATION"
+)
 multiplier *= 0.55;
-}
 
-/*
-Extreme squeeze/reversal risk.
-*/
-
-if (
-squeezeRisk >= 70
-) {
+if (squeezeRisk >= 70)
 multiplier *= 0.75;
 }
-}
 
 
-/*
-NASDAQ CALL
-*/
+if (flow === "NASDAQ_CALL") {
 
-if (
-flow === "NASDAQ_CALL"
-) {
-
-if (
-defensivePhase
-) {
+if (defensivePhase)
 multiplier *= 0.35;
-}
 
-if (
-distributionPhase
-) {
+if (distributionPhase)
 multiplier *= 0.65;
-}
 
 if (
 aggressiveLongPhase &&
@@ -832,44 +887,25 @@ multiplier *= 1.10;
 }
 
 
-/*
-RUSSELL CALL
-*/
+if (flow === "RUSSELL_CALL") {
 
-if (
-flow === "RUSSELL_CALL"
-) {
-
-/*
-Russell is a rotation trade.
-Without confirmation, size is reduced.
-*/
-
-if (
-rotationConfidence < 60
-) {
+if (rotationConfidence < 60)
 multiplier *= 0.65;
-}
 
 if (
 rotationConfidence >= 80 &&
 !rotationBroken
-) {
+)
 multiplier *= 1.10;
-}
 
 if (
 breadthThrustScore >= 70 &&
 participationScore >= 60
-) {
+)
 multiplier *= 1.10;
-}
 
-if (
-rotationExhausted
-) {
+if (rotationExhausted)
 multiplier *= 0.40;
-}
 }
 
 
@@ -882,7 +918,7 @@ multiplier,
 
 
 /* =======================================================
-FLOW-SPECIFIC EDGE
+FLOW EDGE
 ======================================================= */
 
 function calculateFlowEdge(
@@ -893,146 +929,95 @@ strength: number
 let score = 0;
 
 
-/*
-TradeStack strength.
-*/
-
-if (
-strength >= 75
-) {
+if (strength >= 75)
 score += 8;
-}
-else if (
-strength >= 60
-) {
+else if (strength >= 60)
 score += 5;
-}
-else if (
-strength >= 40
-) {
+else if (strength >= 40)
 score += 2;
-}
-else {
+else
 score -= 4;
-}
 
 
-/*
-Global edge.
-*/
-
-score +=
-edgeScore >= 60
-? 3
-: edgeScore >= 40
-? 1
-: edgeScore < 20
-? -3
-: 0;
-
-
-/*
-Flow-specific edge.
-*/
-
-if (
-flow === "NASDAQ_PUT"
-) {
-
-if (
-defensivePhase
-) {
+if (edgeScore >= 60)
 score += 3;
-}
-
-if (
-crashProbability >= 35
-) {
-score += 2;
-}
-
-if (
-deterioratingBreadth
-) {
-score += 2;
-}
-
-if (
-participationFailure
-) {
-score += 2;
-}
-
-if (
-acceleratingBreadthDamage
-) {
-score += 2;
-}
-}
+else if (edgeScore >= 40)
+score += 1;
+else if (edgeScore < 20)
+score -= 3;
 
 
-if (
-flow === "NASDAQ_CALL"
-) {
+if (flow === "NASDAQ_PUT") {
 
-if (
-aggressiveLongPhase
-) {
+if (defensivePhase)
 score += 3;
+
+if (crashProbability >= 35)
+score += 2;
+
+if (deterioratingBreadth)
+score += 2;
+
+if (participationFailure)
+score += 2;
+
+if (acceleratingBreadthDamage)
+score += 2;
 }
+
+
+if (flow === "NASDAQ_CALL") {
+
+if (aggressiveLongPhase)
+score += 3;
 
 if (
 marketQualityScore >= 70 &&
 participationScore >= 70
-) {
+)
 score += 3;
-}
 
-if (
-defensivePhase
-) {
+if (defensivePhase)
 score -= 5;
-}
 
-if (
-rotationBroken
-) {
+if (rotationBroken)
 score -= 3;
 }
-}
 
 
-if (
-flow === "RUSSELL_CALL"
-) {
+if (flow === "RUSSELL_CALL") {
 
-if (
-rotationConfidence >= 75
-) {
+if (rotationConfidence >= 75)
 score += 4;
-}
 
-if (
-rotationConfidence < 50
-) {
+if (rotationConfidence < 50)
 score -= 4;
-}
 
-if (
-breadthThrustScore >= 70
-) {
+if (breadthThrustScore >= 70)
 score += 3;
-}
 
-if (
-rotationBroken
-) {
+if (rotationBroken)
 score -= 5;
-}
 }
 
 
 return score;
+}
+
+
+/* =======================================================
+FALSE BREAK
+======================================================= */
+
+function falseBreakRisk() {
+
+const risk =
+num(
+rotationConfirm?.falseBreakRisk,
+50
+);
+
+return risk > 65;
 }
 
 
@@ -1042,20 +1027,21 @@ FLOW SIZER
 
 function sizeFlow(
 flow: FlowName,
-candidate: FlowState
+candidate: any
 ): SizedFlow {
 
 const strength =
 clamp(
 num(
-candidate?.strength,
-0
+candidate?.strength
 )
 );
+
 
 const state =
 candidate?.state ??
 "NEUTRAL";
+
 
 const direction =
 candidate?.direction ??
@@ -1066,63 +1052,24 @@ candidate?.direction ??
 ELIGIBILITY
 ----------------------------------------------------- */
 
-/*
-Position sizing never activates a flow
-that TradeStack did not activate.
-*/
-
 let eligible =
 strength >= 20;
 
 
-/*
-Conflict disables the competing
-directional flows.
-
-We deliberately don't select a winner.
-*/
-
 if (
-directionalConflict &&
-(
-flow === "NASDAQ_CALL" ||
-flow === "RUSSELL_CALL"
-)
-) {
-eligible = false;
-}
-
-if (
-directionalConflict &&
-flow === "NASDAQ_PUT"
+directionalConflict
 ) {
 eligible = false;
 }
 
 
-/*
-WAIT means no new position.
-*/
-
 if (
-executionMode === "WAIT"
-) {
-/*
-EARLY / BUILD signals can still receive
-a very small starter allocation.
-*/
-
-if (
+executionMode === "WAIT" &&
 strength < 60
 ) {
 eligible = false;
 }
-}
 
-
-/*
-Crisis is not a new-entry environment.
-*/
 
 if (
 riskState === "CRISIS"
@@ -1131,13 +1078,9 @@ eligible = false;
 }
 
 
-/*
-Capitulation is not a normal new-entry
-sizing environment.
-*/
-
 if (
-phase === "PHASE_7_CAPITULATION"
+phase ===
+"PHASE_7_CAPITULATION"
 ) {
 eligible = false;
 }
@@ -1145,27 +1088,60 @@ eligible = false;
 
 if (!eligible) {
 
+let reason =
+"Trade strength below entry threshold";
+
+
+if (directionalConflict)
+reason =
+"Directional conflict";
+
+
+if (riskState === "CRISIS")
+reason =
+"Crisis regime";
+
+
+if (
+phase ===
+"PHASE_7_CAPITULATION"
+)
+reason =
+"Capitulation regime";
+
+
+if (
+executionMode === "WAIT"
+)
+reason =
+"Execution state WAIT";
+
+
 return {
+
 instrument: flow,
+
 direction,
+
 eligible: false,
+
 size: 0,
+
 rawSize: 0,
+
+prePortfolioSize: 0,
+
 strength,
+
 confidence: 0,
+
 riskMultiplier: 0,
+
 mode: "NO_TRADE",
+
 state,
-reason:
-directionalConflict
-? "Directional conflict"
-: riskState === "CRISIS"
-? "Crisis regime"
-: phase === "PHASE_7_CAPITULATION"
-? "Capitulation regime"
-: executionMode === "WAIT"
-? "Execution state WAIT"
-: "Trade strength below entry threshold"
+
+reason
 };
 }
 
@@ -1182,7 +1158,7 @@ strength
 
 
 /* -----------------------------------------------------
-FLOW EDGE
+EDGE
 ----------------------------------------------------- */
 
 const flowEdge =
@@ -1193,7 +1169,7 @@ strength
 
 
 /* -----------------------------------------------------
-RISK MULTIPLIER
+RISK
 ----------------------------------------------------- */
 
 const riskMultiplier =
@@ -1203,74 +1179,49 @@ flow
 
 
 /* -----------------------------------------------------
-BASE STRENGTH
+RAW SIZE
 ----------------------------------------------------- */
-
-/*
-Convert TradeStack strength into
-an initial allocation.
-
-20 strength → very small
-40 strength → moderate
-60 strength → stronger
-80+ strength → aggressive candidate
-*/
 
 let rawSize =
 8 +
-((strength - 20) * 0.62);
+(
+(strength - 20) *
+0.62
+);
 
-
-/*
-Confidence.
-*/
 
 rawSize *=
 0.70 +
-(confidence / 100) * 0.45;
+(
+confidence /
+100
+) * 0.45;
 
-
-/*
-Edge.
-*/
 
 rawSize +=
 flowEdge * 1.25;
 
-
-/*
-Global risk.
-*/
 
 rawSize *=
 riskMultiplier;
 
 
 /* -----------------------------------------------------
-FLOW-SPECIFIC SAFETY
+FLOW SAFETY
 ----------------------------------------------------- */
 
 if (
 flow === "NASDAQ_CALL"
 ) {
 
-if (
-participationFailure
-) {
+if (participationFailure)
 rawSize *= 0.60;
-}
 
-if (
-poorMarketQuality
-) {
+if (poorMarketQuality)
 rawSize *= 0.65;
-}
 
-if (
-severeBreadthDamage
-) {
+if (severeBreadthDamage)
 rawSize *= 0.55;
-}
 }
 
 
@@ -1278,27 +1229,20 @@ if (
 flow === "RUSSELL_CALL"
 ) {
 
-/*
-Russell must have rotation confirmation.
-*/
-
 if (
 rotationConfidence < 55
-) {
+)
 rawSize *= 0.55;
-}
 
 if (
 rotationDecayScore >= 70
-) {
+)
 rawSize *= 0.50;
-}
 
 if (
 falseBreakRisk()
-) {
+)
 rawSize *= 0.60;
-}
 }
 
 
@@ -1306,89 +1250,81 @@ if (
 flow === "NASDAQ_PUT"
 ) {
 
-/*
-Strong bullish impulse should reduce
-short sizing even when structure is weak.
-*/
-
 const bullishImpulse =
-engine.priceMomentum?.bullishImpulse === true;
+priceMomentum?.bullishImpulse === true;
+
 
 const ndxPriceScore =
 num(
-engine.priceMomentum?.ndx?.score ??
-engine.priceMomentum?.score,
+priceMomentum?.ndx?.score ??
+priceMomentum?.score,
 50
 );
+
 
 if (
 bullishImpulse &&
 ndxPriceScore >= 70
-) {
+)
 rawSize *= 0.65;
-}
 
-/*
-Very low price momentum means the
-downside move may already be extended.
-*/
 
 if (
 ndxPriceScore <= 25
-) {
+)
 rawSize *= 0.75;
-}
 }
 
 
 /* -----------------------------------------------------
-STRUCTURAL CAPS
+MAX FLOW SIZE
 ----------------------------------------------------- */
 
 let maxFlowSize =
 BASE_SIZE;
 
 
-/*
-Normal individual maximum.
-*/
-
 if (
 strength >= 75 &&
 confidence >= 70
 ) {
+
 maxFlowSize = 40;
+
 }
 else if (
 strength >= 60
 ) {
+
 maxFlowSize = 32;
+
 }
 else {
+
 maxFlowSize = 22;
+
 }
 
-
-/*
-Fragile structure.
-*/
 
 if (
 severeMarketQuality ||
 severeParticipationFailure ||
 extremeFragility
 ) {
+
 maxFlowSize =
 Math.min(
 maxFlowSize,
 20
 );
+
 }
 else if (
 poorMarketQuality ||
 participationFailure ||
 highFragility
 ) {
+
 maxFlowSize =
 Math.min(
 maxFlowSize,
@@ -1397,13 +1333,10 @@ maxFlowSize,
 }
 
 
-/*
-Persistent deterioration.
-*/
-
 if (
 chronicWeakness
 ) {
+
 maxFlowSize =
 Math.min(
 maxFlowSize,
@@ -1412,15 +1345,11 @@ maxFlowSize,
 }
 
 
-/*
-Long flows are additionally capped
-during defensive regimes.
-*/
-
 if (
 direction === "LONG" &&
 defensivePhase
 ) {
+
 maxFlowSize =
 Math.min(
 maxFlowSize,
@@ -1429,15 +1358,11 @@ maxFlowSize,
 }
 
 
-/*
-Russell requires confirmed rotation
-for larger allocations.
-*/
-
 if (
 flow === "RUSSELL_CALL" &&
 rotationConfidence < 75
 ) {
+
 maxFlowSize =
 Math.min(
 maxFlowSize,
@@ -1446,17 +1371,13 @@ maxFlowSize,
 }
 
 
-/*
-PUT can be larger during confirmed
-structural risk, but never unlimited.
-*/
-
 if (
 flow === "NASDAQ_PUT" &&
 defensivePhase &&
 strength >= 75 &&
 confidence >= 70
 ) {
+
 maxFlowSize =
 Math.min(
 45,
@@ -1476,34 +1397,17 @@ maxFlowSize
 STARTER LOGIC
 ----------------------------------------------------- */
 
-/*
-EARLY / BUILDING signals receive
-smaller initial allocations.
-
-The engine should not turn an EARLY
-signal into a full position.
-*/
-
 if (
-state === "EARLY_DEFENSIVE_SHORT" ||
-state === "EARLY_LONG"
+state ===
+"EARLY_DEFENSIVE_SHORT" ||
+state ===
+"EARLY_LONG"
 ) {
+
 rawSize =
 Math.min(
 rawSize,
 15
-);
-}
-
-
-if (
-state === "SHORT_BUILDING" ||
-state === "LONG_BUILDING"
-) {
-rawSize =
-Math.min(
-rawSize,
-maxFlowSize
 );
 }
 
@@ -1523,27 +1427,14 @@ rawSize
 let mode =
 "MODERATE";
 
-if (
-size >= 35
-) {
+
+if (size >= 35)
 mode = "AGGRESSIVE";
-}
-else if (
-size < 15
-) {
+else if (size < 15)
 mode = "STARTER";
-}
-else if (
-size < 25
-) {
+else if (size < 25)
 mode = "DEFENSIVE";
-}
 
-
-/*
-Capital preservation overrides
-the descriptive mode.
-*/
 
 if (
 severeMarketQuality ||
@@ -1551,6 +1442,7 @@ extremeFragility ||
 chronicWeakness ||
 riskState === "BREAKDOWN"
 ) {
+
 mode =
 size > 0
 ? "CAPITAL_PRESERVATION"
@@ -1573,6 +1465,8 @@ Math.round(
 rawSize
 ),
 
+prePortfolioSize: size,
+
 strength,
 
 confidence,
@@ -1594,23 +1488,7 @@ candidate?.driver ??
 
 
 /* =======================================================
-FALSE BREAK RISK
-======================================================= */
-
-function falseBreakRisk() {
-
-const risk =
-num(
-rotationConfirm?.falseBreakRisk,
-50
-);
-
-return risk > 65;
-}
-
-
-/* =======================================================
-THREE INDEPENDENT SIZES
+INDIVIDUAL FLOWS
 ======================================================= */
 
 const sizedNasdaqPut =
@@ -1619,11 +1497,13 @@ sizeFlow(
 nasdaqPut
 );
 
+
 const sizedNasdaqCall =
 sizeFlow(
 "NASDAQ_CALL",
 nasdaqCall
 );
+
 
 const sizedRussellCall =
 sizeFlow(
@@ -1633,60 +1513,12 @@ russellCall
 
 
 /* =======================================================
-PORTFOLIO LAYER
-=======================================================
-
-ONLY HERE do we allow the three flows
-to interact.
-
-Individual sizing above remains untouched.
-
-Example:
-
-PUT 35
-CALL 20
-RUSSELL 25
-
-raw total = 80
-
-portfolio cap = 60
-
-final:
-
-PUT 26
-CALL 15
-RUSSELL 19
-
-Relative proportions remain intact.
+PORTFOLIO CAP
 ======================================================= */
 
-const activeFlows =
-[
-sizedNasdaqPut,
-sizedNasdaqCall,
-sizedRussellCall
-].filter(
-flow =>
-flow.eligible &&
-flow.size > 0
-);
+let portfolioCap =
+60;
 
-
-/*
-Portfolio cap.
-
-We deliberately keep this below 100.
-The remaining capital stays available
-for later confirmation / averaging / reversal.
-*/
-
-let portfolioCap = 60;
-
-
-/*
-Very healthy regime allows somewhat
-greater aggregate exposure.
-*/
 
 if (
 marketQualityScore >= 70 &&
@@ -1696,19 +1528,16 @@ fragilityScore < 55 &&
 dangerScore < 35 &&
 !persistentWeakness
 ) {
-portfolioCap = 75;
+
+portfolioCap =
+75;
 }
 
-
-/*
-Defensive regimes reduce total portfolio
-exposure even when individual PUT sizing
-is strong.
-*/
 
 if (
 defensivePhase
 ) {
+
 portfolioCap =
 Math.min(
 portfolioCap,
@@ -1722,6 +1551,7 @@ severeMarketQuality ||
 extremeFragility ||
 chronicWeakness
 ) {
+
 portfolioCap =
 Math.min(
 portfolioCap,
@@ -1733,54 +1563,62 @@ portfolioCap,
 if (
 riskState === "CRISIS"
 ) {
-portfolioCap = 0;
+
+portfolioCap =
+0;
 }
+
+
+const individualFlows = [
+sizedNasdaqPut,
+sizedNasdaqCall,
+sizedRussellCall
+];
+
+
+const activeFlows =
+individualFlows.filter(
+flow =>
+flow.eligible &&
+flow.size > 0
+);
 
 
 const rawPortfolioSize =
 activeFlows.reduce(
-(
-total,
-flow
-) =>
+(total, flow) =>
 total + flow.size,
 0
 );
 
 
-/*
-Scale only if necessary.
-
-This preserves the independent
-relative weighting of each flow.
-*/
-
 const portfolioScale =
-rawPortfolioSize > portfolioCap &&
+rawPortfolioSize >
+portfolioCap &&
 rawPortfolioSize > 0
+
 ? portfolioCap /
 rawPortfolioSize
+
 : 1;
 
 
 function applyPortfolioLayer(
 flow: SizedFlow
-) {
-
-const finalSize =
-Math.round(
-flow.size *
-portfolioScale
-);
+): SizedFlow {
 
 return {
+
 ...flow,
 
 prePortfolioSize:
 flow.size,
 
 size:
-finalSize
+Math.round(
+flow.size *
+portfolioScale
+)
 };
 }
 
@@ -1790,10 +1628,12 @@ applyPortfolioLayer(
 sizedNasdaqPut
 );
 
+
 const finalNasdaqCall =
 applyPortfolioLayer(
 sizedNasdaqCall
 );
+
 
 const finalRussellCall =
 applyPortfolioLayer(
@@ -1801,27 +1641,11 @@ sizedRussellCall
 );
 
 
-/* =======================================================
-FINAL PORTFOLIO STATE
-======================================================= */
-
 const finalFlows = [
 finalNasdaqPut,
 finalNasdaqCall,
 finalRussellCall
 ];
-
-
-const totalSize =
-finalFlows.reduce(
-(
-total,
-flow
-) =>
-total +
-flow.size,
-0
-);
 
 
 const activeFinalFlows =
@@ -1831,9 +1655,31 @@ flow.size > 0
 );
 
 
+const totalSize =
+finalFlows.reduce(
+(total, flow) =>
+total + flow.size,
+0
+);
+
+
 /* =======================================================
-DIRECTION
+PORTFOLIO DIRECTION
 ======================================================= */
+
+const hasLong =
+activeFinalFlows.some(
+flow =>
+flow.direction === "LONG"
+);
+
+
+const hasShort =
+activeFinalFlows.some(
+flow =>
+flow.direction === "SHORT"
+);
+
 
 let direction:
 | "LONG"
@@ -1843,34 +1689,25 @@ let direction:
 "NEUTRAL";
 
 
-const hasLong =
-activeFinalFlows.some(
-flow =>
-flow.direction === "LONG"
-);
-
-const hasShort =
-activeFinalFlows.some(
-flow =>
-flow.direction === "SHORT"
-);
-
-
 if (
 hasLong &&
 hasShort
 ) {
-direction = "MIXED";
+
+direction =
+"MIXED";
+
 }
-else if (
-hasLong
-) {
-direction = "LONG";
+else if (hasLong) {
+
+direction =
+"LONG";
+
 }
-else if (
-hasShort
-) {
-direction = "SHORT";
+else if (hasShort) {
+
+direction =
+"SHORT";
 }
 
 
@@ -1881,20 +1718,29 @@ PORTFOLIO MODE
 let mode =
 "NO_TRADE";
 
+
 if (
 totalSize >= 55
 ) {
-mode = "AGGRESSIVE";
+
+mode =
+"AGGRESSIVE";
+
 }
 else if (
 totalSize >= 30
 ) {
-mode = "MODERATE";
+
+mode =
+"MODERATE";
+
 }
 else if (
 totalSize > 0
 ) {
-mode = "DEFENSIVE";
+
+mode =
+"DEFENSIVE";
 }
 
 
@@ -1906,14 +1752,11 @@ extremeFragility ||
 chronicWeakness
 )
 ) {
+
 mode =
 "CAPITAL_PRESERVATION";
 }
 
-
-/* =======================================================
-FLOW SUMMARY
-======================================================= */
 
 const activeInstruments =
 activeFinalFlows.map(
@@ -1923,16 +1766,274 @@ flow.instrument
 
 
 /* =======================================================
-OUTPUT
+PIPELINE
+=======================================================
+
+THIS IS THE IMPORTANT NEW PART.
+
+The frontend gets exactly the values that actually
+entered the sizing calculation.
+
+No frontend guessing.
+No fallback 50.
+No "components" ambiguity.
+======================================================= */
+
+const pipeline = {
+
+master: {
+score: input.masterScore,
+mode: input.masterMode
+},
+
+crash: {
+score: input.crashScore,
+probability: input.crashProbability,
+state: input.crashState
+},
+
+edge: {
+score: input.edgeScore,
+state: input.edgeState
+},
+
+liquidity: {
+score: input.liquidityScore,
+state: input.liquidityState
+},
+
+participation: {
+score: input.participationScore,
+state: input.participationState
+},
+
+fragility: {
+score: input.fragilityScore,
+state: input.fragilityState
+},
+
+rotationDecay: {
+score: input.rotationDecayScore,
+state: input.rotationDecayState
+},
+
+rotationConfirm: {
+confidence:
+input.rotationConfidence,
+state:
+input.rotationConfirmState
+},
+
+marketQuality: {
+score:
+input.marketQualityScore,
+state:
+input.marketQualityState
+},
+
+breadthThrust: {
+score:
+input.breadthThrustScore
+},
+
+squeeze: {
+risk:
+input.squeezeRisk,
+state:
+input.squeezeState
+},
+
+regimeSync: {
+score:
+input.regimeSyncScore,
+state:
+input.regimeSyncState
+},
+
+danger: {
+score:
+input.dangerScore,
+state:
+input.dangerState
+},
+
+systemHeat: {
+value:
+input.systemHeat
+},
+
+structure: {
+breadth50:
+input.breadth50,
+
+breadth200:
+input.breadth200
+},
+
+history: {
+
+breadthTrend:
+input.breadthTrend,
+
+breadthAcceleration:
+input.breadthAcceleration,
+
+participationDecay:
+input.participationDecay,
+
+leadershipDecay:
+input.leadershipDecay,
+
+relativeBreadthWeakness:
+input.relativeBreadthWeakness,
+
+phasePersistence:
+input.phasePersistence,
+
+regimePersistence:
+input.regimePersistence
+},
+
+phase
+};
+
+
+/* =======================================================
+FLOW PIPELINE
+======================================================= */
+
+const flowPipeline = {
+
+nasdaqPut: {
+
+instrument:
+finalNasdaqPut.instrument,
+
+direction:
+finalNasdaqPut.direction,
+
+state:
+finalNasdaqPut.state,
+
+strength:
+finalNasdaqPut.strength,
+
+confidence:
+finalNasdaqPut.confidence,
+
+rawSize:
+finalNasdaqPut.rawSize,
+
+prePortfolioSize:
+finalNasdaqPut.prePortfolioSize,
+
+finalSize:
+finalNasdaqPut.size,
+
+riskMultiplier:
+finalNasdaqPut.riskMultiplier,
+
+mode:
+finalNasdaqPut.mode,
+
+eligible:
+finalNasdaqPut.eligible,
+
+reason:
+finalNasdaqPut.reason
+},
+
+
+nasdaqCall: {
+
+instrument:
+finalNasdaqCall.instrument,
+
+direction:
+finalNasdaqCall.direction,
+
+state:
+finalNasdaqCall.state,
+
+strength:
+finalNasdaqCall.strength,
+
+confidence:
+finalNasdaqCall.confidence,
+
+rawSize:
+finalNasdaqCall.rawSize,
+
+prePortfolioSize:
+finalNasdaqCall.prePortfolioSize,
+
+finalSize:
+finalNasdaqCall.size,
+
+riskMultiplier:
+finalNasdaqCall.riskMultiplier,
+
+mode:
+finalNasdaqCall.mode,
+
+eligible:
+finalNasdaqCall.eligible,
+
+reason:
+finalNasdaqCall.reason
+},
+
+
+russellCall: {
+
+instrument:
+finalRussellCall.instrument,
+
+direction:
+finalRussellCall.direction,
+
+state:
+finalRussellCall.state,
+
+strength:
+finalRussellCall.strength,
+
+confidence:
+finalRussellCall.confidence,
+
+rawSize:
+finalRussellCall.rawSize,
+
+prePortfolioSize:
+finalRussellCall.prePortfolioSize,
+
+finalSize:
+finalRussellCall.size,
+
+riskMultiplier:
+finalRussellCall.riskMultiplier,
+
+mode:
+finalRussellCall.mode,
+
+eligible:
+finalRussellCall.eligible,
+
+reason:
+finalRussellCall.reason
+}
+};
+
+
+/* =======================================================
+RETURN
 ======================================================= */
 
 return {
 
-/*
----------------------------------------------------------
-LEGACY / GLOBAL
----------------------------------------------------------
-*/
+/* -----------------------------------------------------
+GLOBAL
+----------------------------------------------------- */
 
 size:
 totalSize,
@@ -1942,11 +2043,24 @@ direction,
 mode,
 
 
-/*
----------------------------------------------------------
-THREE INDEPENDENT FLOWS
----------------------------------------------------------
-*/
+/* -----------------------------------------------------
+PRIMARY-COMPATIBILITY
+----------------------------------------------------- */
+
+primary:
+activeFinalFlows.length > 0
+? activeFinalFlows
+.slice()
+.sort(
+(a, b) =>
+b.size - a.size
+)[0]
+: null,
+
+
+/* -----------------------------------------------------
+FLOWS
+----------------------------------------------------- */
 
 nasdaqPut:
 finalNasdaqPut,
@@ -1958,28 +2072,18 @@ russellCall:
 finalRussellCall,
 
 
-/*
----------------------------------------------------------
-ARRAY
----------------------------------------------------------
-*/
-
 flows:
 finalFlows,
-
 
 activeFlows:
 activeFinalFlows,
 
-
 activeInstruments,
 
 
-/*
----------------------------------------------------------
+/* -----------------------------------------------------
 PORTFOLIO
----------------------------------------------------------
-*/
+----------------------------------------------------- */
 
 portfolio: {
 
@@ -2005,11 +2109,9 @@ direction
 },
 
 
-/*
----------------------------------------------------------
-GLOBAL RISK
----------------------------------------------------------
-*/
+/* -----------------------------------------------------
+RISK
+----------------------------------------------------- */
 
 risk: {
 
@@ -2036,51 +2138,106 @@ rotationDecayScore,
 
 regimeSyncScore,
 
-rotationConfidence
-},
-
-
-/*
----------------------------------------------------------
-COMPONENTS
----------------------------------------------------------
-*/
-
-components: {
-
-masterScore,
-
-edgeScore,
-
-breadth50,
-
-breadth200,
-
-breadthTrend,
-
-breadthAcceleration,
-
-participationDecay,
-
-leadershipDecay,
-
-phasePersistence,
-
-relativeBreadthWeakness,
-
-regimePersistence,
-
-breadthThrustScore,
+rotationConfidence,
 
 squeezeRisk
 },
 
 
-/*
----------------------------------------------------------
+/* -----------------------------------------------------
+COMPONENTS
+----------------------------------------------------- */
+
+components: {
+
+masterScore:
+input.masterScore,
+
+crashScore:
+input.crashScore,
+
+crashProbability:
+input.crashProbability,
+
+edgeScore:
+input.edgeScore,
+
+liquidityScore:
+input.liquidityScore,
+
+participationScore:
+input.participationScore,
+
+fragilityScore:
+input.fragilityScore,
+
+rotationDecayScore:
+input.rotationDecayScore,
+
+rotationConfidence:
+input.rotationConfidence,
+
+marketQualityScore:
+input.marketQualityScore,
+
+breadthThrustScore:
+input.breadthThrustScore,
+
+squeezeRisk:
+input.squeezeRisk,
+
+regimeSyncScore:
+input.regimeSyncScore,
+
+dangerScore:
+input.dangerScore,
+
+systemHeat:
+input.systemHeat,
+
+breadth50:
+input.breadth50,
+
+breadth200:
+input.breadth200,
+
+breadthTrend:
+input.breadthTrend,
+
+breadthAcceleration:
+input.breadthAcceleration,
+
+participationDecay:
+input.participationDecay,
+
+leadershipDecay:
+input.leadershipDecay,
+
+relativeBreadthWeakness:
+input.relativeBreadthWeakness,
+
+phasePersistence:
+input.phasePersistence,
+
+regimePersistence:
+input.regimePersistence
+},
+
+
+
+/* -----------------------------------------------------
+PIPELINE
+----------------------------------------------------- */
+
+pipeline,
+
+
+flowPipeline,
+
+
+/* -----------------------------------------------------
 META
----------------------------------------------------------
-*/
+----------------------------------------------------- */
 
 meta: {
 
@@ -2136,6 +2293,5 @@ rotationBroken,
 
 rotationExhausted
 }
-
 };
 }
