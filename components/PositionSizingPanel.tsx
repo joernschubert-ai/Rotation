@@ -7,144 +7,288 @@ import { getSignalColor } from "@/lib/engine/colorEngine";
 export default function PositionSizingPanel({
 sizing,
 tradeStack,
-decision,
-master,
-russell,
-nasdaq
+decision
 }: any) {
 
 if (!sizing) return null;
 
 /* =====================================================
-SAFE INPUTS
+SAFE OBJECTS
 ===================================================== */
 
 const components = sizing?.components ?? {};
-const sizingModel = sizing?.sizingModel ?? {};
 const meta = sizing?.meta ?? {};
+const sizingModel = sizing?.sizingModel ?? {};
 
-const size = Number(sizing?.size ?? 0);
-const mode = sizing?.mode ?? "DEFENSIVE";
-const direction = sizing?.direction ?? "NEUTRAL";
+const candidates =
+Array.isArray(sizing?.candidates)
+? sizing.candidates
+: Array.isArray(sizing?.positions)
+? sizing.positions
+: [];
 
-const base = Number(components?.base ?? 0);
-const edge = Number(components?.edge ?? 0);
-const opportunity = Number(components?.opportunity ?? 0);
+/* =====================================================
+HELPERS
+===================================================== */
 
-const rawSize = Number(
-sizingModel?.rawSize ?? 0
+function num(
+value: any,
+fallback = 0
+): number {
+const n = Number(value);
+return Number.isFinite(n) ? n : fallback;
+}
+
+/*
+* IMPORTANT:
+*
+* PositionSizingV2 writes its validated engine values
+* into components.
+*
+* Therefore:
+*
+* components -> meta -> top-level -> fallback
+*
+* We NEVER silently use 50 for a missing engine value.
+*/
+
+function readMetric(
+componentKeys: string[],
+metaKeys: string[] = [],
+topLevelKeys: string[] = [],
+fallback = 0
+) {
+
+for (const key of componentKeys) {
+if (
+components[key] !== undefined &&
+components[key] !== null
+) {
+return num(components[key], fallback);
+}
+}
+
+for (const key of metaKeys) {
+if (
+meta[key] !== undefined &&
+meta[key] !== null
+) {
+return num(meta[key], fallback);
+}
+}
+
+for (const key of topLevelKeys) {
+if (
+sizing[key] !== undefined &&
+sizing[key] !== null
+) {
+return num(sizing[key], fallback);
+}
+}
+
+return fallback;
+}
+
+/* =====================================================
+CORE SIZING VALUES
+===================================================== */
+
+const finalSize =
+num(sizing?.size);
+
+const rawSize =
+num(
+sizingModel?.rawSize,
+num(components?.rawSize)
 );
 
-const adjustedSize = Number(
-sizingModel?.adjustedSize ?? 0
+const adjustedSize =
+num(
+sizingModel?.adjustedSize,
+num(components?.adjustedSize)
 );
 
-const maxSize = Number(
-sizingModel?.maxSize ?? 0
+const maxSize =
+num(sizingModel?.maxSize);
+
+const edge =
+num(
+components?.edge,
+num(meta?.edgeScore)
 );
 
-const tradeStrength = Number(
-meta?.tradeStrength ?? 0
+const opportunity =
+num(components?.opportunity);
+
+/* =====================================================
+ENGINE INPUTS
+===================================================== */
+
+const masterScore =
+readMetric(
+["masterScore"],
+["masterScore"],
+["masterScore"]
 );
 
-const masterScore = Number(
-master?.score ?? 0
+const rotationScore =
+readMetric(
+["rotationScore"],
+[],
+["rotationScore"]
 );
 
-const rotationScore = Number(
-components?.rotationScore ?? 0
+const crashProb =
+readMetric(
+["crashProb"],
+["crashProbability"],
+["crashProb", "crashProbability"]
 );
 
-const crashProb = Number(
-components?.crashProb ?? 0
+const liquidityScore =
+readMetric(
+["liquidityScore", "liquidity"],
+["liquidityScore"],
+["liquidityScore"]
 );
 
-const liquidityScore = Number(
-components?.liquidityScore ?? 50
+const participationScore =
+readMetric(
+["participationScore", "participation"],
+["participationScore"],
+["participationScore"]
 );
 
-const fragilityScore = Number(
-components?.fragilityScore ?? 50
+const fragilityScore =
+readMetric(
+["fragilityScore", "fragility"],
+["fragilityScore"],
+["fragilityScore"]
 );
 
-const participationScore = Number(
-components?.participationScore ?? 50
+const squeezeRisk =
+readMetric(
+["squeezeRisk", "squeeze"],
+["squeezeRisk"],
+["squeezeRisk"]
 );
 
-const marketQualityScore = Number(
-components?.marketQualityScore ?? 50
+const rotationDecayScore =
+readMetric(
+["rotationDecayScore", "rotationDecay"],
+["rotationDecayScore"],
+["rotationDecayScore"]
 );
 
-const rotationDecayScore = Number(
-components?.rotationDecayScore ?? 0
+const breadthVelocityScore =
+readMetric(
+["breadthVelocityScore", "breadthVelocity"],
+["breadthVelocityScore"],
+["breadthVelocityScore"]
 );
 
-const persistenceScore = Number(
-components?.persistenceScore ?? 50
+const marketQualityScore =
+readMetric(
+["marketQualityScore", "marketQuality"],
+["marketQualityScore"],
+["marketQualityScore"]
 );
 
-const regimeSyncScore = Number(
-components?.regimeSyncScore ?? 50
+const persistenceScore =
+readMetric(
+["persistenceScore", "regimePersistence"],
+["persistenceScore"],
+["persistenceScore"]
+);
+
+const thrustStrength =
+readMetric(
+["thrustStrength", "breadthThrust"],
+["thrustStrength"],
+["thrustStrength"]
 );
 
 /* =====================================================
-CONTEXT
+META / STATE
 ===================================================== */
 
+const sizingDirection =
+sizing?.direction ?? "NEUTRAL";
+
+const sizingMode =
+sizing?.mode ?? "DEFENSIVE";
+
 const riskState =
-meta?.riskState ?? "N/A";
+meta?.riskState ??
+sizing?.riskState ??
+"N/A";
 
 const dangerLevel =
-meta?.dangerLevel ?? "N/A";
+meta?.dangerLevel ??
+sizing?.dangerLevel ??
+"N/A";
 
 const masterMode =
-meta?.masterMode ?? "N/A";
+meta?.masterMode ??
+"N/A";
 
-const healthyLiquidity =
-meta?.healthyLiquidity === true;
+const tradeStrength =
+num(
+meta?.tradeStrength,
+num(
+tradeStack?.tradeStrength,
+num(tradeStack?.strength)
+)
+);
 
-const validatedThrust =
-meta?.validatedThrust === true;
+const primary =
+sizing?.primary ??
+sizing?.primaryFlow ??
+null;
 
-const poorMarketQuality =
-meta?.poorMarketQuality === true;
+const primaryInstrument =
+primary?.instrument ??
+sizing?.primaryInstrument ??
+candidates.find(
+(candidate: any) =>
+candidate?.role === "PRIMARY"
+)?.instrument ??
+null;
 
-const persistentWeakness =
-meta?.persistentWeakness === true;
+/* =====================================================
+ALIGNMENT
+===================================================== */
 
-const narrowLeadership =
-meta?.narrowLeadership === true;
+const decisionDirection =
+decision?.direction ?? "NEUTRAL";
 
-const syntheticLiquidityRegime =
-meta?.syntheticLiquidityRegime === true;
-
-const internalDeterioration =
-meta?.internalDeterioration === true;
-
-const severeInternalBreakdown =
-meta?.severeInternalBreakdown === true;
-
-const fragileExpansion =
-meta?.fragileExpansion === true;
+const aligned =
+decisionDirection === "NEUTRAL" ||
+sizingDirection === "NEUTRAL" ||
+decisionDirection === sizingDirection;
 
 /* =====================================================
 COLORS
 ===================================================== */
 
-function directionColor(value: string) {
+function directionColor(
+direction: string
+) {
 
-if (value === "SHORT")
+if (direction === "SHORT")
 return "#ff4d4f";
 
-if (value === "LONG")
+if (direction === "LONG")
 return "#52c41a";
 
 return "#777";
 }
 
-function modeColor(value: string) {
+function modeColor(
+mode: string
+) {
 
-switch (value) {
+switch (mode) {
 
 case "AGGRESSIVE":
 return "#ff4d4f";
@@ -166,137 +310,79 @@ return "#777";
 }
 }
 
-function edgeColor(value: number) {
-
-if (value >= 3)
-return "#52c41a";
-
-if (value >= 1)
-return "#fadb14";
-
-if (value > -2)
-return "#fa8c16";
-
-return "#ff4d4f";
-}
-
-function scoreColor(
+function metricColor(
 value: number,
 inverse = false
 ) {
 
+const v =
+Math.max(0, Math.min(100, value));
+
 if (inverse) {
 
-if (value >= 75)
+if (v >= 75)
 return "#ff4d4f";
 
-if (value >= 55)
+if (v >= 55)
 return "#fa8c16";
+
+if (v >= 40)
+return "#fadb14";
 
 return "#52c41a";
 }
 
-return getSignalColor(value, 100);
+if (v >= 70)
+return "#52c41a";
+
+if (v >= 50)
+return "#fadb14";
+
+if (v >= 30)
+return "#fa8c16";
+
+return "#ff4d4f";
+}
+
+function instrumentLabel(
+instrument: string
+) {
+
+switch (instrument) {
+
+case "NASDAQ_PUT":
+return "NASDAQ PUT";
+
+case "NASDAQ_CALL":
+return "NASDAQ CALL";
+
+case "RUSSELL_CALL":
+return "RUSSELL CALL";
+
+default:
+return instrument;
+}
 }
 
 /* =====================================================
-ALIGNMENT
-===================================================== */
-
-const decisionDirection =
-decision?.direction ?? "NEUTRAL";
-
-const aligned =
-decisionDirection === "NEUTRAL" ||
-direction === "NEUTRAL" ||
-decisionDirection === direction;
-
-/* =====================================================
-WHY SIZE IS LOW
-===================================================== */
-
-const blockers: string[] = [];
-
-if (edge <= -4)
-blockers.push("Strong negative edge");
-
-else if (edge < 0)
-blockers.push("Negative edge");
-
-if (crashProb >= 40)
-blockers.push("Elevated crash probability");
-
-if (fragilityScore >= 70)
-blockers.push("High structural fragility");
-
-if (liquidityScore < 40)
-blockers.push("Weak liquidity");
-
-if (participationScore < 40)
-blockers.push("Weak participation");
-
-if (marketQualityScore < 45)
-blockers.push("Poor market quality");
-
-if (rotationDecayScore >= 70)
-blockers.push("Rotation decay");
-
-if (persistentWeakness)
-blockers.push("Persistent weakness");
-
-if (narrowLeadership)
-blockers.push("Narrow leadership");
-
-if (syntheticLiquidityRegime)
-blockers.push("Synthetic liquidity");
-
-if (internalDeterioration)
-blockers.push("Internal deterioration");
-
-if (severeInternalBreakdown)
-blockers.push("Severe internal breakdown");
-
-if (fragileExpansion)
-blockers.push("Fragile expansion");
-
-/* =====================================================
-SIZING INTERPRETATION
-===================================================== */
-
-let sizeLabel = "NO SIZE";
-
-if (size >= 70)
-sizeLabel = "AGGRESSIVE";
-
-else if (size >= 50)
-sizeLabel = "ACTIVE";
-
-else if (size >= 30)
-sizeLabel = "PROBING";
-
-else if (size > 0)
-sizeLabel = "DEFENSIVE";
-
-/* =====================================================
-SMALL METRIC
+METRIC ROW
 ===================================================== */
 
 function Metric({
 label,
 value,
-color
+inverse = false
 }: {
 label: string;
-value: string | number;
-color?: string;
+value: number;
+inverse?: boolean;
 }) {
 
 return (
-
 <div
 style={{
 border: "1px solid #222",
-background: "#111",
+background: "#101010",
 padding: "9px"
 }}
 >
@@ -305,7 +391,7 @@ padding: "9px"
 style={{
 color: "#666",
 fontSize: "9px",
-marginBottom: "5px"
+marginBottom: "4px"
 }}
 >
 {label}
@@ -313,9 +399,9 @@ marginBottom: "5px"
 
 <div
 style={{
-color: color ?? "#aaa",
-fontWeight: "bold",
-fontSize: "14px"
+color: metricColor(value, inverse),
+fontSize: "18px",
+fontWeight: "bold"
 }}
 >
 {value}
@@ -326,6 +412,43 @@ fontSize: "14px"
 }
 
 /* =====================================================
+CANDIDATES
+===================================================== */
+
+const normalizedCandidates = [
+...candidates,
+sizing?.nasdaqPut,
+sizing?.nasdaqCall,
+sizing?.russellCall
+]
+.filter(Boolean)
+.reduce(
+(list: any[], candidate: any) => {
+
+if (
+!list.some(
+item =>
+item?.instrument ===
+candidate?.instrument
+)
+) {
+list.push(candidate);
+}
+
+return list;
+
+},
+[]
+);
+
+/*
+* If the new sizing engine does not yet return
+* candidate objects, do NOT invent allocations.
+*
+* We display the primary sizing only.
+*/
+
+/* =====================================================
 RENDER
 ===================================================== */
 
@@ -333,7 +456,7 @@ return (
 
 <div
 style={{
-background: "#0d0d0d",
+background: "#0b0b0b",
 border: "1px solid #222",
 padding: "14px"
 }}
@@ -348,7 +471,7 @@ style={{
 display: "flex",
 justifyContent: "space-between",
 alignItems: "center",
-marginBottom: "14px"
+marginBottom: "12px"
 }}
 >
 
@@ -379,18 +502,16 @@ fontWeight: "bold"
 
 </div>
 
+
 {/* =================================================
-PRIMARY SIZE
+PRIMARY ALLOCATION
 ================================================= */}
 
 <div
 style={{
-border:
-size > 0
-? `1px solid ${modeColor(mode)}`
-: "1px solid #333",
+border: "1px solid #333",
 background: "#111",
-padding: "14px",
+padding: "12px",
 marginBottom: "12px"
 }}
 >
@@ -399,7 +520,7 @@ marginBottom: "12px"
 style={{
 color: "#666",
 fontSize: "9px",
-marginBottom: "5px"
+marginBottom: "6px"
 }}
 >
 FINAL ALLOCATION
@@ -418,23 +539,31 @@ alignItems: "center"
 <div
 style={{
 color:
-directionColor(direction),
-fontSize: "16px",
-fontWeight: "bold"
+primaryInstrument
+? "#ddd"
+: "#666",
+fontWeight: "bold",
+fontSize: "16px"
 }}
 >
-{direction}
+{primaryInstrument
+? instrumentLabel(
+primaryInstrument
+)
+: "NO PRIMARY TRADE"}
 </div>
 
 <div
 style={{
-color: modeColor(mode),
-fontSize: "10px",
-marginTop: "4px",
-fontWeight: "bold"
+color:
+directionColor(
+sizingDirection
+),
+fontSize: "11px",
+marginTop: "3px"
 }}
 >
-{sizeLabel}
+{sizingDirection}
 </div>
 
 </div>
@@ -448,84 +577,35 @@ textAlign: "right"
 <div
 style={{
 color:
-getSignalColor(size, 100),
-fontSize: "30px",
+getSignalColor(
+finalSize,
+100
+),
+fontSize: "28px",
 fontWeight: "bold"
 }}
 >
-{size}%
+{finalSize}%
 </div>
 
 <div
 style={{
-color: "#555",
-fontSize: "9px"
-}}
->
-MAX {maxSize}%
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-{/* =================================================
-EDGE
-================================================= */}
-
-<div
-style={{
-border:
-`1px solid ${edgeColor(edge)}`,
-background: "#111",
-padding: "12px",
-marginBottom: "12px"
-}}
->
-
-<div
-style={{
-color: "#666",
-fontSize: "9px",
-marginBottom: "5px"
-}}
->
-CENTRAL EDGE
-</div>
-
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-alignItems: "baseline"
-}}
->
-
-<div
-style={{
-color: edgeColor(edge),
-fontSize: "24px",
-fontWeight: "bold"
-}}
->
-{edge > 0 ? "+" : ""}
-{edge.toFixed(1)}
-</div>
-
-<div
-style={{
-color: "#777",
+color:
+modeColor(
+sizingMode
+),
 fontSize: "10px"
 }}
 >
-Base {base} / Opportunity +{opportunity}
+{sizingMode}
 </div>
 
 </div>
 
 </div>
+
+</div>
+
 
 {/* =================================================
 SIZING PIPELINE
@@ -535,7 +615,7 @@ SIZING PIPELINE
 style={{
 border: "1px solid #222",
 background: "#111",
-padding: "12px",
+padding: "11px",
 marginBottom: "12px"
 }}
 >
@@ -545,7 +625,7 @@ style={{
 color: "#999",
 fontSize: "10px",
 fontWeight: "bold",
-marginBottom: "10px"
+marginBottom: "8px"
 }}
 >
 SIZING PIPELINE
@@ -556,32 +636,81 @@ style={{
 display: "grid",
 gridTemplateColumns:
 "repeat(3, 1fr)",
-gap: "7px"
+gap: "8px"
 }}
 >
 
-<Metric
-label="RAW SIZE"
-value={`${rawSize}%`}
-/>
+<div>
+<div
+style={{
+color: "#666",
+fontSize: "8px"
+}}
+>
+RAW SIZE
+</div>
 
-<Metric
-label="RISK ADJUSTED"
-value={`${adjustedSize}%`}
-/>
+<div
+style={{
+color: "#aaa",
+fontWeight: "bold"
+}}
+>
+{rawSize}%
+</div>
+</div>
 
-<Metric
-label="FINAL SIZE"
-value={`${size}%`}
-color={getSignalColor(size, 100)}
-/>
+<div>
+<div
+style={{
+color: "#666",
+fontSize: "8px"
+}}
+>
+RISK ADJUSTED
+</div>
 
+<div
+style={{
+color: "#aaa",
+fontWeight: "bold"
+}}
+>
+{adjustedSize}%
+</div>
+</div>
+
+<div>
+<div
+style={{
+color: "#ddd",
+fontSize: "8px"
+}}
+>
+FINAL
+</div>
+
+<div
+style={{
+color:
+getSignalColor(
+finalSize,
+100
+),
+fontWeight: "bold"
+}}
+>
+{finalSize}%
+</div>
 </div>
 
 </div>
+
+</div>
+
 
 {/* =================================================
-ENGINE COMPONENTS
+ENGINE INPUTS
 ================================================= */}
 
 <div
@@ -589,7 +718,7 @@ style={{
 color: "#999",
 fontSize: "10px",
 fontWeight: "bold",
-marginBottom: "8px"
+marginBottom: "7px"
 }}
 >
 ENGINE INPUTS
@@ -600,7 +729,7 @@ style={{
 display: "grid",
 gridTemplateColumns:
 "repeat(4, 1fr)",
-gap: "6px",
+gap: "7px",
 marginBottom: "12px"
 }}
 >
@@ -608,72 +737,81 @@ marginBottom: "12px"
 <Metric
 label="MASTER"
 value={masterScore}
-color={scoreColor(masterScore)}
 />
 
 <Metric
 label="ROTATION"
 value={rotationScore}
-color={scoreColor(rotationScore)}
+/>
+
+<Metric
+label="CRASH PROB"
+value={crashProb}
+inverse
 />
 
 <Metric
 label="LIQUIDITY"
 value={liquidityScore}
-color={scoreColor(liquidityScore)}
-/>
-
-<Metric
-label="QUALITY"
-value={marketQualityScore}
-color={scoreColor(marketQualityScore)}
 />
 
 <Metric
 label="PARTICIPATION"
 value={participationScore}
-color={scoreColor(participationScore)}
 />
 
 <Metric
 label="FRAGILITY"
 value={fragilityScore}
-color={scoreColor(fragilityScore, true)}
+inverse
 />
 
 <Metric
 label="ROT. DECAY"
 value={rotationDecayScore}
-color={scoreColor(rotationDecayScore, true)}
+inverse
+/>
+
+<Metric
+label="BREADTH VELOCITY"
+value={breadthVelocityScore}
+/>
+
+<Metric
+label="MARKET QUALITY"
+value={marketQualityScore}
 />
 
 <Metric
 label="PERSISTENCE"
 value={persistenceScore}
-color={scoreColor(persistenceScore, true)}
+inverse
+/>
+
+<Metric
+label="THRUST"
+value={thrustStrength}
+/>
+
+<Metric
+label="SQUEEZE RISK"
+value={squeezeRisk}
+inverse
 />
 
 </div>
 
-{/* =================================================
-VALIDATION FLAGS
-================================================= */}
 
-<div
-style={{
-border: "1px solid #222",
-background: "#111",
-padding: "10px",
-marginBottom: "12px"
-}}
->
+{/* =================================================
+VALIDATION
+================================================= */}
 
 <div
 style={{
 color: "#999",
 fontSize: "10px",
 fontWeight: "bold",
-marginBottom: "8px"
+marginBottom: "7px"
 }}
 >
 VALIDATION
@@ -684,139 +822,156 @@ style={{
 display: "grid",
 gridTemplateColumns:
 "repeat(2, 1fr)",
-gap: "5px",
-fontSize: "9px"
-}}
->
-
-<Flag
-label="HEALTHY LIQUIDITY"
-active={healthyLiquidity}
-/>
-
-<Flag
-label="VALIDATED THRUST"
-active={validatedThrust}
-/>
-
-<Flag
-label="POOR MARKET QUALITY"
-active={poorMarketQuality}
-negative
-/>
-
-<Flag
-label="PERSISTENT WEAKNESS"
-active={persistentWeakness}
-negative
-/>
-
-<Flag
-label="NARROW LEADERSHIP"
-active={narrowLeadership}
-negative
-/>
-
-<Flag
-label="SYNTHETIC LIQUIDITY"
-active={syntheticLiquidityRegime}
-negative
-/>
-
-<Flag
-label="INTERNAL DETERIORATION"
-active={internalDeterioration}
-negative
-/>
-
-<Flag
-label="SEVERE BREAKDOWN"
-active={severeInternalBreakdown}
-negative
-/>
-
-</div>
-
-</div>
-
-{/* =================================================
-WHY SIZE
-================================================= */}
-
-<div
-style={{
-border:
-blockers.length > 0
-? "1px solid #5a2525"
-: "1px solid #244d2c",
-background: "#111",
-padding: "10px",
-marginBottom: "10px"
+gap: "7px",
+marginBottom: "12px"
 }}
 >
 
 <div
 style={{
-color: "#999",
-fontSize: "10px",
+border: "1px solid #222",
+background: "#101010",
+padding: "8px"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "8px"
+}}
+>
+HEALTHY LIQUIDITY
+</div>
+
+<div
+style={{
+color:
+meta?.healthyLiquidity
+? "#52c41a"
+: "#777",
 fontWeight: "bold",
-marginBottom: "7px"
+fontSize: "10px",
+marginTop: "3px"
 }}
 >
-SIZING DIAGNOSTIC
+{meta?.healthyLiquidity
+? "YES"
+: "NO"}
 </div>
 
-{blockers.length === 0 ? (
+</div>
 
 <div
 style={{
-color: "#52c41a",
-fontSize: "10px"
+border: "1px solid #222",
+background: "#101010",
+padding: "8px"
 }}
 >
-No major structural sizing blocker.
-</div>
-
-) : (
 
 <div
 style={{
-display: "flex",
-flexWrap: "wrap",
-gap: "5px"
+color: "#666",
+fontSize: "8px"
 }}
 >
+VALIDATED THRUST
+</div>
 
-{blockers.slice(0, 6).map(
-(blocker) => (
-
-<span
-key={blocker}
+<div
 style={{
-border:
-"1px solid #542525",
-background:
-"#1a1010",
-color: "#ff7875",
-padding:
-"4px 6px",
-fontSize: "9px"
+color:
+meta?.validatedThrust
+? "#52c41a"
+: "#777",
+fontWeight: "bold",
+fontSize: "10px",
+marginTop: "3px"
 }}
 >
-{blocker}
-</span>
-
-)
-)}
+{meta?.validatedThrust
+? "YES"
+: "NO"}
+</div>
 
 </div>
 
-)}
+<div
+style={{
+border: "1px solid #222",
+background: "#101010",
+padding: "8px"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "8px"
+}}
+>
+POOR MARKET QUALITY
+</div>
+
+<div
+style={{
+color:
+meta?.poorMarketQuality
+? "#ff4d4f"
+: "#52c41a",
+fontWeight: "bold",
+fontSize: "10px",
+marginTop: "3px"
+}}
+>
+{meta?.poorMarketQuality
+? "YES"
+: "NO"}
+</div>
 
 </div>
+
+<div
+style={{
+border: "1px solid #222",
+background: "#101010",
+padding: "8px"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "8px"
+}}
+>
+STRUCTURAL FRAGILITY
+</div>
+
+<div
+style={{
+color:
+meta?.structurallyFragile
+? "#ff4d4f"
+: "#52c41a",
+fontWeight: "bold",
+fontSize: "10px",
+marginTop: "3px"
+}}
+>
+{meta?.structurallyFragile
+? "YES"
+: "NO"}
+</div>
+
+</div>
+
+</div>
+
 
 {/* =================================================
-FOOTER CONTEXT
+CONTEXT
 ================================================= */}
 
 <div
@@ -824,82 +979,104 @@ style={{
 display: "grid",
 gridTemplateColumns:
 "repeat(4, 1fr)",
-gap: "6px",
-color: "#666",
+gap: "7px",
 fontSize: "9px"
 }}
 >
 
-<Metric
-label="TRADE STRENGTH"
-value={tradeStrength}
-/>
-
-<Metric
-label="REGIME SYNC"
-value={regimeSyncScore}
-/>
-
-<Metric
-label="CRASH PROB."
-value={`${crashProb}%`}
-/>
-
-<Metric
-label="RISK"
-value={riskState}
-/>
-
+<div
+style={{
+border: "1px solid #222",
+padding: "7px",
+background: "#101010"
+}}
+>
+<div style={{ color: "#666" }}>
+RISK
 </div>
-
+<div style={{ color: "#aaa" }}>
+{riskState}
 </div>
-);
-}
-
-
-/* =====================================================
-FLAG
-===================================================== */
-
-function Flag({
-label,
-active,
-negative = false
-}: {
-label: string;
-active: boolean;
-negative?: boolean;
-}) {
-
-let color = "#444";
-
-if (active) {
-color = negative
-? "#ff4d4f"
-: "#52c41a";
-}
-
-return (
+</div>
 
 <div
 style={{
-border:
-`1px solid ${color}`,
-padding: "5px 6px",
-color:
-active
-? color
-: "#555",
-background:
-active
-? negative
-? "#180f0f"
-: "#0f1810"
-: "#111"
+border: "1px solid #222",
+padding: "7px",
+background: "#101010"
 }}
 >
-{active ? "●" : "○"} {label}
+<div style={{ color: "#666" }}>
+DANGER
+</div>
+<div style={{ color: "#aaa" }}>
+{dangerLevel}
+</div>
 </div>
 
+<div
+style={{
+border: "1px solid #222",
+padding: "7px",
+background: "#101010"
+}}
+>
+<div style={{ color: "#666" }}>
+MASTER MODE
+</div>
+<div style={{ color: "#aaa" }}>
+{masterMode}
+</div>
+</div>
+
+<div
+style={{
+border: "1px solid #222",
+padding: "7px",
+background: "#101010"
+}}
+>
+<div style={{ color: "#666" }}>
+TRADE STRENGTH
+</div>
+<div style={{ color: "#aaa" }}>
+{tradeStrength}
+</div>
+</div>
+
+</div>
+
+
+{/* =================================================
+DEBUG / DATA INTEGRITY
+================================================= */}
+
+<div
+style={{
+marginTop: "10px",
+paddingTop: "8px",
+borderTop: "1px solid #1c1c1c",
+color: "#555",
+fontSize: "8px",
+display: "flex",
+justifyContent: "space-between"
+}}
+>
+
+<span>
+SIZING V2
+</span>
+
+<span>
+components:{Object.keys(components).length}
+</span>
+
+<span>
+candidates:{normalizedCandidates.length}
+</span>
+
+</div>
+
+</div>
 );
 }
