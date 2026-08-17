@@ -410,7 +410,7 @@ exit={engine.exit?.long}
 <PositionSizingPanel
 sizing={engine.sizing}
 decision={engine.decision}
-nasdaq={engine.nasdaq}
+
 />
 
 <CrashPanel
