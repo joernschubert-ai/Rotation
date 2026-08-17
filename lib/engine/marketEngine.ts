@@ -1085,6 +1085,54 @@ historyMetrics
 });
 
 
+console.log("PUT DEBUG", {
+putDecision: putTiming?.decision,
+phase,
+masterMode: master?.mode,
+edgeScore: edgeState?.score,
+
+ndxPriceScore:
+priceMomentum?.ndx?.score ??
+priceMomentum?.score,
+
+bearishImpulse:
+priceMomentum?.bearishImpulse,
+
+bullishImpulse:
+priceMomentum?.bullishImpulse,
+
+ndxAcceleration:
+priceMomentum?.ndx?.acceleration,
+
+priceDirection:
+priceMomentum?.direction,
+
+decayState:
+rotationDecay?.state,
+
+decayScore:
+rotationDecay?.score,
+
+breadthTrend:
+historyMetrics?.breadthTrend,
+
+participationDecay:
+historyMetrics?.participationDecay,
+
+phasePersistence:
+historyMetrics?.phasePersistence,
+
+regimePersistence:
+historyMetrics?.regimePersistence,
+
+relativeBreadthWeakness:
+historyMetrics?.relativeBreadthWeakness,
+
+result:
+tradeStack?.nasdaqPut
+});
+
+
 /* =====================================================
 STATE
 ===================================================== */
