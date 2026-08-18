@@ -20,6 +20,14 @@ type LayerState =
 | "BEARISH"
 | "STRONG_BEARISH";
 
+const TIMING_RANK: Record<PutTiming, number> = {
+WAIT: 0,
+EARLY: 1,
+BUILD: 2,
+STRONG: 3,
+MAX: 4
+};
+
 export function putTimingEngine(engine: any) {
 /* =====================================================
 INPUT
@@ -48,13 +56,21 @@ historyMetrics = {}
 NORMALIZATION
 ===================================================== */
 
-const rsSmall = Number(rotation?.rsSmall ?? 1);
-const rsEqual = Number(rotation?.rsEqual ?? 1);
-const rsGrowth = Number(rotation?.rsGrowth ?? 1);
+const rsSmall =
+Number(rotation?.rsSmall ?? 1);
 
-const decayScore = Number(rotationDecay?.score ?? 0);
+const rsEqual =
+Number(rotation?.rsEqual ?? 1);
+
+const rsGrowth =
+Number(rotation?.rsGrowth ?? 1);
+
+const decayScore =
+Number(rotationDecay?.score ?? 0);
+
 const decayState =
-rotationDecay?.state ?? "HEALTHY_ROTATION";
+rotationDecay?.state ??
+"HEALTHY_ROTATION";
 
 const participationScore =
 Number(participation?.score ?? 50);
@@ -76,37 +92,59 @@ breadthThrust?.strength ??
 );
 
 const breadthVelocityScore =
-Number(breadthVelocity?.score ?? 50);
+Number(
+breadthVelocity?.score ?? 50
+);
 
 const breadthVelocityDelta =
-Number(breadthVelocity?.delta ?? 0);
+Number(
+breadthVelocity?.delta ?? 0
+);
 
 const marketQualityScore =
-Number(marketQuality?.score ?? 50);
+Number(
+marketQuality?.score ?? 50
+);
 
 const syntheticStrength =
-Boolean(marketQuality?.syntheticStrength);
+Boolean(
+marketQuality?.syntheticStrength
+);
 
 const unhealthyLiquidity =
-Boolean(marketQuality?.unhealthyLiquidity);
+Boolean(
+marketQuality?.unhealthyLiquidity
+);
 
 const liquidityTrap =
-Boolean(marketQuality?.liquidityTrap);
+Boolean(
+marketQuality?.liquidityTrap
+);
 
 const regimeAligned =
-Boolean(regimeSync?.aligned);
+Boolean(
+regimeSync?.aligned
+);
 
 const vix =
-Number(marketDrivers?.raw?.vix ?? 20);
+Number(
+marketDrivers?.raw?.vix ?? 20
+);
 
 const gamma =
-Number(marketDrivers?.raw?.gamma ?? 0);
+Number(
+marketDrivers?.raw?.gamma ?? 0
+);
 
 const vixTerm =
-Number(marketDrivers?.raw?.vixTerm ?? 1);
+Number(
+marketDrivers?.raw?.vixTerm ?? 1
+);
 
 const credit =
-Number(marketDrivers?.raw?.credit ?? 1);
+Number(
+marketDrivers?.raw?.credit ?? 1
+);
 
 
 /* =====================================================
@@ -114,75 +152,121 @@ PRICE
 ===================================================== */
 
 const priceScore =
-Number(priceMomentum?.score ?? 50);
+Number(
+priceMomentum?.score ?? 50
+);
 
 const momentum5D =
-Number(priceMomentum?.momentum5D ?? 0);
+Number(
+priceMomentum?.momentum5D ?? 0
+);
 
 const momentum20D =
-Number(priceMomentum?.momentum20D ?? 0);
+Number(
+priceMomentum?.momentum20D ?? 0
+);
 
 const acceleration =
-Number(priceMomentum?.acceleration ?? 0);
+Number(
+priceMomentum?.acceleration ?? 0
+);
 
 const priceState =
-priceMomentum?.state ?? "NEUTRAL";
+priceMomentum?.state ??
+"NEUTRAL";
 
 const structureAlignment =
-priceMomentum?.structureAlignment ?? "UNKNOWN";
+priceMomentum?.structureAlignment ??
+"UNKNOWN";
 
 const earlyBearish =
-Boolean(priceMomentum?.earlyBearish);
+Boolean(
+priceMomentum?.earlyBearish
+);
 
 const bearishImpulse =
-Boolean(priceMomentum?.bearishImpulse);
+Boolean(
+priceMomentum?.bearishImpulse
+);
 
 const bullishImpulse =
-Boolean(priceMomentum?.bullishImpulse);
+Boolean(
+priceMomentum?.bullishImpulse
+);
 
 const cooling =
-Boolean(priceMomentum?.cooling);
+Boolean(
+priceMomentum?.cooling
+);
 
 const accelerating =
-Boolean(priceMomentum?.accelerating);
+Boolean(
+priceMomentum?.accelerating
+);
 
 const decelerating =
-Boolean(priceMomentum?.decelerating);
+Boolean(
+priceMomentum?.decelerating
+);
 
 const priceLeadingStructure =
-Boolean(priceMomentum?.priceLeadingStructure);
+Boolean(
+priceMomentum?.priceLeadingStructure
+);
 
 const structureLeadingPrice =
-Boolean(priceMomentum?.structureLeadingPrice);
+Boolean(
+priceMomentum?.structureLeadingPrice
+);
 
 
 /* =====================================================
 HISTORY
+
+IMPORTANT:
+History is sourced exclusively from
+engine.historyMetrics.
 ===================================================== */
 
 const breadthTrend =
-Number(historyMetrics?.breadthTrend ?? 0);
+Number(
+historyMetrics?.breadthTrend ?? 0
+);
 
 const breadthAcceleration =
-Number(historyMetrics?.breadthAcceleration ?? 0);
+Number(
+historyMetrics?.breadthAcceleration ?? 0
+);
 
 const participationDecay =
-Number(historyMetrics?.participationDecay ?? 0);
+Number(
+historyMetrics?.participationDecay ?? 0
+);
 
 const leadershipDecay =
-Number(historyMetrics?.leadershipDecay ?? 0);
+Number(
+historyMetrics?.leadershipDecay ?? 0
+);
 
 const crashTrend =
-Number(historyMetrics?.crashTrend ?? 0);
+Number(
+historyMetrics?.crashTrend ?? 0
+);
 
 const phasePersistence =
-Number(historyMetrics?.phasePersistence ?? 0);
+Number(
+historyMetrics?.phasePersistence ?? 0
+);
 
 const regimePersistence =
-Number(historyMetrics?.regimePersistence ?? 0);
+Number(
+historyMetrics?.regimePersistence ?? 0
+);
 
 const relativeBreadthWeakness =
-Number(historyMetrics?.relativeBreadthWeakness ?? 0);
+Number(
+historyMetrics?.relativeBreadthWeakness ?? 0
+);
 
 
 /* =====================================================
@@ -353,7 +437,8 @@ let structuralScore = 0;
 * Rotation deterioration
 */
 
-structuralScore += rotationWeight;
+structuralScore +=
+rotationWeight;
 
 /*
 * Participation
@@ -451,8 +536,6 @@ STRUCTURAL STATE
 const structuralState: LayerState =
 structuralBreakdown
 ? "STRONG_BEARISH"
-: structuralScore >= 12
-? "BEARISH"
 : structuralScore >= 7
 ? "BEARISH"
 : structuralScore >= 4
@@ -602,25 +685,6 @@ decayScore < 60
 )
 contradiction += 2;
 
-/*
-* No panic is irrelevant for normal
-* structural PUT building.
-*/
-
-/*
-* Healthy credit / term structure
-* only reduces PANIC confidence.
-*/
-
-const panicContradiction =
-!panicConfirmed
-? (
-(gamma >= 0 ? 1 : 0) +
-(vixTerm > 0.90 ? 1 : 0) +
-(credit < 1.0 ? 1 : 0)
-)
-: 0;
-
 contradiction =
 Math.min(
 8,
@@ -676,7 +740,8 @@ timingScore += 1;
 * Contradiction only affects timing.
 */
 
-timingScore -= contradiction;
+timingScore -=
+contradiction;
 
 timingScore =
 Math.max(
@@ -696,10 +761,13 @@ let timing: PutTiming = "WAIT";
 
 if (timingScore >= 38)
 timing = "MAX";
+
 else if (timingScore >= 30)
 timing = "STRONG";
+
 else if (timingScore >= 20)
 timing = "BUILD";
+
 else if (timingScore >= 12)
 timing = "EARLY";
 
@@ -709,8 +777,6 @@ CRITICAL PRICE OVERRIDE
 ===================================================== */
 
 /*
-* This is one of the most important rules.
-*
 * Structural deterioration + rising NASDAQ
 * means:
 *
@@ -730,13 +796,17 @@ if (
 strongBullishCounterMove &&
 !panicConfirmed
 ) {
-if (timing === "MAX")
+if (TIMING_RANK[timing] >= TIMING_RANK.MAX)
 timing = "BUILD";
 
-else if (timing === "STRONG")
+else if (
+TIMING_RANK[timing] >= TIMING_RANK.STRONG
+)
 timing = "BUILD";
 
-else if (timing === "BUILD")
+else if (
+TIMING_RANK[timing] >= TIMING_RANK.BUILD
+)
 timing = "EARLY";
 }
 
@@ -765,7 +835,8 @@ panicStrength >= 6;
 DECISION
 ===================================================== */
 
-let decision: PutTimingDecision = "NO_TRADE";
+let decision: PutTimingDecision =
+"NO_TRADE";
 
 
 /*
@@ -799,16 +870,19 @@ if (
 timing === "BUILD" &&
 structuralScore >= 8
 )
-decision = "STRUCTURAL_BUILD";
+decision =
+"STRUCTURAL_BUILD";
 
 else if (
 timing === "EARLY" &&
 earlyBearish
 )
-decision = "DEFENSIVE_BUILD";
+decision =
+"DEFENSIVE_BUILD";
 
 else
-decision = "NO_TRADE";
+decision =
+"NO_TRADE";
 }
 
 
@@ -831,38 +905,52 @@ phase ===
 if (
 structuralBreakdown
 ) {
+
 decision =
 panicEligible
 ? "PANIC_SHORT"
 : "STRUCTURAL_BUILD";
+
 }
 
 else if (
 structuralScore >= 10 &&
-timing >= "BUILD"
+TIMING_RANK[timing] >=
+TIMING_RANK.BUILD
 ) {
+
 decision =
-timing === "STRONG"
+TIMING_RANK[timing] >=
+TIMING_RANK.STRONG
 ? "TRANSITIONAL_SHORT"
 : "STRUCTURAL_BUILD";
+
 }
 
 else if (
 structuralScore >= 6 &&
 timing === "BUILD"
 ) {
-decision = "STRUCTURAL_BUILD";
+
+decision =
+"STRUCTURAL_BUILD";
+
 }
 
 else if (
 structuralScore >= 4 &&
 timing === "EARLY"
 ) {
-decision = "DEFENSIVE_BUILD";
+
+decision =
+"DEFENSIVE_BUILD";
+
 }
 
 else {
-decision = "NO_TRADE";
+
+decision =
+"NO_TRADE";
 }
 }
 
@@ -877,32 +965,44 @@ phase ===
 ) {
 
 if (panicEligible) {
+
 decision =
 timing === "MAX"
 ? "PANIC_SHORT"
 : "TRANSITIONAL_SHORT";
+
 }
 
 else if (
 structuralScore >= 12 &&
 priceStateForPut !== "BULLISH" &&
-timing !== "WAIT"
+TIMING_RANK[timing] >
+TIMING_RANK.WAIT
 ) {
+
 decision =
-timing === "STRONG"
+TIMING_RANK[timing] >=
+TIMING_RANK.STRONG
 ? "TRANSITIONAL_SHORT"
 : "STRUCTURAL_BUILD";
+
 }
 
 else if (
 structuralScore >= 7 &&
-timing !== "WAIT"
+TIMING_RANK[timing] >
+TIMING_RANK.WAIT
 ) {
-decision = "DEFENSIVE_BUILD";
+
+decision =
+"DEFENSIVE_BUILD";
+
 }
 
 else {
-decision = "NO_TRADE";
+
+decision =
+"NO_TRADE";
 }
 }
 
@@ -916,20 +1016,32 @@ phase ===
 "PHASE_5_BREAKDOWN"
 ) {
 
-if (panicEligible)
-decision = "PANIC_SHORT";
+if (panicEligible) {
+
+decision =
+"PANIC_SHORT";
+
+}
 
 else if (
 structuralScore >= 12 &&
-timing >= "BUILD"
-)
+TIMING_RANK[timing] >=
+TIMING_RANK.BUILD
+) {
+
 decision =
-timing === "STRONG"
+TIMING_RANK[timing] >=
+TIMING_RANK.STRONG
 ? "TRANSITIONAL_SHORT"
 : "STRUCTURAL_BUILD";
 
-else
-decision = "DEFENSIVE_BUILD";
+}
+
+else {
+
+decision =
+"DEFENSIVE_BUILD";
+}
 }
 
 
@@ -945,10 +1057,12 @@ phase ===
 ) {
 
 if (panicEligible)
-decision = "PANIC_SHORT";
+decision =
+"PANIC_SHORT";
 
 else
-decision = "TRANSITIONAL_SHORT";
+decision =
+"TRANSITIONAL_SHORT";
 }
 
 
@@ -966,15 +1080,20 @@ bullishImpulse &&
 priceScore >= 70 &&
 !panicEligible
 ) {
-if (
-decision === "PANIC_SHORT"
-)
-decision = "TRANSITIONAL_SHORT";
 
 if (
-decision === "TRANSITIONAL_SHORT"
+decision ===
+"PANIC_SHORT"
 )
-decision = "STRUCTURAL_BUILD";
+decision =
+"TRANSITIONAL_SHORT";
+
+if (
+decision ===
+"TRANSITIONAL_SHORT"
+)
+decision =
+"STRUCTURAL_BUILD";
 }
 
 
@@ -982,31 +1101,38 @@ decision = "STRUCTURAL_BUILD";
 EXECUTION
 ===================================================== */
 
-let execution = "NONE";
+let execution =
+"NONE";
 
 switch (decision) {
 
 case "DEFENSIVE_BUILD":
-execution = "SMALL STARTER";
+execution =
+"SMALL STARTER";
 break;
 
 case "STRUCTURAL_BUILD":
-execution = "PARTIAL SIZE";
+execution =
+"PARTIAL SIZE";
 break;
 
 case "TRANSITIONAL_SHORT":
-execution = "PARTIAL SIZE";
+execution =
+"PARTIAL SIZE";
 break;
 
 case "PANIC_SHORT":
+
 execution =
 timing === "MAX"
 ? "FULL SIZE"
 : "PARTIAL SIZE";
+
 break;
 
 default:
-execution = "NONE";
+execution =
+"NONE";
 }
 
 
@@ -1167,14 +1293,27 @@ volatilityExpansion,
 regimeAligned,
 
 institutionalState:
-decision === "PANIC_SHORT"
+
+decision ===
+"PANIC_SHORT"
+
 ? "PANIC_SHORT"
-: decision === "TRANSITIONAL_SHORT"
+
+: decision ===
+"TRANSITIONAL_SHORT"
+
 ? "TRANSITIONAL_SHORT"
-: decision === "STRUCTURAL_BUILD"
+
+: decision ===
+"STRUCTURAL_BUILD"
+
 ? "STRUCTURAL_SHORT"
-: decision === "DEFENSIVE_BUILD"
+
+: decision ===
+"DEFENSIVE_BUILD"
+
 ? "DEFENSIVE_SHORT"
+
 : "NEUTRAL"
 },
 
