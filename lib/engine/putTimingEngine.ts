@@ -1372,6 +1372,38 @@ value: rotationWeight,
 max: 6
 },
 
+crash: {
+value:
+crashProbability >= 75
+? 6
+: crashProbability >= 60
+? 4
+: crashProbability >= 40
+? 2
+: 0,
+max: 6
+},
+
+earlyWarning: {
+value:
+earlyWarning?.active
+? 1
+: 0,
+max: 2
+},
+
+decay: {
+value:
+decayScore >= 80
+? 4
+: decayScore >= 60
+? 3
+: decayScore >= 45
+? 1
+: 0,
+max: 4
+},
+
 structural: {
 value: structuralScore,
 max: 20
@@ -1392,5 +1424,6 @@ value: contradiction,
 max: 8
 }
 }
+
 };
 }
