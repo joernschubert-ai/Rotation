@@ -732,16 +732,87 @@ strength,
 );
 }
 
+/* --------------------------------------------------
+DEBUG — NASDAQ PUT
+-------------------------------------------------- */
 
-strength =
+console.log(
+"[TRADE STACK PUT]",
+{
+timestamp: new Date().toISOString(),
+
+putDecision,
+
+baseInputs: {
+mode,
+edgeScore,
+edgeTier,
+phase,
+phaseConfirmed,
+phaseConfidence,
+},
+
+rotation: {
+rotationState,
+rotationConfidence,
+rotationQuality,
+sustainability,
+rotationParticipation,
+falseBreakRisk,
+},
+
+decay: {
+decayState,
+decayScore,
+},
+
+history: {
+breadthTrend,
+breadthAcceleration,
+participationDecay,
+leadershipDecay,
+crashTrend,
+phasePersistence,
+regimePersistence,
+relativeBreadthWeakness,
+},
+
+price: {
+ndxPriceScore,
+ndxMomentum5D,
+ndxMomentum20D,
+ndxAcceleration,
+priceDirection,
+bullishImpulse,
+bearishImpulse,
+coolingPrice,
+priceConflict,
+},
+
+flags: {
+deterioratingBreadth,
+acceleratingBreadthDecay,
+participationErosion,
+prolongedDistribution,
+prolongedBearRegime,
+severeBearRegime,
+broadParticipationFailure,
+severeParticipationFailure,
+},
+
+calculatedStrengthBeforeClamp:
+strength,
+
+finalStrength:
 Math.max(
 0,
 Math.min(
 100,
 Math.round(strength)
 )
+),
+}
 );
-
 
 /* --------------------------------------------------
 STATE
@@ -1409,6 +1480,111 @@ evaluateNasdaqCall();
 
 const russellCallStack =
 evaluateRussellCall();
+
+/* ======================================================
+DEBUG — TRADE STACK INPUT / OUTPUT
+====================================================== */
+
+console.log(
+"[TRADE STACK DEBUG]",
+{
+timestamp: new Date().toISOString(),
+
+// -------------------------
+// FINAL INPUTS
+// -------------------------
+phase,
+putDecision,
+nasdaqCallDecision,
+russellDecision,
+
+mode,
+
+edgeScore,
+edgeTier,
+
+executionMode,
+phaseConfirmed,
+phaseConfidence,
+
+rotationState,
+rotationConfidence,
+rotationQuality,
+sustainability,
+rotationParticipation,
+falseBreakRisk,
+
+decayState,
+decayScore,
+
+regimeAligned,
+institutionalAligned,
+
+// -------------------------
+// PRICE MOMENTUM
+// -------------------------
+priceScore,
+priceState,
+priceDirection,
+priceAcceleration,
+
+ndxPriceScore,
+ndxMomentum5D,
+ndxMomentum20D,
+ndxAcceleration,
+
+rutPriceScore,
+rutMomentum5D,
+rutMomentum20D,
+rutAcceleration,
+
+// -------------------------
+// HISTORY
+// -------------------------
+breadthTrend,
+breadthAcceleration,
+participationDecay,
+leadershipDecay,
+crashTrend,
+phasePersistence,
+regimePersistence,
+relativeBreadthWeakness,
+
+// -------------------------
+// CALCULATED FLAGS
+// -------------------------
+deterioratingBreadth,
+acceleratingBreadthDecay,
+participationErosion,
+severeParticipationErosion,
+prolongedDistribution,
+prolongedBearRegime,
+severeBearRegime,
+broadParticipationFailure,
+
+// -------------------------
+// RESULT
+// -------------------------
+NASDAQ_PUT: {
+strength: nasdaqPutStack.strength,
+state: nasdaqPutStack.state,
+driver: nasdaqPutStack.driver,
+},
+
+NASDAQ_CALL: {
+strength: nasdaqCallStack.strength,
+state: nasdaqCallStack.state,
+driver: nasdaqCallStack.driver,
+},
+
+RUSSELL_CALL: {
+strength: russellCallStack.strength,
+state: russellCallStack.state,
+driver: russellCallStack.driver,
+},
+}
+);
+
 
 
 /* ======================================================
