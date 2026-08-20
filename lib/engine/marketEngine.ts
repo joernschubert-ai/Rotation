@@ -29,6 +29,7 @@ import { tradeStackEngine } from "./tradeStackEngine";
 
 import { rotationConfirmEngine } from "./rotationConfirmEngine";
 import { rotationDecayEngine } from "./rotationDecayEngine";
+import { regimePersistenceEngine } from "./regimePersistenceEngine";
 
 import { executionStateEngine } from "./executionStateEngine";
 import { regimeSyncEngine } from "./regimeSyncEngine";
@@ -350,6 +351,62 @@ divergence.state
 });
 
 /* =====================================================
+REGIME PERSISTENCE — PRE PHASE
+===================================================== */
+
+const regimePersistence =
+regimePersistenceEngine({
+
+breadth50,
+breadth200,
+
+participationScore:
+Number(participation?.score ?? 50),
+
+/*
+* RotationDecay existiert zu diesem Zeitpunkt noch nicht.
+* Die Persistence Engine soll die historische/
+* strukturelle Persistenz beurteilen, nicht sich selbst
+* über nachgelagerte Engines zirkulär beeinflussen.
+*/
+rotationDecayScore: 0,
+
+/*
+* DangerZone entsteht ebenfalls erst nach der Phase.
+*/
+dangerScore: 0,
+
+fragilityScore:
+Number(fragility?.score ?? 50),
+
+internalDivergenceScore:
+Number(
+divergence?.score ?? 0
+),
+
+breadth50History:
+historyMetrics?.breadth50History ?? [],
+
+breadth200History:
+historyMetrics?.breadth200History ?? [],
+
+participationHistory:
+historyMetrics?.participationHistory ?? [],
+
+/*
+* Noch keine echte RotationDecay-Historie notwendig.
+* Die Engine kann trotzdem Breadth/Participation-Persistenz
+* bewerten.
+*/
+rotationDecayHistory:
+historyMetrics?.rotationDecayHistory ?? [],
+
+phase:
+"PRE_PHASE"
+});
+
+
+/* =====================================================
 FINAL ROTATION
 ===================================================== */
 /*
@@ -477,7 +534,8 @@ structure,
 russell: russellTemp,
 historyMetrics,
 
-priceMomentum
+priceMomentum,
+regimePersistence
 
 });
 
@@ -562,6 +620,7 @@ breadth200,
 fragility,
 participation,
 breadthThrust
+
 });
 
 /* =====================================================
@@ -707,6 +766,7 @@ historyMetrics?.leadershipDecay,
 relativeBreadthWeakness:
 historyMetrics?.relativeBreadthWeakness,
 });
+
 
 /* =====================================================
 ROTATION CONFIRM
@@ -888,6 +948,7 @@ participation,
 breadthThrust,
 
 marketQuality
+
 });
 
 /* =====================================================
@@ -1444,6 +1505,7 @@ rotation,
 rotationConfirm,
 rotationDecay,
 
+regimePersistence,
 signal,
 superSignal,
 
