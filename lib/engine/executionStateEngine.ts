@@ -1,49 +1,55 @@
-// /lib/engine/executionStateEngine.ts
-
 export interface ExecutionStateInput {
-regimeSignal?: string
+regimeSignal?: string;
 
-crashProbability: number
-dangerScore: number
-stressScore: number
+crashProbability: number;
+dangerScore: number;
+stressScore: number;
 
-rotationSignal?: string
-rotationStrength: number
+rotationSignal?: string;
+rotationStrength: number;
 
-breadth200: number
-breadth50: number
+breadth200: number;
+breadth50: number;
 
-gammaExposure: number
-liquidityScore: number
+gammaExposure: number;
+liquidityScore: number;
 
-volatilityState?: string
+volatilityState?: string;
 
-regimeSyncScore?: number
-regimeSyncState?: string
+regimeSyncScore?: number;
+regimeSyncState?: string;
 
-confidence?: number
+confidence?: number;
 
-rotationDecayScore?: number
-fragilityScore?: number
-participationScore?: number
-falseBreakRisk?: number
-squeezeRisk?: number
+rotationDecayScore?: number;
+fragilityScore?: number;
+participationScore?: number;
+falseBreakRisk?: number;
+squeezeRisk?: number;
 
-narrowLeadership?: boolean
-divergenceState?: string
+narrowLeadership?: boolean;
+divergenceState?: string;
 
-internalDivergence?: any
+internalDivergence?: any;
+regimePersistence?: any;
 
-regimePersistence?: any
+concentrationScore?: number;
+vix?: number;
 
-concentrationScore?: number
-vix?: number
-
-masterScore?: number
+/*
+* Optional contextual input.
+*
+* IMPORTANT:
+* masterScore is intentionally NOT used to determine
+* the primary market regime. This avoids a circular
+* dependency:
+*
+* executionState -> master -> executionState
+*/
+masterScore?: number;
 }
 
 export interface ExecutionStateOutput {
-
 marketMode:
 | "RISK_ON"
 | "RISK_OFF"
@@ -53,40 +59,40 @@ marketMode:
 | "ROTATIONAL_STRESS"
 | "INTERNAL_DISTRIBUTION"
 | "VOLATILE_EXPANSION"
-| "LATE_CYCLE_MELTUP"
+| "LATE_CYCLE_MELTUP";
 
 tacticalBias:
 | "LONG_SMALL_CAPS"
 | "LONG_TECH"
 | "DEFENSIVE"
 | "SHORT_INDEX"
-| "NEUTRAL"
+| "NEUTRAL";
 
 riskState:
 | "STABLE"
 | "FRAGILE"
 | "INTERNAL_BREAKDOWN"
 | "BREAKDOWN"
-| "CRISIS"
+| "CRISIS";
 
 executionMode:
 | "ADD_ON_PULLBACKS"
 | "BUILD_POSITION"
 | "REDUCE_RISK"
 | "DEFENSIVE"
-| "WAIT"
+| "WAIT";
 
 urgency:
 | "LOW"
 | "MEDIUM"
 | "HIGH"
-| "EXTREME"
+| "EXTREME";
 
-confidence: number
+confidence: number;
 
-regimeAlignment: boolean
+regimeAlignment: boolean;
 
-summary: string
+summary: string;
 }
 
 export function executionStateEngine(
@@ -109,6 +115,8 @@ breadth50,
 gammaExposure,
 liquidityScore,
 
+volatilityState = "NORMAL",
+
 regimeSyncScore = 50,
 regimeSyncState = "TRANSITION",
 
@@ -124,14 +132,14 @@ narrowLeadership = false,
 divergenceState = "NONE",
 
 internalDivergence = {},
-
 regimePersistence = {},
 
 concentrationScore = 50,
 vix = 20,
 
-masterScore = 50
-} = input
+masterScore: _masterScore = 50
+
+} = input;
 
 /* =====================================================
 SAFE REGIME
@@ -140,289 +148,275 @@ SAFE REGIME
 const regimeSignal =
 typeof rawRegimeSignal === "string"
 ? rawRegimeSignal
-: "NEUTRAL"
+: "NEUTRAL";
+
 
 /* =====================================================
-INTERNAL DIVERGENCE ENGINE
+INTERNAL DIVERGENCE
 ===================================================== */
 
 const divergenceSeverity =
 Number(
 internalDivergence?.severity ?? 0
-)
+);
 
 const internalState =
-internalDivergence?.state ??
-"NONE"
+internalDivergence?.state ?? "NONE";
 
 const hiddenDistribution =
-internalDivergence?.hiddenDistribution ??
-false
+internalDivergence?.hiddenDistribution ?? false;
 
 const participationCollapse =
-internalDivergence?.participationCollapse ??
-false
+internalDivergence?.participationCollapse ?? false;
 
 const internalNarrowLeadership =
-internalDivergence?.narrowLeadership ??
-false
+internalDivergence?.narrowLeadership ?? false;
+
 
 /* =====================================================
-REGIME PERSISTENCE ENGINE
+REGIME PERSISTENCE
 ===================================================== */
 
 const persistenceScore =
 Number(
 regimePersistence?.score ?? 50
-)
+);
 
 const persistenceState =
-regimePersistence?.state ??
-"NEUTRAL"
+regimePersistence?.state ?? "NEUTRAL";
 
 const persistentWeakness =
-regimePersistence?.persistentWeakness ??
-false
+regimePersistence?.persistentWeakness ?? false;
 
 const persistentDistribution =
-regimePersistence?.persistentDistribution ??
-false
+regimePersistence?.persistentDistribution ?? false;
 
 const persistentRisk =
-regimePersistence?.persistentRisk ??
-false
+regimePersistence?.persistentRisk ?? false;
 
 const failedRecovery =
-regimePersistence?.failedRecovery ??
-false
+regimePersistence?.failedRecovery ?? false;
 
 const bounceLikelyTemporary =
-regimePersistence?.bounceLikelyTemporary ??
-false
+regimePersistence?.bounceLikelyTemporary ?? false;
 
 const recoveryConfidence =
 Number(
-regimePersistence?.recoveryConfidence ??
-50
-)
+regimePersistence?.recoveryConfidence ?? 50
+);
 
-const bearishDivergence = (
-
-divergenceState === "BEARISH_DIVERGENCE"
-
-) || (
-
-internalState ===
-"HIDDEN_DISTRIBUTION"
-
-) || (
-
-divergenceSeverity >= 40
-
-)
 
 /* =====================================================
-NEW STRUCTURAL STATES
+DIVERGENCE CLASSIFICATION
 ===================================================== */
 
-const aiLeadershipFragility = (
+const bearishDivergence =
+divergenceState === "BEARISH_DIVERGENCE" ||
+internalState === "HIDDEN_DISTRIBUTION" ||
+divergenceSeverity >= 40;
 
-concentrationScore >= 82 &&
 
-(
+const bullishDivergence =
+divergenceState === "BULLISH_DIVERGENCE" &&
+divergenceSeverity < 40;
+
+
+/* =====================================================
+LEADERSHIP / CONCENTRATION
+===================================================== */
+
+const effectiveNarrowLeadership =
 narrowLeadership ||
-internalNarrowLeadership
-) &&
+internalNarrowLeadership;
 
-participationScore < 58
 
-)
+const aiLeadershipFragility =
+concentrationScore >= 82 &&
+effectiveNarrowLeadership &&
+participationScore < 58;
 
-const rotationalCompression = (
 
+/* =====================================================
+ROTATIONAL COMPRESSION
+===================================================== */
+
+const rotationalCompression =
 rotationDecayScore >= 38 &&
 rotationDecayScore < 65 &&
-
 participationScore < 58 &&
+breadth50 > 52;
 
-breadth50 > 52
 
-)
+/* =====================================================
+EXPANSION EXHAUSTION
+===================================================== */
 
-const expansionExhaustion = (
-
+const expansionExhaustion =
 breadth50 > 68 &&
-
 participationScore < 55 &&
+rotationDecayScore >= 42;
 
-rotationDecayScore >= 42
-
-)
 
 /* =====================================================
 INSTITUTIONAL DISTRIBUTION
 ===================================================== */
 
-const institutionalDistribution = (
-
-(
-narrowLeadership ||
-internalNarrowLeadership
-) &&
-
+const institutionalDistribution =
+effectiveNarrowLeadership &&
 participationScore < 50 &&
-
 rotationDecayScore >= 45 &&
-
 (
 hiddenDistribution ||
 persistentDistribution
-)
+);
 
-)
 
-const volatileExpansion = (
+/* =====================================================
+VOLATILE EXPANSION
+===================================================== */
 
+const volatileExpansion =
 vix >= 22 &&
 vix < 35 &&
-
 breadth50 > 58 &&
 breadth200 > 52 &&
+liquidityScore > 55 &&
+!persistentDistribution &&
+!institutionalDistribution;
 
-liquidityScore > 55
 
-)
+/* =====================================================
+LATE CYCLE MELT-UP
+===================================================== */
 
-const lateCycleMeltup = (
-
+const lateCycleMeltup =
 aiLeadershipFragility &&
-
 liquidityScore >= 65 &&
-
 vix < 18 &&
-
 breadth50 > 62 &&
+gammaExposure > 0 &&
+participationScore >= 50 &&
+!persistentDistribution &&
+!institutionalDistribution;
 
-gammaExposure > 0
 
-)
+/* =====================================================
+DEFENSIVE TRANSITION
 
-const defensiveTransition = (
+IMPORTANT:
+No masterScore dependency.
 
-masterScore > 52 &&
+This prevents:
 
+executionState
+↓
+master
+↓
+executionState
+
+Instead the transition is derived from
+independent structural/risk information.
+===================================================== */
+
+const defensiveTransition =
 (
-participationScore < 40 ||
-participationCollapse
+participationScore < 45 ||
+participationCollapse ||
+persistentWeakness ||
+failedRecovery
 ) &&
+rotationDecayScore >= 35 &&
+(
+fragilityScore >= 55 ||
+dangerScore >= 45 ||
+persistentRisk ||
+bearishDivergence
+);
 
-rotationDecayScore > 40
-
-)
 
 /* =====================================================
 STRUCTURAL WEAKNESS
 ===================================================== */
 
-const structuralWeakness = (
-
+const structuralWeakness =
 breadth50 < 58 ||
-
 breadth200 < 50 ||
-
 participationScore < 55 ||
-
-narrowLeadership ||
-
+effectiveNarrowLeadership ||
 bearishDivergence ||
-
 rotationalCompression ||
-
 expansionExhaustion ||
-
 hiddenDistribution ||
-
 institutionalDistribution ||
-
 divergenceSeverity >= 35 ||
-
 persistentWeakness ||
-
 persistentDistribution ||
-
 persistentRisk ||
+failedRecovery;
 
-failedRecovery
-
-)
 
 /* =====================================================
-BREAKDOWN FILTER
+CONFIRMED BREAKDOWN
 ===================================================== */
 
-const confirmedBreakdown = (
-
+const confirmedBreakdown =
 rotationDecayScore >= 60 &&
-
 (
 participationScore < 40 ||
 participationCollapse
 ) &&
+breadth50 < 45;
 
-breadth50 < 45
-
-)
 
 /* =====================================================
 INTERNAL BREAKDOWN
+
+Important distinction:
+
+weak internals + low crash probability
+does NOT automatically mean market crash.
+
+It means internal deterioration.
 ===================================================== */
 
-const internalBreakdown = (
-
+const internalBreakdown =
 (
 participationScore < 40 ||
 participationCollapse
 ) &&
-
 (
-narrowLeadership ||
-internalNarrowLeadership
+effectiveNarrowLeadership ||
+hiddenDistribution ||
+bearishDivergence
 ) &&
+crashProbability < 30;
 
-crashProbability < 30
-
-)
 
 /* =====================================================
-PERSISTENT DISTRIBUTION FILTER
+PERSISTENT DISTRIBUTION
 ===================================================== */
 
-const persistentDistributionRegime = (
-
+const persistentDistributionRegime =
 persistentDistribution &&
-
 rotationDecayScore >= 38 &&
+participationScore < 58;
 
-participationScore < 58
-
-)
 
 /* =====================================================
-NEW FRAGILE FILTER
+FRAGILE REGIME
 ===================================================== */
 
-const fragileRegime = (
-
+const fragileRegime =
+(
 fragilityScore > 50 &&
-
 participationScore < 50 &&
-
 rotationDecayScore >= 30
+) ||
+bounceLikelyTemporary;
 
-)
 
 /* =====================================================
-RISK STATE
+CRISIS / BREAKDOWN / FRAGILE
 ===================================================== */
 
 let riskState:
@@ -430,7 +424,12 @@ let riskState:
 | "FRAGILE"
 | "INTERNAL_BREAKDOWN"
 | "BREAKDOWN"
-| "CRISIS"
+| "CRISIS";
+
+
+/* =====================================================
+CRISIS
+===================================================== */
 
 if (
 
@@ -459,8 +458,14 @@ breadth50 < 45
 
 ) {
 
-riskState = "CRISIS"
+riskState = "CRISIS";
+
 }
+
+
+/* =====================================================
+INTERNAL BREAKDOWN
+===================================================== */
 
 else if (
 
@@ -472,8 +477,14 @@ fragilityScore < 70
 
 ) {
 
-riskState = "INTERNAL_BREAKDOWN"
+riskState = "INTERNAL_BREAKDOWN";
+
 }
+
+
+/* =====================================================
+BREAKDOWN
+===================================================== */
 
 else if (
 
@@ -506,8 +517,14 @@ breadth50 < 45
 
 ) {
 
-riskState = "BREAKDOWN"
+riskState = "BREAKDOWN";
+
 }
+
+
+/* =====================================================
+FRAGILE
+===================================================== */
 
 else if (
 
@@ -533,17 +550,76 @@ divergenceSeverity >= 30 ||
 
 persistentWeakness ||
 
+persistentDistribution ||
+
 bounceLikelyTemporary
 
 ) {
 
-riskState = "FRAGILE"
+riskState = "FRAGILE";
+
 }
+
+
+/* =====================================================
+STABLE
+===================================================== */
 
 else {
 
-riskState = "STABLE"
+riskState = "STABLE";
+
 }
+
+
+/* =====================================================
+HARD RISK STATE
+
+Centralized because the following MARKET MODE
+branches are evaluated after the hard-risk branch.
+This also prevents TypeScript control-flow
+narrowing errors.
+===================================================== */
+
+const hardRiskOff =
+riskState === "CRISIS" ||
+riskState === "BREAKDOWN";
+
+
+/* =====================================================
+HEALTHY EXPANSION
+===================================================== */
+
+const healthyExpansion =
+
+breadth50 > 62 &&
+
+breadth200 > 55 &&
+
+participationScore >= 60 &&
+
+rotationDecayScore < 28 &&
+
+!effectiveNarrowLeadership &&
+
+!bearishDivergence &&
+
+!hiddenDistribution &&
+
+!institutionalDistribution &&
+
+!persistentWeakness &&
+
+!persistentDistribution &&
+
+!persistentRisk &&
+
+!failedRecovery &&
+
+!bounceLikelyTemporary &&
+
+recoveryConfidence >= 60;
+
 
 /* =====================================================
 MARKET MODE
@@ -558,85 +634,44 @@ let marketMode:
 | "ROTATIONAL_STRESS"
 | "INTERNAL_DISTRIBUTION"
 | "VOLATILE_EXPANSION"
-| "LATE_CYCLE_MELTUP"
+| "LATE_CYCLE_MELTUP";
 
-const healthyExpansion = (
 
-breadth50 > 62 &&
-breadth200 > 55 &&
-
-participationScore >= 60 &&
-
-rotationDecayScore < 28 &&
-
-!narrowLeadership &&
-
-!bearishDivergence &&
-
-!hiddenDistribution &&
-
-!institutionalDistribution &&
-
-!persistentWeakness &&
-
-recoveryConfidence >= 60
-
-)
+/* =====================================================
+1. HARD RISK OFF
+===================================================== */
 
 if (
 
+hardRiskOff
+
+) {
+
+marketMode = "RISK_OFF";
+
+}
+
+
+/* =====================================================
+2. DEFENSIVE TRANSITION
+===================================================== */
+
+else if (
+
 defensiveTransition &&
 
-riskState !== "BREAKDOWN" &&
-riskState !== "CRISIS"
+!hardRiskOff
 
 ) {
 
-marketMode = "DEFENSIVE_TRANSITION"
+marketMode = "DEFENSIVE_TRANSITION";
+
 }
 
-else if (
 
-aiLeadershipFragility &&
-
-riskState !== "BREAKDOWN" &&
-riskState !== "CRISIS" &&
-
-liquidityScore >= 60 &&
-
-!persistentDistribution &&
-!institutionalDistribution
-
-) {
-
-marketMode = "AI_EXPANSION"
-}
-
-else if (
-
-lateCycleMeltup &&
-
-!persistentWeakness &&
-!institutionalDistribution
-
-) {
-
-marketMode = "LATE_CYCLE_MELTUP"
-}
-
-else if (
-
-volatileExpansion &&
-
-riskState !== "CRISIS" &&
-
-!persistentDistribution &&
-!institutionalDistribution
-
-) {
-
-marketMode = "VOLATILE_EXPANSION"
-}
+/* =====================================================
+3. INTERNAL DISTRIBUTION
+===================================================== */
 
 else if (
 
@@ -663,8 +698,14 @@ breadth50 > 60
 
 ) {
 
-marketMode = "INTERNAL_DISTRIBUTION"
+marketMode = "INTERNAL_DISTRIBUTION";
+
 }
+
+
+/* =====================================================
+4. ROTATIONAL STRESS
+===================================================== */
 
 else if (
 
@@ -674,8 +715,71 @@ persistentWeakness
 
 ) {
 
-marketMode = "ROTATIONAL_STRESS"
+marketMode = "ROTATIONAL_STRESS";
+
 }
+
+
+/* =====================================================
+5. AI EXPANSION
+===================================================== */
+
+else if (
+
+aiLeadershipFragility &&
+
+!hardRiskOff &&
+
+liquidityScore >= 60 &&
+
+!persistentDistribution &&
+
+!institutionalDistribution
+
+) {
+
+marketMode = "AI_EXPANSION";
+
+}
+
+
+/* =====================================================
+6. LATE CYCLE MELT-UP
+===================================================== */
+
+else if (
+
+lateCycleMeltup &&
+
+!hardRiskOff
+
+) {
+
+marketMode = "LATE_CYCLE_MELTUP";
+
+}
+
+
+/* =====================================================
+7. VOLATILE EXPANSION
+===================================================== */
+
+else if (
+
+volatileExpansion &&
+
+!hardRiskOff
+
+) {
+
+marketMode = "VOLATILE_EXPANSION";
+
+}
+
+
+/* =====================================================
+8. HEALTHY RISK ON
+===================================================== */
 
 else if (
 
@@ -687,26 +791,38 @@ healthyExpansion
 
 ) {
 
-marketMode = "RISK_ON"
+marketMode = "RISK_ON";
+
 }
+
+
+/* =====================================================
+9. RISK OFF SIGNAL
+===================================================== */
 
 else if (
 
-regimeSignal.includes("RISK_OFF") ||
+regimeSignal.includes("RISK_OFF") &&
 
-riskState === "BREAKDOWN" ||
-
-riskState === "CRISIS"
+riskState !== "STABLE"
 
 ) {
 
-marketMode = "RISK_OFF"
+marketMode = "RISK_OFF";
+
 }
+
+
+/* =====================================================
+10. TRANSITION
+===================================================== */
 
 else {
 
-marketMode = "TRANSITION"
+marketMode = "TRANSITION";
+
 }
+
 
 /* =====================================================
 TACTICAL BIAS
@@ -717,7 +833,8 @@ let tacticalBias:
 | "LONG_TECH"
 | "DEFENSIVE"
 | "SHORT_INDEX"
-| "NEUTRAL"
+| "NEUTRAL";
+
 
 if (
 
@@ -731,29 +848,37 @@ participationScore >= 65 &&
 
 liquidityScore >= 60 &&
 
-!narrowLeadership &&
+!effectiveNarrowLeadership &&
 
 !hiddenDistribution &&
 
 !institutionalDistribution &&
 
-!persistentWeakness
+!persistentWeakness &&
+
+!persistentDistribution
 
 ) {
 
-tacticalBias = "LONG_SMALL_CAPS"
+tacticalBias = "LONG_SMALL_CAPS";
+
 }
+
 
 else if (
 
 marketMode === "RISK_ON" ||
+
 marketMode === "AI_EXPANSION" ||
+
 marketMode === "LATE_CYCLE_MELTUP"
 
 ) {
 
-tacticalBias = "LONG_TECH"
+tacticalBias = "LONG_TECH";
+
 }
+
 
 else if (
 
@@ -761,25 +886,34 @@ riskState === "CRISIS"
 
 ) {
 
-tacticalBias = "SHORT_INDEX"
+tacticalBias = "SHORT_INDEX";
+
 }
+
 
 else if (
 
 marketMode === "RISK_OFF" ||
+
 marketMode === "DEFENSIVE_TRANSITION" ||
+
 marketMode === "INTERNAL_DISTRIBUTION" ||
+
 riskState === "INTERNAL_BREAKDOWN"
 
 ) {
 
-tacticalBias = "DEFENSIVE"
+tacticalBias = "DEFENSIVE";
+
 }
+
 
 else {
 
-tacticalBias = "NEUTRAL"
+tacticalBias = "NEUTRAL";
+
 }
+
 
 /* =====================================================
 EXECUTION MODE
@@ -790,7 +924,12 @@ let executionMode:
 | "BUILD_POSITION"
 | "REDUCE_RISK"
 | "DEFENSIVE"
-| "WAIT"
+| "WAIT";
+
+
+/* =====================================================
+INSTITUTIONAL CONDITIONS
+===================================================== */
 
 const institutionalConditions = (
 
@@ -818,7 +957,7 @@ squeezeRisk < 60 &&
 
 gammaExposure > 0 &&
 
-!narrowLeadership &&
+!effectiveNarrowLeadership &&
 
 !bearishDivergence &&
 
@@ -827,6 +966,8 @@ gammaExposure > 0 &&
 !institutionalDistribution &&
 
 !persistentWeakness &&
+
+!persistentDistribution &&
 
 !bounceLikelyTemporary &&
 
@@ -837,15 +978,25 @@ recoveryConfidence >= 70 &&
 riskState === "STABLE" &&
 
 confidence >= 72
-)
+
+);
+
 
 if (
+
 institutionalConditions
+
 ) {
 
 executionMode =
-"ADD_ON_PULLBACKS"
+"ADD_ON_PULLBACKS";
+
 }
+
+
+/* =====================================================
+BUILD POSITION
+===================================================== */
 
 else if (
 
@@ -867,51 +1018,73 @@ rotationDecayScore < 40 &&
 
 !institutionalDistribution &&
 
-!persistentWeakness
+!persistentWeakness &&
+
+!persistentDistribution &&
+
+riskState !== "BREAKDOWN" &&
+
+riskState !== "CRISIS"
 
 ) {
 
 executionMode =
-"BUILD_POSITION"
+"BUILD_POSITION";
+
 }
+
+
+/* =====================================================
+DEFENSIVE
+===================================================== */
 
 else if (
 
-riskState === "CRISIS"
+riskState === "CRISIS" ||
+
+marketMode === "RISK_OFF"
 
 ) {
 
 executionMode =
-"DEFENSIVE"
+"DEFENSIVE";
+
 }
 
+
+/* =====================================================
+REDUCE RISK
+===================================================== */
+
 else if (
+
+riskState === "BREAKDOWN" ||
+
+riskState === "INTERNAL_BREAKDOWN" ||
+
+marketMode === "INTERNAL_DISTRIBUTION" ||
 
 marketMode === "DEFENSIVE_TRANSITION"
 
 ) {
 
 executionMode =
-"DEFENSIVE"
+"REDUCE_RISK";
+
 }
 
-else if (
 
-riskState === "BREAKDOWN" ||
-riskState === "INTERNAL_BREAKDOWN" ||
-
-marketMode === "INTERNAL_DISTRIBUTION"
-
-) {
-
-executionMode =
-"REDUCE_RISK"
-}
+/* =====================================================
+WAIT
+===================================================== */
 
 else {
 
-executionMode = "WAIT"
+executionMode =
+"WAIT";
+
 }
+
 
 /* =====================================================
 URGENCY
@@ -921,7 +1094,8 @@ let urgency:
 | "LOW"
 | "MEDIUM"
 | "HIGH"
-| "EXTREME"
+| "EXTREME";
+
 
 if (
 
@@ -940,8 +1114,10 @@ persistenceScore >= 80
 
 ) {
 
-urgency = "EXTREME"
+urgency = "EXTREME";
+
 }
+
 
 else if (
 
@@ -963,8 +1139,10 @@ riskState === "INTERNAL_BREAKDOWN"
 
 ) {
 
-urgency = "HIGH"
+urgency = "HIGH";
+
 }
+
 
 else if (
 
@@ -976,17 +1154,23 @@ structuralWeakness ||
 
 hiddenDistribution ||
 
-persistentWeakness
+persistentWeakness ||
+
+failedRecovery
 
 ) {
 
-urgency = "MEDIUM"
+urgency = "MEDIUM";
+
 }
+
 
 else {
 
-urgency = "LOW"
+urgency = "LOW";
+
 }
+
 
 /* =====================================================
 REGIME ALIGNMENT
@@ -997,6 +1181,7 @@ const regimeAlignment = (
 regimeSyncScore >= 70 &&
 
 breadth50 > 60 &&
+
 breadth200 > 54 &&
 
 liquidityScore > 58 &&
@@ -1007,7 +1192,7 @@ rotationDecayScore < 30 &&
 
 gammaExposure > 0 &&
 
-!narrowLeadership &&
+!effectiveNarrowLeadership &&
 
 !bearishDivergence &&
 
@@ -1017,194 +1202,261 @@ gammaExposure > 0 &&
 
 !persistentWeakness &&
 
-recoveryConfidence >= 60
+!persistentDistribution &&
 
-)
+!persistentRisk &&
+
+recoveryConfidence >= 60 &&
+
+riskState === "STABLE"
+
+);
+
 
 /* =====================================================
 CONFIDENCE
 ===================================================== */
 
-let finalConfidence = confidence
+let finalConfidence =
+Number(confidence ?? 50);
+
 
 if (regimeAlignment) {
-finalConfidence += 10
+finalConfidence += 10;
 }
 
 if (marketMode === "AI_EXPANSION") {
-finalConfidence += 4
+finalConfidence += 4;
 }
 
 if (marketMode === "LATE_CYCLE_MELTUP") {
-finalConfidence -= 6
+finalConfidence -= 6;
 }
 
 if (marketMode === "ROTATIONAL_STRESS") {
-finalConfidence -= 8
+finalConfidence -= 8;
 }
 
 if (marketMode === "DEFENSIVE_TRANSITION") {
-finalConfidence -= 12
+finalConfidence -= 12;
 }
 
 if (marketMode === "INTERNAL_DISTRIBUTION") {
-finalConfidence -= 10
+finalConfidence -= 10;
+}
+
+if (marketMode === "VOLATILE_EXPANSION") {
+finalConfidence -= 4;
 }
 
 if (riskState === "CRISIS") {
-finalConfidence -= 30
+finalConfidence -= 30;
 }
 
 if (riskState === "BREAKDOWN") {
-finalConfidence -= 20
+finalConfidence -= 20;
 }
 
 if (riskState === "INTERNAL_BREAKDOWN") {
-finalConfidence -= 14
+finalConfidence -= 14;
 }
 
 if (rotationDecayScore >= 50) {
-finalConfidence -= 15
+finalConfidence -= 15;
 }
 
 if (rotationDecayScore >= 70) {
-finalConfidence -= 20
+finalConfidence -= 20;
 }
 
 if (fragilityScore >= 70) {
-finalConfidence -= 15
+finalConfidence -= 15;
 }
 
 if (liquidityScore < 40) {
-finalConfidence -= 10
+finalConfidence -= 10;
 }
 
 if (participationScore < 45) {
-finalConfidence -= 12
+finalConfidence -= 12;
 }
 
 if (gammaExposure < 0) {
-finalConfidence -= 10
+finalConfidence -= 10;
 }
 
-if (narrowLeadership) {
-finalConfidence -= 12
+if (effectiveNarrowLeadership) {
+finalConfidence -= 12;
+}
+
+if (bullishDivergence) {
+finalConfidence += 4;
 }
 
 if (bearishDivergence) {
-finalConfidence -= 10
+finalConfidence -= 10;
 }
 
 if (hiddenDistribution) {
-finalConfidence -= 12
+finalConfidence -= 12;
 }
 
 if (institutionalDistribution) {
-finalConfidence -= 18
+finalConfidence -= 18;
 }
 
 if (persistentWeakness) {
-finalConfidence -= 14
+finalConfidence -= 14;
 }
 
 if (persistentDistribution) {
-finalConfidence -= 16
+finalConfidence -= 16;
+}
+
+if (persistentRisk) {
+finalConfidence -= 12;
 }
 
 if (failedRecovery) {
-finalConfidence -= 10
+finalConfidence -= 10;
 }
 
 if (bounceLikelyTemporary) {
-finalConfidence -= 8
+finalConfidence -= 8;
 }
 
 finalConfidence -=
 Math.round(
 divergenceSeverity * 0.22
-)
+);
+
 
 finalConfidence = Math.max(
 0,
-Math.min(100, finalConfidence)
+Math.min(
+100,
+Math.round(finalConfidence)
 )
+);
+
 
 /* =====================================================
 SUMMARY
 ===================================================== */
 
 let summary =
-`${marketMode} | ${tacticalBias} | ${riskState}`
+`${marketMode} | ${tacticalBias} | ${riskState}`;
+
 
 if (marketMode === "DEFENSIVE_TRANSITION") {
-summary += " | Defensive institutional transition"
+summary +=
+" | Defensive institutional transition";
 }
 
 if (aiLeadershipFragility) {
-summary += " | AI leadership fragility"
+summary +=
+" | AI leadership fragility";
 }
 
 if (rotationalCompression) {
-summary += " | Rotational compression"
+summary +=
+" | Rotational compression";
 }
 
 if (expansionExhaustion) {
-summary += " | Expansion exhaustion"
+summary +=
+" | Expansion exhaustion";
 }
 
 if (volatileExpansion) {
-summary += " | Volatile expansion"
+summary +=
+" | Volatile expansion";
 }
 
 if (lateCycleMeltup) {
-summary += " | Late-cycle melt-up"
+summary +=
+" | Late-cycle melt-up";
 }
 
 if (institutionalDistribution) {
-summary += " | Institutional distribution"
+summary +=
+" | Institutional distribution";
 }
 
 if (internalBreakdown) {
-summary += " | Internal breakdown"
+summary +=
+" | Internal breakdown";
 }
 
 if (hiddenDistribution) {
-summary += " | Hidden distribution"
+summary +=
+" | Hidden distribution";
 }
 
 if (persistentWeakness) {
-summary += " | Persistent weakness"
+summary +=
+" | Persistent weakness";
 }
 
 if (persistentDistribution) {
-summary += " | Persistent institutional distribution"
+summary +=
+" | Persistent institutional distribution";
+}
+
+if (persistentRisk) {
+summary +=
+" | Persistent risk";
 }
 
 if (failedRecovery) {
-summary += " | Failed recovery rally"
+summary +=
+" | Failed recovery rally";
 }
 
 if (bounceLikelyTemporary) {
-summary += " | Bounce likely temporary"
+summary +=
+" | Bounce likely temporary";
 }
 
-if (narrowLeadership) {
-summary += " | Narrow leadership"
+if (effectiveNarrowLeadership) {
+summary +=
+" | Narrow leadership";
 }
 
 if (bearishDivergence) {
-summary += " | Bearish divergence"
+summary +=
+" | Bearish divergence";
 }
 
-return {
-marketMode,
-tacticalBias,
-riskState,
-executionMode,
-urgency,
-confidence: finalConfidence,
-regimeAlignment,
-summary
+if (bullishDivergence) {
+summary +=
+" | Bullish divergence";
 }
+
+
+/* =====================================================
+RETURN
+===================================================== */
+
+return {
+
+marketMode,
+
+tacticalBias,
+
+riskState,
+
+executionMode,
+
+urgency,
+
+confidence:
+finalConfidence,
+
+regimeAlignment,
+
+summary
+
+};
 
 }

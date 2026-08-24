@@ -26,6 +26,7 @@ breadthThrust?: any;
 fragility?: any;
 squeeze?: any;
 participation?: any;
+regimePersistence?: any;
 }
 
 export interface SuperSignalOutput {

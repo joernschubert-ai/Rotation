@@ -55,6 +55,7 @@ import replay2025 from "@/data/replay/2025.json";
 
 import { historicalReplay } from "./historicalReplay";
 
+
 export function marketEngine(data: any) {
 
 /* =====================================================
@@ -67,12 +68,14 @@ driversEngine(data);
 const marketDrivers =
 marketDriversEngine(data);
 
+
 /* =====================================================
 STRUCTURE
 ===================================================== */
 
 const structure =
 structureEngine(data);
+
 
 /* =====================================================
 CLEAN INPUT
@@ -101,6 +104,7 @@ data.marketData?.["^VIX"]?.current ?? 20
 const historyMetrics =
 data.historyMetrics ?? {};
 
+
 /* =====================================================
 PRICE MOMENTUM
 ===================================================== */
@@ -110,8 +114,9 @@ priceMomentumEngine({
 historyMetrics,
 
 indices:
-data.indices ?? {},
+data.indices ?? {}
 });
+
 
 /* =====================================================
 DIVERGENCE
@@ -120,10 +125,14 @@ DIVERGENCE
 const divergence = (() => {
 
 const breadth =
-structure?.breadth?.b50?.value ?? 0;
+Number(
+structure?.breadth?.b50?.value ?? 0
+);
 
 const ad =
-structure?.advanceDecline?.value ?? 0;
+Number(
+structure?.advanceDecline?.value ?? 0
+);
 
 let score = 0;
 
@@ -142,6 +151,7 @@ score += 2;
 }
 
 return {
+
 score,
 
 state:
@@ -153,6 +163,7 @@ score > 1
 };
 
 })();
+
 
 /* =====================================================
 LIQUIDITY
@@ -200,6 +211,7 @@ data.correlationScore ?? 0
 historyMetrics
 });
 
+
 /* =====================================================
 FRAGILITY
 ===================================================== */
@@ -219,9 +231,6 @@ data.crashProbability ?? 0
 breadth50,
 breadth200,
 
-/*
-* Komplettes Liquidity-Objekt injizieren.
-*/
 liquidity,
 
 gammaExposure:
@@ -243,6 +252,7 @@ data.volOfVolRatio ?? 1
 
 structure
 });
+
 
 /* =====================================================
 SQUEEZE
@@ -266,14 +276,10 @@ data.moveIndex ?? 80
 breadth50
 });
 
+
 /* =====================================================
 ROTATION BASE
 ===================================================== */
-
-/*
-* Erster Pass ohne Participation/BreadthThrust.
-* Diese Engines benötigen Rotation zunächst selbst.
-*/
 
 const rotationBase =
 rotationEngine({
@@ -299,6 +305,7 @@ squeeze,
 
 structure
 });
+
 
 /* =====================================================
 PARTICIPATION
@@ -348,6 +355,7 @@ rotationBase?.score ?? 50
 )
 });
 
+
 /* =====================================================
 BREADTH THRUST
 ===================================================== */
@@ -387,11 +395,12 @@ divergenceState:
 divergence.state
 });
 
+
 /* =====================================================
 REGIME PERSISTENCE — PRE PHASE
 ===================================================== */
 
-const regimePersistence =
+const regimePersistencePre =
 regimePersistenceEngine({
 
 breadth50,
@@ -403,15 +412,16 @@ participation?.score ?? 50
 ),
 
 /*
-* Noch kein RotationDecay.
-* Verhindert zirkuläre Abhängigkeit.
+* RotationDecay existiert noch nicht.
 */
-rotationDecayScore: 0,
+rotationDecayScore:
+0,
 
 /*
-* DangerZone entsteht später.
+* DangerZone existiert noch nicht.
 */
-dangerScore: 0,
+dangerScore:
+0,
 
 fragilityScore:
 Number(
@@ -438,6 +448,7 @@ historyMetrics?.rotationDecayHistory ?? [],
 phase:
 "PRE_PHASE"
 });
+
 
 /* =====================================================
 FINAL ROTATION
@@ -470,6 +481,7 @@ breadthThrust,
 
 structure
 });
+
 
 /* =====================================================
 CRASH
@@ -515,6 +527,7 @@ drivers:
 driversCore
 });
 
+
 /* =====================================================
 EARLY WARNING
 ===================================================== */
@@ -527,8 +540,9 @@ earlyWarningEngine({
 historyMetrics
 });
 
+
 /* =====================================================
-TEMP PUT / RUSSELL
+TEMP PUT
 ===================================================== */
 
 const putTimingTemp =
@@ -540,9 +554,15 @@ phase:
 rotation,
 crash,
 earlyWarning,
+
 historyMetrics,
 priceMomentum
 });
+
+
+/* =====================================================
+TEMP RUSSELL
+===================================================== */
 
 const russellTemp =
 russellEngine({
@@ -569,6 +589,7 @@ vix,
 historyMetrics
 });
 
+
 /* =====================================================
 PHASE
 ===================================================== */
@@ -592,13 +613,15 @@ historyMetrics,
 
 priceMomentum,
 
-regimePersistence
+regimePersistence:
+regimePersistencePre
 });
 
 const phase =
 phaseData.phase;
 
 const regime = {
+
 label:
 phase,
 
@@ -606,14 +629,17 @@ score:
 crash.score
 };
 
+
 /* =====================================================
 PHASE STAGE
 ===================================================== */
 
 const phaseStage = {
+
 phase,
 phaseData
 };
+
 
 /* =====================================================
 CONFIDENCE
@@ -628,6 +654,7 @@ crash,
 rotation,
 phase
 });
+
 
 /* =====================================================
 SYSTEM HEAT
@@ -656,11 +683,12 @@ gammaExposure:
 data.gammaExposure
 });
 
+
 /* =====================================================
 REGIME SYNC — PRE
 ===================================================== */
 
-const regimeSyncTemp =
+const regimeSyncPre =
 regimeSyncEngine({
 
 phase,
@@ -694,6 +722,7 @@ fragility,
 participation,
 breadthThrust
 });
+
 
 /* =====================================================
 DANGER ZONE
@@ -746,16 +775,18 @@ history:
 historyMetrics
 });
 
+
 /* =====================================================
 EXECUTION STATE — PRE
 ===================================================== */
 
 /*
-* Dieser Pass existiert ausschließlich,
-* damit RotationDecay / RotationConfirm
-* einen konsistenten Execution-State erhalten.
+* Technischer Zwischen-State.
 *
-* Er darf NICHT als finaler Trading-State verwendet werden.
+* Dieser State wird ausschließlich für
+* RotationDecay / RotationConfirm verwendet.
+*
+* Er ist NICHT der finale Trading-State.
 */
 
 const executionStatePre =
@@ -809,11 +840,11 @@ vix > 25
 
 regimeSyncScore:
 Number(
-regimeSyncTemp?.score ?? 50
+regimeSyncPre?.score ?? 50
 ),
 
 regimeSyncState:
-regimeSyncTemp?.state ??
+regimeSyncPre?.state ??
 "TRANSITION",
 
 confidence:
@@ -821,10 +852,8 @@ Number(
 confidence?.score ?? 50
 ),
 
-/*
-* Noch nicht verfügbar.
-*/
-rotationDecayScore: 0,
+rotationDecayScore:
+0,
 
 fragilityScore:
 Number(
@@ -847,7 +876,8 @@ divergence?.state ?? "NONE",
 internalDivergence:
 divergence,
 
-regimePersistence,
+regimePersistence:
+regimePersistencePre,
 
 concentrationScore:
 Number(
@@ -862,6 +892,7 @@ data.masterScore ?? 50
 )
 });
 
+
 /* =====================================================
 ROTATION DECAY
 ===================================================== */
@@ -872,7 +903,6 @@ rotationDecayEngine({
 historyMetrics,
 
 rotation,
-
 structure,
 
 crash,
@@ -885,7 +915,7 @@ participation,
 breadthThrust,
 
 regimeSync:
-regimeSyncTemp,
+regimeSyncPre,
 
 executionState:
 executionStatePre,
@@ -931,6 +961,7 @@ relativeBreadthWeakness:
 historyMetrics?.relativeBreadthWeakness
 });
 
+
 /* =====================================================
 ROTATION CONFIRM
 ===================================================== */
@@ -940,6 +971,7 @@ rotationConfirmEngine({
 
 rotation,
 structure,
+
 crash,
 earlyWarning,
 
@@ -956,7 +988,7 @@ executionState:
 executionStatePre,
 
 regimeSync:
-regimeSyncTemp,
+regimeSyncPre,
 
 liquidity,
 fragility,
@@ -968,6 +1000,7 @@ rotationDecay,
 
 historyMetrics
 });
+
 
 /* =====================================================
 FINAL RUSSELL
@@ -1008,6 +1041,7 @@ divergence,
 priceMomentum
 });
 
+
 /* =====================================================
 PHASE CONFIRMATION
 ===================================================== */
@@ -1022,7 +1056,6 @@ phaseData,
 rotation,
 
 crash,
-
 earlyWarning,
 
 participation,
@@ -1036,6 +1069,7 @@ rotationDecay,
 historyMetrics
 });
 
+
 /* =====================================================
 MARKET QUALITY
 ===================================================== */
@@ -1048,7 +1082,6 @@ structure,
 participation,
 
 rotation,
-
 breadthThrust,
 
 rotationDecay,
@@ -1062,13 +1095,14 @@ internalDivergence:
 divergence,
 
 regimeSync:
-regimeSyncTemp,
+regimeSyncPre,
 
 concentrationScore:
 Number(
 data.concentrationScore ?? 50
 )
 });
+
 
 /* =====================================================
 REGIME SYNC — FINAL
@@ -1111,6 +1145,67 @@ breadthThrust,
 marketQuality
 });
 
+
+/* =====================================================
+REGIME PERSISTENCE — FINAL
+===================================================== */
+
+/*
+* Jetzt stehen RotationDecay, DangerZone,
+* Fragility und die tatsächliche Phase zur Verfügung.
+*
+* Dieser zweite Lauf ist der maßgebliche
+* Persistence-State für den finalen Regime-/Risk-Stack.
+*/
+
+const regimePersistence =
+regimePersistenceEngine({
+
+breadth50,
+breadth200,
+
+participationScore:
+Number(
+participation?.score ?? 50
+),
+
+rotationDecayScore:
+Number(
+rotationDecay?.score ?? 0
+),
+
+dangerScore:
+Number(
+dangerZone?.score ?? 0
+),
+
+fragilityScore:
+Number(
+fragility?.score ?? 50
+),
+
+internalDivergenceScore:
+Number(
+divergence?.score ?? 0
+),
+
+breadth50History:
+historyMetrics?.breadth50History ?? [],
+
+breadth200History:
+historyMetrics?.breadth200History ?? [],
+
+participationHistory:
+historyMetrics?.participationHistory ?? [],
+
+rotationDecayHistory:
+historyMetrics?.rotationDecayHistory ?? [],
+
+phase:
+phase ?? "UNKNOWN"
+});
+
+
 /* =====================================================
 FINAL PUT TIMING
 ===================================================== */
@@ -1137,11 +1232,16 @@ marketDrivers,
 regimeSync,
 
 breadthThrust,
-
 marketQuality,
 
-rotationDecay
+rotationDecay,
+
+/*
+* Finaler Persistence-State.
+*/
+regimePersistence
 });
+
 
 /* =====================================================
 MASTER
@@ -1176,20 +1276,23 @@ phaseStage,
 
 historyMetrics,
 
-priceMomentum
+priceMomentum,
+
+/*
+* Finaler Persistence-State.
+*/
+regimePersistence
 });
+
 
 /* =====================================================
 EXECUTION STATE — FINAL
 ===================================================== */
 
 /*
-* Jetzt sind die zentralen Regime-/Risk-Informationen
-* vollständig vorhanden.
-*
-* Dieser State ist derjenige, der ab hier für
-* Edge → Nasdaq → TradeStack → Sizing → Signal
-* verwendet wird.
+* Das ist der einzige ExecutionState,
+* der ab hier als finaler Trading-State
+* verwendet werden darf.
 */
 
 const executionState =
@@ -1281,6 +1384,11 @@ divergence?.state ?? "NONE",
 internalDivergence:
 divergence,
 
+/*
+* WICHTIG:
+* Jetzt nicht mehr PRE-Persistence,
+* sondern der finale Persistence-State.
+*/
 regimePersistence,
 
 concentrationScore:
@@ -1296,6 +1404,7 @@ master?.score ?? 50
 )
 });
 
+
 /* =====================================================
 EDGE
 ===================================================== */
@@ -1305,6 +1414,7 @@ edgeStateEngine({
 
 rotation,
 russell,
+
 structure,
 earlyWarning,
 crash,
@@ -1328,6 +1438,7 @@ dangerZone,
 marketData:
 data.marketData ?? {}
 });
+
 
 /* =====================================================
 NASDAQ CALL
@@ -1361,6 +1472,7 @@ executionState,
 master
 });
 
+
 /* =====================================================
 POSITIONING
 ===================================================== */
@@ -1390,11 +1502,12 @@ earlyWarning?.active
 
 score:
 Math.round(
-(rotation.score * 0.5) +
-((structure?.health?.value ?? 0) * 0.3) -
-((crash?.probability ?? 0) * 0.2)
+(Number(rotation?.score ?? 50) * 0.5) +
+(Number(structure?.health?.value ?? 0) * 0.3) -
+(Number(crash?.probability ?? 0) * 0.2)
 )
 };
+
 
 /* =====================================================
 TRADE STACK
@@ -1430,8 +1543,11 @@ rotationDecay,
 executionState,
 regimeSync,
 
-historyMetrics
+historyMetrics,
+
+regimePersistence
 });
+
 
 /* =====================================================
 STATE
@@ -1455,6 +1571,7 @@ data.pnl ?? 0
 )
 });
 
+
 /* =====================================================
 SIZING
 ===================================================== */
@@ -1462,37 +1579,17 @@ SIZING
 const sizing =
 positionSizingV2({
 
-/*
-* CORE
-*/
-
 master,
 crash,
-
-/*
-* TRADE FLOWS
-*/
 
 putTiming,
 russell,
 
-/*
-* PORTFOLIO / STATE
-*/
-
 positioning,
 state,
 
-/*
-* SYSTEM RISK
-*/
-
 systemHeat,
 earlyWarning,
-
-/*
-* MARKET STRUCTURE
-*/
 
 rotation,
 structure,
@@ -1501,24 +1598,12 @@ edgeState,
 tradeStack,
 divergence,
 
-/*
-* REGIME / EXECUTION
-*/
-
 regimeSync,
 dangerZone,
 executionState,
 
-/*
-* ROTATION
-*/
-
 rotationConfirm,
 rotationDecay,
-
-/*
-* MARKET QUALITY / RISK
-*/
 
 liquidity,
 breadthThrust,
@@ -1527,14 +1612,13 @@ marketQuality,
 squeeze,
 participation,
 
-/*
-* ADDITIONAL CONTEXT
-*/
-
 phase,
 historyMetrics,
-priceMomentum
+priceMomentum,
+
+regimePersistence
 });
+
 
 /* =====================================================
 EXIT
@@ -1572,6 +1656,7 @@ liquidity,
 participation
 });
 
+
 /* =====================================================
 POSITION
 ===================================================== */
@@ -1588,6 +1673,7 @@ phase,
 crash,
 rotation
 });
+
 
 /* =====================================================
 DECISION
@@ -1609,6 +1695,7 @@ master,
 positioning,
 edgeState
 });
+
 
 /* =====================================================
 SIGNAL
@@ -1648,16 +1735,21 @@ squeeze,
 participation,
 marketQuality,
 
-priceMomentum
+priceMomentum,
+
+regimePersistence
 });
 
+
 const signal = {
+
 ...(signalResult?.signal ?? {
 active: false
 }),
 
 phase
 };
+
 
 /* =====================================================
 SUPER SIGNAL
@@ -1692,8 +1784,11 @@ breadthThrust,
 fragility,
 squeeze,
 participation,
-marketQuality
+marketQuality,
+
+regimePersistence
 });
+
 
 /* =====================================================
 EXECUTION
@@ -1718,12 +1813,6 @@ executionState,
 dangerZone,
 regimeSync,
 
-/*
-* Neue Engines explizit injizieren.
-* executionEngine besitzt dafür bereits
-* entsprechende Safe-Access-Defaults.
-*/
-
 rotationConfirm,
 
 liquidity,
@@ -1732,6 +1821,7 @@ fragility,
 squeeze,
 participation
 });
+
 
 /* =====================================================
 RISK
@@ -1745,23 +1835,27 @@ exit,
 state
 });
 
+
 /* =====================================================
 HISTORICAL REPLAY
 ===================================================== */
 
 const replaySnapshots = [
+
 ...replay2020,
 ...replay2021,
 ...replay2022,
 ...replay2023,
 ...replay2024,
 ...replay2025
+
 ];
 
 const replay =
 historicalReplay(
 replaySnapshots
 );
+
 
 /* =====================================================
 RETURN
@@ -1784,7 +1878,16 @@ rotation,
 rotationConfirm,
 rotationDecay,
 
+/*
+* Finaler Persistence-State.
+*/
 regimePersistence,
+
+/*
+* PRE-State bewusst separat verfügbar,
+* damit Debugging möglich bleibt.
+*/
+regimePersistencePre,
 
 signal,
 superSignal,
@@ -1795,7 +1898,14 @@ execution,
 
 executionState,
 
+/*
+* PRE-State ebenfalls nur für Debugging.
+*/
+executionStatePre,
+
 regimeSync,
+regimeSyncPre,
+
 dangerZone,
 
 liquidity,
