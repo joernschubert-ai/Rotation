@@ -579,6 +579,21 @@ liquidity,
 fragility,
 squeeze,
 
+breadthTrend:
+historyMetrics?.breadthTrend ?? 0,
+
+breadthAcceleration:
+historyMetrics?.breadthAcceleration ?? 0,
+
+participationDecay:
+historyMetrics?.participationDecay ?? 0,
+
+leadershipDecay:
+historyMetrics?.leadershipDecay ?? 0,
+
+relativeBreadthWeakness:
+historyMetrics?.relativeBreadthWeakness ?? 0,
+
 structure
 });
 
@@ -895,6 +910,21 @@ squeeze,
 
 participation,
 breadthThrust,
+
+breadthTrend:
+historyMetrics?.breadthTrend ?? 0,
+
+breadthAcceleration:
+historyMetrics?.breadthAcceleration ?? 0,
+
+participationDecay:
+historyMetrics?.participationDecay ?? 0,
+
+leadershipDecay:
+historyMetrics?.leadershipDecay ?? 0,
+
+relativeBreadthWeakness:
+historyMetrics?.relativeBreadthWeakness ?? 0,
 
 structure
 });
