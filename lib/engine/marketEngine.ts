@@ -1661,6 +1661,28 @@ regimePersistence
 MASTER
 ===================================================== */
 
+const masterInput = {
+crash,
+rotation,
+putTiming,
+russell,
+phaseData,
+structure,
+participation,
+breadthThrust,
+liquidity,
+fragility,
+marketQuality,
+rotationDecay,
+phaseConfirmation,
+regimeSync,
+phaseStage,
+historyMetrics,
+priceMomentum,
+regimePersistence
+};
+
+
 const master =
 masterScoreEngine({
 
