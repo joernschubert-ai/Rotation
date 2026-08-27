@@ -102,27 +102,35 @@ function clamp(
 value: number,
 min = 0,
 max = 100
-) {
+): number {
 return Math.max(
 min,
 Math.min(max, value)
 );
 }
 
+
 /*
-* Numeric extraction helper.
+* Robust numeric extraction helper.
 *
 * Supports:
 *
 * 55
 *
-* and:
-*
 * { value: 55 }
 *
-* and:
-*
 * { score: 55 }
+*
+* { current: 55 }
+*
+* { risk: 55 }
+*
+* Priority:
+*
+* value
+* score
+* risk
+* current
 */
 
 function numericValue(
@@ -130,10 +138,11 @@ value: any,
 fallback = 50
 ): number {
 
-if (typeof value === "number") {
-return Number.isFinite(value)
-? value
-: fallback;
+if (
+typeof value === "number" &&
+Number.isFinite(value)
+) {
+return value;
 }
 
 if (
@@ -141,22 +150,65 @@ value &&
 typeof value === "object"
 ) {
 
-const candidate =
-value.value ??
-value.score ??
-value.current;
+const candidates = [
+value.value,
+value.score,
+value.risk,
+value.current
+];
+
+for (const candidate of candidates) {
+
+const numeric =
+Number(candidate);
 
 if (
-typeof candidate === "number" &&
-Number.isFinite(candidate)
+Number.isFinite(numeric)
 ) {
-return candidate;
+return numeric;
 }
-
+}
 }
 
 return fallback;
 }
+
+
+/*
+* Robust relative-strength extraction.
+*
+* Prevents NaN from entering the rotation
+* calculation when malformed snapshot data
+* is encountered.
+*/
+
+function relativeStrength(
+directValue: any,
+rotationValue: any,
+fallback = 1
+): number {
+
+const direct =
+Number(directValue);
+
+if (
+Number.isFinite(direct)
+) {
+return direct;
+}
+
+const nested =
+Number(rotationValue);
+
+if (
+Number.isFinite(nested)
+) {
+return nested;
+}
+
+return fallback;
+}
+
 
 /* =====================================================
 ENGINE
@@ -171,41 +223,42 @@ RELATIVE STRENGTH
 =================================================== */
 
 const rsSmall =
-Number(
-data.rsSmall ??
-data.rotation?.rsSmall ??
+relativeStrength(
+data.rsSmall,
+data.rotation?.rsSmall,
 1
 );
 
 const rsGrowth =
-Number(
-data.rsGrowth ??
-data.rotation?.rsGrowth ??
+relativeStrength(
+data.rsGrowth,
+data.rotation?.rsGrowth,
 1
 );
 
 const rsEqual =
-Number(
-data.rsEqual ??
-data.rotation?.rsEqual ??
+relativeStrength(
+data.rsEqual,
+data.rotation?.rsEqual,
 1
 );
+
 
 /* ===================================================
 MARKET INPUTS
 =================================================== */
 
 const concentrationScore =
-Number(
+numericValue(
 data.concentrationScore ??
-data.rotation?.concentrationScore ??
+data.rotation?.concentrationScore,
 0
 );
 
 const futuresVsCash =
-Number(
+numericValue(
 data.futuresVsCash ??
-data.rotation?.futuresVsCash ??
+data.rotation?.futuresVsCash,
 0
 );
 
@@ -216,14 +269,13 @@ data.marketData?.["^VIX"],
 18
 );
 
+
 /* ===================================================
 STRUCTURE
 =================================================== */
 
 /*
-* IMPORTANT:
-*
-* Snapshot currently provides:
+* Snapshot may provide:
 *
 * breadth.b50 = 55.79
 * breadth.b200 = 71.37
@@ -232,7 +284,7 @@ STRUCTURE
 *
 * breadth.b50.value
 *
-* numericValue() handles both.
+* numericValue() supports both.
 */
 
 const breadth50 =
@@ -247,6 +299,7 @@ data.structure?.breadth?.b200,
 50
 );
 
+
 /* ===================================================
 BREADTH THRUST
 =================================================== */
@@ -256,6 +309,7 @@ numericValue(
 data.breadthThrust,
 50
 );
+
 
 /* ===================================================
 LIQUIDITY
@@ -267,6 +321,7 @@ data.liquidity,
 50
 );
 
+
 /* ===================================================
 FRAGILITY
 =================================================== */
@@ -277,15 +332,31 @@ data.fragility,
 50
 );
 
+
 /* ===================================================
 SQUEEZE
 =================================================== */
+
+/*
+* IMPORTANT:
+*
+* squeezeEngine() exposes the actual squeeze
+* risk through `risk`.
+*
+* numericValue() now explicitly supports:
+*
+* value
+* score
+* risk
+* current
+*/
 
 const squeeze =
 numericValue(
 data.squeeze,
 50
 );
+
 
 /* ===================================================
 PARTICIPATION
@@ -297,34 +368,41 @@ data.participation,
 50
 );
 
+
 /* ===================================================
 HISTORY
 =================================================== */
 
 const breadthTrend =
-Number(
-data.breadthTrend ?? 0
+numericValue(
+data.breadthTrend,
+0
 );
 
 const breadthAcceleration =
-Number(
-data.breadthAcceleration ?? 0
+numericValue(
+data.breadthAcceleration,
+0
 );
 
 const participationDecay =
-Number(
-data.participationDecay ?? 0
+numericValue(
+data.participationDecay,
+0
 );
 
 const leadershipDecay =
-Number(
-data.leadershipDecay ?? 0
+numericValue(
+data.leadershipDecay,
+0
 );
 
 const relativeBreadthWeakness =
-Number(
-data.relativeBreadthWeakness ?? 0
+numericValue(
+data.relativeBreadthWeakness,
+0
 );
+
 
 /* ===================================================
 RELATIVE DIFFERENCES
@@ -338,6 +416,7 @@ rsGrowth - 1;
 
 const dEqual =
 rsEqual - 1;
+
 
 /* =====================================================
 CENTRAL MARKET STRUCTURE FLAGS
@@ -363,6 +442,7 @@ narrowLeadership,
 severeNarrowLeadership,
 breadthFailure
 } = structureFlags;
+
 
 /* =====================================================
 LEADERSHIP BREADTH
@@ -407,6 +487,7 @@ leadershipBreadth
 )
 );
 
+
 /* =====================================================
 PASSIVE DEPENDENCE
 ===================================================== */
@@ -439,6 +520,7 @@ Math.round(
 passiveDependence
 )
 );
+
 
 /* =====================================================
 INSTITUTIONAL PARTICIPATION
@@ -484,11 +566,13 @@ institutionalParticipation
 )
 );
 
+
 /* =====================================================
 SCORE
 ===================================================== */
 
 let score = 58;
+
 
 /* -----------------------------------------------------
 SMALL CAP RELATIVE STRENGTH
@@ -514,6 +598,7 @@ if (dSmall < -0.05) {
 score -= 6;
 }
 
+
 /* -----------------------------------------------------
 EQUAL WEIGHT
 ----------------------------------------------------- */
@@ -534,6 +619,7 @@ if (dEqual < -0.05) {
 score -= 5;
 }
 
+
 /* -----------------------------------------------------
 LEADERSHIP CONCENTRATION
 ----------------------------------------------------- */
@@ -553,6 +639,7 @@ rsEqual < 0.97
 score -= 15;
 }
 
+
 /* -----------------------------------------------------
 CONCENTRATION
 ----------------------------------------------------- */
@@ -568,6 +655,7 @@ score -= 5;
 if (concentrationScore >= 85) {
 score -= 5;
 }
+
 
 /* -----------------------------------------------------
 BREADTH THRUST
@@ -585,6 +673,7 @@ else if (breadthThrust < 35) {
 score -= 8;
 }
 
+
 /* -----------------------------------------------------
 BREADTH FAILURE
 ----------------------------------------------------- */
@@ -592,6 +681,7 @@ BREADTH FAILURE
 if (breadthFailure) {
 score -= 10;
 }
+
 
 /* -----------------------------------------------------
 LIQUIDITY
@@ -609,6 +699,7 @@ else if (liquidity < 40) {
 score -= 8;
 }
 
+
 /* -----------------------------------------------------
 PARTICIPATION
 ----------------------------------------------------- */
@@ -620,6 +711,7 @@ score -= 8;
 if (participation < 30) {
 score -= 10;
 }
+
 
 /* -----------------------------------------------------
 LIQUIDITY + NARROW LEADERSHIP
@@ -640,6 +732,7 @@ breadthFailure
 score -= 12;
 }
 
+
 /* -----------------------------------------------------
 PASSIVE DEPENDENCE
 ----------------------------------------------------- */
@@ -651,6 +744,7 @@ score -= 12;
 else if (passiveDependence >= 55) {
 score -= 6;
 }
+
 
 /* -----------------------------------------------------
 INSTITUTIONAL PARTICIPATION
@@ -674,6 +768,7 @@ institutionalParticipation < 35
 score -= 10;
 }
 
+
 /* -----------------------------------------------------
 HISTORICAL BREADTH
 ----------------------------------------------------- */
@@ -694,6 +789,7 @@ if (breadthAcceleration < -10) {
 score -= 10;
 }
 
+
 /* -----------------------------------------------------
 PARTICIPATION DECAY
 ----------------------------------------------------- */
@@ -705,6 +801,7 @@ score -= 8;
 if (participationDecay > 20) {
 score -= 10;
 }
+
 
 /* -----------------------------------------------------
 LEADERSHIP DECAY
@@ -718,6 +815,7 @@ if (leadershipDecay > 20) {
 score -= 10;
 }
 
+
 /* -----------------------------------------------------
 RELATIVE BREADTH WEAKNESS
 ----------------------------------------------------- */
@@ -729,6 +827,7 @@ score -= 6;
 if (relativeBreadthWeakness > 20) {
 score -= 10;
 }
+
 
 /* -----------------------------------------------------
 COMBINED INTERNAL DETERIORATION
@@ -749,6 +848,7 @@ relativeBreadthWeakness > 15
 score -= 12;
 }
 
+
 /* -----------------------------------------------------
 FRAGILITY
 ----------------------------------------------------- */
@@ -761,6 +861,7 @@ else if (fragility > 70) {
 score -= 6;
 }
 
+
 /* -----------------------------------------------------
 SQUEEZE
 ----------------------------------------------------- */
@@ -768,6 +869,7 @@ SQUEEZE
 if (squeeze > 75) {
 score -= 5;
 }
+
 
 /* -----------------------------------------------------
 VIX
@@ -785,6 +887,7 @@ else if (vix > 20) {
 score -= 2;
 }
 
+
 /* =====================================================
 FINAL SCORE CLAMP
 ===================================================== */
@@ -797,6 +900,7 @@ Math.min(
 Math.round(score)
 )
 );
+
 
 /* =====================================================
 SIGNAL
@@ -825,6 +929,7 @@ else {
 signal = "RISK_OFF_ROTATION";
 }
 
+
 /* =====================================================
 REGIME
 ===================================================== */
@@ -851,6 +956,7 @@ else {
 regime = "EARLY";
 }
 
+
 /* =====================================================
 STATE
 ===================================================== */
@@ -864,7 +970,7 @@ let state:
 | "BREAKDOWN";
 
 /*
-* Breakdown has priority.
+* Breakdown has highest priority.
 */
 
 if (
@@ -920,6 +1026,7 @@ else {
 state = "HEALTHY_ROTATION";
 }
 
+
 /* =====================================================
 CONFIDENCE
 ===================================================== */
@@ -952,6 +1059,7 @@ Math.min(
 Math.round(confidence)
 )
 );
+
 
 /* =====================================================
 SUMMARY
@@ -1016,6 +1124,7 @@ if (leadershipDecay > 12) {
 summary +=
 " | Leadership decay active";
 }
+
 
 /* =====================================================
 RETURN
