@@ -76,10 +76,14 @@ structure?.highsLows?.lows ?? 0
 );
 
 const crashScore =
-Number(crash?.score ?? 0);
+Number(
+crash?.score ?? 0
+);
 
 const crashProbability =
-Number(crash?.probability ?? 0);
+Number(
+crash?.probability ?? 0
+);
 
 const early =
 Boolean(
@@ -124,26 +128,22 @@ drivers?.move ??
 
 const liquidityScore =
 Number(
-liquidity?.score ??
-50
+liquidity?.score ?? 50
 );
 
 const fragilityScore =
 Number(
-fragility?.score ??
-50
+fragility?.score ?? 50
 );
 
 const participationScore =
 Number(
-participation?.score ??
-50
+participation?.score ?? 50
 );
 
 const thrustScore =
 Number(
-breadthThrust?.score ??
-50
+breadthThrust?.score ?? 50
 );
 
 
@@ -165,6 +165,57 @@ rotationDecay?.state ??
 HISTORY
 ===================================================== */
 
+/*
+* IMPORTANT:
+*
+* Die History kann aus einer Phase stammen, in der einzelne
+* Engines noch nicht korrekt kalibriert waren.
+*
+* Deshalb wird historische Information NICHT mehr als
+* absolute Wahrheit behandelt.
+*
+* Aktuelle Marktstruktur besitzt Priorität.
+*
+* Die History dient vor allem:
+*
+* - Persistenz
+* - Richtung
+* - strukturellem Kontext
+* - längerfristiger Warnung
+*
+* und nicht als alleiniger Trigger für einen Breakdown.
+*/
+
+
+/* -----------------------------------------------------
+HISTORY RELIABILITY
+----------------------------------------------------- */
+
+/*
+* Übergangsparameter.
+*
+* 1.00 = vollständiges Vertrauen
+* 0.75 = hohes Vertrauen
+* 0.55 = vorsichtiges Übergangsvertrauen
+* 0.25 = sehr geringe historische Aussagekraft
+* 0.00 = History ignorieren
+*
+* Da die History seit Juli teilweise mit noch nicht
+* vollständig kalibrierten Engines erzeugt wurde,
+* verwenden wir aktuell bewusst 0.55.
+*
+* Dieser Wert kann später erhöht werden, wenn die
+* Engine über längere Zeit stabil läuft.
+*/
+
+const historyReliability =
+0.55;
+
+
+/* -----------------------------------------------------
+RAW HISTORY
+----------------------------------------------------- */
+
 const breadthTrend =
 Number(
 historyMetrics?.breadthTrend ?? 0
@@ -175,6 +226,11 @@ Number(
 historyMetrics?.breadthAcceleration ?? 0
 );
 
+const participationTrendHistory =
+Number(
+historyMetrics?.participationTrend ?? 0
+);
+
 const participationDecayHistory =
 Number(
 historyMetrics?.participationDecay ?? 0
@@ -183,6 +239,21 @@ historyMetrics?.participationDecay ?? 0
 const leadershipDecayHistory =
 Number(
 historyMetrics?.leadershipDecay ?? 0
+);
+
+const rotationTrend =
+Number(
+historyMetrics?.rotationTrend ?? 0
+);
+
+const liquidityTrend =
+Number(
+historyMetrics?.liquidityTrend ?? 0
+);
+
+const fragilityTrend =
+Number(
+historyMetrics?.fragilityTrend ?? 0
 );
 
 const crashTrend =
@@ -200,7 +271,7 @@ Number(
 historyMetrics?.relativeBreadthWeakness ?? 0
 );
 
-const institutionalPressure =
+const institutionalPressureRaw =
 Number(
 historyMetrics?.institutionalPressure ?? 0
 );
@@ -240,17 +311,17 @@ Number(
 historyMetrics?.distributionDays ?? 0
 );
 
-const prolongedBearRegime =
+const prolongedBearRegimeRaw =
 Boolean(
 historyMetrics?.prolongedBearRegime
 );
 
-const persistentDistribution =
+const persistentDistributionRaw =
 Boolean(
 historyMetrics?.persistentDistribution
 );
 
-const acceleratingWeakness =
+const acceleratingWeaknessRaw =
 Boolean(
 historyMetrics?.acceleratingWeakness
 );
@@ -261,32 +332,117 @@ HISTORY-DERIVED STRUCTURAL FLAGS
 ===================================================== */
 
 /*
-* These flags are deliberately independent from the
-* current one-day snapshot.
+* Diese Flags bleiben zunächst RAW.
 *
-* A rotation confirmation engine must not suddenly call
-* a long-running bearish structure "healthy" merely
-* because today's breadth is temporarily stable.
+* Sie werden später nicht blind als Boolean-Trigger
+* verwendet, sondern über die History-Reliability
+* gewichtet.
+*/
+
+const persistentBreadthWeaknessRaw =
+breadthWeakDays >= 20;
+
+const persistentParticipationWeaknessRaw =
+participationWeakDays >= 20;
+
+const persistentRotationWeaknessRaw =
+rotationWeakDays >= 30;
+
+const persistentLiquidityWeaknessRaw =
+liquidityWeakDays >= 30;
+
+const persistentFragilityRaw =
+fragilityHighDays >= 30;
+
+const persistentDistributionHistoryRaw =
+distributionDays >= 20 ||
+persistentDistributionRaw;
+
+
+/* =====================================================
+WEIGHTED HISTORY
+===================================================== */
+
+/*
+* Historische Zähler werden auf eine Vertrauensbasis
+* reduziert.
+*
+* Beispiel:
+*
+* 120 Rotation Weak Days
+*
+* werden bei Reliability 0.55 zu:
+*
+* 66 gewichteten Tagen.
+*
+* Wichtig:
+* Die RAW-Werte bleiben erhalten und werden im Debug
+* weiterhin ausgegeben.
+*/
+
+const weightedBreadthWeakDays =
+breadthWeakDays *
+historyReliability;
+
+const weightedParticipationWeakDays =
+participationWeakDays *
+historyReliability;
+
+const weightedRotationWeakDays =
+rotationWeakDays *
+historyReliability;
+
+const weightedLiquidityWeakDays =
+liquidityWeakDays *
+historyReliability;
+
+const weightedFragilityHighDays =
+fragilityHighDays *
+historyReliability;
+
+const weightedDistributionDays =
+distributionDays *
+historyReliability;
+
+const weightedPhasePersistence =
+phasePersistence *
+historyReliability;
+
+const weightedInstitutionalPressure =
+institutionalPressureRaw *
+historyReliability;
+
+
+/* =====================================================
+WEIGHTED STRUCTURAL FLAGS
+===================================================== */
+
+/*
+* Wichtig:
+*
+* Diese Flags dürfen nicht einfach wieder auf den
+* ursprünglichen RAW-Werten basieren.
+*
+* Sonst wäre die Reliability-Schicht wirkungslos.
 */
 
 const persistentBreadthWeakness =
-breadthWeakDays >= 20;
+weightedBreadthWeakDays >= 20;
 
 const persistentParticipationWeakness =
-participationWeakDays >= 20;
+weightedParticipationWeakDays >= 20;
 
 const persistentRotationWeakness =
-rotationWeakDays >= 30;
+weightedRotationWeakDays >= 30;
 
 const persistentLiquidityWeakness =
-liquidityWeakDays >= 30;
+weightedLiquidityWeakDays >= 30;
 
 const persistentFragility =
-fragilityHighDays >= 30;
+weightedFragilityHighDays >= 30;
 
 const persistentDistributionHistory =
-distributionDays >= 20 ||
-persistentDistribution;
+weightedDistributionDays >= 20;
 
 
 /* =====================================================
@@ -294,16 +450,12 @@ FLAGS
 ===================================================== */
 
 /*
-* Breadth is intentionally separated into:
+* Breadth:
 *
-* strong
-* healthy
-* neutral
-* weak
-*
-* This prevents a B50 value around 55 from being
-* interpreted as a healthy confirmation when the
-* broader structure is deteriorating.
+* >70 / >60 = strong
+* >58 / >52 = healthy
+* <50 = weak
+* <42 / <45 = severe
 */
 
 const strongBreadth =
@@ -323,9 +475,9 @@ breadth50 < 42 ||
 breadth200 < 45;
 
 
-/*
-* Internal breadth confirmation.
-*/
+/* -----------------------------------------------------
+INTERNALS
+----------------------------------------------------- */
 
 const healthyInternals =
 ad > 0 &&
@@ -340,16 +492,17 @@ ad === 0 &&
 highs === lows;
 
 
+/* -----------------------------------------------------
+VOLATILITY
+----------------------------------------------------- */
+
 const calmVolatility =
 vix < 20;
 
 
-/*
-* Narrow leadership:
-*
-* Growth leads while Small Caps and Equal Weight
-* remain below the market-wide benchmark.
-*/
+/* -----------------------------------------------------
+NARROW LEADERSHIP
+----------------------------------------------------- */
 
 const narrowLeadership =
 rsGrowth > 1.03 &&
@@ -367,13 +520,51 @@ rsSmall < 0.97 &&
 rsEqual < 0.97;
 
 
+/* =====================================================
+CURRENT STRUCTURAL FLAGS
+===================================================== */
+
 /*
-* Structural confirmation failure.
+* Diese Flags beziehen sich ausschließlich auf den
+* aktuellen Snapshot.
+*
+* Sie werden NICHT durch die History abgeschwächt.
 */
 
 const internalBreakdown =
 weakBreadth &&
 weakInternals;
+
+
+/*
+* Aktueller harter Breakdown:
+*
+* Die Kombination aus sehr hoher Fragility,
+* Liquiditätsstress, schwacher Participation und
+* sehr schwacher Rotation kann einen Breakdown auch
+* ohne historische Bestätigung auslösen.
+*
+* Dadurch bleibt die Engine auch dann handlungsfähig,
+* wenn die History noch unzuverlässig ist.
+*/
+
+const currentStructuralBreakdown =
+(
+fragilityScore >= 85 &&
+liquidityScore < 35 &&
+participationScore < 45 &&
+rotationScore < 20
+) ||
+(
+severelyWeakBreadth &&
+weakInternals &&
+participationScore < 45
+);
+
+
+/* =====================================================
+STRUCTURAL DETERIORATION
+===================================================== */
 
 const structuralDeterioration =
 weakBreadth ||
@@ -390,45 +581,68 @@ QUALITY
 ===================================================== */
 
 /*
-* Quality answers:
+* Quality beantwortet:
 *
-* "How healthy is the rotation right now?"
+* "Wie gesund ist die Rotation?"
 *
-* It is NOT the same thing as rotation direction.
+* Nicht:
+*
+* "Ist der Markt bullish oder bearish?"
 */
 
-let quality = 55;
+let quality =
+55;
 
 
-if (healthyBreadth) {
+/* -----------------------------------------------------
+POSITIVE CURRENT STRUCTURE
+----------------------------------------------------- */
+
+if (
+healthyBreadth
+) {
 quality += 10;
 }
 
-if (strongBreadth) {
+if (
+strongBreadth
+) {
 quality += 10;
 }
 
-if (healthyInternals) {
+if (
+healthyInternals
+) {
 quality += 8;
 }
 
-if (participationScore > 55) {
+if (
+participationScore > 55
+) {
 quality += 6;
 }
 
-if (thrustScore > 60) {
+if (
+thrustScore > 60
+) {
 quality += 5;
 }
 
-if (liquidityScore > 65) {
+if (
+liquidityScore > 65
+) {
 quality += 5;
 }
 
-if (gamma > 0) {
+if (
+gamma > 0
+) {
 quality += 4;
 }
 
-if (calmVolatility) {
+if (
+calmVolatility
+) {
 quality += 4;
 }
 
@@ -437,122 +651,240 @@ quality += 4;
 NEGATIVE CURRENT STRUCTURE
 ----------------------------------------------------- */
 
-if (weakBreadth) {
+if (
+weakBreadth
+) {
 quality -= 8;
 }
 
-if (severelyWeakBreadth) {
+if (
+severelyWeakBreadth
+) {
 quality -= 8;
 }
 
-if (weakInternals) {
+if (
+weakInternals
+) {
 quality -= 8;
 }
 
-if (narrowLeadership) {
+if (
+narrowLeadership
+) {
 quality -= 4;
 }
 
-if (severeNarrowLeadership) {
+if (
+severeNarrowLeadership
+) {
 quality -= 8;
 }
 
-if (megaCapDistortion) {
+if (
+megaCapDistortion
+) {
 quality -= 8;
 }
 
-if (participationScore < 45) {
+if (
+participationScore < 45
+) {
 quality -= 8;
 }
 
-if (liquidityScore < 40) {
+if (
+liquidityScore < 40
+) {
 quality -= 6;
 }
 
-if (fragilityScore > 75) {
+if (
+fragilityScore > 75
+) {
 quality -= 8;
 }
 
-if (crashProbability > 55) {
+if (
+crashProbability > 55
+) {
 quality -= 10;
 }
 
-if (early) {
+if (
+early
+) {
 quality -= 4;
 }
 
 
 /* -----------------------------------------------------
-HISTORICAL QUALITY
+HISTORICAL CONTEXT
 ----------------------------------------------------- */
 
-if (phasePersistence >= 20) {
+/*
+* Historische Informationen wirken nur mit der
+* Reliability.
+*
+* Dadurch kann die History Quality verschlechtern,
+* aber nicht mehr ungebremst zerstören.
+*/
+
+if (
+weightedPhasePersistence >= 20
+) {
 quality -= 2;
 }
 
-if (phasePersistence >= 40) {
+if (
+weightedPhasePersistence >= 40
+) {
 quality -= 3;
 }
 
-if (persistentDistributionHistory) {
-quality -= 6;
+if (
+persistentDistributionHistory
+) {
+quality -=
+Math.round(
+6 * historyReliability
+);
 }
 
-if (persistentBreadthWeakness) {
-quality -= 5;
+if (
+persistentBreadthWeakness
+) {
+quality -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (persistentParticipationWeakness) {
-quality -= 5;
+if (
+persistentParticipationWeakness
+) {
+quality -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (persistentRotationWeakness) {
-quality -= 5;
+if (
+persistentRotationWeakness
+) {
+quality -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (persistentLiquidityWeakness) {
-quality -= 4;
+if (
+persistentLiquidityWeakness
+) {
+quality -=
+Math.round(
+4 * historyReliability
+);
 }
 
-if (persistentFragility) {
-quality -= 5;
+if (
+persistentFragility
+) {
+quality -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (prolongedBearRegime) {
-quality -= 5;
+if (
+prolongedBearRegimeRaw
+) {
+quality -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (institutionalPressure > 60) {
-quality -= 4;
+if (
+weightedInstitutionalPressure > 60
+) {
+quality -=
+Math.round(
+4 * historyReliability
+);
 }
 
-if (participationDecayHistory > 20) {
-quality -= 4;
+if (
+participationDecayHistory > 20
+) {
+quality -=
+Math.round(
+4 * historyReliability
+);
 }
 
-if (breadthTrend < -1) {
-quality -= 3;
+if (
+breadthTrend < -1
+) {
+quality -=
+Math.round(
+3 * historyReliability
+);
 }
 
-if (breadthAcceleration < -1) {
-quality -= 3;
+if (
+breadthAcceleration < -1
+) {
+quality -=
+Math.round(
+3 * historyReliability
+);
 }
 
-if (relativeBreadthWeakness > 10) {
-quality -= 3;
+if (
+relativeBreadthWeakness > 10
+) {
+quality -=
+Math.round(
+3 * historyReliability
+);
 }
 
-if (acceleratingWeakness) {
-quality -= 5;
+if (
+acceleratingWeaknessRaw
+) {
+quality -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (rotationDecayScore > 60) {
+
+/* -----------------------------------------------------
+CURRENT ROTATION DECAY
+----------------------------------------------------- */
+
+/*
+* RotationDecay ist ein aktueller Engine-Wert und wird
+* deshalb NICHT über die History-Reliability reduziert.
+*/
+
+if (
+rotationDecayScore > 60
+) {
+
 quality -= 10;
+
 }
 
-else if (rotationDecayScore > 40) {
+else if (
+rotationDecayScore > 40
+) {
+
 quality -= 5;
+
 }
+
 
 quality =
 Math.max(
@@ -568,125 +900,228 @@ Math.round(quality)
 SUSTAINABILITY
 ===================================================== */
 
-/*
-* Sustainability asks whether the current rotational
-* structure can plausibly continue.
-*/
+let sustainability =
+55;
 
-let sustainability = 55;
 
-if (healthyBreadth) {
+/* -----------------------------------------------------
+POSITIVE
+----------------------------------------------------- */
+
+if (
+healthyBreadth
+) {
 sustainability += 10;
 }
 
-if (strongBreadth) {
+if (
+strongBreadth
+) {
 sustainability += 8;
 }
 
-if (healthyInternals) {
+if (
+healthyInternals
+) {
 sustainability += 8;
 }
 
-if (participationScore > 55) {
+if (
+participationScore > 55
+) {
 sustainability += 6;
 }
 
-if (gamma > 0) {
+if (
+gamma > 0
+) {
 sustainability += 5;
 }
 
-if (liquidityScore > 65) {
+if (
+liquidityScore > 65
+) {
 sustainability += 5;
 }
 
-if (calmVolatility) {
+if (
+calmVolatility
+) {
 sustainability += 4;
 }
 
 
 /* -----------------------------------------------------
-NEGATIVE
+NEGATIVE CURRENT
 ----------------------------------------------------- */
 
-if (weakBreadth) {
+if (
+weakBreadth
+) {
 sustainability -= 8;
 }
 
-if (severelyWeakBreadth) {
+if (
+severelyWeakBreadth
+) {
 sustainability -= 8;
 }
 
-if (weakInternals) {
+if (
+weakInternals
+) {
 sustainability -= 8;
 }
 
-if (narrowLeadership) {
+if (
+narrowLeadership
+) {
 sustainability -= 4;
 }
 
-if (severeNarrowLeadership) {
+if (
+severeNarrowLeadership
+) {
 sustainability -= 8;
 }
 
-if (megaCapDistortion) {
+if (
+megaCapDistortion
+) {
 sustainability -= 8;
 }
 
-if (participationScore < 45) {
+if (
+participationScore < 45
+) {
 sustainability -= 8;
 }
 
-if (liquidityScore < 40) {
+if (
+liquidityScore < 40
+) {
 sustainability -= 6;
 }
 
-if (rotationDecayScore > 60) {
+if (
+rotationDecayScore > 60
+) {
 sustainability -= 12;
 }
 
-if (persistentDistributionHistory) {
-sustainability -= 6;
+
+/* -----------------------------------------------------
+HISTORICAL
+----------------------------------------------------- */
+
+if (
+persistentDistributionHistory
+) {
+sustainability -=
+Math.round(
+6 * historyReliability
+);
 }
 
-if (persistentBreadthWeakness) {
-sustainability -= 5;
+if (
+persistentBreadthWeakness
+) {
+sustainability -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (persistentParticipationWeakness) {
-sustainability -= 5;
+if (
+persistentParticipationWeakness
+) {
+sustainability -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (persistentRotationWeakness) {
-sustainability -= 5;
+if (
+persistentRotationWeakness
+) {
+sustainability -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (persistentFragility) {
-sustainability -= 5;
+if (
+persistentLiquidityWeakness
+) {
+sustainability -=
+Math.round(
+4 * historyReliability
+);
 }
 
-if (prolongedBearRegime) {
-sustainability -= 5;
+if (
+persistentFragility
+) {
+sustainability -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (participationDecayHistory > 20) {
-sustainability -= 4;
+if (
+prolongedBearRegimeRaw
+) {
+sustainability -=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (breadthTrend < -1) {
-sustainability -= 3;
+if (
+participationDecayHistory > 20
+) {
+sustainability -=
+Math.round(
+4 * historyReliability
+);
 }
 
-if (breadthAcceleration < -1) {
-sustainability -= 3;
+if (
+breadthTrend < -1
+) {
+sustainability -=
+Math.round(
+3 * historyReliability
+);
 }
 
-if (acceleratingWeakness) {
-sustainability -= 6;
+if (
+breadthAcceleration < -1
+) {
+sustainability -=
+Math.round(
+3 * historyReliability
+);
 }
 
-if (institutionalPressure >= 80) {
-sustainability -= 5;
+if (
+acceleratingWeaknessRaw
+) {
+sustainability -=
+Math.round(
+6 * historyReliability
+);
 }
+
+if (
+weightedInstitutionalPressure >= 80
+) {
+sustainability -=
+Math.round(
+5 * historyReliability
+);
+}
+
 
 sustainability =
 Math.max(
@@ -703,95 +1138,160 @@ FALSE BREAK RISK
 ===================================================== */
 
 /*
-* FalseBreakRisk is asymmetric:
+* FalseBreakRisk bleibt überwiegend ein aktuelles
+* Signal.
 *
-* A bearish structural break is more trustworthy when
-* participation, breadth, liquidity and history all
-* confirm it.
-*
-* Conversely, a positive price move without internal
-* confirmation receives a high false-break risk.
+* Historische Werte werden nur gedämpft berücksichtigt.
 */
 
-let falseBreakRisk = 25;
+let falseBreakRisk =
+25;
 
-if (narrowLeadership) {
+
+if (
+narrowLeadership
+) {
 falseBreakRisk += 5;
 }
 
-if (severeNarrowLeadership) {
+if (
+severeNarrowLeadership
+) {
 falseBreakRisk += 8;
 }
 
-if (megaCapDistortion) {
+if (
+megaCapDistortion
+) {
 falseBreakRisk += 6;
 }
 
-if (weakBreadth) {
+if (
+weakBreadth
+) {
 falseBreakRisk += 6;
 }
 
-if (weakInternals) {
+if (
+weakInternals
+) {
 falseBreakRisk += 6;
 }
 
-if (rotationDecayScore > 60) {
+if (
+rotationDecayScore > 60
+) {
 falseBreakRisk += 10;
 }
 
-else if (rotationDecayScore > 40) {
+else if (
+rotationDecayScore > 40
+) {
 falseBreakRisk += 5;
 }
 
-if (crashProbability > 55) {
+if (
+crashProbability > 55
+) {
 falseBreakRisk += 10;
 }
 
-if (gamma < 0) {
+if (
+gamma < 0
+) {
 falseBreakRisk += 8;
 }
 
-if (persistentDistributionHistory) {
-falseBreakRisk += 8;
+
+/* -----------------------------------------------------
+HISTORICAL FALSE-BREAK CONTEXT
+----------------------------------------------------- */
+
+if (
+persistentDistributionHistory
+) {
+falseBreakRisk +=
+Math.round(
+8 * historyReliability
+);
 }
 
-if (persistentBreadthWeakness) {
-falseBreakRisk += 5;
+if (
+persistentBreadthWeakness
+) {
+falseBreakRisk +=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (persistentParticipationWeakness) {
-falseBreakRisk += 5;
+if (
+persistentParticipationWeakness
+) {
+falseBreakRisk +=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (persistentRotationWeakness) {
-falseBreakRisk += 5;
+if (
+persistentRotationWeakness
+) {
+falseBreakRisk +=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (prolongedBearRegime) {
-falseBreakRisk += 6;
+if (
+prolongedBearRegimeRaw
+) {
+falseBreakRisk +=
+Math.round(
+6 * historyReliability
+);
 }
 
-if (crashTrend > 5) {
-falseBreakRisk += 4;
+if (
+crashTrend > 5
+) {
+falseBreakRisk +=
+Math.round(
+4 * historyReliability
+);
 }
 
-if (breadthAcceleration < -1) {
-falseBreakRisk += 5;
+if (
+breadthAcceleration < -1
+) {
+falseBreakRisk +=
+Math.round(
+5 * historyReliability
+);
 }
 
-if (acceleratingWeakness) {
-falseBreakRisk += 6;
+if (
+acceleratingWeaknessRaw
+) {
+falseBreakRisk +=
+Math.round(
+6 * historyReliability
+);
 }
 
-if (institutionalPressure >= 80) {
-falseBreakRisk += 5;
+if (
+weightedInstitutionalPressure >= 80
+) {
+falseBreakRisk +=
+Math.round(
+5 * historyReliability
+);
 }
 
 
-/*
-* If the internals are actually improving, false-break
-* risk should fall.
-*/
+/* -----------------------------------------------------
+POSITIVE CURRENT CONFIRMATION
+----------------------------------------------------- */
 
 if (
 healthyBreadth &&
@@ -799,8 +1299,11 @@ healthyInternals &&
 participationScore >= 55 &&
 rotationScore >= 50
 ) {
+
 falseBreakRisk -= 10;
+
 }
+
 
 falseBreakRisk =
 Math.max(
@@ -817,11 +1320,13 @@ RECOVERY QUALITY
 ===================================================== */
 
 /*
-* Recovery must be broad.
+* Recovery muss breit sein.
 *
-* A Nasdaq rebound led only by Growth while Small Caps,
-* Equal Weight and participation remain weak is NOT
-* treated as a confirmed rotation recovery.
+* Die Recovery-Berechnung verwendet bewusst primär
+* CURRENT DATA.
+*
+* Alte History darf eine Erholung nicht künstlich
+* verhindern.
 */
 
 const recoveryBreadthScore =
@@ -848,6 +1353,7 @@ recoveryRotationScore
 )
 );
 
+
 const rotationRecovery =
 recoveryScore >= 62 &&
 breadth50 >= 58 &&
@@ -862,6 +1368,44 @@ historyMetrics
 
 
 /* =====================================================
+CURRENT DISTRIBUTION
+===================================================== */
+
+/*
+* Aktuelle Distribution muss unabhängig von der alten
+* History sichtbar bleiben.
+*/
+
+const currentDistribution =
+rotationDecayScore >= 50 ||
+participationScore < 45 ||
+liquidityScore < 40 ||
+fragilityScore > 75;
+
+
+/* =====================================================
+HISTORY DISTRIBUTION CONFIDENCE
+===================================================== */
+
+/*
+* Die History kann weiterhin anzeigen:
+*
+* "Da war über längere Zeit Distribution."
+*
+* Aber daraus wird nicht mehr automatisch:
+*
+* "Der Markt befindet sich heute definitiv im Breakdown."
+*/
+
+const historicalDistributionConfidence =
+clamp(
+weightedDistributionDays * 3,
+0,
+60
+);
+
+
+/* =====================================================
 STATE
 ===================================================== */
 
@@ -872,51 +1416,94 @@ let confidence =
 45;
 
 
+/* =====================================================
+HARD CURRENT BREAKDOWN
+===================================================== */
+
 /*
-* -----------------------------------------------------
-* HARD INTERNAL BREAKDOWN
-* -----------------------------------------------------
+* Aktuelle Marktstruktur hat Vorrang.
 *
-* Distribution takes precedence over a superficial
-* "confirming" signal.
+* Wenn Fragility, Liquidity, Participation und Rotation
+* gleichzeitig extrem schlecht sind, darf die Engine
+* unabhängig von der History INTERNAL_BREAKDOWN melden.
 */
 
 if (
-(
-rotationDecayScore >= 65 &&
-participationScore < 50
-) ||
-(
-persistentDistributionHistory &&
-participationScore < 55 &&
-rotationScore < 50
-) ||
-(
-prolongedBearRegime &&
-institutionalPressure >= 80 &&
-participationScore < 50
-) ||
-(
-severeNarrowLeadership &&
-weakBreadth &&
-weakInternals
-)
+currentStructuralBreakdown
 ) {
 
 state =
 "INTERNAL_BREAKDOWN";
 
 confidence =
-25;
+78;
+
 }
 
+
+/* =====================================================
+HISTORICAL + CURRENT BREAKDOWN
+===================================================== */
+
 /*
-* -----------------------------------------------------
-* CONFIRMED
-* -----------------------------------------------------
+* Historische Distribution darf einen Breakdown
+* verstärken, aber nur wenn CURRENT STRUCTURE ebenfalls
+* schwach ist.
 *
-* Confirmation requires broad participation.
+* Wichtig:
+*
+* persistentDistributionHistory allein reicht NICHT.
 */
+
+else if (
+persistentDistributionHistory &&
+participationScore < 50 &&
+liquidityScore < 40 &&
+rotationScore < 35 &&
+fragilityScore > 70
+) {
+
+state =
+"INTERNAL_BREAKDOWN";
+
+confidence =
+70;
+
+}
+
+
+/* =====================================================
+STRONG CURRENT INTERNAL BREAKDOWN
+===================================================== */
+
+/*
+* Auch ohne historische Bestätigung:
+*
+* sehr schwache Breadth
+* + negative Internals
+* + schwache Participation
+* + schlechte Rotation
+*/
+
+else if (
+severelyWeakBreadth &&
+weakInternals &&
+participationScore < 45 &&
+rotationScore < 30
+) {
+
+state =
+"INTERNAL_BREAKDOWN";
+
+confidence =
+74;
+
+}
+
+
+/* =====================================================
+CONFIRMED
+===================================================== */
 
 else if (
 strongBreadth &&
@@ -935,13 +1522,13 @@ state =
 
 confidence =
 82;
+
 }
 
-/*
-* -----------------------------------------------------
-* CONFIRMING
-* -----------------------------------------------------
-*/
+
+/* =====================================================
+CONFIRMING
+===================================================== */
 
 else if (
 healthyBreadth &&
@@ -958,16 +1545,13 @@ state =
 
 confidence =
 65;
+
 }
 
-/*
-* -----------------------------------------------------
-* EARLY
-* -----------------------------------------------------
-*
-* Weak structure or incomplete confirmation remains
-* EARLY rather than being promoted artificially.
-*/
+
+/* =====================================================
+EARLY
+===================================================== */
 
 else {
 
@@ -976,19 +1560,28 @@ state =
 
 confidence =
 45;
+
 }
 
 
+/* =====================================================
+RECOVERY OVERRIDE
+===================================================== */
+
 /*
-* Recovery can override a stale breakdown only if the
-* recovery itself is broad and credible.
+* Eine echte breite Erholung darf einen alten EARLY /
+* stale breakdown Zustand überwinden.
+*
+* Sie darf jedoch keinen aktuell extremen Breakdown
+* überschreiben.
 */
 
 if (
 rotationRecovery &&
 quality >= 60 &&
 sustainability >= 60 &&
-falseBreakRisk < 50
+falseBreakRisk < 50 &&
+!currentStructuralBreakdown
 ) {
 
 state =
@@ -999,26 +1592,29 @@ Math.max(
 confidence,
 68
 );
+
 }
 
+
+/* =====================================================
+HISTORICAL OVERRIDE BLOCK
+===================================================== */
 
 /*
-* But a recovery attempt cannot override a strong
-* historical distribution structure.
+* WICHTIG:
+*
+* Alte History darf jetzt NICHT mehr allein einen
+* INTERNAL_BREAKDOWN erzwingen.
+*
+* Wir verwenden sie lediglich als Kontext.
+*
+* Dadurch verschwindet genau das bisherige Problem:
+*
+* distributionDays = 118
+* institutionalPressure = 100
+*
+* => nicht mehr automatisch INTERNAL_BREAKDOWN.
 */
-
-if (
-persistentDistributionHistory &&
-institutionalPressure >= 80 &&
-participationScore < 55
-) {
-
-state =
-"INTERNAL_BREAKDOWN";
-
-confidence =
-25;
-}
 
 
 /* =====================================================
@@ -1035,6 +1631,7 @@ state === "EARLY"
 
 summary =
 "Rotation not yet confirmed; internal participation remains incomplete";
+
 }
 
 
@@ -1044,6 +1641,7 @@ state === "CONFIRMING"
 
 summary =
 "Rotation improving with partial internal confirmation";
+
 }
 
 
@@ -1053,6 +1651,7 @@ state === "CONFIRMED"
 
 summary =
 "Broad institutional rotation confirmed";
+
 }
 
 
@@ -1061,7 +1660,8 @@ state === "INTERNAL_BREAKDOWN"
 ) {
 
 summary =
-"Internal participation deterioration accelerating";
+"Current internal structure shows meaningful breakdown risk";
+
 }
 
 
@@ -1071,6 +1671,7 @@ narrowLeadership
 
 summary +=
 " | Narrow leadership";
+
 }
 
 
@@ -1080,6 +1681,17 @@ megaCapDistortion
 
 summary +=
 " | Mega-cap distortion";
+
+}
+
+
+if (
+currentDistribution
+) {
+
+summary +=
+" | Current distribution pressure";
+
 }
 
 
@@ -1088,16 +1700,18 @@ persistentDistributionHistory
 ) {
 
 summary +=
-" | Persistent distribution";
+" | Historical distribution context";
+
 }
 
 
 if (
-prolongedBearRegime
+prolongedBearRegimeRaw
 ) {
 
 summary +=
-" | Prolonged bearish regime";
+" | Historical prolonged bearish context";
+
 }
 
 
@@ -1106,7 +1720,8 @@ persistentBreadthWeakness
 ) {
 
 summary +=
-" | Persistent breadth weakness";
+" | Historical breadth weakness";
+
 }
 
 
@@ -1115,16 +1730,48 @@ persistentParticipationWeakness
 ) {
 
 summary +=
-" | Persistent participation weakness";
+" | Historical participation weakness";
+
 }
 
 
 if (
-acceleratingWeakness
+persistentRotationWeakness
 ) {
 
 summary +=
-" | Accelerating weakness";
+" | Historical rotation weakness";
+
+}
+
+
+if (
+persistentLiquidityWeakness
+) {
+
+summary +=
+" | Historical liquidity weakness";
+
+}
+
+
+if (
+persistentFragility
+) {
+
+summary +=
+" | Historical fragility";
+
+}
+
+
+if (
+acceleratingWeaknessRaw
+) {
+
+summary +=
+" | Historical accelerating weakness";
+
 }
 
 
@@ -1134,6 +1781,7 @@ rotationRecovery
 
 summary +=
 " | Broad recovery attempt";
+
 }
 
 
@@ -1164,6 +1812,10 @@ summary,
 
 metrics: {
 
+/* -------------------------------------------------
+* CURRENT ROTATION
+* ------------------------------------------------- */
+
 rsSmall,
 rsGrowth,
 rsEqual,
@@ -1186,6 +1838,7 @@ correlation,
 
 crashScore,
 crashProbability,
+
 earlyScore,
 
 participation:
@@ -1197,9 +1850,54 @@ thrustScore,
 rotationDecay:
 rotationDecayScore,
 
-breadthTrend,
 
+/* -------------------------------------------------
+* CURRENT FLAGS
+* ------------------------------------------------- */
+
+healthyBreadth,
+strongBreadth,
+
+weakBreadth,
+severelyWeakBreadth,
+
+healthyInternals,
+weakInternals,
+neutralInternals,
+
+narrowLeadership,
+severeNarrowLeadership,
+megaCapDistortion,
+
+internalBreakdown,
+currentStructuralBreakdown,
+
+structuralDeterioration,
+
+currentDistribution,
+
+rotationRecovery,
+recoveryScore,
+
+
+/* -------------------------------------------------
+* HISTORY RELIABILITY
+* ------------------------------------------------- */
+
+historyReliability,
+
+historicalDistributionConfidence,
+
+
+/* -------------------------------------------------
+* RAW HISTORY
+* ------------------------------------------------- */
+
+breadthTrend,
 breadthAcceleration,
+
+participationTrend:
+participationTrendHistory,
 
 participationDecay:
 participationDecayHistory,
@@ -1207,22 +1905,56 @@ participationDecayHistory,
 leadershipDecay:
 leadershipDecayHistory,
 
+rotationTrend,
+liquidityTrend,
+fragilityTrend,
+
 crashTrend,
 
 phasePersistence,
 
 relativeBreadthWeakness,
 
-institutionalPressure,
+institutionalPressure:
+institutionalPressureRaw,
 
 daysInPhase,
 
 breadthWeakDays,
 participationWeakDays,
 rotationWeakDays,
+
 liquidityWeakDays,
 fragilityHighDays,
+
 distributionDays,
+
+persistentBreadthWeaknessRaw,
+persistentParticipationWeaknessRaw,
+persistentRotationWeaknessRaw,
+persistentLiquidityWeaknessRaw,
+persistentFragilityRaw,
+persistentDistributionHistoryRaw,
+
+prolongedBearRegimeRaw,
+persistentDistributionRaw,
+acceleratingWeaknessRaw,
+
+
+/* -------------------------------------------------
+* WEIGHTED HISTORY
+* ------------------------------------------------- */
+
+weightedBreadthWeakDays,
+weightedParticipationWeakDays,
+weightedRotationWeakDays,
+weightedLiquidityWeakDays,
+weightedFragilityHighDays,
+weightedDistributionDays,
+
+weightedPhasePersistence,
+
+weightedInstitutionalPressure,
 
 persistentBreadthWeakness,
 persistentParticipationWeakness,
@@ -1231,27 +1963,32 @@ persistentLiquidityWeakness,
 persistentFragility,
 persistentDistributionHistory,
 
-prolongedBearRegime,
-acceleratingWeakness,
 
-recoveryScore,
+/* -------------------------------------------------
+* HISTORY FLAGS
+* ------------------------------------------------- */
 
-healthyBreadth,
-strongBreadth,
-weakBreadth,
-severelyWeakBreadth,
+prolongedBearRegime:
+prolongedBearRegimeRaw,
 
-healthyInternals,
-weakInternals,
+acceleratingWeakness:
+acceleratingWeaknessRaw,
 
-narrowLeadership,
-severeNarrowLeadership,
-megaCapDistortion,
 
-internalBreakdown,
-structuralDeterioration
+/* -------------------------------------------------
+* CURRENT / HISTORY DISTINCTION
+* ------------------------------------------------- */
+
+currentStructurePriority:
+true,
+
+historyIsContextOnlyForBreakdown:
+true
+
 }
+
 };
+
 }
 
 
@@ -1281,4 +2018,26 @@ rotationDecay?.institutionalDistribution ||
 historyMetrics?.hiddenDistribution ||
 historyMetrics?.persistentDistribution
 );
+
+}
+
+
+/* ============================================================
+CLAMP
+============================================================ */
+
+function clamp(
+value: number,
+min: number,
+max: number
+): number {
+
+return Math.max(
+min,
+Math.min(
+max,
+value
+)
+);
+
 }
