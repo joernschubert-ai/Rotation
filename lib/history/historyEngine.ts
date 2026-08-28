@@ -1,7 +1,11 @@
+/* =====================================================
+HISTORY ENGINE
+===================================================== */
+
 export interface HistoryMetrics {
 
 /* =====================================================
-Trends
+TRENDS
 ===================================================== */
 
 breadthTrend: number;
@@ -40,6 +44,9 @@ priceTrend:
 | "BEARISH"
 | "STRONG_BEARISH";
 
+/* =====================================================
+LEADERSHIP / RISK
+===================================================== */
 
 leadershipTrend: number;
 
@@ -51,7 +58,7 @@ persistenceScore: number;
 phasePersistence: number;
 
 /* =====================================================
-NEW
+PERSISTENCE
 ===================================================== */
 
 daysInPhase: number;
@@ -85,124 +92,450 @@ marketCharacter:
 | "DISTRIBUTION"
 | "BEAR";
 
-
-averageBreadth:number;
-averageParticipation:number;
-averageRotation:number;
-averageLiquidity:number;
-averageFragility:number;
-
-highestBreadth:number;
-lowestBreadth:number;
-
-highestRotation:number;
-lowestRotation:number;
-
-}
-
 /* =====================================================
-HELPERS
+AVERAGES
 ===================================================== */
 
-function getBreadth50(snapshot: any): number {
-return Number(
-snapshot?.structure?.breadth?.b50?.value ?? 0
-);
+averageBreadth: number;
+averageParticipation: number;
+averageRotation: number;
+averageLiquidity: number;
+averageFragility: number;
+
+highestBreadth: number;
+lowestBreadth: number;
+
+highestRotation: number;
+lowestRotation: number;
 }
 
-function getBreadth20(snapshot: any): number {
-return Number(
-snapshot?.structure?.breadth?.b20?.value ?? 0
-);
+
+/* =====================================================
+GENERIC HELPERS
+===================================================== */
+
+function toNumber(
+value: any,
+fallback = 0
+): number {
+
+if (typeof value === "number") {
+return Number.isFinite(value)
+? value
+: fallback;
 }
 
-function getParticipation(snapshot: any): number {
-return Number(
-snapshot?.participation?.score ?? 0
-);
+if (
+value !== null &&
+typeof value === "object"
+) {
+
+if (typeof value.value === "number") {
+return Number.isFinite(value.value)
+? value.value
+: fallback;
 }
 
-function getRotation(snapshot: any): number {
-return Number(
-snapshot?.rotation?.score ?? 0
-);
+if (
+typeof value.score === "number"
+) {
+return Number.isFinite(value.score)
+? value.score
+: fallback;
 }
 
-function getLiquidity(snapshot: any): number {
-return Number(
-snapshot?.liquidity?.score ?? 0
-);
 }
 
-function getFragility(snapshot: any): number {
-return Number(
-snapshot?.fragility?.score ?? 0
-);
+const parsed = Number(value);
+
+return Number.isFinite(parsed)
+? parsed
+: fallback;
 }
 
-function getLeadership(snapshot: any): number {
-return Number(
-snapshot?.participation?.leadershipBreadth ??
-snapshot?.rotation?.leadershipBreadth ??
+
+/* =====================================================
+BREADTH
+===================================================== */
+
+function getBreadth50(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.structure?.breadth?.b50,
 0
 );
 }
 
-function getCrash(snapshot: any): number {
-return Number(
-snapshot?.crash?.probability ?? 0
+
+function getBreadth20(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.structure?.breadth?.b20,
+0
 );
 }
 
-function getPersistence(snapshot: any): number {
-return Number(
-snapshot?.master?.score ?? 0
+
+function getBreadth200(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.structure?.breadth?.b200,
+0
 );
 }
 
-function getNewHighs(snapshot: any): number {
-return Number(
-snapshot?.structure?.highsLows?.highs ?? 0
+
+/* =====================================================
+PARTICIPATION
+===================================================== */
+
+function getParticipation(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.participation?.score,
+0
 );
 }
 
-function getDanger(snapshot: any): number {
-return Number(snapshot?.dangerZone?.score ?? 0);
+
+/* =====================================================
+ROTATION
+===================================================== */
+
+function getRotation(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.rotation?.score,
+0
+);
 }
 
-function getExecution(snapshot: any): number {
-return Number(snapshot?.executionState?.score ?? 0);
+
+/* =====================================================
+LIQUIDITY
+===================================================== */
+
+function getLiquidity(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.liquidity?.score,
+0
+);
 }
 
-function getEdge(snapshot: any): number {
-return Number(snapshot?.edgeState?.score ?? 0);
+
+/* =====================================================
+FRAGILITY
+===================================================== */
+
+function getFragility(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.fragility?.score,
+0
+);
 }
 
-function getPhase(snapshot: any): string {
-return snapshot?.phase ?? "";
+
+/* =====================================================
+LEADERSHIP
+===================================================== */
+
+function getLeadership(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.participation?.leadershipBreadth ??
+snapshot?.rotation?.leadershipBreadth ??
+0,
+0
+);
 }
+
+
+/* =====================================================
+CRASH
+===================================================== */
+
+function getCrash(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.crash?.probability,
+0
+);
+}
+
+
+/* =====================================================
+MASTER / PERSISTENCE
+===================================================== */
+
+function getPersistence(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.master?.score,
+0
+);
+}
+
+
+/* =====================================================
+NEW HIGHS / LOWS
+===================================================== */
+
+function getNewHighs(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.structure?.highsLows?.highs,
+0
+);
+}
+
+
+function getNewLows(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.structure?.highsLows?.lows,
+0
+);
+}
+
+
+/* =====================================================
+DANGER
+===================================================== */
+
+function getDanger(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.dangerZone?.score,
+0
+);
+}
+
+
+/* =====================================================
+EXECUTION
+===================================================== */
+
+function getExecution(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.executionState?.score,
+0
+);
+}
+
+
+/* =====================================================
+EDGE
+===================================================== */
+
+function getEdge(
+snapshot: any
+): number {
+
+return toNumber(
+snapshot?.edgeState?.score,
+0
+);
+}
+
+
+/* =====================================================
+PHASE
+===================================================== */
+
+/*
+Snapshots können unterschiedliche Formen enthalten:
+
+phase: "PHASE_4_RISK"
+
+oder:
+
+phase: {
+phase: "PHASE_4_RISK"
+}
+
+oder:
+
+phase: {
+phase: "PHASE_4_RISK",
+subPhase: "INTERNAL_DISTRIBUTION"
+}
+
+Deshalb niemals direkt snapshot.phase vergleichen.
+*/
+
+function getPhase(
+snapshot: any
+): string {
+
+const phase =
+snapshot?.phase;
+
+if (
+typeof phase === "string"
+) {
+return phase;
+}
+
+if (
+phase &&
+typeof phase === "object"
+) {
+
+if (
+typeof phase.phase === "string"
+) {
+return phase.phase;
+}
+
+if (
+typeof phase.name === "string"
+) {
+return phase.name;
+}
+
+if (
+typeof phase.state === "string"
+) {
+return phase.state;
+}
+
+}
+
+return "";
+}
+
+
+/* =====================================================
+SUB PHASE
+===================================================== */
+
+function getSubPhase(
+snapshot: any
+): string {
+
+const phase =
+snapshot?.phase;
+
+if (
+phase &&
+typeof phase === "object" &&
+typeof phase.subPhase === "string"
+) {
+
+return phase.subPhase;
+}
+
+return "";
+}
+
+
+/* =====================================================
+REGIME
+===================================================== */
+
+function getRegimeState(
+snapshot: any
+): string {
+
+const phase =
+snapshot?.phase;
+
+if (
+phase &&
+typeof phase === "object" &&
+typeof phase.regimeState === "string"
+) {
+
+return phase.regimeState;
+}
+
+return "";
+}
+
 
 /* =====================================================
 PRICE HELPERS
 ===================================================== */
 
-function getNDXPrice(snapshot: any): number {
-return Number(
-snapshot?.indices?.ndx?.value ?? 0
+function getIndexValue(
+snapshot: any,
+index: "ndx" | "spx" | "rut"
+): number {
+
+return toNumber(
+snapshot?.indices?.[index],
+0
 );
 }
 
-function getSPXPrice(snapshot: any): number {
-return Number(
-snapshot?.indices?.spx?.value ?? 0
+
+function getNDXPrice(
+snapshot: any
+): number {
+
+return getIndexValue(
+snapshot,
+"ndx"
 );
 }
 
-function getRUTPrice(snapshot: any): number {
-return Number(
-snapshot?.indices?.rut?.value ?? 0
+
+function getSPXPrice(
+snapshot: any
+): number {
+
+return getIndexValue(
+snapshot,
+"spx"
 );
 }
+
+
+function getRUTPrice(
+snapshot: any
+): number {
+
+return getIndexValue(
+snapshot,
+"rut"
+);
+}
+
+
+/* =====================================================
+PRICE RETURN
+===================================================== */
 
 function priceReturn(
 newestPrice: number,
@@ -212,9 +545,12 @@ oldPrice: number
 if (
 !Number.isFinite(newestPrice) ||
 !Number.isFinite(oldPrice) ||
+newestPrice <= 0 ||
 oldPrice <= 0
 ) {
+
 return 0;
+
 }
 
 return (
@@ -224,14 +560,46 @@ return (
 
 
 /* =====================================================
-ENGINE
+CLAMP
 ===================================================== */
 
-export function historyEngine(
-history: any[]
-): HistoryMetrics {
+function clamp(
+value: number,
+min: number,
+max: number
+): number {
 
-if (!history || history.length < 5) {
+return Math.max(
+min,
+Math.min(
+max,
+value
+)
+);
+}
+
+
+/* =====================================================
+ROUND
+===================================================== */
+
+function round1(
+value: number
+): number {
+
+return Math.round(
+value * 10
+) / 10;
+}
+
+
+/* =====================================================
+EMPTY RESULT
+===================================================== */
+
+function emptyHistoryMetrics():
+HistoryMetrics {
+
 return {
 
 breadthTrend: 0,
@@ -244,7 +612,7 @@ rotationTrend: 0,
 liquidityTrend: 0,
 fragilityTrend: 0,
 
-/* PRICE / INDEX MOMENTUM */
+/* PRICE */
 
 ndxPriceTrend: 0,
 ndxMomentum5D: 0,
@@ -263,6 +631,8 @@ priceMomentumScore: 50,
 
 priceTrend: "NEUTRAL",
 
+/* OTHER */
+
 leadershipTrend: 0,
 
 relativeBreadthWeakness: 0,
@@ -271,6 +641,8 @@ crashTrend: 0,
 
 persistenceScore: 0,
 phasePersistence: 0,
+
+/* PERSISTENCE */
 
 daysInPhase: 0,
 
@@ -297,6 +669,10 @@ acceleratingWeakness: false,
 persistentDistribution: false,
 prolongedBearRegime: false,
 
+marketCharacter: "EXPANSION",
+
+/* AVERAGES */
+
 averageBreadth: 0,
 averageParticipation: 0,
 averageRotation: 0,
@@ -307,30 +683,111 @@ highestBreadth: 0,
 lowestBreadth: 0,
 
 highestRotation: 0,
-lowestRotation: 0,
-
-marketCharacter: "EXPANSION"
+lowestRotation: 0
 
 };
+
 }
 
 
-const newest = history[0];
+/* =====================================================
+ENGINE
+===================================================== */
 
-const historyLength = history.length;
+export function historyEngine(
+history: any[]
+): HistoryMetrics {
+
+
+/* =====================================================
+VALIDATE HISTORY
+===================================================== */
+
+if (
+!Array.isArray(history) ||
+history.length < 2
+) {
+
+return emptyHistoryMetrics();
+
+}
+
+
+/* =====================================================
+CLEAN HISTORY
+===================================================== */
+
+/*
+Wichtig:
+
+Die MarketHistory wird newest-first gespeichert:
+
+history[0] = aktuellster Snapshot
+history[1] = vorheriger Snapshot
+...
+
+Wir behalten diese Reihenfolge bewusst bei.
+*/
+
+const cleanHistory =
+history.filter(
+snapshot =>
+snapshot &&
+typeof snapshot === "object"
+);
+
+
+/* =====================================================
+BASIC REFERENCES
+===================================================== */
+
+const newest =
+cleanHistory[0];
+
+const historyLength =
+cleanHistory.length;
+
+
+/* =====================================================
+WINDOWS
+===================================================== */
 
 const shortWindow =
-Math.min(5, historyLength - 1);
+Math.min(
+5,
+historyLength - 1
+);
 
 const longWindow =
-Math.min(20, historyLength - 1);
+Math.min(
+20,
+historyLength - 1
+);
 
-const mid = history[shortWindow];
-const oldest = history[longWindow];
+const mid =
+cleanHistory[shortWindow];
 
-/* =====================================
+const oldest =
+cleanHistory[longWindow];
+
+
+/* =====================================================
+PHASE
+===================================================== */
+
+const newestPhase =
+getPhase(newest);
+
+const newestSubPhase =
+getSubPhase(newest);
+
+const newestRegimeState =
+getRegimeState(newest);
+
+
+/* =====================================================
 PRICE SNAPSHOTS
-===================================== */
+===================================================== */
 
 const ndxNewest =
 getNDXPrice(newest);
@@ -359,9 +816,10 @@ getRUTPrice(mid);
 const rutOldest =
 getRUTPrice(oldest);
 
-/* =====================================
+
+/* =====================================================
 PRICE RETURNS
-===================================== */
+===================================================== */
 
 const ndxMomentum5D =
 priceReturn(
@@ -399,9 +857,10 @@ rutNewest,
 rutOldest
 );
 
-/* =====================================
+
+/* =====================================================
 PRICE TREND
-===================================== */
+===================================================== */
 
 const ndxPriceTrend =
 ndxMomentum20D;
@@ -412,96 +871,146 @@ spxMomentum20D;
 const rutPriceTrend =
 rutMomentum20D;
 
-/* =====================================
+
+/* =====================================================
 NASDAQ ACCELERATION
-===================================== */
+===================================================== */
 
 /*
-Vergleicht kurzfristiges Momentum
-mit dem längerfristigen Momentum.
+20D Momentum wird auf einen ungefähren
+5D-Wert normalisiert.
 
-Beispiel:
-
-5D = +10%
+5D = +2%
 20D = +4%
 
-=> klar beschleunigender Aufwärtsmarkt
+=> 5D annualisierte Richtung schwächer
 */
 
 const ndxAcceleration =
 ndxMomentum5D -
 (ndxMomentum20D / 4);
 
-/* =====================================
+
+/* =====================================================
+PRICE DATA QUALITY
+===================================================== */
+
+const ndxDataAvailable =
+ndxNewest > 0 &&
+ndxOldest > 0;
+
+const spxDataAvailable =
+spxNewest > 0 &&
+spxOldest > 0;
+
+const rutDataAvailable =
+rutNewest > 0 &&
+rutOldest > 0;
+
+
+/* =====================================================
 PRICE MOMENTUM SCORE
-===================================== */
+===================================================== */
 
-let priceMomentumScore = 50;
+let priceMomentumScore =
+50;
 
-/* NASDAQ */
+
+/* -----------------------------------------------------
+NASDAQ
+----------------------------------------------------- */
+
+if (ndxDataAvailable) {
 
 priceMomentumScore +=
-Math.max(
+clamp(
+ndxMomentum5D * 2,
 -20,
-Math.min(
-20,
-ndxMomentum5D * 2
-)
+20
 );
 
 priceMomentumScore +=
-Math.max(
+clamp(
+ndxMomentum20D,
 -15,
-Math.min(
-15,
-ndxMomentum20D
-)
+15
 );
 
-/* S&P CONFIRMATION */
+}
+
+
+/* -----------------------------------------------------
+S&P CONFIRMATION
+----------------------------------------------------- */
+
+if (spxDataAvailable) {
 
 priceMomentumScore +=
-Math.max(
+clamp(
+spxMomentum5D,
 -10,
-Math.min(
-10,
-spxMomentum5D
-)
+10
 );
 
-/* RUSSELL */
+}
+
+
+/* -----------------------------------------------------
+RUSSELL
+----------------------------------------------------- */
+
+if (rutDataAvailable) {
 
 priceMomentumScore +=
-Math.max(
+clamp(
+rutMomentum5D,
 -5,
-Math.min(
-5,
-rutMomentum5D
-)
+5
 );
 
-/* ACCELERATION */
+}
 
-if (ndxAcceleration > 5) {
+
+/* -----------------------------------------------------
+ACCELERATION
+----------------------------------------------------- */
+
+if (
+ndxDataAvailable &&
+ndxAcceleration > 5
+) {
+
 priceMomentumScore += 10;
+
 }
 
-if (ndxAcceleration < -5) {
+if (
+ndxDataAvailable &&
+ndxAcceleration < -5
+) {
+
 priceMomentumScore -= 10;
+
 }
+
+
+/* =====================================================
+NORMALIZE PRICE SCORE
+===================================================== */
 
 priceMomentumScore =
-Math.max(
+clamp(
+Math.round(
+priceMomentumScore
+),
 0,
-Math.min(
-100,
-Math.round(priceMomentumScore)
-)
+100
 );
 
-/* =====================================
+
+/* =====================================================
 PRICE TREND CLASSIFICATION
-===================================== */
+===================================================== */
 
 let priceTrend:
 "STRONG_BULLISH"
@@ -509,6 +1018,7 @@ let priceTrend:
 | "NEUTRAL"
 | "BEARISH"
 | "STRONG_BEARISH";
+
 
 if (
 priceMomentumScore >= 75 &&
@@ -556,26 +1066,41 @@ priceTrend =
 }
 
 
-/* =====================================
+/* =====================================================
 ROLLING STATISTICS
-===================================== */
+===================================================== */
 
-let breadthSum = 0;
-let participationSum = 0;
-let rotationSum = 0;
-let liquiditySum = 0;
-let fragilitySum = 0;
+let breadthSum =
+0;
 
-let highestBreadth = -Infinity;
-let lowestBreadth = Infinity;
+let participationSum =
+0;
 
-let highestRotation = -Infinity;
-let lowestRotation = Infinity;
+let rotationSum =
+0;
+
+let liquiditySum =
+0;
+
+let fragilitySum =
+0;
+
+let highestBreadth =
+-Infinity;
+
+let lowestBreadth =
+Infinity;
+
+let highestRotation =
+-Infinity;
+
+let lowestRotation =
+Infinity;
 
 
-/* =====================================
-BREADTH
-===================================== */
+/* =====================================================
+CURRENT / HISTORICAL TRENDS
+===================================================== */
 
 const breadthTrend =
 getBreadth50(newest) -
@@ -589,10 +1114,6 @@ const relativeBreadthWeakness =
 getBreadth50(newest) -
 getBreadth20(newest);
 
-/* =====================================
-PARTICIPATION
-===================================== */
-
 const participationTrend =
 getParticipation(newest) -
 getParticipation(oldest);
@@ -601,231 +1122,598 @@ const participationDecay =
 getNewHighs(oldest) -
 getNewHighs(newest);
 
-/* =====================================
-ROTATION
-===================================== */
-
 const rotationTrend =
 getRotation(newest) -
 getRotation(oldest);
-
-/* =====================================
-LIQUIDITY
-===================================== */
 
 const liquidityTrend =
 getLiquidity(newest) -
 getLiquidity(oldest);
 
-/* =====================================
-FRAGILITY
-===================================== */
-
 const fragilityTrend =
 getFragility(newest) -
 getFragility(oldest);
-
-/* =====================================
-LEADERSHIP
-===================================== */
 
 const leadershipTrend =
 getLeadership(newest) -
 getLeadership(oldest);
 
-/* =====================================
-CRASH
-===================================== */
-
 const crashTrend =
 getCrash(newest) -
 getCrash(oldest);
 
-/* =====================================
-PERSISTENCE
-===================================== */
-
 const persistenceScore =
 getPersistence(newest);
 
-const phasePersistence =
-history.filter(
-h => h.phase === newest.phase
-).length;
 
-/* =====================================
-NEW
-===================================== */
+/* =====================================================
+PHASE PERSISTENCE
+===================================================== */
 
-let daysInPhase = 0;
+/*
+Nicht mehr:
 
-let breadthWeakDays = 0;
-let participationWeakDays = 0;
-let rotationWeakDays = 0;
+history.filter(...).length
 
-let liquidityWeakDays = 0;
-let fragilityHighDays = 0;
+Denn das würde auch alte, voneinander getrennte
+PHASE_4-RISK-Perioden zusammenzählen.
 
-let distributionDays = 0;
+Wir zählen ausschließlich den aktuellen
+zusammenhängenden Phasenblock.
+*/
 
-let dangerPersistence = 0;
-let executionPersistence = 0;
-let edgePersistence = 0;
+let daysInPhase =
+0;
 
-let firstPhaseBreak = false;
-
-for (const snap of history) {
-
-const breadth = getBreadth50(snap);
-const participation = getParticipation(snap);
-const rotation = getRotation(snap);
-const liquidity = getLiquidity(snap);
-const fragility = getFragility(snap);
-
-breadthSum += breadth;
-participationSum += participation;
-rotationSum += rotation;
-liquiditySum += liquidity;
-fragilitySum += fragility;
-
-highestBreadth = Math.max(highestBreadth, breadth);
-lowestBreadth = Math.min(lowestBreadth, breadth);
-
-highestRotation = Math.max(highestRotation, rotation);
-lowestRotation = Math.min(lowestRotation, rotation);
-
-if (!firstPhaseBreak) {
-
-if (getPhase(snap) === getPhase(newest))
-daysInPhase++;
-else
-firstPhaseBreak = true;
-
-}
-
-if (breadth < 55)
-breadthWeakDays++;
-
-if (participation < 60)
-participationWeakDays++;
-
-if (rotation < 60)
-rotationWeakDays++;
-
-if (liquidity < 55)
-liquidityWeakDays++;
-
-if (fragility > 60)
-fragilityHighDays++;
+for (
+const snapshot of cleanHistory
+) {
 
 if (
-snap.phase === "PHASE_3_DISTRIBUTION" ||
-snap.phase === "PHASE_4_RISK"
+getPhase(snapshot) === newestPhase
 ) {
-distributionDays++;
+
+daysInPhase++;
+
+} else {
+
+break;
+
 }
 
-if (getDanger(snap) > 60)
+}
+
+const phasePersistence =
+daysInPhase;
+
+
+/* =====================================================
+PERSISTENCE COUNTERS
+===================================================== */
+
+let breadthWeakDays =
+0;
+
+let participationWeakDays =
+0;
+
+let rotationWeakDays =
+0;
+
+let liquidityWeakDays =
+0;
+
+let fragilityHighDays =
+0;
+
+let distributionDays =
+0;
+
+let dangerPersistence =
+0;
+
+let executionPersistence =
+0;
+
+let edgePersistence =
+0;
+
+
+/* =====================================================
+SEQUENTIAL DISTRIBUTION COUNT
+===================================================== */
+
+let currentDistributionStreak =
+0;
+
+
+/* =====================================================
+HISTORY LOOP
+===================================================== */
+
+for (
+const snapshot of cleanHistory
+) {
+
+const breadth =
+getBreadth50(snapshot);
+
+const participation =
+getParticipation(snapshot);
+
+const rotation =
+getRotation(snapshot);
+
+const liquidity =
+getLiquidity(snapshot);
+
+const fragility =
+getFragility(snapshot);
+
+const phase =
+getPhase(snapshot);
+
+const subPhase =
+getSubPhase(snapshot);
+
+const regimeState =
+getRegimeState(snapshot);
+
+
+/* -----------------------------------------------------
+ROLLING SUMS
+----------------------------------------------------- */
+
+breadthSum +=
+breadth;
+
+participationSum +=
+participation;
+
+rotationSum +=
+rotation;
+
+liquiditySum +=
+liquidity;
+
+fragilitySum +=
+fragility;
+
+
+/* -----------------------------------------------------
+EXTREMES
+----------------------------------------------------- */
+
+highestBreadth =
+Math.max(
+highestBreadth,
+breadth
+);
+
+lowestBreadth =
+Math.min(
+lowestBreadth,
+breadth
+);
+
+highestRotation =
+Math.max(
+highestRotation,
+rotation
+);
+
+lowestRotation =
+Math.min(
+lowestRotation,
+rotation
+);
+
+
+/* -----------------------------------------------------
+WEAKNESS
+----------------------------------------------------- */
+
+if (
+breadth < 55
+) {
+
+breadthWeakDays++;
+
+}
+
+if (
+participation < 60
+) {
+
+participationWeakDays++;
+
+}
+
+if (
+rotation < 60
+) {
+
+rotationWeakDays++;
+
+}
+
+if (
+liquidity < 55
+) {
+
+liquidityWeakDays++;
+
+}
+
+if (
+fragility > 60
+) {
+
+fragilityHighDays++;
+
+}
+
+
+/* -----------------------------------------------------
+DISTRIBUTION
+----------------------------------------------------- */
+
+/*
+Distribution wird über mehrere Informationen erkannt.
+
+PHASE_3_DISTRIBUTION
+PHASE_4_RISK
+INTERNAL_DISTRIBUTION
+DISTRIBUTION regime
+
+Damit wird das historische Marktbild robuster.
+*/
+
+const isDistribution =
+phase === "PHASE_3_DISTRIBUTION" ||
+phase === "PHASE_4_RISK" ||
+subPhase === "INTERNAL_DISTRIBUTION" ||
+subPhase === "DISTRIBUTION" ||
+regimeState === "DISTRIBUTION";
+
+
+if (
+isDistribution
+) {
+
+distributionDays++;
+
+currentDistributionStreak++;
+
+} else {
+
+currentDistributionStreak =
+0;
+
+}
+
+
+/* -----------------------------------------------------
+DANGER
+----------------------------------------------------- */
+
+if (
+getDanger(snapshot) > 60
+) {
+
 dangerPersistence++;
 
-if (getExecution(snap) < 40)
+}
+
+
+/* -----------------------------------------------------
+EXECUTION
+----------------------------------------------------- */
+
+if (
+getExecution(snapshot) < 40
+) {
+
 executionPersistence++;
 
-if (getEdge(snap) < 40)
+}
+
+
+/* -----------------------------------------------------
+EDGE
+----------------------------------------------------- */
+
+if (
+getEdge(snapshot) < 40
+) {
+
 edgePersistence++;
 
 }
 
-let institutionalPressure = 0;
+}
 
-institutionalPressure += Math.min(distributionDays * 4, 30);
 
-institutionalPressure += Math.min(breadthWeakDays * 3, 20);
+/* =====================================================
+AVERAGES
+===================================================== */
 
-institutionalPressure += Math.min(participationWeakDays * 3, 15);
+const averageBreadth =
+breadthSum /
+historyLength;
 
-institutionalPressure += Math.min(rotationWeakDays * 2, 10);
+const averageParticipation =
+participationSum /
+historyLength;
 
-institutionalPressure += Math.min(liquidityWeakDays * 2, 10);
+const averageRotation =
+rotationSum /
+historyLength;
 
-institutionalPressure += Math.min(fragilityHighDays * 2, 15);
+const averageLiquidity =
+liquiditySum /
+historyLength;
+
+const averageFragility =
+fragilitySum /
+historyLength;
+
+
+/* =====================================================
+INSTITUTIONAL PRESSURE
+===================================================== */
+
+/*
+Institutional pressure ist kein einzelner
+Tageswert.
+
+Er entsteht aus:
+
+Distribution
+Breadth weakness
+Participation weakness
+Rotation weakness
+Liquidity stress
+Fragility
+
+Die Gewichtung bleibt bewusst asymmetrisch:
+anhaltende Distribution und Fragility sind wichtiger
+als kurzfristige Rotation.
+*/
+
+let institutionalPressure =
+0;
+
+institutionalPressure +=
+Math.min(
+distributionDays * 4,
+30
+);
+
+institutionalPressure +=
+Math.min(
+breadthWeakDays * 3,
+20
+);
+
+institutionalPressure +=
+Math.min(
+participationWeakDays * 3,
+15
+);
+
+institutionalPressure +=
+Math.min(
+rotationWeakDays * 2,
+10
+);
+
+institutionalPressure +=
+Math.min(
+liquidityWeakDays * 2,
+10
+);
+
+institutionalPressure +=
+Math.min(
+fragilityHighDays * 2,
+15
+);
 
 institutionalPressure =
-Math.min(institutionalPressure,100);
+clamp(
+Math.round(
+institutionalPressure
+),
+0,
+100
+);
+
+
+/* =====================================================
+ROTATION PERSISTENCE
+===================================================== */
+
+/*
+100 = keine Weakness
+0 = sehr lange Weakness
+*/
 
 const rotationPersistence =
-Math.max(0,100-rotationWeakDays*5);
+clamp(
+100 -
+(rotationWeakDays * 5),
+0,
+100
+);
+
+
+/* =====================================================
+LIQUIDITY PERSISTENCE
+===================================================== */
 
 const liquidityPersistence =
-Math.max(0,100-liquidityWeakDays*5);
+clamp(
+100 -
+(liquidityWeakDays * 5),
+0,
+100
+);
+
+
+/* =====================================================
+FRAGILITY PERSISTENCE
+===================================================== */
 
 const fragilityPersistence =
-Math.min(fragilityHighDays*6,100);
+clamp(
+fragilityHighDays * 6,
+0,
+100
+);
+
+
+/* =====================================================
+WEAKNESS ACCELERATION
+===================================================== */
+
+/*
+Nicht mehr ausschließlich:
+breadthWeakDays >= 5 &&
+participationWeakDays >= 5
+
+Zusätzlich müssen die aktuellen Werte
+schwach oder fallend sein.
+*/
+
+const currentBreadth =
+getBreadth50(newest);
+
+const currentParticipation =
+getParticipation(newest);
+
+const currentRotation =
+getRotation(newest);
+
+const currentLiquidity =
+getLiquidity(newest);
+
+const currentFragility =
+getFragility(newest);
+
 
 const acceleratingWeakness =
-breadthWeakDays>=5 &&
-participationWeakDays>=5;
+(
+breadthWeakDays >= 5 &&
+participationWeakDays >= 5 &&
+(
+breadthTrend < -1 ||
+participationTrend < -1 ||
+breadthAcceleration < -1
+)
+)
+||
+(
+currentFragility > 75 &&
+currentLiquidity < 40 &&
+currentParticipation < 50
+);
+
+
+/* =====================================================
+PERSISTENT DISTRIBUTION
+===================================================== */
 
 const persistentDistribution =
-distributionDays>=7;
+distributionDays >= 7 ||
+currentDistributionStreak >= 5;
+
+
+/* =====================================================
+PROLONGED BEAR REGIME
+===================================================== */
+
+/*
+Bear-Regime erst bei echter Persistenz.
+
+Nicht bereits nach wenigen PHASE_4 Tagen.
+*/
 
 const prolongedBearRegime =
-distributionDays>=15;
+distributionDays >= 15 &&
+(
+averageBreadth < 55 ||
+averageParticipation < 55 ||
+averageFragility > 65
+);
+
+
+/* =====================================================
+MARKET CHARACTER
+===================================================== */
 
 let marketCharacter:
-"EXPANSION"|
-"TRANSITION"|
-"DISTRIBUTION"|
+"EXPANSION"
+| "TRANSITION"
+| "DISTRIBUTION"
+| "BEAR";
+
+
+if (
+prolongedBearRegime
+) {
+
+marketCharacter =
 "BEAR";
-
-if(prolongedBearRegime){
-
-marketCharacter="BEAR";
-
-}else if(persistentDistribution){
-
-marketCharacter="DISTRIBUTION";
-
-}else if(institutionalPressure>35){
-
-marketCharacter="TRANSITION";
-
-}else{
-
-marketCharacter="EXPANSION";
 
 }
 
-/* =====================================
-AVERAGES
-===================================== */
+else if (
+persistentDistribution
+) {
 
-const averageBreadth =
-breadthSum / history.length;
+marketCharacter =
+"DISTRIBUTION";
 
-const averageParticipation =
-participationSum / history.length;
+}
 
-const averageRotation =
-rotationSum / history.length;
+else if (
+institutionalPressure > 35
+) {
 
-const averageLiquidity =
-liquiditySum / history.length;
+marketCharacter =
+"TRANSITION";
 
-const averageFragility =
-fragilitySum / history.length;
+}
 
-const round = (v:number)=>Math.round(v*10)/10;
+else {
 
-/* =====================================
+marketCharacter =
+"EXPANSION";
+
+}
+
+
+/* =====================================================
 DEBUG
-===================================== */
+===================================================== */
 
-console.log("HISTORY DEBUG", {
+console.log(
+"HISTORY ENGINE",
+{
 
-newestNDX:
+historyLength,
+
+newestPhase,
+newestSubPhase,
+newestRegimeState,
+
+daysInPhase,
+phasePersistence,
+
+/* PRICE */
+
 ndxNewest,
-
 ndxMomentum5D,
 ndxMomentum20D,
 ndxAcceleration,
@@ -839,41 +1727,68 @@ rutMomentum20D,
 priceMomentumScore,
 priceTrend,
 
-newestRotation:
-  getRotation(newest),
+/* CURRENT */
 
-oldestRotation:
-  getRotation(oldest),
+currentBreadth,
+currentParticipation,
+currentRotation,
+currentLiquidity,
+currentFragility,
 
-newestFragility:
-  getFragility(newest),
+/* TRENDS */
 
-oldestFragility:
-  getFragility(oldest),
+breadthTrend,
+breadthAcceleration,
 
-newestBreadth:
-  getBreadth50(newest),
+participationTrend,
+participationDecay,
 
-oldestBreadth:
-  getBreadth50(oldest),
+rotationTrend,
+liquidityTrend,
+fragilityTrend,
 
-newestParticipation:
-  getParticipation(newest),
+relativeBreadthWeakness,
 
-oldestParticipation:
-  getParticipation(oldest),
+crashTrend,
 
-historyLength:
-  history.length
+/* PERSISTENCE */
 
-});
+breadthWeakDays,
+participationWeakDays,
+rotationWeakDays,
+
+liquidityWeakDays,
+fragilityHighDays,
+
+distributionDays,
+currentDistributionStreak,
+
+institutionalPressure,
+
+rotationPersistence,
+liquidityPersistence,
+fragilityPersistence,
+
+acceleratingWeakness,
+persistentDistribution,
+prolongedBearRegime,
+
+marketCharacter
+
+}
+);
+
+
+/* =====================================================
+RETURN
+===================================================== */
 
 return {
 
 breadthTrend,
 breadthAcceleration,
 
-/* PRICE / INDEX MOMENTUM */
+/* PRICE */
 
 ndxPriceTrend,
 ndxMomentum5D,
@@ -891,6 +1806,7 @@ rutMomentum20D,
 priceMomentumScore,
 priceTrend,
 
+/* TRENDS */
 
 participationTrend,
 participationDecay,
@@ -904,6 +1820,8 @@ leadershipTrend,
 relativeBreadthWeakness,
 
 crashTrend,
+
+/* PERSISTENCE */
 
 persistenceScore,
 phasePersistence,
@@ -935,11 +1853,32 @@ prolongedBearRegime,
 
 marketCharacter,
 
-averageBreadth: round(averageBreadth),
-averageParticipation: round(averageParticipation),
-averageRotation: round(averageRotation),
-averageLiquidity: round(averageLiquidity),
-averageFragility: round(averageFragility),
+/* AVERAGES */
+
+averageBreadth:
+round1(
+averageBreadth
+),
+
+averageParticipation:
+round1(
+averageParticipation
+),
+
+averageRotation:
+round1(
+averageRotation
+),
+
+averageLiquidity:
+round1(
+averageLiquidity
+),
+
+averageFragility:
+round1(
+averageFragility
+),
 
 highestBreadth,
 lowestBreadth,
