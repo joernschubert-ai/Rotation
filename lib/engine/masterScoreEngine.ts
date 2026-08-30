@@ -20,15 +20,13 @@ MASTER SCORE SEMANTICS
 * LOW SCORE -> GREEN -> CALL
 * HIGH SCORE -> RED -> PUT
 *
-* All returned component scores follow the same
-* risk-oriented semantic:
+* ALL component scores use exactly the same semantic:
 *
-* HIGH = more risk / more PUT pressure
-* LOW = more constructive / more CALL pressure
+* LOW = constructive / CALL
+* HIGH = risk / PUT
 *
-* This intentionally removes the previous inversion
-* problem where some values were constructive while
-* the Master Score itself was interpreted defensively.
+* There is NO mixed constructive/risk interpretation
+* inside the returned Master Score object.
 */
 
 
@@ -41,7 +39,6 @@ const rotation = engine.rotation ?? {};
 const putTiming = engine.putTiming ?? {};
 const russell = engine.russell ?? {};
 const phaseData = engine.phaseData ?? {};
-const structure = engine.structure ?? {};
 const participation = engine.participation ?? {};
 const breadthThrust = engine.breadthThrust ?? {};
 const liquidity = engine.liquidity ?? {};
@@ -286,31 +283,16 @@ value
 
 
 /*
-* Converts a constructive score into a risk score.
+* Convert a constructive score into risk space.
 *
-* 100 constructive
-* =>
-* 0 risk
+* Example:
 *
-* 0 constructive
-* =>
-* 100 risk
+* constructive 100 -> risk 0
+* constructive 50 -> risk 50
+* constructive 0 -> risk 100
 */
 
 function riskFromConstructive(
-value: number
-) {
-
-return 100 - clamp(value);
-
-}
-
-
-/*
-* Converts a risk score into a constructive score.
-*/
-
-function constructiveFromRisk(
 value: number
 ) {
 
@@ -351,10 +333,15 @@ value * weight;
 
 denominator +=
 weight;
+
 }
 
-if (denominator <= 0) {
+if (
+denominator <= 0
+) {
+
 return 50;
+
 }
 
 return numerator / denominator;
@@ -367,10 +354,13 @@ TIMING NORMALIZATION
 ===================================================== */
 
 /*
-* putTiming historically uses 0..12.
+* putTiming historically uses a 0..12 scale.
 *
 * 0 = no PUT timing pressure
 * 12 = maximum PUT timing pressure
+*
+* Therefore it is directly normalized into
+* the common 0..100 RISK scale.
 */
 
 const timingRisk =
@@ -386,9 +376,11 @@ RISK COMPONENTS
 /*
 * CRASH
 *
-* Already risk-oriented:
+* crash.score:
+* high = more risk
 *
-* high = more crash risk
+* crash.probability:
+* high = more risk
 */
 
 const crashRisk =
@@ -407,12 +399,11 @@ weight: 0.50
 /*
 * ROTATION
 *
-* rotation.score is constructive:
+* rotation.score:
+* high = constructive
+* low = risk
 *
-* high = healthy rotation
-* low = weak rotation
-*
-* Therefore invert it into risk.
+* Convert into risk space.
 */
 
 const rotationRisk =
@@ -424,7 +415,7 @@ rotationScore
 /*
 * PUT TIMING
 *
-* Already risk-oriented.
+* Already risk-oriented after normalization.
 */
 
 const timingRiskScore =
@@ -434,7 +425,11 @@ timingRisk;
 /*
 * RUSSELL
 *
-* Russell confidence is constructive.
+* Russell confidence:
+* high = constructive
+* low = weak / blocked
+*
+* Convert into risk space.
 */
 
 const russellRisk =
@@ -446,7 +441,8 @@ russellScore
 /*
 * PARTICIPATION
 *
-* High participation = healthy.
+* high = healthy
+* low = weak
 */
 
 const participationRisk =
@@ -457,6 +453,9 @@ participationScore
 
 /*
 * BREADTH THRUST
+*
+* high = healthy
+* low = fragile
 */
 
 const thrustRisk =
@@ -468,10 +467,8 @@ thrustScore
 /*
 * BREADTH VELOCITY
 *
-* Assumption:
-*
-* high score = healthy/stable
-* low score = deterioration
+* high = healthy/stable
+* low = deterioration
 */
 
 const breadthVelocityRisk =
@@ -484,7 +481,7 @@ breadthVelocityScore
 * LIQUIDITY
 *
 * high = healthy
-* low = fragile
+* low = stressed
 */
 
 const liquidityRisk =
@@ -496,9 +493,9 @@ liquidityScore
 /*
 * FRAGILITY
 *
-* Already risk-oriented:
+* Already risk-oriented.
 *
-* high = bad
+* high = dangerous
 */
 
 const fragilityRisk =
@@ -510,9 +507,9 @@ fragilityScore
 /*
 * ROTATION DECAY
 *
-* Already risk-oriented:
+* Already risk-oriented.
 *
-* high = deteriorating
+* high = deteriorating rotation
 */
 
 const rotationDecayRisk =
@@ -524,7 +521,8 @@ rotationDecayScore
 /*
 * MARKET QUALITY
 *
-* high quality = constructive
+* high = healthy
+* low = structural deterioration
 */
 
 const marketQualityRisk =
@@ -536,7 +534,8 @@ marketQualityScore
 /*
 * REGIME SYNC
 *
-* high synchronization = constructive
+* high = synchronized / constructive
+* low = breakdown / divergence
 */
 
 const regimeSyncRisk =
@@ -548,7 +547,7 @@ regimeSyncScore
 /*
 * DANGER ZONE
 *
-* already risk-oriented.
+* Already risk-oriented.
 */
 
 const dangerRisk =
@@ -560,7 +559,8 @@ dangerScore
 /*
 * PRICE MOMENTUM
 *
-* high momentum score = constructive.
+* high = constructive
+* low = weak
 */
 
 const priceMomentumRisk =
@@ -600,39 +600,69 @@ Number(averageFragility)
 
 
 /*
-* Convert historical quality into historical risk.
+* Historical values are mostly constructive
+* measurements.
+*
+* Convert every constructive measurement into
+* the common risk space first.
 */
 
-const historicalQualityConstructive =
+const historicalBreadthRisk =
+riskFromConstructive(
+historicalBreadth
+);
+
+const historicalParticipationRisk =
+riskFromConstructive(
+historicalParticipation
+);
+
+const historicalRotationRisk =
+riskFromConstructive(
+historicalRotation
+);
+
+const historicalLiquidityRisk =
+riskFromConstructive(
+historicalLiquidity
+);
+
+
+/*
+* Historical fragility is already a risk measurement.
+*/
+
+const historicalFragilityRisk =
+historicalFragility;
+
+
+/*
+* Historical risk.
+*/
+
+const historicalRisk =
 weightedAverage([
 {
-value: historicalBreadth,
+value: historicalBreadthRisk,
 weight: 0.20
 },
 {
-value: historicalParticipation,
+value: historicalParticipationRisk,
 weight: 0.20
 },
 {
-value: historicalRotation,
+value: historicalRotationRisk,
 weight: 0.15
 },
 {
-value: historicalLiquidity,
+value: historicalLiquidityRisk,
 weight: 0.20
 },
 {
-value: constructiveFromRisk(
-historicalFragility
-),
+value: historicalFragilityRisk,
 weight: 0.25
 }
 ]);
-
-const historicalRisk =
-riskFromConstructive(
-historicalQualityConstructive
-);
 
 
 /* =====================================================
@@ -640,144 +670,93 @@ STRUCTURAL RISK
 ===================================================== */
 
 /*
-* Structural quality is calculated in constructive
-* space first and then converted into risk space.
+* All inputs below are already in RISK space.
+*
+* Therefore they can be combined directly.
 */
 
-const structuralQualityConstructive =
+const structuralRisk =
 weightedAverage([
 {
-value:
-constructiveFromRisk(
-marketQualityRisk
-),
+value: marketQualityRisk,
 weight: 0.30
 },
 {
-value:
-constructiveFromRisk(
-participationRisk
-),
+value: participationRisk,
 weight: 0.20
 },
 {
-value:
-constructiveFromRisk(
-breadthVelocityRisk
-),
+value: breadthVelocityRisk,
 weight: 0.15
 },
 {
-value:
-constructiveFromRisk(
-rotationDecayRisk
-),
+value: rotationDecayRisk,
 weight: 0.15
 },
 {
-value:
-constructiveFromRisk(
-fragilityRisk
-),
+value: fragilityRisk,
 weight: 0.20
 }
 ]);
-
-const structuralRisk =
-riskFromConstructive(
-structuralQualityConstructive
-);
 
 
 /* =====================================================
 CURRENT MARKET RISK
 ===================================================== */
 
-const currentQualityConstructive =
+/*
+* All components are now directly risk-oriented.
+*
+* No second inversion is necessary.
+*/
+
+const currentMarketRisk =
 weightedAverage([
 {
-value:
-constructiveFromRisk(
-rotationRisk
-),
+value: rotationRisk,
 weight: 0.12
 },
 {
-value:
-constructiveFromRisk(
-participationRisk
-),
+value: participationRisk,
 weight: 0.12
 },
 {
-value:
-constructiveFromRisk(
-thrustRisk
-),
+value: thrustRisk,
 weight: 0.08
 },
 {
-value:
-constructiveFromRisk(
-breadthVelocityRisk
-),
+value: breadthVelocityRisk,
 weight: 0.08
 },
 {
-value:
-constructiveFromRisk(
-liquidityRisk
-),
+value: liquidityRisk,
 weight: 0.10
 },
 {
-value:
-constructiveFromRisk(
-fragilityRisk
-),
+value: fragilityRisk,
 weight: 0.14
 },
 {
-value:
-constructiveFromRisk(
-rotationDecayRisk
-),
+value: rotationDecayRisk,
 weight: 0.08
 },
 {
-value:
-constructiveFromRisk(
-marketQualityRisk
-),
+value: marketQualityRisk,
 weight: 0.16
 },
 {
-value:
-constructiveFromRisk(
-priceMomentumRisk
-),
+value: priceMomentumRisk,
 weight: 0.05
 },
 {
-value:
-constructiveFromRisk(
-regimeSyncRisk
-),
+value: regimeSyncRisk,
 weight: 0.04
 },
 {
-value:
-constructiveFromRisk(
-dangerRisk
-),
+value: dangerRisk,
 weight: 0.03
 }
 ]);
-
-const currentMarketRisk =
-riskFromConstructive(
-currentQualityConstructive
-);
 
 
 /* =====================================================
@@ -785,14 +764,14 @@ BASE MASTER RISK
 ===================================================== */
 
 /*
-* This is now explicitly a RISK score.
+* Master Score = RISK SCORE.
 *
-* Higher = more PUT pressure.
-*
-* The weighting deliberately gives the current market
-* state the highest influence, while structural and
-* historical persistence prevent the score from reacting
-* too violently to a single daily move.
+* Current market conditions have the largest weight.
+* Structural quality provides the second layer.
+* Historical conditions prevent short-term noise from
+* dominating the score.
+* Crash risk is deliberately kept as an additional
+* independent risk input.
 */
 
 let score =
@@ -821,9 +800,16 @@ PHASE ADJUSTMENT
 ===================================================== */
 
 /*
-* Phase is a bounded risk overlay.
+* Phase is a bounded RISK overlay.
 *
-* Later / more dangerous phases increase PUT pressure.
+* Earlier phases:
+* lower risk
+*
+* Later phases:
+* higher risk
+*
+* PHASE_7_CAPITULATION receives a reduced adjustment
+* because capitulation can represent exhaustion.
 */
 
 let phaseAdjustment = 0;
@@ -868,14 +854,6 @@ break;
 
 case "PHASE_7_CAPITULATION":
 
-/*
-* Capitulation is extremely bearish,
-* but also represents exhaustion.
-*
-* Therefore it is not given the maximum
-* positive adjustment.
-*/
-
 phaseAdjustment = +10;
 
 break;
@@ -888,7 +866,7 @@ phaseAdjustment = 0;
 
 
 /*
-* Confirmed phase gets slightly more weight.
+* Confirmed phases receive slightly more weight.
 */
 
 if (
@@ -906,8 +884,9 @@ phaseConfidence < 40
 ) {
 
 /*
-* Low confidence pulls the score toward
-* neutral instead of forcing a directional call.
+* Low phase confidence pulls the score toward neutral.
+*
+* It does not directly create a bullish or bearish signal.
 */
 
 score =
@@ -916,7 +895,8 @@ score =
 
 }
 
-score += phaseAdjustment;
+score +=
+phaseAdjustment;
 
 
 /* =====================================================
@@ -924,11 +904,10 @@ REGIME PERSISTENCE OVERLAY
 ===================================================== */
 
 /*
-* Persistence is now explicitly integrated.
+* Persistence is deliberately treated as an OVERLAY.
 *
-* This is important because a single snapshot can
-* temporarily improve while the underlying regime
-* remains structurally weak.
+* It should confirm structural weakness but must never
+* completely replace the underlying market score.
 */
 
 let persistenceAdjustment = 0;
@@ -1004,8 +983,7 @@ persistenceAdjustment += 4;
 
 
 /*
-* Improving persistence can reduce risk slightly,
-* but never erase structural risk.
+* Improving persistence can reduce risk slightly.
 */
 
 if (
@@ -1016,6 +994,11 @@ persistenceTrend === "IMPROVING"
 persistenceAdjustment -= 5;
 
 }
+
+
+/*
+* Bound persistence overlay.
+*/
 
 persistenceAdjustment =
 clamp(
@@ -1032,6 +1015,13 @@ persistenceAdjustment;
 STRUCTURAL WARNING ADJUSTMENTS
 ===================================================== */
 
+/*
+* Warning signals are deliberately bounded overlays.
+*
+* They confirm risk but do not create an independent
+* Master Score.
+*/
+
 let warningAdjustment = 0;
 
 
@@ -1044,7 +1034,7 @@ Number(breadthTrend) <= -2;
 
 
 /*
-* Accelerating breadth decay.
+* Accelerating breadth deterioration.
 */
 
 const acceleratingBreadthDecay =
@@ -1162,7 +1152,7 @@ warningAdjustment += 2;
 
 
 /*
-* Prevent warning stack from dominating the score.
+* Warning stack can never dominate the underlying score.
 */
 
 warningAdjustment =
@@ -1181,10 +1171,7 @@ EXECUTION ADJUSTMENT
 ===================================================== */
 
 /*
-* Execution state is a risk overlay.
-*
-* It should influence the Master Score,
-* but never dominate the market engine.
+* Execution state is a small risk overlay.
 */
 
 let executionAdjustment = 0;
@@ -1225,7 +1212,7 @@ executionAdjustment;
 
 
 /* =====================================================
-SCORE CLAMP
+FINAL SCORE
 ===================================================== */
 
 score =
@@ -1243,10 +1230,13 @@ MASTER SIGNAL
 ===================================================== */
 
 /*
-* Explicit user-facing interpretation.
+* SINGLE SOURCE OF TRUTH FOR PANEL INTERPRETATION:
 *
-* LOW = CALL
-* HIGH = PUT
+* 0..35 = CALL / GREEN
+* 36..64 = NEUTRAL / YELLOW
+* 65..100 = PUT / RED
+*
+* The panel should NOT invert these values again.
 */
 
 let signal:
@@ -1288,6 +1278,11 @@ color = "YELLOW";
 /* =====================================================
 SIGNAL STRENGTH
 ===================================================== */
+
+/*
+* Strength describes how far the score has moved
+* into the corresponding directional zone.
+*/
 
 let signalStrength = 0;
 
@@ -1396,12 +1391,12 @@ MODE
 /*
 * IMPORTANT:
 *
-* Mode remains a trading posture.
+* Mode is NOT the Master Score.
 *
 * Master Score = risk intensity
-* Mode = execution posture
+* Mode = trading posture
 *
-* These are deliberately separate.
+* Both are deliberately independent.
 */
 
 let mode:
@@ -1410,9 +1405,12 @@ let mode:
 | "RISK"
 | "CRASH";
 
-
 mode = "LONG";
 
+
+/*
+* Distribution.
+*/
 
 if (
 phase === "PHASE_3_DISTRIBUTION"
@@ -1423,6 +1421,10 @@ mode = "NEUTRAL";
 }
 
 
+/*
+* Risk.
+*/
+
 if (
 phase === "PHASE_4_RISK"
 ) {
@@ -1431,6 +1433,10 @@ mode = "RISK";
 
 }
 
+
+/*
+* Crash phases.
+*/
 
 if (
 phase === "PHASE_5_BREAKDOWN" ||
@@ -1444,8 +1450,8 @@ mode = "CRASH";
 
 
 /*
-* Strong structural deterioration can move an
-* earlier phase into risk mode.
+* Strong structural deterioration can promote
+* an earlier phase into RISK.
 */
 
 if (
@@ -1458,6 +1464,11 @@ mode = "RISK";
 }
 
 
+/*
+* Accelerating breadth weakness combined with
+* rising crash risk confirms defensive posture.
+*/
+
 if (
 acceleratingBreadthDecay &&
 risingCrashRisk
@@ -1469,7 +1480,8 @@ mode = "RISK";
 
 
 /*
-* Persistence can also promote risk posture.
+* Persistent bearish regime can promote LONG
+* into RISK when distribution risk is significant.
 */
 
 if (
@@ -1484,7 +1496,7 @@ mode = "RISK";
 
 
 /*
-* Execution layer may force defensive mode.
+* Execution layer may force defensive posture.
 */
 
 const executionOverride = (
@@ -1509,8 +1521,8 @@ mode = "RISK";
 
 
 /*
-* Do NOT downgrade RISK/CRASH merely because
-* of narrow leadership.
+* Do NOT downgrade RISK/CRASH because of
+* narrow leadership.
 */
 
 if (
@@ -1569,7 +1581,6 @@ let regime:
 | "TRANSITION"
 | "RISK"
 | "CRASH";
-
 
 regime = "LONG";
 
@@ -1678,7 +1689,7 @@ return {
 score,
 
 /*
-* Explicit score interpretation for the panel.
+* SINGLE SOURCE OF TRUTH FOR USER INTERFACE
 */
 
 signal,
@@ -1719,13 +1730,17 @@ scoreInterpretation:
 callThreshold:
 35,
 
+neutralLowerThreshold:
+36,
+
+neutralUpperThreshold:
+64,
+
 putThreshold:
 65,
 
 signal,
-
 color,
-
 signalStrength,
 
 
@@ -1861,14 +1876,14 @@ RISK-ORIENTED COMPONENTS
 =================================================== */
 
 /*
-* IMPORTANT:
-*
-* All components now use the SAME semantic:
+* ALL components use exactly the same semantics:
 *
 * HIGH = RISK / PUT
 * LOW = CONSTRUCTIVE / CALL
 *
-* This removes the previous mixed interpretation.
+* The panel must display these values directly.
+*
+* DO NOT invert them in the UI.
 */
 
 components: {
@@ -1944,27 +1959,37 @@ dangerRisk
 ),
 
 /*
-* New persistence components.
+* Persistence components.
+*
+* These are also risk-oriented.
 */
 
 regimePersistence:
 Math.round(
+clamp(
 persistenceScore
+)
 ),
 
 distributionRisk:
 Math.round(
+clamp(
 distributionRisk
+)
 ),
 
 falseRecoveryRisk:
 Math.round(
+clamp(
 falseRecoveryRisk
+)
 ),
 
 marketFatigue:
 Math.round(
+clamp(
 marketFatigue
+)
 )
 
 }
