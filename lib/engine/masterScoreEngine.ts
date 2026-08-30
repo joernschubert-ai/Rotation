@@ -68,12 +68,36 @@ Number(crash?.probability ?? 0);
 const rotationScore =
 Number(rotation?.score ?? 50);
 
+
+/*
+* Russell handling is intentionally defensive.
+*
+* A BLOCKED Russell signal does NOT mean:
+*
+* "maximum Russell risk"
+*
+* It means:
+*
+* "Russell provides no usable directional information."
+*
+* Therefore BLOCKED is mapped to neutral risk = 50.
+*/
+
+const russellBlocked =
+russell?.state === "BLOCKED" ||
+russell?.decision === "NO_TRADE" ||
+russell?.action === "NO_TRADE";
+
+
 const russellScore =
-Number(
+russellBlocked
+? 50
+: Number(
 russell?.confidence ??
 russell?.score?.value ??
 50
 );
+
 
 const timingRaw =
 Number(
@@ -425,15 +449,19 @@ timingRisk;
 /*
 * RUSSELL
 *
-* Russell confidence:
-* high = constructive
-* low = weak / blocked
+* A BLOCKED / NO_TRADE Russell signal is NEUTRAL.
 *
-* Convert into risk space.
+* It must NOT become 100 risk merely because the
+* confidence value is zero.
+*
+* If Russell provides a real directional score,
+* normal constructive -> risk inversion applies.
 */
 
 const russellRisk =
-riskFromConstructive(
+russellBlocked
+? 50
+: riskFromConstructive(
 russellScore
 );
 
@@ -1385,18 +1413,172 @@ Number(rotation?.rsEqual ?? 1) < 0.995
 
 
 /* =====================================================
+DEFENSIVE STRUCTURAL CONFIRMATION
+===================================================== */
+
+/*
+* IMPORTANT:
+*
+* PHASE_3_DISTRIBUTION is no longer an automatic
+* NEUTRAL mode.
+*
+* The Master Score has priority.
+*
+* A defensive mode is confirmed when:
+*
+* 1. Score is already in PUT territory
+*
+* AND
+*
+* 2. Structural evidence confirms that the high score
+* is not merely a temporary isolated spike.
+*
+* This prevents:
+*
+* PHASE_3 = NEUTRAL
+*
+* from overriding a clearly defensive structure.
+*/
+
+
+/*
+* Rotation breakdown confirmation.
+*/
+
+const rotationBreakdown =
+rotation?.signal === "RISK_OFF_ROTATION" ||
+rotation?.state === "BREAKDOWN" ||
+rotationScore <= 35;
+
+
+/*
+* Fragility breakdown confirmation.
+*/
+
+const fragilityBreakdown =
+fragilityScore >= 75;
+
+
+/*
+* Market quality breakdown confirmation.
+*/
+
+const marketQualityBreakdown =
+marketQuality?.state === "STRUCTURAL_BREAKDOWN" ||
+marketQualityScore <= 35;
+
+
+/*
+* Weak participation confirmation.
+*/
+
+const weakParticipation =
+participation?.state === "WEAK" ||
+participationScore < 45;
+
+
+/*
+* Defensive timing confirmation.
+*/
+
+const defensiveTiming =
+putTiming?.decision === "DEFENSIVE_BUILD" ||
+timingRiskScore >= 65;
+
+
+/*
+* Structural evidence count.
+*/
+
+const defensiveEvidenceCount = [
+rotationBreakdown,
+fragilityBreakdown,
+marketQualityBreakdown,
+weakParticipation,
+defensiveTiming,
+prolongedBearRegime,
+acceleratingWeakness
+]
+.filter(Boolean)
+.length;
+
+
+/*
+* Distribution is itself a meaningful structural phase,
+* but it should be combined with actual risk evidence.
+*/
+
+const distributionPhase =
+phase === "PHASE_3_DISTRIBUTION";
+
+
+/*
+* Defensive structural confirmation.
+*
+* Score >= 65 establishes the risk regime.
+*
+* At least two independent structural confirmations
+* are required to promote the trading mode to RISK.
+*
+* A confirmed PHASE_3 distribution requires only two
+* confirmations because distribution is already a
+* meaningful regime transition.
+*/
+
+const defensiveStructuralConfirmation =
+score >= 65 &&
+(
+(
+distributionPhase &&
+defensiveEvidenceCount >= 2
+) ||
+(
+!distributionPhase &&
+defensiveEvidenceCount >= 3
+)
+);
+
+
+/*
+* Stronger structural confirmation.
+*
+* This is useful for diagnostics and future engines.
+*/
+
+const strongDefensiveStructure =
+score >= 75 &&
+defensiveEvidenceCount >= 3;
+
+
+/* =====================================================
 MODE
 ===================================================== */
 
 /*
 * IMPORTANT:
 *
-* Mode is NOT the Master Score.
+* Mode is NOT simply the phase.
 *
 * Master Score = risk intensity
 * Mode = trading posture
 *
-* Both are deliberately independent.
+* The Score has priority.
+*
+* Therefore:
+*
+* PHASE_3 + SCORE 89 + structural breakdown
+*
+* => RISK
+*
+* instead of:
+*
+* PHASE_3
+* => NEUTRAL
+*/
+
+
+/*
+* Default posture.
 */
 
 let mode:
@@ -1409,7 +1591,11 @@ mode = "LONG";
 
 
 /*
-* Distribution.
+* Base phase posture.
+*
+* Distribution starts at NEUTRAL, but this is only
+* the baseline. It can be promoted by the score and
+* structural confirmation below.
 */
 
 if (
@@ -1422,7 +1608,7 @@ mode = "NEUTRAL";
 
 
 /*
-* Risk.
+* Risk phases.
 */
 
 if (
@@ -1450,13 +1636,54 @@ mode = "CRASH";
 
 
 /*
-* Strong structural deterioration can promote
-* an earlier phase into RISK.
+* SCORE-FIRST DEFENSIVE PROMOTION.
+*
+* This is the key correction.
+*
+* A high Master Score is allowed to override the
+* neutral baseline of PHASE_3.
+*/
+
+if (
+defensiveStructuralConfirmation &&
+mode !== "CRASH"
+) {
+
+mode = "RISK";
+
+}
+
+
+/*
+* Strong defensive structure can promote a lower phase
+* even when the phase engine has not yet transitioned.
+*/
+
+if (
+strongDefensiveStructure &&
+phase !== "PHASE_5_BREAKDOWN" &&
+phase !== "PHASE_6_ACCELERATION" &&
+phase !== "PHASE_7_CAPITULATION"
+) {
+
+mode = "RISK";
+
+}
+
+
+/*
+* Explicit prolonged bear regime.
+*
+* This is independent confirmation and should not be
+* ignored simply because the current phase is only
+* PHASE_3.
 */
 
 if (
 prolongedBearRegime &&
-broadParticipationFailure
+institutionalPressure > 70 &&
+score >= 65 &&
+mode !== "CRASH"
 ) {
 
 mode = "RISK";
@@ -1465,29 +1692,13 @@ mode = "RISK";
 
 
 /*
-* Accelerating breadth weakness combined with
-* rising crash risk confirms defensive posture.
+* Accelerating weakness plus PUT territory.
 */
 
 if (
-acceleratingBreadthDecay &&
-risingCrashRisk
-) {
-
-mode = "RISK";
-
-}
-
-
-/*
-* Persistent bearish regime can promote LONG
-* into RISK when distribution risk is significant.
-*/
-
-if (
-bearishPersistence &&
-distributionRisk >= 60 &&
-mode === "LONG"
+acceleratingWeakness &&
+score >= 65 &&
+mode !== "CRASH"
 ) {
 
 mode = "RISK";
@@ -1523,12 +1734,14 @@ mode = "RISK";
 /*
 * Do NOT downgrade RISK/CRASH because of
 * narrow leadership.
+*
+* Narrow leadership is diagnostic only.
 */
 
 if (
 narrowLeadership &&
 weakInternals &&
-phase !== "PHASE_1_EXPANSION" &&
+phase === "PHASE_1_EXPANSION" &&
 mode === "LONG"
 ) {
 
@@ -1586,7 +1799,8 @@ regime = "LONG";
 
 
 if (
-phase === "PHASE_3_DISTRIBUTION"
+phase === "PHASE_3_DISTRIBUTION" &&
+mode === "NEUTRAL"
 ) {
 
 regime = "TRANSITION";
@@ -1610,6 +1824,17 @@ mode === "CRASH"
 regime = "CRASH";
 
 }
+
+
+/*
+* IMPORTANT:
+*
+* PHASE_3 does NOT force TRANSITION anymore.
+*
+* If the score and structural evidence have already
+* promoted the trading mode to RISK, the regime must
+* also become RISK.
+*/
 
 
 /* =====================================================
@@ -1646,6 +1871,32 @@ signal === "PUT"
 
 summary =
 "Defensive market regime | PUT bias";
+
+}
+
+
+/*
+* Explicit mode information.
+*/
+
+if (
+mode === "RISK" &&
+signal === "PUT"
+) {
+
+summary =
+"Defensive structural regime | PUT bias";
+
+}
+
+
+if (
+mode === "RISK" &&
+signal === "NEUTRAL"
+) {
+
+summary =
+"Defensive posture | structural risk elevated";
 
 }
 
@@ -1832,6 +2083,24 @@ persistenceTrend,
 
 
 /*
+* Defensive structural confirmation
+*/
+
+defensiveEvidenceCount,
+rotationBreakdown,
+fragilityBreakdown,
+marketQualityBreakdown,
+weakParticipation,
+defensiveTiming,
+
+distributionPhase,
+defensiveStructuralConfirmation,
+strongDefensiveStructure,
+
+russellBlocked,
+
+
+/*
 * Diagnostics
 */
 
@@ -1866,6 +2135,11 @@ crashRisk
 timingRisk:
 Math.round(
 timingRiskScore
+),
+
+russellRisk:
+Math.round(
+russellRisk
 )
 
 },
