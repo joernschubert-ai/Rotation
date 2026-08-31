@@ -6,7 +6,8 @@ export default function MasterPanel({
 master,
 decision,
 signal,
-nasdaq
+nasdaq,
+marketPhase
 }: any) {
 
 if (!master) return null;
@@ -14,13 +15,13 @@ if (!master) return null;
 /* =====================================================
 MASTER SCORE SEMANTICS
 
- 0   = CALL / CONSTRUCTIVE
- 50  = NEUTRAL / TRANSITION
- 100 = PUT / DEFENSIVE
+0   = CALL / CONSTRUCTIVE
+50  = NEUTRAL / TRANSITION
+100 = PUT / DEFENSIVE
 
- IMPORTANT:
- The engine already returns RISK-oriented values.
- The panel MUST NOT invert them.
+IMPORTANT:
+The engine already returns RISK-oriented values.
+The panel MUST NOT invert them.
 
 ===================================================== */
 
@@ -195,8 +196,8 @@ return COLORS.textMuted;
 /* =====================================================
 RISK COLOR
 
- HIGH = RISK / PUT
- LOW  = CONSTRUCTIVE / CALL
+HIGH = RISK / PUT
+LOW  = CONSTRUCTIVE / CALL
 
 ===================================================== */
 
@@ -315,39 +316,27 @@ const type =
   String(signalFromMaster)
     .toUpperCase();
 
-if (
-  type === "STRONG_PUT"
-) {
+if (type === "STRONG_PUT") {
   return "ADD PUTS AGGRESSIVELY";
 }
 
-if (
-  type === "PUT_BUILD"
-) {
+if (type === "PUT_BUILD") {
   return "BUILD PUT POSITION";
 }
 
-if (
-  type === "LONG_RUSSELL"
-) {
+if (type === "LONG_RUSSELL") {
   return "ROTATE INTO RUSSELL";
 }
 
-if (
-  type === "REDUCE"
-) {
+if (type === "REDUCE") {
   return "REDUCE EXPOSURE";
 }
 
-if (
-  type === "SHORT_SETUP"
-) {
+if (type === "SHORT_SETUP") {
   return "SHORT SETUP";
 }
 
-if (
-  type === "NO_SIGNAL"
-) {
+if (type === "NO_SIGNAL") {
   return "NO SIGNAL";
 }
 
@@ -680,23 +669,51 @@ meta.strongDefensiveStructure
 /* =====================================================
 PHASE RESOLUTION
 
- We deliberately check several possible
- locations because the panel should not display
- UNKNOWN merely because the engine moved the phase
- property into another object.
+PRIMARY SOURCE:
+
+marketEngine.ts returns:
+
+return {
+phase,
+phaseData,
+…
+}
+
+Therefore marketPhase is the primary,
+authoritative phase source for this panel.
+
+All other paths remain fallbacks only.
 
 ===================================================== */
 
 const phaseCandidates = [
-meta.phase,
-master.phase,
-master.rotationPhase,
-master.rotation?.phase,
-master.regimePhase,
-master.structure?.phase,
+
+/* PRIMARY MARKET ENGINE PHASE */
+marketPhase,
+
+/* MASTER FALLBACKS */
+master?.phase,
+
+master?.phaseData?.phase,
+
+meta?.phase,
+
+/* DECISION FALLBACKS */
 decision?.phase,
+
 decision?.rotationPhase,
-decision?.regimePhase
+
+decision?.regimePhase,
+
+/* LEGACY / STRUCTURAL FALLBACKS */
+master?.rotationPhase,
+
+master?.rotation?.phase,
+
+master?.regimePhase,
+
+master?.structure?.phase
+
 ];
 
 const phase =
@@ -1001,7 +1018,6 @@ progress?: number;
 
 return (
   <div style={cardStyle}>
-
     <div style={labelStyle}>
       {label}
     </div>
@@ -1009,6 +1025,7 @@ return (
     <div
       style={{
         ...valueStyle,
+
         color:
           color ??
           COLORS.text
@@ -1030,7 +1047,6 @@ return (
         />
       </div>
     )}
-
   </div>
 );
 
@@ -1165,6 +1181,7 @@ return (
         <div
           style={{
             ...labelStyle,
+
             marginBottom:
               "3px"
           }}
@@ -1440,6 +1457,7 @@ return (
       }}
     >
       EXECUTION:{" "}
+
       <span
         style={{
           color:
@@ -1451,6 +1469,7 @@ return (
       >
         {getExecution()}
       </span>
+
     </div>
 
   </div>
@@ -1659,9 +1678,6 @@ return (
 
   {/* =================================================
      COLLAPSIBLE DETAILS
-     
-     These are intentionally hidden by default.
-     The user can open them when required.
   ================================================= */}
 
   <details style={detailsStyle}>
