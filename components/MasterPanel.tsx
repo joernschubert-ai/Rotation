@@ -14,30 +14,22 @@ if (!master) return null;
 /* =====================================================
 MASTER SCORE SEMANTICS
 
-0 = CALL / CONSTRUCTIVE
-50 = NEUTRAL / TRANSITION
-100 = PUT / DEFENSIVE
+ 0   = CALL / CONSTRUCTIVE
+ 50  = NEUTRAL / TRANSITION
+ 100 = PUT / DEFENSIVE
 
-IMPORTANT:
-The engine already returns RISK-oriented values.
-The panel MUST NOT invert them again.
+ IMPORTANT:
+ The engine already returns RISK-oriented values.
+ The panel MUST NOT invert them.
+
 ===================================================== */
 
-const score = Number(master.score ?? 0);
-
-const signalFromMaster =
-master.signal ??
-signal?.type ??
-"NO SIGNAL";
-
-const masterColor =
-master.color ??
-(
-score >= 65
-? "RED"
-: score >= 36
-? "YELLOW"
-: "GREEN"
+const score = Math.max(
+0,
+Math.min(
+100,
+Number(master.score ?? 0)
+)
 );
 
 /* =====================================================
@@ -66,8 +58,10 @@ textDim: "#666",
 background: "#0d0d0d",
 backgroundCard: "#141414",
 backgroundStrong: "#111",
+
 border: "#242424",
 borderSoft: "#1d1d1d"
+
 };
 
 /* =====================================================
@@ -77,14 +71,15 @@ MASTER SCORE COLOR
 function getScoreColor(value: number) {
 
 if (value >= 65) {
-return COLORS.red;
+  return COLORS.red;
 }
 
 if (value >= 36) {
-return COLORS.yellow;
+  return COLORS.yellow;
 }
 
 return COLORS.green;
+
 }
 
 /* =====================================================
@@ -94,14 +89,15 @@ MASTER SCORE LABEL
 function getScoreLabel(value: number) {
 
 if (value <= 35) {
-return "CALL / CONSTRUCTIVE";
+  return "CALL / CONSTRUCTIVE";
 }
 
 if (value <= 64) {
-return "NEUTRAL / TRANSITION";
+  return "NEUTRAL / TRANSITION";
 }
 
 return "PUT / DEFENSIVE";
+
 }
 
 /* =====================================================
@@ -111,14 +107,15 @@ MASTER SCORE DESCRIPTION
 function getScoreDescription(value: number) {
 
 if (value <= 35) {
-return "Constructive market structure";
+  return "Constructive market structure";
 }
 
 if (value <= 64) {
-return "No clear directional edge";
+  return "No clear directional edge";
 }
 
 return "Defensive market structure";
+
 }
 
 /* =====================================================
@@ -128,18 +125,19 @@ MODE COLOR
 function getModeColor(mode: string) {
 
 if (mode === "LONG") {
-return COLORS.green;
+  return COLORS.green;
 }
 
 if (mode === "RISK") {
-return COLORS.orange;
+  return COLORS.orange;
 }
 
 if (mode === "CRASH") {
-return COLORS.red;
+  return COLORS.red;
 }
 
 return COLORS.textMuted;
+
 }
 
 /* =====================================================
@@ -149,22 +147,23 @@ REGIME COLOR
 function getRegimeColor(regime: string) {
 
 if (regime === "CRASH") {
-return COLORS.red;
+  return COLORS.red;
 }
 
 if (regime === "RISK") {
-return COLORS.orange;
+  return COLORS.orange;
 }
 
 if (regime === "TRANSITION") {
-return COLORS.yellow;
+  return COLORS.yellow;
 }
 
 if (regime === "LONG") {
-return COLORS.green;
+  return COLORS.green;
 }
 
 return COLORS.textMuted;
+
 }
 
 /* =====================================================
@@ -174,48 +173,72 @@ EXPOSURE COLOR
 function getExposureColor(exp: number) {
 
 if (exp <= -70) {
-return COLORS.red;
+  return COLORS.red;
 }
 
 if (exp <= -40) {
-return COLORS.orange;
+  return COLORS.orange;
 }
 
 if (exp <= -10) {
-return COLORS.yellow;
+  return COLORS.yellow;
 }
 
 if (exp > 0) {
-return COLORS.green;
+  return COLORS.green;
 }
 
 return COLORS.textMuted;
+
 }
 
 /* =====================================================
-RISK COMPONENT COLOR
+RISK COLOR
 
-ALL MASTER COMPONENTS:
+ HIGH = RISK / PUT
+ LOW  = CONSTRUCTIVE / CALL
 
-LOW = CONSTRUCTIVE
-HIGH = RISK
 ===================================================== */
 
 function getRiskColor(value: number) {
 
 if (value >= 75) {
-return COLORS.red;
+  return COLORS.red;
 }
 
 if (value >= 65) {
-return COLORS.orange;
+  return COLORS.orange;
 }
 
 if (value >= 35) {
-return COLORS.yellow;
+  return COLORS.yellow;
 }
 
 return COLORS.green;
+
+}
+
+/* =====================================================
+SAFE VALUE
+===================================================== */
+
+function safeScore(value: any) {
+
+const number =
+  Number(value);
+
+if (!Number.isFinite(number)) {
+  return 0;
+}
+
+return Math.max(
+  0,
+  Math.min(
+    100,
+    number
+  )
+);
+
 }
 
 /* =====================================================
@@ -224,115 +247,117 @@ COMPONENT BAR
 
 function bar(value: number) {
 
-const safeValue = Math.max(
-0,
-Math.min(
-100,
-Number(value) || 0
-)
-);
+const safeValue =
+  safeScore(value);
 
 return {
-width: `${safeValue}%`,
-height: "6px",
-background: getRiskColor(safeValue),
-borderRadius: "3px",
-transition: "width 0.25s ease"
+  width: `${safeValue}%`,
+  height: "5px",
+  background:
+    getRiskColor(safeValue),
+  borderRadius: "3px",
+  transition:
+    "width 0.25s ease"
 };
+
 }
 
 /* =====================================================
-SIGNAL COLOR
+SIGNAL
 ===================================================== */
+
+const signalFromMaster =
+master.signal ??
+signal?.type ??
+"NO SIGNAL";
 
 function getSignalColor(type: string) {
 
 if (!type) {
-return COLORS.textMuted;
+  return COLORS.textMuted;
 }
 
 const normalized =
-String(type).toUpperCase();
+  String(type)
+    .toUpperCase();
 
 if (
-normalized.includes("PUT") ||
-normalized.includes("SHORT") ||
-normalized.includes("RISK")
+  normalized.includes("PUT") ||
+  normalized.includes("SHORT") ||
+  normalized.includes("RISK")
 ) {
-return COLORS.red;
+  return COLORS.red;
 }
 
 if (
-normalized.includes("CALL") ||
-normalized.includes("LONG") ||
-normalized.includes("RUSSELL")
+  normalized.includes("CALL") ||
+  normalized.includes("LONG") ||
+  normalized.includes("RUSSELL")
 ) {
-return COLORS.green;
+  return COLORS.green;
 }
 
 if (
-normalized.includes("BUILD") ||
-normalized.includes("WAIT") ||
-normalized.includes("SETUP")
+  normalized.includes("BUILD") ||
+  normalized.includes("WAIT") ||
+  normalized.includes("SETUP")
 ) {
-return COLORS.yellow;
+  return COLORS.yellow;
 }
 
 return COLORS.textMuted;
-}
 
-/* =====================================================
-SIGNAL TEXT
-===================================================== */
+}
 
 function getSignalText() {
 
 const type =
-String(signalFromMaster)
-.toUpperCase();
+  String(signalFromMaster)
+    .toUpperCase();
 
 if (
-type === "STRONG_PUT"
+  type === "STRONG_PUT"
 ) {
-return "ADD PUTS AGGRESSIVELY";
+  return "ADD PUTS AGGRESSIVELY";
 }
 
 if (
-type === "PUT_BUILD"
+  type === "PUT_BUILD"
 ) {
-return "BUILD PUT POSITION";
+  return "BUILD PUT POSITION";
 }
 
 if (
-type === "LONG_RUSSELL"
+  type === "LONG_RUSSELL"
 ) {
-return "ROTATE INTO RUSSELL";
+  return "ROTATE INTO RUSSELL";
 }
 
 if (
-type === "REDUCE"
+  type === "REDUCE"
 ) {
-return "REDUCE EXPOSURE";
+  return "REDUCE EXPOSURE";
 }
 
 if (
-type === "SHORT_SETUP"
+  type === "SHORT_SETUP"
 ) {
-return "SHORT SETUP";
+  return "SHORT SETUP";
 }
 
 if (
-type === "NO_SIGNAL"
+  type === "NO_SIGNAL"
 ) {
-return "NO SIGNAL";
+  return "NO SIGNAL";
 }
 
 return type
-.replaceAll("_", " ");
+  .replaceAll("_", " ");
+
 }
 
 /* =====================================================
-DECISION
+GLOBAL DECISION
 ===================================================== */
 
 const globalDecision =
@@ -348,30 +373,33 @@ action: string
 ) {
 
 const normalized =
-String(action)
-.toUpperCase();
+  String(action)
+    .toUpperCase();
 
 if (
-normalized.includes("PUT") ||
-normalized.includes("SHORT")
+  normalized.includes("PUT") ||
+  normalized.includes("SHORT") ||
+  normalized.includes("DEFENSIVE")
 ) {
-return COLORS.red;
+  return COLORS.red;
 }
 
 if (
-normalized.includes("RUSSELL") ||
-normalized.includes("LONG")
+  normalized.includes("RUSSELL") ||
+  normalized.includes("LONG") ||
+  normalized.includes("CALL")
 ) {
-return COLORS.green;
+  return COLORS.green;
 }
 
 if (
-normalized.includes("WAIT")
+  normalized.includes("WAIT")
 ) {
-return COLORS.yellow;
+  return COLORS.yellow;
 }
 
 return COLORS.textMuted;
+
 }
 
 /* =====================================================
@@ -381,50 +409,49 @@ EXECUTION
 function getExecution() {
 
 if (!decision) {
-return "NO DATA";
+  return "NO DATA";
 }
 
 const action =
-String(globalDecision)
-.toUpperCase();
+  String(globalDecision)
+    .toUpperCase();
 
 if (
-action.includes("MAX")
+  action.includes("MAX")
 ) {
-return "FULL POSITION";
+  return "FULL POSITION";
 }
 
 if (
-action.includes("AGGRESSIVE")
+  action.includes("AGGRESSIVE")
 ) {
-return "ADD FAST";
+  return "ADD FAST";
 }
 
 if (
-action.includes("BUILD")
+  action.includes("BUILD")
 ) {
-return "SCALE IN";
+  return "SCALE IN";
 }
 
 if (
-action.includes("ENTER")
+  action.includes("ENTER")
 ) {
-return "INITIATE";
+  return "INITIATE";
 }
 
 if (
-action.includes("WAIT")
+  action.includes("WAIT")
 ) {
-return "HOLD / WAIT";
+  return "HOLD / WAIT";
 }
 
 return "MANAGE";
+
 }
 
 /* =====================================================
 MASTER SUMMARY
-
-Engine summary is the primary source.
 ===================================================== */
 
 const masterSummary =
@@ -433,19 +460,35 @@ master.summary ??
 
 function getSummaryColor() {
 
-if (master.signal === "PUT") {
-return COLORS.red;
+const normalized =
+  String(
+    master.signal ??
+    signalFromMaster ??
+    ""
+  ).toUpperCase();
+
+if (
+  normalized.includes("PUT") ||
+  normalized.includes("SHORT")
+) {
+  return COLORS.red;
 }
 
-if (master.signal === "CALL") {
-return COLORS.green;
+if (
+  normalized.includes("CALL") ||
+  normalized.includes("LONG")
+) {
+  return COLORS.green;
 }
 
-if (master.mode === "RISK") {
-return COLORS.orange;
+if (
+  master.mode === "RISK"
+) {
+  return COLORS.orange;
 }
 
 return COLORS.yellow;
+
 }
 
 /* =====================================================
@@ -455,58 +498,50 @@ NASDAQ
 function getNasdaqColor() {
 
 if (!nasdaq?.active) {
-return COLORS.textDim;
+  return COLORS.textDim;
 }
 
 if (
-nasdaq.mode === "MOMENTUM_LONG"
+  nasdaq.mode === "MOMENTUM_LONG" ||
+  nasdaq.mode === "TACTICAL_LONG" ||
+  nasdaq.mode === "PULLBACK_LONG"
 ) {
-return COLORS.blue;
-}
-
-if (
-nasdaq.mode === "TACTICAL_LONG"
-) {
-return COLORS.blue;
-}
-
-if (
-nasdaq.mode === "PULLBACK_LONG"
-) {
-return COLORS.blue;
+  return COLORS.blue;
 }
 
 return COLORS.textMuted;
+
 }
 
 function getNasdaqText() {
 
 if (!nasdaq?.active) {
-return "NASDAQ OFF";
+  return "NASDAQ OFF";
 }
 
 if (
-nasdaq.mode === "MOMENTUM_LONG"
+  nasdaq.mode === "MOMENTUM_LONG"
 ) {
-return "MOMENTUM LONG";
+  return "MOMENTUM LONG";
 }
 
 if (
-nasdaq.mode === "TACTICAL_LONG"
+  nasdaq.mode === "TACTICAL_LONG"
 ) {
-return "TACTICAL LONG";
+  return "TACTICAL LONG";
 }
 
 if (
-nasdaq.mode === "PULLBACK_LONG"
+  nasdaq.mode === "PULLBACK_LONG"
 ) {
-return "PULLBACK LONG";
+  return "PULLBACK LONG";
 }
 
 return String(
-nasdaq.mode ??
-"ACTIVE"
+  nasdaq.mode ??
+  "ACTIVE"
 ).replaceAll("_", " ");
+
 }
 
 /* =====================================================
@@ -517,93 +552,93 @@ const components =
 master.components ?? {};
 
 const crash =
-Number(
-components.crash ?? 0
+safeScore(
+components.crash
 );
 
 const rotation =
-Number(
-components.rotation ?? 0
+safeScore(
+components.rotation
 );
 
 const priceMomentum =
-Number(
-components.priceMomentum ?? 0
+safeScore(
+components.priceMomentum
 );
 
 const timing =
-Number(
-components.timing ?? 0
+safeScore(
+components.timing
 );
 
 const russell =
-Number(
-components.russell ?? 0
+safeScore(
+components.russell
 );
 
 const participation =
-Number(
-components.participation ?? 0
+safeScore(
+components.participation
 );
 
 const breadthThrust =
-Number(
-components.breadthThrust ?? 0
+safeScore(
+components.breadthThrust
 );
 
 const breadthVelocity =
-Number(
-components.breadthVelocity ?? 0
+safeScore(
+components.breadthVelocity
 );
 
 const rotationDecay =
-Number(
-components.rotationDecay ?? 0
+safeScore(
+components.rotationDecay
 );
 
 const liquidity =
-Number(
-components.liquidity ?? 0
+safeScore(
+components.liquidity
 );
 
 const marketQuality =
-Number(
-components.marketQuality ?? 0
+safeScore(
+components.marketQuality
 );
 
 const fragility =
-Number(
-components.fragility ?? 0
+safeScore(
+components.fragility
 );
 
 const regimeSync =
-Number(
-components.regimeSync ?? 0
+safeScore(
+components.regimeSync
 );
 
 const dangerZone =
-Number(
-components.dangerZone ?? 0
+safeScore(
+components.dangerZone
 );
 
 const regimePersistence =
-Number(
-components.regimePersistence ?? 0
+safeScore(
+components.regimePersistence
 );
 
 const distributionRisk =
-Number(
-components.distributionRisk ?? 0
+safeScore(
+components.distributionRisk
 );
 
 const falseRecoveryRisk =
-Number(
-components.falseRecoveryRisk ?? 0
+safeScore(
+components.falseRecoveryRisk
 );
 
 const marketFatigue =
-Number(
-components.marketFatigue ?? 0
+safeScore(
+components.marketFatigue
 );
 
 /* =====================================================
@@ -643,21 +678,59 @@ meta.strongDefensiveStructure
 );
 
 /* =====================================================
-PHASE
+PHASE RESOLUTION
+
+ We deliberately check several possible
+ locations because the panel should not display
+ UNKNOWN merely because the engine moved the phase
+ property into another object.
+
 ===================================================== */
 
+const phaseCandidates = [
+meta.phase,
+master.phase,
+master.rotationPhase,
+master.rotation?.phase,
+master.regimePhase,
+master.structure?.phase,
+decision?.phase,
+decision?.rotationPhase,
+decision?.regimePhase
+];
+
 const phase =
-meta.phase ??
-"UNKNOWN";
+phaseCandidates.find(
+(value: any) =>
+value !== undefined &&
+value !== null &&
+String(value).trim() !== "" &&
+String(value).toUpperCase() !== "UNKNOWN"
+) ?? "UNKNOWN";
+
+/* =====================================================
+PHASE CONFIDENCE
+===================================================== */
 
 const phaseConfidence =
-Number(
-meta.phaseConfidence ?? 0
+safeScore(
+meta.phaseConfidence ??
+master.phaseConfidence ??
+master.rotationPhaseConfidence ??
+decision?.phaseConfidence ??
+0
 );
+
+/* =====================================================
+PHASE CONFIRMATION
+===================================================== */
 
 const phaseConfirmed =
 Boolean(
-meta.phaseConfirmed
+meta.phaseConfirmed ??
+master.phaseConfirmed ??
+decision?.phaseConfirmed ??
+false
 );
 
 /* =====================================================
@@ -665,33 +738,36 @@ QUALITY / RISK
 ===================================================== */
 
 const currentQuality =
-Number(
-meta.currentQuality ?? 0
+safeScore(
+meta.currentQuality
 );
 
 const structuralQuality =
-Number(
-meta.structuralQuality ?? 0
+safeScore(
+meta.structuralQuality
 );
 
 const historicalQuality =
-Number(
-meta.historicalQuality ?? 0
+safeScore(
+meta.historicalQuality
 );
 
 const crashRisk =
-Number(
-meta.crashRisk ?? crash
+safeScore(
+meta.crashRisk ??
+crash
 );
 
 const timingRisk =
-Number(
-meta.timingRisk ?? timing
+safeScore(
+meta.timingRisk ??
+timing
 );
 
 const russellRisk =
-Number(
-meta.russellRisk ?? russell
+safeScore(
+meta.russellRisk ??
+russell
 );
 
 /* =====================================================
@@ -699,65 +775,266 @@ RESPONSIVE STYLES
 ===================================================== */
 
 const panelStyle: CSSProperties = {
-background: COLORS.background,
-border: `1px solid ${COLORS.border}`,
-padding: "clamp(12px, 2vw, 18px)",
-color: COLORS.text,
-width: "100%",
-minWidth: 0,
-boxSizing: "border-box",
-overflow: "hidden",
-borderRadius: "4px"
+background:
+COLORS.background,
+
+border:
+  `1px solid ${COLORS.border}`,
+
+padding:
+  "clamp(10px, 2vw, 16px)",
+
+color:
+  COLORS.text,
+
+width:
+  "100%",
+
+maxWidth:
+  "100%",
+
+minWidth:
+  0,
+
+boxSizing:
+  "border-box",
+
+overflow:
+  "hidden",
+
+borderRadius:
+  "4px"
+
 };
 
 const headerStyle: CSSProperties = {
-display: "flex",
-flexWrap: "wrap",
-alignItems: "center",
-justifyContent: "space-between",
-gap: "8px",
-marginBottom: "14px"
+display:
+"flex",
+
+flexWrap:
+  "wrap",
+
+alignItems:
+  "center",
+
+justifyContent:
+  "space-between",
+
+gap:
+  "8px",
+
+marginBottom:
+  "10px"
+
 };
 
 const gridStyle: CSSProperties = {
-display: "grid",
+display:
+"grid",
+
 gridTemplateColumns:
-"repeat(auto-fit, minmax(min(100%, 170px), 1fr))",
-gap: "10px",
-width: "100%"
+  "repeat(auto-fit, minmax(min(100%, 145px), 1fr))",
+
+gap:
+  "8px",
+
+width:
+  "100%",
+
+minWidth:
+  0
+
 };
 
 const cardStyle: CSSProperties = {
-background: COLORS.backgroundCard,
-border: `1px solid ${COLORS.border}`,
-padding: "10px",
-minWidth: 0,
-boxSizing: "border-box",
-borderRadius: "3px"
+background:
+COLORS.backgroundCard,
+
+border:
+  `1px solid ${COLORS.border}`,
+
+padding:
+  "8px",
+
+minWidth:
+  0,
+
+boxSizing:
+  "border-box",
+
+borderRadius:
+  "3px",
+
+overflow:
+  "hidden"
+
 };
 
 const labelStyle: CSSProperties = {
-color: COLORS.textMuted,
-fontSize: "10px",
-textTransform: "uppercase",
-letterSpacing: "0.05em",
-marginBottom: "5px",
-lineHeight: 1.2
+color:
+COLORS.textMuted,
+
+fontSize:
+  "9px",
+
+textTransform:
+  "uppercase",
+
+letterSpacing:
+  "0.05em",
+
+marginBottom:
+  "4px",
+
+lineHeight:
+  1.2
+
 };
 
 const valueStyle: CSSProperties = {
-fontSize: "15px",
-fontWeight: "bold",
-lineHeight: 1.25,
-overflowWrap: "anywhere"
+fontSize:
+"14px",
+
+fontWeight:
+  "bold",
+
+lineHeight:
+  1.25,
+
+overflowWrap:
+  "anywhere",
+
+wordBreak:
+  "break-word",
+
+minWidth:
+  0
+
 };
 
 const progressBackgroundStyle: CSSProperties = {
-background: "#222",
-marginTop: "6px",
-borderRadius: "3px",
-overflow: "hidden"
+background:
+"#222",
+
+marginTop:
+  "5px",
+
+borderRadius:
+  "3px",
+
+overflow:
+  "hidden",
+
+width:
+  "100%"
+
 };
+
+const detailsStyle: CSSProperties = {
+marginTop:
+"10px",
+
+border:
+  `1px solid ${COLORS.border}`,
+
+background:
+  "#101010",
+
+borderRadius:
+  "3px",
+
+overflow:
+  "hidden"
+
+};
+
+const summaryButtonStyle: CSSProperties = {
+cursor:
+"pointer",
+
+padding:
+  "9px 10px",
+
+color:
+  COLORS.textMuted,
+
+fontSize:
+  "10px",
+
+fontWeight:
+  "bold",
+
+textTransform:
+  "uppercase",
+
+letterSpacing:
+  "0.05em",
+
+userSelect:
+  "none",
+
+listStyle:
+  "none"
+
+};
+
+const detailsContentStyle: CSSProperties = {
+padding:
+"0 8px 8px 8px"
+};
+
+/* =====================================================
+SMALL COMPONENT
+===================================================== */
+
+function MetricCard({
+label,
+value,
+color,
+progress
+}: {
+label: string;
+value: string | number;
+color?: string;
+progress?: number;
+}) {
+
+return (
+  <div style={cardStyle}>
+
+    <div style={labelStyle}>
+      {label}
+    </div>
+
+    <div
+      style={{
+        ...valueStyle,
+        color:
+          color ??
+          COLORS.text
+      }}
+    >
+      {value}
+    </div>
+
+    {progress !== undefined && (
+      <div
+        style={
+          progressBackgroundStyle
+        }
+      >
+        <div
+          style={
+            bar(progress)
+          }
+        />
+      </div>
+    )}
+
+  </div>
+);
+
+}
 
 /* =====================================================
 RENDER
@@ -767,1176 +1044,1013 @@ return (
 
 <div style={panelStyle}>
 
-{/* =================================================
-HEADER
-================================================= */}
-
-<div style={headerStyle}>
-
-<h3
-style={{
-color: "#aaa",
-margin: 0,
-fontSize: "14px",
-letterSpacing: "0.06em"
-}}
->
-MASTER CONTROL
-</h3>
-
-<div
-style={{
-color: getModeColor(master.mode),
-border:
-`1px solid ${getModeColor(master.mode)}`,
-padding: "4px 8px",
-fontSize: "10px",
-fontWeight: "bold",
-whiteSpace: "nowrap"
-}}
->
-MODE: {master.mode ?? "UNKNOWN"}
-</div>
-
-</div>
-
-{/* =================================================
-MASTER SCORE HERO
-================================================= */}
-
-<div
-style={{
-border:
-`2px solid ${getScoreColor(score)}`,
-background: COLORS.backgroundStrong,
-padding: "14px",
-marginBottom: "12px",
-boxSizing: "border-box",
-borderRadius: "3px"
-}}
->
-
-<div
-style={{
-display: "flex",
-flexWrap: "wrap",
-justifyContent: "space-between",
-alignItems: "flex-end",
-gap: "12px"
-}}
->
-
-<div>
-
-<div style={labelStyle}>
-MASTER SCORE · RISK
-</div>
-
-<div
-style={{
-color: getScoreColor(score),
-fontSize:
-"clamp(32px, 9vw, 46px)",
-fontWeight: "bold",
-lineHeight: 1
-}}
->
-{score}/100
-</div>
-
-</div>
-
-<div
-style={{
-color: getScoreColor(score),
-fontSize:
-"clamp(13px, 3.5vw, 17px)",
-fontWeight: "bold",
-textAlign: "right",
-overflowWrap: "anywhere"
-}}
->
-{getScoreLabel(score)}
-</div>
-
-</div>
-
-<div
-style={{
-marginTop: "8px",
-color: COLORS.textMuted,
-fontSize: "11px",
-lineHeight: 1.4
-}}
->
-{getScoreDescription(score)}
-</div>
-
-{/* SCORE SCALE */}
-
-<div
-style={{
-marginTop: "12px",
-position: "relative",
-height: "7px",
-background:
-"linear-gradient(to right, #52c41a 0%, #52c41a 35%, #fadb14 35%, #fadb14 65%, #ff4d4f 65%, #ff4d4f 100%)",
-borderRadius: "4px"
-}}
->
-
-<div
-style={{
-position: "absolute",
-top: "-4px",
-left:
-`calc(${Math.max(
-0,
-Math.min(100, score)
-)}% - 2px)`,
-width: "4px",
-height: "15px",
-background: "#fff",
-borderRadius: "2px",
-boxShadow:
-"0 0 4px rgba(255,255,255,0.8)"
-}}
-/>
-
-</div>
-
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-color: COLORS.textDim,
-fontSize: "9px",
-marginTop: "5px"
-}}
->
-<span>CALL 0</span>
-<span>NEUTRAL 50</span>
-<span>PUT 100</span>
-</div>
-
-</div>
-
-{/* =================================================
-SIGNAL
-================================================= */}
-
-<div
-style={{
-marginBottom: "12px",
-padding: "12px",
-border:
-`2px solid ${getSignalColor(signalFromMaster)}`,
-background: "#181818",
-color:
-getSignalColor(signalFromMaster),
-fontWeight: "bold",
-fontSize:
-"clamp(13px, 3.5vw, 15px)",
-textAlign: "center",
-overflowWrap: "anywhere",
-boxShadow:
-`0 0 8px ${getSignalColor(signalFromMaster)}33`,
-borderRadius: "3px"
-}}
->
-{getSignalText()}
-</div>
-
-{/* =================================================
-STATUS
-================================================= */}
-
-<div style={gridStyle}>
-
-{/* MODE */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Mode
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getModeColor(master.mode)
-}}
->
-{master.mode ?? "—"}
-</div>
-
-</div>
-
-{/* REGIME */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Regime
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getRegimeColor(
-master.regime
-)
-}}
->
-{master.regime ?? "—"}
-</div>
-
-</div>
-
-{/* EXPOSURE */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Net Exposure
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getExposureColor(
-Number(
-master.netExposure ?? 0
-)
-),
-fontSize: "18px"
-}}
->
-{Number(
-master.netExposure ?? 0
-)}%
-</div>
-
-</div>
-
-{/* SIGNAL STRENGTH */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Signal Strength
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getScoreColor(score)
-}}
->
-{Number(
-master.signalStrength ?? 0
-)}%
-</div>
-
-</div>
-
-</div>
-
-{/* =================================================
-MASTER SUMMARY
-================================================= */}
-
-<div
-style={{
-marginTop: "12px",
-padding: "10px",
-border:
-`1px solid ${getSummaryColor()}`,
-color:
-getSummaryColor(),
-background: "#111",
-fontSize: "12px",
-lineHeight: 1.45,
-overflowWrap: "anywhere",
-borderRadius: "3px"
-}}
->
-{masterSummary}
-</div>
-
-{/* =================================================
-DECISION / EXECUTION
-================================================= */}
-
-<div
-style={{
-...gridStyle,
-marginTop: "12px"
-}}
->
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Decision
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getDecisionColor(
-globalDecision
-)
-}}
->
-{globalDecision}
-</div>
-
-<div
-style={{
-color: COLORS.textDim,
-fontSize: "11px",
-marginTop: "4px"
-}}
->
-{globalDirection}
-</div>
-
-</div>
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Execution
-</div>
-
-<div
-style={{
-...valueStyle,
-color: COLORS.text
-}}
->
-{getExecution()}
-</div>
-
-</div>
-
-</div>
-
-{/* =================================================
-NASDAQ
-================================================= */}
-
-<div
-style={{
-marginTop: "12px",
-padding: "10px",
-border:
-`1px solid ${getNasdaqColor()}`,
-background: COLORS.backgroundCard,
-color: getNasdaqColor(),
-fontSize: "12px",
-textAlign: "center",
-overflowWrap: "anywhere",
-borderRadius: "3px"
-}}
->
-
-<strong>
-{getNasdaqText()}
-</strong>
-
-{nasdaq?.execution && (
-<>
-<br />
-
-<span
-style={{
-opacity: 0.75,
-fontSize: "11px"
-}}
->
-{nasdaq.execution}
-</span>
-</>
-)}
-
-</div>
-
-{/* =================================================
-RISK COMPONENTS
-
-HIGH = RISK / PUT
-LOW = CONSTRUCTIVE / CALL
-================================================= */}
-
-<div
-style={{
-marginTop: "14px",
-borderTop:
-`1px solid ${COLORS.border}`,
-paddingTop: "12px"
-}}
->
-
-<div
-style={{
-...labelStyle,
-marginBottom: "9px"
-}}
->
-Risk Components
-</div>
-
-<div style={gridStyle}>
-
-{/* ROTATION */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Rotation
-</div>
-
-<div style={valueStyle}>
-{rotation}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(rotation)} />
-</div>
-
-</div>
-
-{/* CRASH */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Crash
-</div>
-
-<div style={valueStyle}>
-{crash}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(crash)} />
-</div>
-
-</div>
-
-{/* PRICE MOMENTUM */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Price Momentum
-</div>
-
-<div style={valueStyle}>
-{priceMomentum}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(priceMomentum)} />
-</div>
-
-</div>
-
-{/* TIMING */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Timing
-</div>
-
-<div style={valueStyle}>
-{timing}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(timing)} />
-</div>
-
-</div>
-
-{/* RUSSELL */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Russell
-</div>
-
-<div style={valueStyle}>
-{russell}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(russell)} />
-</div>
-
-</div>
-
-{/* PARTICIPATION */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Participation
-</div>
-
-<div style={valueStyle}>
-{participation}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(participation)} />
-</div>
-
-</div>
-
-{/* BREADTH THRUST */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Breadth Thrust
-</div>
-
-<div style={valueStyle}>
-{breadthThrust}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(breadthThrust)} />
-</div>
-
-</div>
-
-{/* BREADTH VELOCITY */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Breadth Velocity
-</div>
-
-<div style={valueStyle}>
-{breadthVelocity}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(breadthVelocity)} />
-</div>
-
-</div>
-
-{/* ROTATION DECAY */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Rotation Decay
-</div>
-
-<div style={valueStyle}>
-{rotationDecay}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(rotationDecay)} />
-</div>
+  {/* =================================================
+     HEADER
+  ================================================= */}
 
-</div>
-
-{/* LIQUIDITY */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Liquidity
-</div>
-
-<div style={valueStyle}>
-{liquidity}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(liquidity)} />
-</div>
-
-</div>
-
-{/* MARKET QUALITY */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Market Quality
-</div>
-
-<div style={valueStyle}>
-{marketQuality}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(marketQuality)} />
-</div>
-
-</div>
-
-{/* FRAGILITY */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Fragility
-</div>
-
-<div style={valueStyle}>
-{fragility}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(fragility)} />
-</div>
-
-</div>
-
-{/* REGIME SYNC */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Regime Sync
-</div>
-
-<div style={valueStyle}>
-{regimeSync}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(regimeSync)} />
-</div>
-
-</div>
-
-{/* DANGER ZONE */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Danger Zone
-</div>
-
-<div style={valueStyle}>
-{dangerZone}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div style={bar(dangerZone)} />
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-{/* =================================================
-PERSISTENCE
-================================================= */}
-
-<div
-style={{
-marginTop: "14px",
-borderTop:
-`1px solid ${COLORS.border}`,
-paddingTop: "12px"
-}}
->
-
-<div
-style={{
-...labelStyle,
-marginBottom: "9px"
-}}
->
-Regime Persistence
-</div>
-
-<div style={gridStyle}>
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Persistence
-</div>
-
-<div style={valueStyle}>
-{regimePersistence}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div
-style={
-bar(regimePersistence)
-}
-/>
-</div>
-
-</div>
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Distribution Risk
-</div>
-
-<div style={valueStyle}>
-{distributionRisk}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div
-style={
-bar(distributionRisk)
-}
-/>
-</div>
-
-</div>
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-False Recovery Risk
-</div>
-
-<div style={valueStyle}>
-{falseRecoveryRisk}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div
-style={
-bar(falseRecoveryRisk)
-}
-/>
-</div>
-
-</div>
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Market Fatigue
-</div>
+  <div style={headerStyle}>
 
-<div style={valueStyle}>
-{marketFatigue}/100
-</div>
-
-<div style={progressBackgroundStyle}>
-<div
-style={
-bar(marketFatigue)
-}
-/>
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-{/* =================================================
-STRUCTURAL DIAGNOSTICS
-================================================= */}
-
-<div
-style={{
-marginTop: "14px",
-borderTop:
-`1px solid ${COLORS.border}`,
-paddingTop: "12px"
-}}
->
-
-<div
-style={{
-...labelStyle,
-marginBottom: "9px"
-}}
->
-Structural Diagnostics
-</div>
-
-<div style={gridStyle}>
-
-{/* CURRENT QUALITY */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Current Quality
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getRiskColor(
-currentQuality
-)
-}}
->
-{currentQuality}/100
-</div>
-
-</div>
-
-{/* STRUCTURAL QUALITY */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Structural Quality
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getRiskColor(
-structuralQuality
-)
-}}
->
-{structuralQuality}/100
-</div>
-
-</div>
-
-{/* HISTORICAL QUALITY */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Historical Quality
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getRiskColor(
-historicalQuality
-)
-}}
->
-{historicalQuality}/100
-</div>
-
-</div>
-
-{/* CRASH RISK */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Crash Risk
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getRiskColor(
-crashRisk
-)
-}}
->
-{crashRisk}/100
-</div>
-
-</div>
+    <h3
+      style={{
+        color:
+          "#aaa",
 
-{/* TIMING RISK */}
+        margin:
+          0,
 
-<div style={cardStyle}>
+        fontSize:
+          "13px",
 
-<div style={labelStyle}>
-Timing Risk
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getRiskColor(
-timingRisk
-)
-}}
->
-{timingRisk}/100
-</div>
-
-</div>
-
-{/* RUSSELL RISK */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Russell Risk
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-getRiskColor(
-russellRisk
-)
-}}
->
-{russellRisk}/100
-</div>
+        letterSpacing:
+          "0.06em"
+      }}
+    >
+      MASTER CONTROL
+    </h3>
+
+    <div
+      style={{
+        color:
+          getModeColor(
+            master.mode
+          ),
+
+        border:
+          `1px solid ${getModeColor(
+            master.mode
+          )}`,
+
+        padding:
+          "3px 7px",
+
+        fontSize:
+          "9px",
+
+        fontWeight:
+          "bold",
+
+        whiteSpace:
+          "nowrap"
+      }}
+    >
+      MODE: {master.mode ?? "UNKNOWN"}
+    </div>
+
+  </div>
+
+  {/* =================================================
+     COMPACT MASTER SCORE
+  ================================================= */}
+
+  <div
+    style={{
+      border:
+        `1px solid ${getScoreColor(score)}`,
+
+      background:
+        COLORS.backgroundStrong,
+
+      padding:
+        "10px",
 
-</div>
-
-{/* DEFENSIVE EVIDENCE */}
-
-<div style={cardStyle}>
-
-<div style={labelStyle}>
-Defensive Evidence
-</div>
+      marginBottom:
+        "10px",
+
+      boxSizing:
+        "border-box",
+
+      borderRadius:
+        "3px",
+
+      width:
+        "100%",
+
+      minWidth:
+        0
+    }}
+  >
+
+    <div
+      style={{
+        display:
+          "flex",
+
+        alignItems:
+          "center",
+
+        justifyContent:
+          "space-between",
+
+        gap:
+          "10px",
+
+        minWidth:
+          0,
+
+        flexWrap:
+          "wrap"
+      }}
+    >
+
+      <div
+        style={{
+          minWidth:
+            0,
+
+          flex:
+            "1 1 110px"
+        }}
+      >
+
+        <div
+          style={{
+            ...labelStyle,
+            marginBottom:
+              "3px"
+          }}
+        >
+          MASTER SCORE · RISK
+        </div>
+
+        <div
+          style={{
+            color:
+              getScoreColor(score),
+
+            fontSize:
+              "clamp(24px, 7vw, 32px)",
+
+            fontWeight:
+              "bold",
+
+            lineHeight:
+              1
+          }}
+        >
+          {score}/100
+        </div>
+
+      </div>
 
-<div
-style={{
-...valueStyle,
-color:
-defensiveEvidenceCount >= 3
-? COLORS.red
-: defensiveEvidenceCount >= 2
-? COLORS.orange
-: COLORS.textMuted
-}}
->
-{defensiveEvidenceCount}
-</div>
-
-</div>
+      <div
+        style={{
+          flex:
+            "1 1 130px",
 
-{/* PHASE CONFIDENCE */}
+          minWidth:
+            0,
 
-<div style={cardStyle}>
+          textAlign:
+            "right",
 
-<div style={labelStyle}>
-Phase Confidence
-</div>
-
-<div
-style={{
-...valueStyle,
-color:
-phaseConfidence >= 70
-? COLORS.green
-: phaseConfidence >= 40
-? COLORS.yellow
-: COLORS.red
-}}
->
-{phaseConfidence}%
-</div>
+          color:
+            getScoreColor(score),
 
-</div>
+          fontSize:
+            "clamp(11px, 3vw, 14px)",
 
-</div>
+          fontWeight:
+            "bold",
 
-</div>
+          overflowWrap:
+            "anywhere"
+        }}
+      >
+        {getScoreLabel(score)}
+      </div>
 
-{/* =================================================
-PHASE / STRUCTURE STATE
-================================================= */}
-
-<div
-style={{
-marginTop: "14px",
-borderTop:
-`1px solid ${COLORS.border}`,
-paddingTop: "12px"
-}}
->
-
-<div
-style={{
-...labelStyle,
-marginBottom: "9px"
-}}
->
-Structural State
-</div>
+    </div>
 
-<div style={gridStyle}>
+    <div
+      style={{
+        marginTop:
+          "6px",
+
+        color:
+          COLORS.textMuted,
 
-{/* PHASE */}
+        fontSize:
+          "10px",
 
-<div style={cardStyle}>
+        lineHeight:
+          1.35
+      }}
+    >
+      {getScoreDescription(score)}
+    </div>
+
+    {/* SCORE SCALE */}
 
-<div style={labelStyle}>
-Phase
-</div>
+    <div
+      style={{
+        marginTop:
+          "9px",
+
+        position:
+          "relative",
 
-<div
-style={{
-...valueStyle,
-color:
-phaseConfirmed
-? COLORS.orange
-: COLORS.text
-}}
->
-{String(phase)
-.replaceAll("_", " ")}
-</div>
+        height:
+          "5px",
 
-</div>
+        background:
+          "linear-gradient(to right, #52c41a 0%, #52c41a 35%, #fadb14 35%, #fadb14 65%, #ff4d4f 65%, #ff4d4f 100%)",
 
-{/* PHASE CONFIRMED */}
+        borderRadius:
+          "3px",
 
-<div style={cardStyle}>
+        width:
+          "100%"
+      }}
+    >
 
-<div style={labelStyle}>
-Phase Confirmation
-</div>
+      <div
+        style={{
+          position:
+            "absolute",
 
-<div
-style={{
-...valueStyle,
-color:
-phaseConfirmed
-? COLORS.green
-: COLORS.textMuted
-}}
->
-{phaseConfirmed
-? "CONFIRMED"
-: "UNCONFIRMED"}
-</div>
+          top:
+            "-3px",
 
-</div>
+          left:
+            `calc(${score}% - 2px)`,
 
-{/* WEAK INTERNALS */}
+          width:
+            "4px",
 
-<div style={cardStyle}>
+          height:
+            "11px",
 
-<div style={labelStyle}>
-Weak Internals
-</div>
+          background:
+            "#fff",
 
-<div
-style={{
-...valueStyle,
-color:
-weakInternals
-? COLORS.red
-: COLORS.green
-}}
->
-{weakInternals
-? "ACTIVE"
-: "CLEAR"}
-</div>
+          borderRadius:
+            "2px",
 
-</div>
+          boxShadow:
+            "0 0 4px rgba(255,255,255,0.8)"
+        }}
+      />
 
-{/* NARROW LEADERSHIP */}
+    </div>
 
-<div style={cardStyle}>
+    <div
+      style={{
+        display:
+          "flex",
 
-<div style={labelStyle}>
-Narrow Leadership
-</div>
+        justifyContent:
+          "space-between",
 
-<div
-style={{
-...valueStyle,
-color:
-narrowLeadership
-? COLORS.orange
-: COLORS.green
-}}
->
-{narrowLeadership
-? "ACTIVE"
-: "NORMAL"}
-</div>
+        color:
+          COLORS.textDim,
 
-</div>
+        fontSize:
+          "8px",
 
-{/* DEFENSIVE STRUCTURE */}
+        marginTop:
+          "4px",
 
-<div style={cardStyle}>
+        gap:
+          "4px"
+      }}
+    >
+      <span>
+        CALL 0
+      </span>
 
-<div style={labelStyle}>
-Defensive Structure
-</div>
+      <span>
+        NEUTRAL 50
+      </span>
+
+      <span>
+        PUT 100
+      </span>
+    </div>
 
-<div
-style={{
-...valueStyle,
-color:
-strongDefensiveStructure
-? COLORS.red
-: defensiveStructuralConfirmation
-? COLORS.orange
-: COLORS.textMuted
-}}
->
-{strongDefensiveStructure
-? "STRONG"
-: defensiveStructuralConfirmation
-? "CONFIRMED"
-: "NOT CONFIRMED"}
-</div>
+  </div>
 
-</div>
+  {/* =================================================
+     DECISION HERO
+  ================================================= */}
 
-</div>
+  <div
+    style={{
+      border:
+        `2px solid ${getDecisionColor(
+          globalDecision
+        )}`,
 
-</div>
+      background:
+        "#151515",
+
+      padding:
+        "10px",
+
+      marginBottom:
+        "10px",
+
+      borderRadius:
+        "3px",
+
+      minWidth:
+        0
+    }}
+  >
+
+    <div
+      style={{
+        display:
+          "flex",
+
+        flexWrap:
+          "wrap",
+
+        justifyContent:
+          "space-between",
+
+        alignItems:
+          "center",
+
+        gap:
+          "8px"
+      }}
+    >
+
+      <div>
+
+        <div style={labelStyle}>
+          DECISION
+        </div>
+
+        <div
+          style={{
+            color:
+              getDecisionColor(
+                globalDecision
+              ),
+
+            fontSize:
+              "clamp(14px, 4vw, 18px)",
+
+            fontWeight:
+              "bold",
+
+            overflowWrap:
+              "anywhere"
+          }}
+        >
+          {globalDecision}
+        </div>
+
+      </div>
+
+      <div
+        style={{
+          color:
+            COLORS.textMuted,
+
+          fontSize:
+            "10px",
+
+          textAlign:
+            "right",
+
+          overflowWrap:
+            "anywhere"
+        }}
+      >
+        {globalDirection}
+      </div>
+
+    </div>
+
+    <div
+      style={{
+        marginTop:
+          "7px",
+
+        color:
+          COLORS.textMuted,
+
+        fontSize:
+          "10px",
+
+        textTransform:
+          "uppercase"
+      }}
+    >
+      EXECUTION:{" "}
+      <span
+        style={{
+          color:
+            COLORS.text,
+
+          fontWeight:
+            "bold"
+        }}
+      >
+        {getExecution()}
+      </span>
+    </div>
+
+  </div>
+
+  {/* =================================================
+     SIGNAL
+  ================================================= */}
+
+  <div
+    style={{
+      marginBottom:
+        "10px",
+
+      padding:
+        "9px",
+
+      border:
+        `1px solid ${getSignalColor(
+          signalFromMaster
+        )}`,
+
+      background:
+        "#181818",
+
+      color:
+        getSignalColor(
+          signalFromMaster
+        ),
+
+      fontWeight:
+        "bold",
+
+      fontSize:
+        "clamp(11px, 3vw, 13px)",
+
+      textAlign:
+        "center",
+
+      overflowWrap:
+        "anywhere",
+
+      boxShadow:
+        `0 0 7px ${getSignalColor(
+          signalFromMaster
+        )}22`,
+
+      borderRadius:
+        "3px"
+    }}
+  >
+    {getSignalText()}
+  </div>
+
+  {/* =================================================
+     PRIMARY STATUS
+  ================================================= */}
+
+  <div style={gridStyle}>
+
+    <MetricCard
+      label="Regime"
+      value={
+        master.regime ??
+        "—"
+      }
+      color={
+        getRegimeColor(
+          master.regime
+        )
+      }
+    />
+
+    <MetricCard
+      label="Net Exposure"
+      value={`${Number(
+        master.netExposure ?? 0
+      )}%`}
+      color={
+        getExposureColor(
+          Number(
+            master.netExposure ?? 0
+          )
+        )
+      }
+    />
+
+    <MetricCard
+      label="Signal Strength"
+      value={`${Number(
+        master.signalStrength ?? 0
+      )}%`}
+      color={
+        getScoreColor(score)
+      }
+    />
+
+    <MetricCard
+      label="Phase"
+      value={
+        String(phase)
+          .replaceAll("_", " ")
+      }
+      color={
+        phaseConfirmed
+          ? COLORS.orange
+          : phase !== "UNKNOWN"
+          ? COLORS.yellow
+          : COLORS.textMuted
+      }
+    />
+
+  </div>
+
+  {/* =================================================
+     SUMMARY
+  ================================================= */}
+
+  <div
+    style={{
+      marginTop:
+        "10px",
+
+      padding:
+        "9px",
+
+      border:
+        `1px solid ${getSummaryColor()}`,
+
+      color:
+        getSummaryColor(),
+
+      background:
+        "#111",
+
+      fontSize:
+        "10px",
+
+      lineHeight:
+        1.4,
+
+      overflowWrap:
+        "anywhere",
+
+      borderRadius:
+        "3px"
+    }}
+  >
+    {masterSummary}
+  </div>
+
+  {/* =================================================
+     NASDAQ
+  ================================================= */}
+
+  <div
+    style={{
+      marginTop:
+        "10px",
+
+      padding:
+        "8px",
+
+      border:
+        `1px solid ${getNasdaqColor()}`,
+
+      background:
+        COLORS.backgroundCard,
+
+      color:
+        getNasdaqColor(),
+
+      fontSize:
+        "10px",
+
+      textAlign:
+        "center",
+
+      overflowWrap:
+        "anywhere",
+
+      borderRadius:
+        "3px"
+    }}
+  >
+
+    <strong>
+      {getNasdaqText()}
+    </strong>
+
+    {nasdaq?.execution && (
+      <>
+        {" · "}
+
+        <span
+          style={{
+            opacity:
+              0.75
+          }}
+        >
+          {nasdaq.execution}
+        </span>
+      </>
+    )}
+
+  </div>
+
+  {/* =================================================
+     COLLAPSIBLE DETAILS
+     
+     These are intentionally hidden by default.
+     The user can open them when required.
+  ================================================= */}
+
+  <details style={detailsStyle}>
+
+    <summary
+      style={summaryButtonStyle}
+    >
+      Risk Components
+    </summary>
+
+    <div style={detailsContentStyle}>
+
+      <div style={gridStyle}>
+
+        <MetricCard
+          label="Rotation"
+          value={`${rotation}/100`}
+          progress={rotation}
+        />
+
+        <MetricCard
+          label="Crash"
+          value={`${crash}/100`}
+          progress={crash}
+        />
+
+        <MetricCard
+          label="Price Momentum"
+          value={`${priceMomentum}/100`}
+          progress={priceMomentum}
+        />
+
+        <MetricCard
+          label="Timing"
+          value={`${timing}/100`}
+          progress={timing}
+        />
+
+        <MetricCard
+          label="Russell"
+          value={`${russell}/100`}
+          progress={russell}
+        />
+
+        <MetricCard
+          label="Participation"
+          value={`${participation}/100`}
+          progress={participation}
+        />
+
+        <MetricCard
+          label="Breadth Thrust"
+          value={`${breadthThrust}/100`}
+          progress={breadthThrust}
+        />
+
+        <MetricCard
+          label="Breadth Velocity"
+          value={`${breadthVelocity}/100`}
+          progress={breadthVelocity}
+        />
+
+        <MetricCard
+          label="Rotation Decay"
+          value={`${rotationDecay}/100`}
+          progress={rotationDecay}
+        />
+
+        <MetricCard
+          label="Liquidity"
+          value={`${liquidity}/100`}
+          progress={liquidity}
+        />
+
+        <MetricCard
+          label="Market Quality"
+          value={`${marketQuality}/100`}
+          progress={marketQuality}
+        />
+
+        <MetricCard
+          label="Fragility"
+          value={`${fragility}/100`}
+          progress={fragility}
+        />
+
+        <MetricCard
+          label="Regime Sync"
+          value={`${regimeSync}/100`}
+          progress={regimeSync}
+        />
+
+        <MetricCard
+          label="Danger Zone"
+          value={`${dangerZone}/100`}
+          progress={dangerZone}
+        />
+
+      </div>
+
+    </div>
+
+  </details>
+
+  {/* =================================================
+     REGIME PERSISTENCE
+  ================================================= */}
+
+  <details style={detailsStyle}>
+
+    <summary
+      style={summaryButtonStyle}
+    >
+      Regime Persistence
+    </summary>
+
+    <div style={detailsContentStyle}>
+
+      <div style={gridStyle}>
+
+        <MetricCard
+          label="Persistence"
+          value={`${regimePersistence}/100`}
+          progress={regimePersistence}
+        />
+
+        <MetricCard
+          label="Distribution Risk"
+          value={`${distributionRisk}/100`}
+          progress={distributionRisk}
+        />
+
+        <MetricCard
+          label="False Recovery Risk"
+          value={`${falseRecoveryRisk}/100`}
+          progress={falseRecoveryRisk}
+        />
+
+        <MetricCard
+          label="Market Fatigue"
+          value={`${marketFatigue}/100`}
+          progress={marketFatigue}
+        />
+
+      </div>
+
+    </div>
+
+  </details>
+
+  {/* =================================================
+     STRUCTURAL DIAGNOSTICS
+  ================================================= */}
+
+  <details style={detailsStyle}>
+
+    <summary
+      style={summaryButtonStyle}
+    >
+      Structural Diagnostics
+    </summary>
+
+    <div style={detailsContentStyle}>
+
+      <div style={gridStyle}>
+
+        <MetricCard
+          label="Current Quality"
+          value={`${currentQuality}/100`}
+          color={
+            getRiskColor(
+              currentQuality
+            )
+          }
+        />
+
+        <MetricCard
+          label="Structural Quality"
+          value={`${structuralQuality}/100`}
+          color={
+            getRiskColor(
+              structuralQuality
+            )
+          }
+        />
+
+        <MetricCard
+          label="Historical Quality"
+          value={`${historicalQuality}/100`}
+          color={
+            getRiskColor(
+              historicalQuality
+            )
+          }
+        />
+
+        <MetricCard
+          label="Crash Risk"
+          value={`${crashRisk}/100`}
+          color={
+            getRiskColor(
+              crashRisk
+            )
+          }
+        />
+
+        <MetricCard
+          label="Timing Risk"
+          value={`${timingRisk}/100`}
+          color={
+            getRiskColor(
+              timingRisk
+            )
+          }
+        />
+
+        <MetricCard
+          label="Russell Risk"
+          value={`${russellRisk}/100`}
+          color={
+            getRiskColor(
+              russellRisk
+            )
+          }
+        />
+
+        <MetricCard
+          label="Defensive Evidence"
+          value={
+            defensiveEvidenceCount
+          }
+          color={
+            defensiveEvidenceCount >= 3
+              ? COLORS.red
+              : defensiveEvidenceCount >= 2
+              ? COLORS.orange
+              : COLORS.textMuted
+          }
+        />
+
+        <MetricCard
+          label="Phase Confidence"
+          value={`${phaseConfidence}%`}
+          color={
+            phaseConfidence >= 70
+              ? COLORS.green
+              : phaseConfidence >= 40
+              ? COLORS.yellow
+              : COLORS.red
+          }
+        />
+
+      </div>
+
+    </div>
+
+  </details>
+
+  {/* =================================================
+     STRUCTURAL STATE
+  ================================================= */}
+
+  <details style={detailsStyle}>
+
+    <summary
+      style={summaryButtonStyle}
+    >
+      Structural State
+    </summary>
+
+    <div style={detailsContentStyle}>
+
+      <div style={gridStyle}>
+
+        <MetricCard
+          label="Phase"
+          value={
+            String(phase)
+              .replaceAll("_", " ")
+          }
+          color={
+            phaseConfirmed
+              ? COLORS.orange
+              : phase !== "UNKNOWN"
+              ? COLORS.yellow
+              : COLORS.textMuted
+          }
+        />
+
+        <MetricCard
+          label="Phase Confirmation"
+          value={
+            phaseConfirmed
+              ? "CONFIRMED"
+              : "UNCONFIRMED"
+          }
+          color={
+            phaseConfirmed
+              ? COLORS.green
+              : COLORS.textMuted
+          }
+        />
+
+        <MetricCard
+          label="Weak Internals"
+          value={
+            weakInternals
+              ? "ACTIVE"
+              : "CLEAR"
+          }
+          color={
+            weakInternals
+              ? COLORS.red
+              : COLORS.green
+          }
+        />
+
+        <MetricCard
+          label="Narrow Leadership"
+          value={
+            narrowLeadership
+              ? "ACTIVE"
+              : "NORMAL"
+          }
+          color={
+            narrowLeadership
+              ? COLORS.orange
+              : COLORS.green
+          }
+        />
+
+        <MetricCard
+          label="Defensive Structure"
+          value={
+            strongDefensiveStructure
+              ? "STRONG"
+              : defensiveStructuralConfirmation
+              ? "CONFIRMED"
+              : "NOT CONFIRMED"
+          }
+          color={
+            strongDefensiveStructure
+              ? COLORS.red
+              : defensiveStructuralConfirmation
+              ? COLORS.orange
+              : COLORS.textMuted
+          }
+        />
+
+      </div>
+
+    </div>
+
+  </details>
+
+  {/* =================================================
+     ENGINE SEMANTICS
+  ================================================= */}
+
+  <div
+    style={{
+      marginTop:
+        "10px",
+
+      paddingTop:
+        "8px",
+
+      borderTop:
+        `1px solid ${COLORS.borderSoft}`,
+
+      color:
+        COLORS.textDim,
+
+      fontSize:
+        "8px",
+
+      lineHeight:
+        1.4,
+
+      textAlign:
+        "center"
+    }}
+  >
+    MASTER SCORE SEMANTICS:
+    LOW = CALL / CONSTRUCTIVE ·
+    HIGH = PUT / RISK
+  </div>
 
-{/* =================================================
-ENGINE SEMANTICS
-================================================= */}
-
-<div
-style={{
-marginTop: "14px",
-paddingTop: "10px",
-borderTop:
-`1px solid ${COLORS.borderSoft}`,
-color: COLORS.textDim,
-fontSize: "9px",
-lineHeight: 1.5,
-textAlign: "center"
-}}
->
-MASTER SCORE SEMANTICS: LOW = CALL / CONSTRUCTIVE · HIGH = PUT / RISK
 </div>
 
-</div>
 );
 }
