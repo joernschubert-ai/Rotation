@@ -386,6 +386,7 @@ master={engine.master}
 decision={engine.decision}
 signal={engine.signal}
 nasdaq={engine.nasdaq}
+marketPhase={engine.phase}
 />
 
 <TradeStackPanel
