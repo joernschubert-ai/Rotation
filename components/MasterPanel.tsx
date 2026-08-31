@@ -7,7 +7,8 @@ master,
 decision,
 signal,
 nasdaq,
-marketPhase
+marketPhase,
+rotationConfirm
 }: any) {
 
 if (!master) return null;
@@ -740,15 +741,35 @@ decision?.phaseConfidence ??
 
 /* =====================================================
 PHASE CONFIRMATION
+
+Priority:
+
+1. Explicit phase confirmation
+2. Rotation confirmation engine
+3. Structural confirmation
 ===================================================== */
+
+const rotationConfirmState =
+String(
+rotationConfirm?.state ??
+rotationConfirm?.confirmation ??
+rotationConfirm?.signal ??
+""
+).toUpperCase();
 
 const phaseConfirmed =
 Boolean(
 meta.phaseConfirmed ??
 master.phaseConfirmed ??
 decision?.phaseConfirmed ??
-false
+(
+rotationConfirmState === "CONFIRMED" ||
+rotationConfirmState === "BREAKDOWN_CONFIRMED" ||
+rotationConfirmState === "INTERNAL_BREAKDOWN" ||
+rotationConfirmState === "ROTATION_CONFIRMED"
+)
 );
+
 
 /* =====================================================
 QUALITY / RISK
