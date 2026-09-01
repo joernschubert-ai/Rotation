@@ -1660,12 +1660,16 @@ const putTiming =
 putTimingEngine({
 
 phase,
+phaseData,
 
 rotation,
+rotationConfirm,
+
 crash,
 earlyWarning,
 
 historyMetrics,
+
 priceMomentum,
 
 participation,
@@ -1678,6 +1682,7 @@ marketDrivers,
 regimeSync,
 
 breadthThrust,
+
 marketQuality,
 
 rotationDecay,
