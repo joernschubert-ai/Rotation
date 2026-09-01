@@ -39,7 +39,8 @@ const triggerQuality =
 putTiming.triggerQuality ?? "NONE";
 
 const summary =
-putTiming.summary ?? "No structural short edge";
+putTiming.summary ??
+"No structural short edge";
 
 
 /* =====================================================
@@ -54,7 +55,8 @@ case "PANIC_SHORT":
 return {
 label: "PANIC / EXTENDED",
 color: "#ff4d4f",
-note: "Avoid chasing new puts – reduce risk"
+note:
+"Move extended – avoid chasing new puts"
 };
 
 
@@ -62,7 +64,8 @@ case "STRONG_BUILD":
 return {
 label: "STRONG PUT BUILD",
 color: "#ff4d4f",
-note: "Strong structure with price confirmation"
+note:
+"Strong structure with price confirmation"
 };
 
 
@@ -70,7 +73,8 @@ case "TACTICAL_BUILD":
 return {
 label: "TACTICAL PUT BUILD",
 color: "#ff7a45",
-note: "Structural breakdown with tactical confirmation"
+note:
+"Structural breakdown with tactical confirmation"
 };
 
 
@@ -78,7 +82,8 @@ case "STRUCTURAL_BUILD":
 return {
 label: "STRUCTURAL PUT BUILD",
 color: "#fa8c16",
-note: "Structural short edge – price timing still developing"
+note:
+"Structural short edge – price timing still developing"
 };
 
 
@@ -86,7 +91,8 @@ case "DEFENSIVE_BUILD":
 return {
 label: "DEFENSIVE PUT BUILD",
 color: "#fadb14",
-note: "Early structural deterioration"
+note:
+"Early structural deterioration"
 };
 
 
@@ -95,7 +101,8 @@ default:
 return {
 label: "WAIT",
 color: "#999",
-note: "No immediate put entry"
+note:
+"No immediate put entry"
 };
 }
 }
@@ -104,19 +111,24 @@ const info = getInfo();
 
 
 /* =====================================================
-EXIT
+POSITION STATE
+
+Wichtig:
+Exit-Engine und PutTiming sind unterschiedliche Dinge.
+
+Das Panel interpretiert deshalb nicht aggressiv
+exit.short, sondern zeigt primär den Timing-State.
 ===================================================== */
 
-function getExit() {
-
-if (!exit) return null;
+function getPositionState() {
 
 if (decision === "WAIT") {
 
 return {
 label: "NO NEW ENTRY",
 color: "#999",
-note: "Wait for better timing"
+note:
+"Wait for better timing"
 };
 
 }
@@ -126,7 +138,21 @@ if (decision === "PANIC_SHORT") {
 return {
 label: "REDUCE RISK",
 color: "#ff4d4f",
-note: "Move may already be extended"
+note:
+"Move may already be extended"
+};
+
+}
+
+if (exit?.action) {
+
+return {
+label: exit.action,
+color: "#fa8c16",
+note:
+exit.summary ??
+exit.reason ??
+"Exit engine active"
 };
 
 }
@@ -134,18 +160,23 @@ note: "Move may already be extended"
 return {
 label: "STRUCTURE ACTIVE",
 color: "#fa8c16",
-note: "Short structure remains valid"
+note:
+"Short structure remains valid"
 };
 }
 
-const exitInfo = getExit();
+const positionInfo =
+getPositionState();
 
 
 /* =====================================================
 HELPERS
 ===================================================== */
 
-function bar(value: number, max: number) {
+function bar(
+value: number,
+max: number
+) {
 
 const safeValue =
 Number.isFinite(value)
@@ -169,11 +200,13 @@ Math.min(
 return {
 width: `${pct}%`,
 height: "6px",
-background: getSignalColor(
+background:
+getSignalColor(
 safeValue,
 safeMax
 ),
-transition: "width 0.3s ease"
+transition:
+"width 0.3s ease"
 };
 }
 
@@ -185,8 +218,6 @@ COMPONENT SAFE ACCESS
 const components =
 putTiming.components ?? {};
 
-const layers =
-putTiming.layers ?? {};
 
 const phaseComponent =
 components.phase ?? {
@@ -194,11 +225,13 @@ value: 0,
 max: 9
 };
 
+
 const rotationComponent =
 components.rotation ?? {
 value: 0,
 max: 6
 };
+
 
 const structuralComponent =
 components.structural ?? {
@@ -206,11 +239,13 @@ value: 0,
 max: 20
 };
 
+
 const priceComponent =
 components.price ?? {
 value: 0,
 max: 14
 };
+
 
 const panicComponent =
 components.panic ?? {
@@ -218,11 +253,36 @@ value: 0,
 max: 10
 };
 
+
 const contradictionComponent =
 components.contradiction ?? {
 value: 0,
 max: 8
 };
+
+
+const decayComponent =
+components.decay ?? {
+value: 0,
+max: 4
+};
+
+
+/* =====================================================
+META / STATES
+===================================================== */
+
+const institutionalState =
+putTiming.meta?.institutionalState ??
+"NEUTRAL";
+
+const rotationDecayState =
+putTiming.meta?.rotationDecayState ??
+"UNKNOWN";
+
+const rotationConfirmState =
+putTiming.meta?.rotationConfirmState ??
+"UNKNOWN";
 
 
 /* =====================================================
@@ -257,7 +317,8 @@ INFO BOX
 style={{
 marginBottom: "14px",
 padding: "10px",
-border: `1px solid ${info.color}`,
+border:
+`1px solid ${info.color}`,
 background: "#111"
 }}
 >
@@ -287,7 +348,11 @@ opacity: 0.7
 DECISION
 ================================================= */}
 
-<div style={{ marginBottom: "12px" }}>
+<div
+style={{
+marginBottom: "12px"
+}}
+>
 
 <div style={{ color: "#777" }}>
 Decision
@@ -309,7 +374,11 @@ fontWeight: "bold"
 EXECUTION
 ================================================= */}
 
-<div style={{ marginBottom: "12px" }}>
+<div
+style={{
+marginBottom: "12px"
+}}
+>
 
 <div style={{ color: "#777" }}>
 Execution
@@ -318,15 +387,20 @@ Execution
 <div
 style={{
 fontWeight: "bold",
+
 color:
 execution === "FULL SIZE"
 ? "#ff4d4f"
+
 : execution === "PARTIAL SIZE"
 ? "#fa8c16"
+
 : execution === "SMALL STARTER"
 ? "#fadb14"
+
 : execution === "REDUCE RISK"
 ? "#ff4d4f"
+
 : "#999"
 }}
 >
@@ -340,7 +414,11 @@ execution === "FULL SIZE"
 TIMING
 ================================================= */}
 
-<div style={{ marginBottom: "12px" }}>
+<div
+style={{
+marginBottom: "12px"
+}}
+>
 
 <div style={{ color: "#777" }}>
 Timing
@@ -357,7 +435,11 @@ Timing
 ENTRY WINDOW
 ================================================= */}
 
-<div style={{ marginBottom: "12px" }}>
+<div
+style={{
+marginBottom: "12px"
+}}
+>
 
 <div style={{ color: "#777" }}>
 Entry Window
@@ -366,11 +448,15 @@ Entry Window
 <div
 style={{
 color:
+
 entryWindow === "OPEN"
 ? "#fa8c16"
+
 : entryWindow === "EXTENDED"
 ? "#ff4d4f"
+
 : "#999",
+
 fontWeight: "bold"
 }}
 >
@@ -384,13 +470,21 @@ fontWeight: "bold"
 TRIGGER QUALITY
 ================================================= */}
 
-<div style={{ marginBottom: "12px" }}>
+<div
+style={{
+marginBottom: "12px"
+}}
+>
 
 <div style={{ color: "#777" }}>
 Trigger Quality
 </div>
 
-<div>
+<div
+style={{
+fontSize: "12px"
+}}
+>
 {triggerQuality}
 </div>
 
@@ -398,12 +492,14 @@ Trigger Quality
 
 
 {/* =================================================
-EXIT
+POSITION STATE
 ================================================= */}
 
-{exitInfo && (
-
-<div style={{ marginBottom: "12px" }}>
+<div
+style={{
+marginBottom: "14px"
+}}
+>
 
 <div style={{ color: "#777" }}>
 Position State
@@ -411,11 +507,12 @@ Position State
 
 <div
 style={{
-color: exitInfo.color,
+color:
+positionInfo.color,
 fontWeight: "bold"
 }}
 >
-{exitInfo.label}
+{positionInfo.label}
 </div>
 
 <div
@@ -424,19 +521,21 @@ fontSize: "12px",
 opacity: 0.7
 }}
 >
-{exitInfo.note}
+{positionInfo.note}
 </div>
 
 </div>
-
-)}
 
 
 {/* =================================================
 TOTAL SCORE
 ================================================= */}
 
-<div style={{ marginBottom: "14px" }}>
+<div
+style={{
+marginBottom: "14px"
+}}
+>
 
 <div style={{ color: "#777" }}>
 Put Timing Score
@@ -458,12 +557,14 @@ height: "6px",
 marginTop: "5px"
 }}
 >
+
 <div
 style={bar(
 score,
 maxScore
 )}
 />
+
 </div>
 
 </div>
@@ -475,8 +576,10 @@ STRUCTURAL LAYERS
 
 <div
 style={{
-borderTop: "1px solid #222",
-paddingTop: "12px"
+borderTop:
+"1px solid #222",
+paddingTop:
+"12px"
 }}
 >
 
@@ -490,8 +593,6 @@ STRUCTURAL LAYERS
 </div>
 
 
-{/* STRUCTURE */}
-
 <LayerRow
 label="Structure"
 value={structuralComponent.value}
@@ -499,8 +600,6 @@ max={structuralComponent.max}
 bar={bar}
 />
 
-
-{/* PHASE */}
 
 <LayerRow
 label="Phase"
@@ -510,8 +609,6 @@ bar={bar}
 />
 
 
-{/* ROTATION */}
-
 <LayerRow
 label="Rotation"
 value={rotationComponent.value}
@@ -520,7 +617,40 @@ bar={bar}
 />
 
 
-{/* PRICE */}
+<LayerRow
+label="Rotation Decay"
+value={decayComponent.value}
+max={decayComponent.max}
+bar={bar}
+/>
+
+</div>
+
+
+{/* =================================================
+EXECUTION LAYERS
+================================================= */}
+
+<div
+style={{
+borderTop:
+"1px solid #222",
+paddingTop:
+"12px",
+marginTop:
+"14px"
+}}
+>
+
+<div
+style={{
+color: "#777",
+marginBottom: "10px"
+}}
+>
+EXECUTION QUALITY
+</div>
+
 
 <LayerRow
 label="Price Execution"
@@ -530,8 +660,6 @@ bar={bar}
 />
 
 
-{/* PANIC */}
-
 <LayerRow
 label="Panic"
 value={panicComponent.value}
@@ -539,8 +667,6 @@ max={panicComponent.max}
 bar={bar}
 />
 
-
-{/* CONTRADICTION */}
 
 <LayerRow
 label="Contradiction"
@@ -553,6 +679,71 @@ bar={bar}
 
 
 {/* =================================================
+INSTITUTIONAL STATE
+================================================= */}
+
+<div
+style={{
+borderTop:
+"1px solid #222",
+paddingTop:
+"12px",
+marginTop:
+"14px"
+}}
+>
+
+<div
+style={{
+color: "#777",
+fontSize: "11px",
+marginBottom: "6px"
+}}
+>
+INSTITUTIONAL STATE
+</div>
+
+<div
+style={{
+fontSize: "12px",
+marginBottom: "4px"
+}}
+>
+<span style={{ color: "#666" }}>
+Bias:
+</span>{" "}
+<b>
+{institutionalState}
+</b>
+</div>
+
+<div
+style={{
+fontSize: "12px",
+marginBottom: "4px"
+}}
+>
+<span style={{ color: "#666" }}>
+Rotation Decay:
+</span>{" "}
+{rotationDecayState}
+</div>
+
+<div
+style={{
+fontSize: "12px"
+}}
+>
+<span style={{ color: "#666" }}>
+Rotation Confirm:
+</span>{" "}
+{rotationConfirmState}
+</div>
+
+</div>
+
+
+{/* =================================================
 SUMMARY
 ================================================= */}
 
@@ -560,7 +751,8 @@ SUMMARY
 style={{
 marginTop: "14px",
 paddingTop: "10px",
-borderTop: "1px solid #222"
+borderTop:
+"1px solid #222"
 }}
 >
 
@@ -604,18 +796,26 @@ bar
 }: any) {
 
 const safeValue =
-typeof value === "number"
+typeof value === "number" &&
+Number.isFinite(value)
 ? value
 : 0;
 
 const safeMax =
-typeof max === "number"
+typeof max === "number" &&
+Number.isFinite(max) &&
+max > 0
 ? max
 : 1;
 
+
 return (
 
-<div style={{ marginBottom: "10px" }}>
+<div
+style={{
+marginBottom: "10px"
+}}
+>
 
 <div
 style={{
@@ -625,13 +825,16 @@ fontSize: "12px"
 }}
 >
 
-<span>{label}</span>
+<span>
+{label}
+</span>
 
 <span>
 {safeValue}/{safeMax}
 </span>
 
 </div>
+
 
 <div
 style={{
