@@ -54,6 +54,9 @@ russell.meta ?? {};
 const components =
 russell.components ?? {};
 
+const history =
+russell.history ?? {};
+
 
 /* =====================================================
 COMPONENT SAFE ACCESS
@@ -82,10 +85,7 @@ max: 7
 SUPER SIGNAL
 
 IMPORTANT:
-
-UI follows the ENGINE decision.
-
-The panel does NOT reinterpret the score.
+UI follows ENGINE action only.
 ===================================================== */
 
 function getSuperSignal() {
@@ -134,7 +134,7 @@ return {
 text: "NO RUSSELL EDGE",
 color: "#999",
 border: "#333",
-note: "Long gate not sufficiently confirmed"
+note: "Russell CALL conditions are not sufficiently confirmed"
 };
 }
 }
@@ -145,9 +145,6 @@ getSuperSignal();
 
 /* =====================================================
 EXECUTION
-
-Again:
-Follow ENGINE action.
 ===================================================== */
 
 function getRussellExecution() {
@@ -182,7 +179,7 @@ case "EARLY":
 return {
 action: "SMALL STARTER",
 mode: "PROBE",
-note: "Early rotation – confirmation required"
+note: "Early rotation – confirmation still required"
 };
 
 
@@ -254,7 +251,7 @@ if (action === "NO_TRADE") {
 return {
 label: "NO NEW ENTRY",
 color: "#999",
-note: "No valid Russell CALL setup",
+note: "Existing position management only",
 sizeReduction
 };
 }
@@ -365,6 +362,38 @@ marketState.russellLongBlocked === true;
 const gateOpen =
 marketState.russellLongGate === true;
 
+const distributionConfirmationRequired =
+marketState.distributionConfirmationRequired === true;
+
+
+/* =====================================================
+FORMAT HELPERS
+===================================================== */
+
+function formatNumber(
+value: any,
+digits = 0
+) {
+
+if (typeof value !== "number") {
+return "N/A";
+}
+
+return value.toFixed(digits);
+}
+
+
+function getBooleanStatus(
+value: boolean | undefined,
+positiveLabel = "YES",
+negativeLabel = "NO"
+) {
+
+return value === true
+? positiveLabel
+: negativeLabel;
+}
+
 
 /* =====================================================
 RENDER
@@ -379,7 +408,8 @@ border: "1px solid #222",
 padding: "16px",
 width: "100%",
 boxSizing: "border-box",
-minWidth: 0
+minWidth: 0,
+overflow: "hidden"
 }}
 >
 
@@ -392,7 +422,8 @@ HEADER
 style={{
 color: "#888",
 marginBottom: "12px",
-marginTop: 0
+marginTop: 0,
+fontSize: "16px"
 }}
 >
 RUSSELL (CALLS)
@@ -740,6 +771,21 @@ blocked
 }
 />
 
+
+<InfoRow
+label="Distribution Check"
+value={
+distributionConfirmationRequired
+? "CONFIRMATION REQUIRED"
+: "CLEAR"
+}
+color={
+distributionConfirmationRequired
+? "#fa8c16"
+: "#52c41a"
+}
+/>
+
 </div>
 
 
@@ -829,7 +875,106 @@ flexShrink: 0
 
 
 {/* =================================================
-META
+ROTATION QUALITY
+================================================= */}
+
+<div
+style={{
+marginTop: "14px",
+paddingTop: "12px",
+borderTop: "1px solid #222"
+}}
+>
+
+<div
+style={{
+color: "#777",
+fontSize: "11px",
+marginBottom: "8px"
+}}
+>
+ROTATION QUALITY
+</div>
+
+
+<InfoRow
+label="Rotation State"
+value={
+meta.rotationConfirmState ??
+"UNKNOWN"
+}
+/>
+
+
+<InfoRow
+label="Confidence"
+value={`${formatNumber(meta.rotationConfidence)}%`}
+color={
+meta.rotationConfidence >= 70
+? "#52c41a"
+: meta.rotationConfidence >= 50
+? "#faad14"
+: "#999"
+}
+/>
+
+
+<InfoRow
+label="Rotation Quality"
+value={`${formatNumber(meta.rotationQuality)}%`}
+color={
+meta.rotationQuality >= 65
+? "#52c41a"
+: meta.rotationQuality >= 50
+? "#faad14"
+: "#999"
+}
+/>
+
+
+<InfoRow
+label="False Break Risk"
+value={`${formatNumber(meta.falseBreakRisk)}%`}
+color={
+meta.falseBreakRisk >= 60
+? "#ff4d4f"
+: meta.falseBreakRisk >= 40
+? "#faad14"
+: "#52c41a"
+}
+/>
+
+
+<InfoRow
+label="Rotation Decay"
+value={
+typeof meta.rotationDecayScore === "number"
+? `${meta.rotationDecayScore}`
+: "N/A"
+}
+color={
+meta.rotationDecayScore >= 75
+? "#ff4d4f"
+: meta.rotationDecayScore >= 50
+? "#faad14"
+: "#52c41a"
+}
+/>
+
+
+<InfoRow
+label="Decay State"
+value={
+meta.rotationDecayState ??
+"UNKNOWN"
+}
+/>
+
+</div>
+
+
+{/* =================================================
+MARKET CONTEXT
 ================================================= */}
 
 <div
@@ -852,30 +997,21 @@ MARKET CONTEXT
 
 
 <InfoRow
-label="Rotation State"
-value={
-meta.rotationConfirmState ??
-"UNKNOWN"
-}
-/>
-
-<InfoRow
-label="Rotation Decay"
-value={
-typeof meta.rotationDecayScore === "number"
-? `${meta.rotationDecayScore}`
-: "N/A"
-}
-/>
-
-<InfoRow
 label="Market Quality"
 value={
 typeof meta.marketQualityScore === "number"
 ? `${meta.marketQualityScore}`
 : "N/A"
 }
+color={
+meta.marketQualityScore >= 55
+? "#52c41a"
+: meta.marketQualityScore >= 40
+? "#faad14"
+: "#ff4d4f"
+}
 />
+
 
 <InfoRow
 label="Participation"
@@ -884,7 +1020,60 @@ typeof meta.participationScore === "number"
 ? `${meta.participationScore}`
 : "N/A"
 }
+color={
+meta.participationScore >= 70
+? "#52c41a"
+: meta.participationScore >= 50
+? "#faad14"
+: "#ff4d4f"
+}
 />
+
+
+<InfoRow
+label="Phase Confirmation"
+value={
+typeof meta.phaseConfirmationScore === "number"
+? `${meta.phaseConfirmationScore}`
+: "N/A"
+}
+/>
+
+
+<InfoRow
+label="Phase State"
+value={
+meta.phaseConfirmationState ??
+"UNKNOWN"
+}
+/>
+
+
+<InfoRow
+label="Price Momentum"
+value={
+typeof meta.priceMomentumScore === "number"
+? `${meta.priceMomentumScore}`
+: "N/A"
+}
+color={
+meta.priceMomentumScore >= 50
+? "#52c41a"
+: meta.priceMomentumScore >= 30
+? "#faad14"
+: "#ff4d4f"
+}
+/>
+
+
+<InfoRow
+label="Momentum State"
+value={
+meta.priceMomentumState ??
+"UNKNOWN"
+}
+/>
+
 
 <InfoRow
 label="Breadth 50"
@@ -895,11 +1084,184 @@ typeof meta.breadth50 === "number"
 }
 />
 
+
 <InfoRow
 label="Breadth 200"
 value={
 typeof meta.breadth200 === "number"
 ? `${meta.breadth200.toFixed(1)}`
+: "N/A"
+}
+/>
+
+
+<InfoRow
+label="VIX"
+value={
+typeof meta.vix === "number"
+? meta.vix.toFixed(1)
+: "N/A"
+}
+/>
+
+</div>
+
+
+{/* =================================================
+MARKET CONDITIONS
+================================================= */}
+
+<div
+style={{
+marginTop: "14px",
+paddingTop: "12px",
+borderTop: "1px solid #222"
+}}
+>
+
+<div
+style={{
+color: "#777",
+fontSize: "11px",
+marginBottom: "8px"
+}}
+>
+MARKET CONDITIONS
+</div>
+
+
+<StatusRow
+label="Absolute Risk Off"
+active={marketState.absoluteRiskOff === true}
+negative
+/>
+
+
+<StatusRow
+label="Broad Market Weakness"
+active={marketState.broadMarketWeakness === true}
+negative
+/>
+
+
+<StatusRow
+label="Severe Breakdown"
+active={marketState.severeMarketBreakdown === true}
+negative
+/>
+
+
+<StatusRow
+label="Rotation False Break"
+active={marketState.rotationFalseBreak === true}
+negative
+/>
+
+
+<StatusRow
+label="Rotation Distribution"
+active={marketState.rotationDistribution === true}
+negative
+/>
+
+
+<StatusRow
+label="Russell Strong Breadth"
+active={marketState.russellStrongBreadth === true}
+positive
+/>
+
+</div>
+
+
+{/* =================================================
+HISTORY
+================================================= */}
+
+<div
+style={{
+marginTop: "14px",
+paddingTop: "12px",
+borderTop: "1px solid #222"
+}}
+>
+
+<div
+style={{
+color: "#777",
+fontSize: "11px",
+marginBottom: "8px"
+}}
+>
+MARKET HISTORY
+</div>
+
+
+<InfoRow
+label="Russell 5D"
+value={
+typeof history.russell5dReturn === "number"
+? `${history.russell5dReturn.toFixed(2)}%`
+: "N/A"
+}
+/>
+
+
+<InfoRow
+label="NASDAQ 5D"
+value={
+typeof history.nasdaq5dReturn === "number"
+? `${history.nasdaq5dReturn.toFixed(2)}%`
+: "N/A"
+}
+/>
+
+
+<InfoRow
+label="S&P 500 5D"
+value={
+typeof history.sp5005dReturn === "number"
+? `${history.sp5005dReturn.toFixed(2)}%`
+: "N/A"
+}
+/>
+
+
+<InfoRow
+label="Breadth Trend"
+value={
+typeof history.breadthTrend === "number"
+? history.breadthTrend.toFixed(1)
+: "N/A"
+}
+/>
+
+
+<InfoRow
+label="Breadth Acceleration"
+value={
+typeof history.breadthAcceleration === "number"
+? history.breadthAcceleration.toFixed(1)
+: "N/A"
+}
+/>
+
+
+<InfoRow
+label="Participation Decay"
+value={
+typeof history.participationDecay === "number"
+? history.participationDecay.toFixed(1)
+: "N/A"
+}
+/>
+
+
+<InfoRow
+label="Crash Trend"
+value={
+typeof history.crashTrend === "number"
+? history.crashTrend.toFixed(1)
 : "N/A"
 }
 />
@@ -940,7 +1302,7 @@ fontSize: "12px"
 <span
 style={{
 color: "#777",
-flexShrink: 0
+minWidth: 0
 }}
 >
 {label}
@@ -954,7 +1316,87 @@ bold
 ? "bold"
 : "normal",
 textAlign: "right",
+wordBreak: "break-word",
+minWidth: 0
+}}
+>
+{value}
+</span>
+
+</div>
+
+);
+
+}
+
+
+/* =====================================================
+STATUS ROW
+===================================================== */
+
+function StatusRow({
+label,
+active,
+negative = false,
+positive = false
+}: any) {
+
+let color = "#999";
+let value = "INACTIVE";
+
+if (negative) {
+
+color =
+active
+? "#ff4d4f"
+: "#52c41a";
+
+value =
+active
+? "ACTIVE"
+: "CLEAR";
+}
+
+if (positive) {
+
+color =
+active
+? "#52c41a"
+: "#999";
+
+value =
+active
+? "CONFIRMED"
+: "NO";
+}
+
+return (
+
+<div
+style={{
+display: "flex",
+justifyContent: "space-between",
+gap: "12px",
+marginBottom: "7px",
+fontSize: "12px"
+}}
+>
+
+<span
+style={{
+color: "#ccc",
+minWidth: 0,
 wordBreak: "break-word"
+}}
+>
+{label}
+</span>
+
+<span
+style={{
+color,
+fontWeight: "bold",
+flexShrink: 0
 }}
 >
 {value}
