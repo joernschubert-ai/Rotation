@@ -22,6 +22,8 @@ import StructurePanel from "@/components/StructurePanel";
 import CrashPanel from "@/components/CrashPanel";
 import PutTimingPanel from "@/components/PutTimingPanel";
 import RussellPanel from "@/components/RussellPanel";
+import NasdaqPanel from "@/components/NasdaqPanel";
+
 import MasterPanel from "@/components/MasterPanel";
 import PositionSizingPanel from "@/components/PositionSizingPanel";
 import PhaseBar from "@/components/PhaseBar";
@@ -404,6 +406,11 @@ exit={engine.exit?.short}
 <RussellPanel
 russell={engine.russell}
 exit={engine.exit?.long}
+/>
+
+<NasdaqPanel
+nasdaq={engine.nasdaq}
+exit={engine.exit}
 />
 
 <PositionSizingPanel
