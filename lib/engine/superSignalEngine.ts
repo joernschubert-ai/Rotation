@@ -60,6 +60,13 @@ regimeAligned: boolean;
 phaseConfirmed: boolean;
 phaseConfidence: number;
 
+rotationConfirmed: boolean;
+rotationConfirming: boolean;
+rotationDirection:
+| "BULLISH"
+| "BEARISH"
+| "NEUTRAL";
+
 breadthConfirmed: boolean;
 liquiditySupported: boolean;
 participationHealthy: boolean;
@@ -85,6 +92,11 @@ state:
 
 summary: string;
 }
+
+
+/* ============================================================
+SUPER SIGNAL ENGINE
+============================================================ */
 
 export function superSignalEngine(
 input: SuperSignalInput
@@ -117,8 +129,11 @@ liquidity,
 breadthThrust,
 fragility,
 squeeze,
-participation
+participation,
+
+regimePersistence
 } = input;
+
 
 /* =====================================================
 BASE SIGNAL
@@ -152,7 +167,11 @@ const isShortSignal =
 "SHORT_FLOW"
 ].includes(signalType);
 
-const signalDirection =
+const signalDirection:
+| "LONG"
+| "SHORT"
+| "NEUTRAL" =
+
 isLongSignal
 ? "LONG"
 : isShortSignal
@@ -165,7 +184,9 @@ PHASE CONFIRMATION
 ===================================================== */
 
 const phaseConfirmed =
-phaseConfirmation?.confirmed ?? false;
+Boolean(
+phaseConfirmation?.confirmed
+);
 
 const phaseConfidence =
 Number(
@@ -178,21 +199,102 @@ phaseConfirmation?.state ??
 
 
 /* =====================================================
-ROTATION QUALITY
+ROTATION CONFIRM
 ===================================================== */
+
+/*
+* RotationConfirmEngine ist die zentrale
+* Richtungsbestätigung.
+*
+* confirmed bedeutet:
+*
+* BULLISH_CONFIRMED
+* BEARISH_CONFIRMED
+* INTERNAL_BREAKDOWN
+*
+* confirming bedeutet:
+*
+* BULLISH_CONFIRMING
+* BEARISH_CONFIRMING
+*/
+
+const rotationState =
+rotationConfirm?.state ??
+"BULLISH_EARLY";
+
+const rotationDirection =
+rotationConfirm?.direction ??
+"NEUTRAL";
+
+const rotationConfirmed =
+Boolean(
+rotationConfirm?.confirmed
+);
+
+const rotationConfirming =
+Boolean(
+rotationConfirm?.confirming
+);
+
+const rotationConfidence =
+Number(
+rotationConfirm?.confidence ?? 45
+);
 
 const rotationQuality =
 Number(
-rotationConfirm?.quality ??
-rotationConfirm?.score ??
-50
+rotationConfirm?.quality ?? 50
 );
 
 const sustainability =
 Number(
-rotationConfirm?.sustainability ??
-50
+rotationConfirm?.sustainability ?? 50
 );
+
+const bearishRotationConfirmed =
+rotationDirection === "BEARISH" &&
+rotationConfirmed;
+
+const bullishRotationConfirmed =
+rotationDirection === "BULLISH" &&
+rotationConfirmed;
+
+const bearishRotationConfirming =
+rotationDirection === "BEARISH" &&
+rotationConfirming;
+
+const bullishRotationConfirming =
+rotationDirection === "BULLISH" &&
+rotationConfirming;
+
+const internalBreakdown =
+rotationState ===
+"INTERNAL_BREAKDOWN";
+
+
+/* =====================================================
+ROTATION DIRECTION ALIGNMENT
+===================================================== */
+
+const rotationDirectionAligned =
+isLongSignal
+? (
+rotationDirection === "BULLISH" ||
+rotationDirection === "NEUTRAL"
+)
+: isShortSignal
+? (
+rotationDirection === "BEARISH" ||
+rotationDirection === "NEUTRAL"
+)
+: true;
+
+const rotationDirectionConflict =
+isLongSignal
+? rotationDirection === "BEARISH"
+: isShortSignal
+? rotationDirection === "BULLISH"
+: false;
 
 
 /* =====================================================
@@ -219,9 +321,6 @@ marketDrivers?.raw?.liquidity ??
 50
 );
 
-const liquiditySupport =
-liquidityScore;
-
 
 /* =====================================================
 FRAGILITY
@@ -235,7 +334,7 @@ fragility?.score ??
 
 
 /* =====================================================
-FALSE BREAK
+FALSE BREAK RISK
 ===================================================== */
 
 const falseBreakRisk =
@@ -252,23 +351,27 @@ SQUEEZE
 const squeezeRisk =
 Number(
 squeeze?.risk ??
+squeeze?.score ??
 rotationConfirm?.squeezeRisk ??
 0
 );
 
 
 /* =====================================================
-MEGA CAP DEPENDENCY
+MEGA CAP RISK
 ===================================================== */
 
-const megaCapDependency =
-Number(
-rotationConfirm?.megaCapDependency ??
-(
-rotationConfirm?.megaCapOnly
-? 80
-: 30
-)
+/*
+* Finale RotationConfirmEngine liefert
+* megaCapDistortion unter metrics.
+*/
+
+const megaCapRisk =
+Boolean(
+rotationConfirm?.megaCapDependency >= 70 ||
+rotationConfirm?.megaCapOnly ||
+rotationConfirm?.metrics?.megaCapDistortion ||
+rotationConfirm?.metrics?.narrowLeadership
 );
 
 
@@ -278,29 +381,38 @@ ROTATION DECAY
 
 const decayState =
 rotationDecay?.state ??
+rotationConfirm?.rotationDecayState ??
 "HEALTHY_ROTATION";
 
 const decayScore =
 Number(
-rotationDecay?.score ?? 0
+rotationDecay?.score ??
+rotationConfirm?.rotationDecayScore ??
+0
 );
 
 const momentumQuality =
 Number(
-rotationDecay?.momentumQuality ?? 50
+rotationDecay?.momentumQuality ??
+50
 );
 
-const decayWarning =
-decayScore >= 24;
+/*
+* Diese Schwellen müssen mit der
+* RotationConfirmEngine konsistent sein.
+*/
 
-const severeDecay =
+const decayWarning =
 decayScore >= 45;
 
-const rotationFailure =
+const severeDecay =
 decayScore >= 65;
 
+const rotationFailure =
+decayScore >= 80;
+
 const rotationHealthy =
-decayScore < 24;
+decayScore < 45;
 
 
 /* =====================================================
@@ -308,7 +420,9 @@ REGIME
 ===================================================== */
 
 const regimeAligned =
-regimeSync?.aligned ?? false;
+Boolean(
+regimeSync?.aligned
+);
 
 const regimeScore =
 Number(
@@ -321,10 +435,13 @@ DANGER
 ===================================================== */
 
 const dangerLevel =
-dangerZone?.level ?? "LOW";
+dangerZone?.level ??
+"LOW";
 
 const dangerEscalation =
-dangerZone?.escalation ?? false;
+Boolean(
+dangerZone?.escalation
+);
 
 
 /* =====================================================
@@ -332,10 +449,12 @@ EXECUTION
 ===================================================== */
 
 const executionMode =
-executionState?.executionMode ?? "WAIT";
+executionState?.executionMode ??
+"WAIT";
 
 const riskState =
-executionState?.riskState ?? "STABLE";
+executionState?.riskState ??
+"STABLE";
 
 
 /* =====================================================
@@ -344,35 +463,47 @@ STRUCTURE
 
 const breadth50 =
 Number(
-structure?.breadth?.b50?.value ?? 50
+structure?.breadth?.b50?.value ??
+structure?.breadth?.b50 ??
+50
 );
 
 const breadth200 =
 Number(
-structure?.breadth?.b200?.value ?? 50
+structure?.breadth?.b200?.value ??
+structure?.breadth?.b200 ??
+50
 );
 
 const adValue =
 Number(
-structure?.advanceDecline?.value ?? 0
+structure?.advanceDecline?.value ??
+structure?.advanceDecline ??
+0
 );
 
 
 /* =====================================================
-DIRECTIONAL BREADTH CONFIRMATION
+DIRECTIONAL BREADTH
 ===================================================== */
 
 const bullishBreadthConfirmed =
-breadth50 >= 60 &&
-breadth200 >= 54 &&
-adValue > -5;
+breadth50 >= 58 &&
+breadth200 >= 52 &&
+adValue > 0;
 
 const bearishBreadthConfirmed =
-breadth50 <= 50 ||
+breadth50 < 55 ||
+breadth200 < 52 ||
 (
-breadth50 < 55 &&
+breadth50 < 58 &&
 adValue < 0
 );
+
+const severeBearishBreadth =
+breadth50 < 45 ||
+breadth200 < 48;
+
 
 const breadthConfirmed =
 isLongSignal
@@ -400,12 +531,20 @@ BREADTH THRUST
 ===================================================== */
 
 const thrustActive =
-breadthThrust?.active ?? false;
+Boolean(
+breadthThrust?.active
+);
 
 const thrustStrength =
 Number(
-breadthThrust?.strength ?? 0
+breadthThrust?.strength ??
+breadthThrust?.score ??
+0
 );
+
+const strongBullishThrust =
+thrustActive &&
+thrustStrength >= 70;
 
 
 /* =====================================================
@@ -414,9 +553,9 @@ DIRECTIONAL PARTICIPATION
 
 const participationHealthy =
 isLongSignal
-? participationScore >= 58
+? participationScore >= 55
 : isShortSignal
-? participationScore <= 50
+? participationScore < 55
 : participationScore >= 55;
 
 
@@ -424,16 +563,25 @@ isLongSignal
 DIRECTIONAL LIQUIDITY
 ===================================================== */
 
+/*
+* Bei LONG:
+* hohe Liquidität unterstützt Risikoassets.
+*
+* Bei PUT:
+* schwache Liquidität unterstützt
+* defensive Marktverschlechterung.
+*/
+
 const liquidityConfirmed =
 isLongSignal
-? liquidityScore >= 55
+? liquidityScore >= 50
 : isShortSignal
-? liquidityScore <= 55
+? liquidityScore < 55
 : liquidityScore >= 50;
 
 
 /* =====================================================
-FRAGILITY STATE
+FRAGILITY
 ===================================================== */
 
 const lowFragility =
@@ -441,49 +589,23 @@ fragilityScore < 45 &&
 dangerLevel !== "HIGH" &&
 dangerLevel !== "EXTREME";
 
-
-/* =====================================================
-DIRECTIONAL FRAGILITY SUPPORT
-===================================================== */
-
 const fragilitySupportsTrade =
 isLongSignal
 ? fragilityScore < 60
 : isShortSignal
-? fragilityScore >= 55
+? fragilityScore >= 60
 : true;
 
 
 /* =====================================================
-RISKS
+RISK FLAGS
 ===================================================== */
 
 const squeezeDetected =
 squeezeRisk >= 65;
 
-const megaCapRisk =
-megaCapDependency >= 70;
-
 const falseBreakDetected =
 falseBreakRisk >= 65;
-
-
-/* =====================================================
-STRUCTURAL STATE
-===================================================== */
-
-const bullishStructuralErosion =
-breadth50 < 58 ||
-breadth200 < 50 ||
-participationScore < 55 ||
-bearishDivergence ||
-megaCapRisk;
-
-const bearishStructuralConfirmation =
-breadth50 < 55 ||
-participationScore < 52 ||
-bearishDivergence ||
-fragilityScore > 60;
 
 
 /* =====================================================
@@ -497,41 +619,80 @@ marketQuality?.score ?? 50
 
 
 /* =====================================================
+CRASH
+===================================================== */
+
+const crashProbability =
+Number(
+crash?.probability ?? 0
+);
+
+const crashScore =
+Number(
+crash?.score ?? 0
+);
+
+
+/* =====================================================
+REGIME PERSISTENCE
+===================================================== */
+
+const persistenceScore =
+Number(
+regimePersistence?.score ??
+regimePersistence?.persistenceScore ??
+50
+);
+
+
+/* =====================================================
 INSTITUTIONAL SCORE
 ===================================================== */
 
 let institutionalScore = 0;
 
 
-/* ---------- BASE SIGNAL ---------- */
+/* -----------------------------------------------------
+BASE SIGNAL
+----------------------------------------------------- */
 
 institutionalScore +=
-signalStrength * 0.10;
+signalStrength * 0.08;
 
 
-/* ---------- ROTATION ---------- */
-
-institutionalScore +=
-rotationQuality * 0.18;
-
-institutionalScore +=
-sustainability * 0.12;
-
-
-/* ---------- REGIME ---------- */
+/* -----------------------------------------------------
+ROTATION QUALITY
+----------------------------------------------------- */
 
 institutionalScore +=
-regimeScore * 0.10;
-
-
-/* ---------- PHASE ---------- */
+rotationQuality * 0.12;
 
 institutionalScore +=
-phaseConfidence * 0.10;
+sustainability * 0.08;
 
-if (phaseConfirmed) {
-institutionalScore += 8;
-}
+
+/* -----------------------------------------------------
+ROTATION CONFIDENCE
+----------------------------------------------------- */
+
+institutionalScore +=
+rotationConfidence * 0.08;
+
+
+/* -----------------------------------------------------
+REGIME
+----------------------------------------------------- */
+
+institutionalScore +=
+regimeScore * 0.08;
+
+
+/* -----------------------------------------------------
+PHASE
+----------------------------------------------------- */
+
+institutionalScore +=
+phaseConfidence * 0.08;
 
 
 /* =====================================================
@@ -544,60 +705,200 @@ institutionalScore +=
 participationScore * 0.12;
 
 institutionalScore +=
-liquidityScore * 0.10;
+liquidityScore * 0.08;
 
 institutionalScore +=
 marketQualityScore * 0.08;
 
-if (bullishBreadthConfirmed) {
-institutionalScore += 10;
-}
+institutionalScore +=
+momentumQuality * 0.04;
 
-if (thrustActive) {
+
+/* ---------------------------------------------------
+DIRECTIONAL ROTATION
+--------------------------------------------------- */
+
+if (bullishRotationConfirmed) {
+institutionalScore += 15;
+}
+else if (bullishRotationConfirming) {
 institutionalScore += 8;
 }
 
-if (thrustStrength >= 75) {
-institutionalScore += 5;
+
+if (rotationDirectionConflict) {
+institutionalScore -= 25;
 }
+
+
+/* ---------------------------------------------------
+BREADTH
+--------------------------------------------------- */
+
+if (bullishBreadthConfirmed) {
+institutionalScore += 10;
+}
+else {
+institutionalScore -= 12;
+}
+
+
+/* ---------------------------------------------------
+PARTICIPATION
+--------------------------------------------------- */
+
+if (!participationHealthy) {
+institutionalScore -= 12;
+}
+
+
+/* ---------------------------------------------------
+LIQUIDITY
+--------------------------------------------------- */
+
+if (!liquidityConfirmed) {
+institutionalScore -= 10;
+}
+
+
+/* ---------------------------------------------------
+THRUST
+--------------------------------------------------- */
+
+if (thrustActive) {
+institutionalScore += 6;
+}
+
+if (strongBullishThrust) {
+institutionalScore += 6;
+}
+
+
+/* ---------------------------------------------------
+ROTATION DECAY
+--------------------------------------------------- */
 
 if (rotationHealthy) {
 institutionalScore += 6;
 }
 
-if (executionMode === "ADD_ON_PULLBACKS") {
-institutionalScore += 6;
+if (decayWarning) {
+institutionalScore -= 8;
 }
 
-if (fragilityScore > 75) {
+if (severeDecay) {
+institutionalScore -= 15;
+}
+
+
+/* ---------------------------------------------------
+EXECUTION
+--------------------------------------------------- */
+
+if (
+executionMode ===
+"ADD_ON_PULLBACKS"
+) {
+institutionalScore += 5;
+}
+
+
+/* ---------------------------------------------------
+FRAGILITY
+--------------------------------------------------- */
+
+if (fragilityScore >= 80) {
 institutionalScore -= 25;
 }
-else if (fragilityScore > 60) {
+else if (fragilityScore >= 65) {
+institutionalScore -= 18;
+}
+else if (fragilityScore >= 55) {
+institutionalScore -= 8;
+}
+
+
+/* ---------------------------------------------------
+DIVERGENCE
+--------------------------------------------------- */
+
+if (bearishDivergence) {
+institutionalScore -= 18;
+}
+
+
+/* ---------------------------------------------------
+MEGA CAP RISK
+--------------------------------------------------- */
+
+if (megaCapRisk) {
 institutionalScore -= 15;
 }
 
-if (bullishStructuralErosion) {
+
+/* ---------------------------------------------------
+FALSE BREAK
+--------------------------------------------------- */
+
+if (falseBreakDetected) {
 institutionalScore -= 15;
 }
 
-if (!liquidityConfirmed) {
-institutionalScore -= 12;
-}
 
-if (!participationHealthy) {
+/* ---------------------------------------------------
+SQUEEZE
+--------------------------------------------------- */
+
+if (squeezeDetected) {
 institutionalScore -= 10;
 }
 
-if (!bullishBreadthConfirmed) {
+
+/* ---------------------------------------------------
+CRASH
+--------------------------------------------------- */
+
+if (crashProbability > 60) {
 institutionalScore -= 12;
 }
 
-if (bearishDivergence) {
+if (crashProbability > 75) {
+institutionalScore -= 10;
+}
+
+
+/* ---------------------------------------------------
+EXECUTION RISK
+--------------------------------------------------- */
+
+if (riskState === "BREAKDOWN") {
 institutionalScore -= 15;
 }
 
-if (megaCapRisk) {
-institutionalScore -= 18;
+if (riskState === "CRISIS") {
+institutionalScore -= 25;
+}
+
+
+/* ---------------------------------------------------
+DANGER
+--------------------------------------------------- */
+
+if (dangerEscalation) {
+institutionalScore -= 12;
+}
+
+if (dangerLevel === "HIGH") {
+institutionalScore -= 10;
+}
+
+
+/* ---------------------------------------------------
+MOMENTUM
+--------------------------------------------------- */
+
+if (momentumQuality < 45) {
+institutionalScore -= 10;
 }
 }
 
@@ -609,38 +910,87 @@ SHORT / PUT-SPECIFIC SCORING
 if (isShortSignal) {
 
 /*
-Bei SHORT/PUT ist schwache Participation
-keine negative Confirmation.
+Bei PUTs ist entscheidend:
 
-Sie bestätigt die interne Marktverschlechterung.
+Die RotationConfirmEngine muss
+bearishe Struktur bestätigen.
+
+Schwache Participation, schwache
+Liquidität, hohe Fragility und
+Rotation Decay sind positive
+Confirmation.
 */
+
+
+institutionalScore +=
+marketQualityScore * 0.04;
+
+
+/* ---------------------------------------------------
+DIRECTIONAL ROTATION
+--------------------------------------------------- */
+
+if (bearishRotationConfirmed) {
+institutionalScore += 18;
+}
+else if (bearishRotationConfirming) {
+institutionalScore += 10;
+}
+
+
+if (internalBreakdown) {
+institutionalScore += 15;
+}
+
+
+/*
+Bullish bestätigte Rotation arbeitet
+direkt gegen das PUT-Setup.
+*/
+
+if (bullishRotationConfirmed) {
+institutionalScore -= 30;
+}
+else if (bullishRotationConfirming) {
+institutionalScore -= 15;
+}
+
+
+/* ---------------------------------------------------
+PARTICIPATION
+--------------------------------------------------- */
 
 if (participationScore < 55) {
 institutionalScore += 10;
 }
 
 if (participationScore < 50) {
-institutionalScore += 5;
+institutionalScore += 6;
 }
 
-/*
-Breadth deterioration bestätigt SHORT.
-*/
+if (participationScore < 45) {
+institutionalScore += 4;
+}
+
+
+/* ---------------------------------------------------
+BREADTH
+--------------------------------------------------- */
 
 if (bearishBreadthConfirmed) {
 institutionalScore += 12;
 }
 
-if (breadth50 < 50) {
+if (severeBearishBreadth) {
 institutionalScore += 6;
 }
 
-/*
-Hohe Fragility unterstützt defensive /
-Short-Setups.
-*/
 
-if (fragilityScore >= 55) {
+/* ---------------------------------------------------
+FRAGILITY
+--------------------------------------------------- */
+
+if (fragilityScore >= 60) {
 institutionalScore += 8;
 }
 
@@ -648,13 +998,31 @@ if (fragilityScore >= 70) {
 institutionalScore += 6;
 }
 
-/*
-Rotation Decay ist bei einem PUT kein
-automatischer negativer Faktor.
+if (fragilityScore >= 85) {
+institutionalScore += 5;
+}
 
-Moderate bis hohe Decay-Werte bestätigen
-die institutionelle Verschlechterung.
-*/
+
+/* ---------------------------------------------------
+LIQUIDITY
+--------------------------------------------------- */
+
+if (liquidityScore < 55) {
+institutionalScore += 6;
+}
+
+if (liquidityScore < 40) {
+institutionalScore += 5;
+}
+
+if (liquidityScore < 30) {
+institutionalScore += 4;
+}
+
+
+/* ---------------------------------------------------
+ROTATION DECAY
+--------------------------------------------------- */
 
 if (decayWarning) {
 institutionalScore += 8;
@@ -665,56 +1033,136 @@ institutionalScore += 10;
 }
 
 if (rotationFailure) {
-institutionalScore += 12;
+institutionalScore += 8;
 }
 
-/*
-Bearish divergence ist positive
-Confirmation für SHORT.
-*/
+
+/* ---------------------------------------------------
+DIVERGENCE
+--------------------------------------------------- */
 
 if (bearishDivergence) {
 institutionalScore += 12;
 }
 
-/*
-Mega-Cap Dependency ist ein Fragility-Signal.
-Für defensive / PUT-Setups kann dies
-strukturell unterstützend sein.
-*/
+if (bullishDivergence) {
+institutionalScore -= 18;
+}
+
+
+/* ---------------------------------------------------
+MEGA CAP DEPENDENCY
+--------------------------------------------------- */
 
 if (megaCapRisk) {
 institutionalScore += 6;
 }
 
-if (bearishStructuralConfirmation) {
-institutionalScore += 8;
+
+/* ---------------------------------------------------
+BULLISH THRUST
+--------------------------------------------------- */
+
+if (strongBullishThrust) {
+institutionalScore -= 15;
+}
+else if (thrustActive) {
+institutionalScore -= 6;
 }
 
-/*
-Sehr hohe Liquidität ist für defensive
-Short-Setups weniger unterstützend.
-*/
 
-if (liquidityScore > 70) {
+/* ---------------------------------------------------
+LIQUIDITY EXCEPTION
+--------------------------------------------------- */
+
+if (liquidityScore > 75) {
 institutionalScore -= 5;
 }
 
-/*
-Bullish Breadth Thrust arbeitet gegen
-das SHORT-Setup.
-*/
 
-if (thrustActive && thrustStrength >= 70) {
-institutionalScore -= 12;
+/* ---------------------------------------------------
+CRASH OVERLAY
+--------------------------------------------------- */
+
+if (crashProbability > 50) {
+institutionalScore += 5;
 }
 
+if (crashProbability > 65) {
+institutionalScore += 6;
+}
+
+
 /*
-Bullish Divergence arbeitet gegen SHORT.
+Ein extremer Crash kann für neue PUT-Einstiege
+problematisch sein, weil das Timing bereits
+zu spät sein könnte.
+
+Deshalb kein unbegrenztes Bonus-System.
 */
 
-if (bullishDivergence) {
-institutionalScore -= 15;
+if (crashProbability > 85) {
+institutionalScore -= 8;
+}
+
+
+/* ---------------------------------------------------
+FALSE BREAK
+--------------------------------------------------- */
+
+/*
+Wichtig:
+
+FalseBreakRisk blockiert einen PUT NICHT
+automatisch.
+
+RotationConfirm liefert dieses Risiko
+primär als Qualitäts-/Marktstrukturinformation.
+
+Nur bei gleichzeitig bullischer Struktur
+wird es problematisch.
+*/
+
+if (
+falseBreakDetected &&
+bullishRotationConfirming
+) {
+institutionalScore -= 8;
+}
+
+
+/* ---------------------------------------------------
+DANGER
+--------------------------------------------------- */
+
+/*
+EXTREME bleibt ein Hard Stop.
+
+HIGH ist bei einem bestehenden defensiven
+Setup kein automatisches Gegenargument.
+*/
+
+if (
+dangerEscalation &&
+!bearishRotationConfirmed &&
+!internalBreakdown
+) {
+institutionalScore -= 8;
+}
+
+
+/* ---------------------------------------------------
+REGIME PERSISTENCE
+--------------------------------------------------- */
+
+if (
+persistenceScore >= 60 &&
+(
+bearishRotationConfirmed ||
+bearishRotationConfirming
+)
+) {
+institutionalScore += 5;
 }
 }
 
@@ -740,124 +1188,62 @@ marketQualityScore * 0.08;
 
 
 /* =====================================================
-GLOBAL PENALTIES
+PHASE CONFIRMATION
 ===================================================== */
-
-if (dangerEscalation) {
-institutionalScore -= 15;
-}
-
-if (
-riskState === "CRISIS" &&
-isLongSignal
-) {
-institutionalScore -= 25;
-}
-
-if (
-riskState === "BREAKDOWN" &&
-isLongSignal
-) {
-institutionalScore -= 15;
-}
-
-if (falseBreakDetected) {
-institutionalScore -= 15;
-}
 
 /*
-Squeeze-Risk ist primär für LONG problematisch.
+PhaseConfirmation bleibt wichtig.
+
+Sie ist aber NICHT die einzige
+Richtungsbestätigung.
+
+RotationConfirm kann bereits eine
+institutionelle bearish Confirmation liefern.
 */
 
-if (
-squeezeDetected &&
-isLongSignal
-) {
-institutionalScore -= 10;
+if (phaseConfirmed) {
+
+institutionalScore += 8;
+
+}
+else {
+
+institutionalScore -= 6;
 }
 
-
-/* =====================================================
-PHASE PENALTIES
-===================================================== */
-
-if (!phaseConfirmed) {
-institutionalScore -= 10;
-}
 
 if (phaseConfidence < 40) {
-institutionalScore -= 8;
+institutionalScore -= 6;
 }
 
 
 /* =====================================================
-CRASH OVERLAY
+REGIME ALIGNMENT
 ===================================================== */
 
-const crashProbability =
-Number(
-crash?.probability ?? 0
-);
+if (regimeAligned) {
 
-if (
-crashProbability > 60 &&
-isLongSignal
-) {
-institutionalScore -= 15;
+institutionalScore += 5;
+
 }
-
-if (
-crashProbability > 75 &&
-isLongSignal
+else if (
+institutionalScore > 0 &&
+signalDirection !== "NEUTRAL"
 ) {
-institutionalScore -= 10;
-}
 
-/*
-Erhöhte Crash-Wahrscheinlichkeit unterstützt
-defensive PUT-Setups moderat.
-*/
-
-if (
-crashProbability > 50 &&
-isShortSignal
-) {
-institutionalScore += 6;
-}
-
-if (
-crashProbability > 65 &&
-isShortSignal
-) {
-institutionalScore += 6;
+institutionalScore -= 3;
 }
 
 
 /* =====================================================
-MOMENTUM QUALITY
+FINAL CLAMP
 ===================================================== */
 
-if (isLongSignal) {
-
-institutionalScore +=
-momentumQuality * 0.04;
-
-if (momentumQuality < 45) {
-institutionalScore -= 10;
-}
-}
-
-
-/* =====================================================
-CLAMP
-===================================================== */
-
-institutionalScore = Math.max(
+institutionalScore =
+clamp(
+institutionalScore,
 0,
-Math.min(
-100,
-Math.round(institutionalScore)
-)
+100
 );
 
 
@@ -870,6 +1256,7 @@ let quality:
 | "TACTICAL"
 | "CONFIRMED"
 | "INSTITUTIONAL";
+
 
 if (institutionalScore >= 86) {
 
@@ -903,6 +1290,7 @@ let state:
 | "CONFIRMED"
 | "HIGH_CONVICTION";
 
+
 if (
 !signalActive ||
 signalDirection === "NEUTRAL" ||
@@ -913,14 +1301,24 @@ state = "INVALID";
 
 }
 else if (
-institutionalScore >= 86
+institutionalScore >= 86 &&
+(
+bullishRotationConfirmed ||
+bearishRotationConfirmed ||
+internalBreakdown
+)
 ) {
 
 state = "HIGH_CONVICTION";
 
 }
 else if (
-institutionalScore >= 72
+institutionalScore >= 72 &&
+(
+rotationConfirmed ||
+rotationConfirming ||
+phaseConfirmed
+)
 ) {
 
 state = "CONFIRMED";
@@ -946,9 +1344,9 @@ TRIGGER
 let trigger = false;
 
 
-/*
+/* -----------------------------------------------------
 LONG TRIGGER
-*/
+----------------------------------------------------- */
 
 if (isLongSignal) {
 
@@ -958,32 +1356,54 @@ activeSignalCheck(signalType) &&
 
 institutionalScore >= 72 &&
 
-rotationQuality >= 60 &&
+rotationDirection === "BULLISH" &&
 
-phaseConfirmed &&
+(
+bullishRotationConfirmed ||
+bullishRotationConfirming
+) &&
+
+(
+phaseConfirmed ||
+phaseConfidence >= 65
+) &&
 
 bullishBreadthConfirmed &&
 
 participationScore >= 55 &&
 
-liquidityScore >= 55 &&
+liquidityScore >= 50 &&
 
 !dangerEscalation &&
+
+dangerLevel !== "EXTREME" &&
 
 riskState !== "CRISIS" &&
 
 !bearishDivergence &&
 
-!falseBreakDetected
+!bullishRotationConfirmed === false &&
+
+!rotationDirectionConflict
 );
 }
 
 
-/*
+/* -----------------------------------------------------
 SHORT / PUT TRIGGER
-*/
+----------------------------------------------------- */
 
 if (isShortSignal) {
+
+/*
+Ein PUT darf jetzt durch die finale
+RotationConfirmEngine institutionell
+bestätigt werden.
+
+Kein künstlicher Zwang mehr, dass
+gleichzeitig eine bullische Definition
+von "phaseConfirmed" vorhanden sein muss.
+*/
 
 trigger = (
 
@@ -991,16 +1411,20 @@ activeSignalCheck(signalType) &&
 
 institutionalScore >= 72 &&
 
-phaseConfirmed &&
+rotationDirection === "BEARISH" &&
 
 (
+bearishRotationConfirmed ||
+internalBreakdown ||
+(
+bearishRotationConfirming &&
+(
 bearishBreadthConfirmed ||
-bearishDivergence ||
 severeDecay ||
-fragilityScore >= 60
+fragilityScore >= 65
+)
+)
 ) &&
-
-!falseBreakDetected &&
 
 !bullishDivergence &&
 
@@ -1019,44 +1443,138 @@ state !== "INVALID";
 
 
 /* =====================================================
+PRIORITY
+===================================================== */
+
+const priority:
+| "LOW"
+| "MEDIUM"
+| "HIGH" =
+
+institutionalScore >= 72
+? "HIGH"
+: institutionalScore >= 52
+? "MEDIUM"
+: "LOW";
+
+
+/* =====================================================
 SUMMARY
 ===================================================== */
 
 let summary =
 `${signalDirection} | ${quality} | ${state}`;
 
+
+/* -----------------------------------------------------
+ROTATION
+----------------------------------------------------- */
+
+summary +=
+` | Rotation ${rotationState}`;
+
+
+if (rotationConfirmed) {
+summary += " | Direction confirmed";
+}
+else if (rotationConfirming) {
+summary += " | Direction building";
+}
+
+
+/* -----------------------------------------------------
+PHASE
+----------------------------------------------------- */
+
 if (phaseConfirmed) {
-summary += " | Phase confirmed";
+
+summary +=
+" | Phase confirmed";
+
 }
 else {
-summary += ` | Phase ${phaseState}`;
+
+summary +=
+` | Phase ${phaseState}`;
 }
+
+
+/* -----------------------------------------------------
+REGIME
+----------------------------------------------------- */
 
 if (regimeAligned) {
 summary += " | Regime aligned";
 }
 
-if (isLongSignal && thrustActive) {
+
+/* -----------------------------------------------------
+LONG
+----------------------------------------------------- */
+
+if (
+isLongSignal &&
+bullishBreadthConfirmed
+) {
+summary += " | Broad participation";
+}
+
+if (
+isLongSignal &&
+thrustActive
+) {
 summary += " | Breadth thrust";
 }
 
-if (isShortSignal && bearishBreadthConfirmed) {
+
+/* -----------------------------------------------------
+SHORT
+----------------------------------------------------- */
+
+if (
+isShortSignal &&
+bearishBreadthConfirmed
+) {
 summary += " | Breadth deterioration";
 }
+
+if (
+isShortSignal &&
+bearishRotationConfirmed
+) {
+summary += " | Bearish rotation confirmed";
+}
+
+if (internalBreakdown) {
+summary += " | Internal breakdown";
+}
+
+
+/* -----------------------------------------------------
+DECAY
+----------------------------------------------------- */
 
 if (decayWarning) {
 summary += " | Rotation decay";
 }
 
 if (severeDecay) {
-summary += " | Internal deterioration";
+summary += " | Severe internal deterioration";
 }
 
 if (rotationFailure) {
 summary += " | Rotation failure";
 }
 
-if (falseBreakDetected) {
+
+/* -----------------------------------------------------
+RISKS
+----------------------------------------------------- */
+
+if (
+falseBreakDetected &&
+isLongSignal
+) {
 summary += " | False-break risk";
 }
 
@@ -1065,7 +1583,7 @@ summary += " | Squeeze risk";
 }
 
 if (megaCapRisk) {
-summary += " | Mega-cap dependency";
+summary += " | Narrow / mega-cap leadership";
 }
 
 if (bearishDivergence) {
@@ -1087,19 +1605,15 @@ active,
 
 trigger,
 
-type: signalType,
+type:
+signalType,
 
 strength:
 institutionalScore,
 
 quality,
 
-priority:
-institutionalScore >= 72
-? "HIGH"
-: institutionalScore >= 52
-? "MEDIUM"
-: "LOW",
+priority,
 
 institutionalScore,
 
@@ -1110,6 +1624,12 @@ regimeAligned,
 phaseConfirmed,
 
 phaseConfidence,
+
+rotationConfirmed,
+
+rotationConfirming,
+
+rotationDirection,
 
 breadthConfirmed,
 
@@ -1143,25 +1663,43 @@ summary
 }
 
 
-/* =====================================================
+/* ============================================================
 ACTIVE SIGNAL CHECK
-===================================================== */
+============================================================ */
 
 function activeSignalCheck(
 type: string
-) {
+): boolean {
 
 return [
 
 "PUT_ATTACK",
 "PUT_BUILD",
+"SHORT_FLOW",
 
 "LONG_ATTACK",
-
 "ROTATION_BUILD",
-"ROTATION_FLOW",
-
-"SHORT_FLOW"
+"ROTATION_FLOW"
 
 ].includes(type);
+}
+
+
+/* ============================================================
+CLAMP
+============================================================ */
+
+function clamp(
+value: number,
+min: number,
+max: number
+): number {
+
+return Math.max(
+min,
+Math.min(
+max,
+Math.round(value)
+)
+);
 }
