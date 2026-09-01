@@ -1,112 +1,93 @@
 "use client";
 
 type Props = {
-executionState?: any;
-regimeSync?: any;
-dangerZone?: any;
-phase?: string;
+executionState: any;
+regimeSync: any;
+dangerZone: any;
+phase: string;
 };
 
-/* ======================================================
-HELPERS
-====================================================== */
-
-function normalizeValue(
-value: any,
-fallback = "N/A"
-): string {
-if (
-value === undefined ||
-value === null ||
-value === ""
-) {
-return fallback;
-}
-
-return String(value);
-}
+export default function RegimeRibbonPanel({
+executionState,
+regimeSync,
+dangerZone,
+phase
+}: Props) {
+if (!executionState) return null;
 
 /* ======================================================
 PHASE COLORS
-Aktuelle 7-Phase Architecture
+
+PHASE-FARBE = STRUKTURELLES MARKTRISIKO
+
+Unterstützt sowohl alte als auch aktuelle
+marketPhaseEngine States.
 ====================================================== */
 
-function getPhaseColor(phase?: string) {
-switch (phase) {
-case "PHASE_1":
-case "PHASE_1_EXPANSION":
+function getPhaseColor(phaseValue: string) {
+const value = String(phaseValue ?? "").toUpperCase();
+
+if (
+value === "PHASE_1" ||
+value.includes("PHASE_1_EXPANSION")
+) {
 return "#52c41a";
+}
 
-case "PHASE_2":
-case "PHASE_2_WARNING":
+if (
+value === "PHASE_2" ||
+value.includes("PHASE_2_WARNING")
+) {
 return "#95de64";
+}
 
-case "PHASE_3":
-case "PHASE_3_DISTRIBUTION":
+if (
+value === "PHASE_3" ||
+value.includes("PHASE_3_DISTRIBUTION")
+) {
 return "#fadb14";
+}
 
-case "PHASE_4":
-case "PHASE_4_RISK":
+if (
+value === "PHASE_4" ||
+value.includes("PHASE_4_RISK")
+) {
 return "#fa8c16";
+}
 
-case "PHASE_5":
-case "PHASE_5_BREAKDOWN":
-return "#ff7875";
-
-case "PHASE_6":
-case "PHASE_6_ACCELERATION":
+if (
+value === "PHASE_5" ||
+value.includes("PHASE_5_BREAKDOWN")
+) {
 return "#ff4d4f";
+}
 
-case "PHASE_7":
-case "PHASE_7_CAPITULATION":
+if (
+value === "PHASE_6" ||
+value.includes("PHASE_6_ACCELERATION")
+) {
 return "#a8071a";
+}
 
-default:
+if (
+value === "PHASE_7" ||
+value.includes("PHASE_7_CAPITULATION")
+) {
+return "#7f1d1d";
+}
+
 return "#666";
 }
-}
 
-/* ======================================================
-PHASE DISPLAY
-====================================================== */
-
-function getPhaseLabel(phase?: string) {
-switch (phase) {
-case "PHASE_1_EXPANSION":
-return "PHASE 1 · EXPANSION";
-
-case "PHASE_2_WARNING":
-return "PHASE 2 · WARNING";
-
-case "PHASE_3_DISTRIBUTION":
-return "PHASE 3 · DISTRIBUTION";
-
-case "PHASE_4_RISK":
-return "PHASE 4 · RISK";
-
-case "PHASE_5_BREAKDOWN":
-return "PHASE 5 · BREAKDOWN";
-
-case "PHASE_6_ACCELERATION":
-return "PHASE 6 · ACCELERATION";
-
-case "PHASE_7_CAPITULATION":
-return "PHASE 7 · CAPITULATION";
-
-default:
-return normalizeValue(
-phase,
-"UNKNOWN PHASE"
-);
-}
-}
 
 /* ======================================================
 MARKET MODE
 ====================================================== */
 
-function getModeColor(mode?: string) {
-switch (mode) {
+function getModeColor(mode: string) {
+const value = String(mode ?? "").toUpperCase();
+
+switch (value) {
 case "RISK_ON":
 return "#52c41a";
 
@@ -117,20 +98,20 @@ return "#ff4d4f";
 case "TRANSITION":
 return "#faad14";
 
-case "NEUTRAL":
-return "#aaa";
-
 default:
 return "#888";
 }
 }
 
+
 /* ======================================================
 RISK STATE
 ====================================================== */
 
-function getRiskColor(risk?: string) {
-switch (risk) {
+function getRiskColor(risk: string) {
+const value = String(risk ?? "").toUpperCase();
+
+switch (value) {
 case "STABLE":
 return "#52c41a";
 
@@ -148,12 +129,15 @@ return "#666";
 }
 }
 
+
 /* ======================================================
 DANGER ZONE
 ====================================================== */
 
-function getDangerColor(level?: string) {
-switch (level) {
+function getDangerColor(level: string) {
+const value = String(level ?? "").toUpperCase();
+
+switch (value) {
 case "LOW":
 return "#52c41a";
 
@@ -171,19 +155,18 @@ return "#666";
 }
 }
 
+
 /* ======================================================
 REGIME SYNCHRONISATION
+
+BREAKDOWN war vorher nicht berücksichtigt
+und fiel deshalb auf Grau zurück.
 ====================================================== */
 
-function getSyncColor(
-state?: string,
-aligned?: boolean
-) {
-if (aligned === true) {
-return "#52c41a";
-}
+function getSyncColor(state: string) {
+const value = String(state ?? "").toUpperCase();
 
-switch (state) {
+switch (value) {
 case "ALIGNED":
 return "#52c41a";
 
@@ -194,41 +177,61 @@ case "FRAGILE":
 return "#fa8c16";
 
 case "DIVERGING":
+return "#ff7875";
+
+case "BREAKDOWN":
 return "#ff4d4f";
+
+case "CRISIS":
+return "#a8071a";
 
 default:
 return "#666";
 }
 }
 
+
 /* ======================================================
 TACTICAL BIAS
+
+Unterstützt die aktuelle Engine-Semantik:
+- BULLISH / LONG_INDEX = Grün
+- BEARISH / SHORT_INDEX = Rot
+- NEUTRAL = Grau
 ====================================================== */
 
-function getBiasColor(bias?: string) {
-switch (bias) {
+function getBiasColor(bias: string) {
+const value = String(bias ?? "").toUpperCase();
+
+switch (value) {
 case "BULLISH":
 case "LONG":
+case "LONG_INDEX":
 return "#52c41a";
 
 case "BEARISH":
 case "SHORT":
+case "SHORT_INDEX":
 return "#ff4d4f";
 
-case "DEFENSIVE":
-return "#fa8c16";
+case "NEUTRAL":
+case "WAIT":
+return "#aaa";
 
 default:
 return "#aaa";
 }
 }
 
+
 /* ======================================================
 URGENCY
 ====================================================== */
 
-function getUrgencyColor(urgency?: string) {
-switch (urgency) {
+function getUrgencyColor(urgency: string) {
+const value = String(urgency ?? "").toUpperCase();
+
+switch (value) {
 case "EXTREME":
 return "#ff4d4f";
 
@@ -242,162 +245,54 @@ case "LOW":
 return "#52c41a";
 
 default:
-return "#888";
+return "#aaa";
 }
 }
+
 
 /* ======================================================
-EXECUTION MODE
+DATA
 ====================================================== */
 
-function getExecutionColor(
-executionMode?: string
-) {
-switch (executionMode) {
-case "ATTACK":
-case "AGGRESSIVE_ENTRY":
-return "#ff4d4f";
+const phaseColor = getPhaseColor(phase);
 
-case "BUILD":
-case "DEFENSIVE_BUILD":
-return "#fa8c16";
+const modeColor = getModeColor(
+executionState?.marketMode
+);
 
-case "ADD_ON_PULLBACKS":
-return "#40a9ff";
+const riskColor = getRiskColor(
+executionState?.riskState
+);
 
-case "HOLD":
-return "#52c41a";
+const syncColor = getSyncColor(
+regimeSync?.state
+);
 
-case "WAIT":
-case "NO_TRADE":
-return "#888";
+const dangerColor = getDangerColor(
+dangerZone?.level
+);
 
-default:
-return "#40a9ff";
-}
-}
+const biasColor = getBiasColor(
+executionState?.tacticalBias
+);
 
-/* ======================================================
-COMPONENT
-====================================================== */
-
-export default function RegimeRibbonPanel({
-executionState,
-regimeSync,
-dangerZone,
-phase
-}: Props) {
-
-/*
-=======================================================
-SAFE DATA EXTRACTION
-=======================================================
-*/
-
-const currentPhase =
-phase ??
-executionState?.phase ??
-executionState?.marketPhase ??
-"UNKNOWN";
-
-const marketMode =
-executionState?.marketMode ??
-executionState?.mode ??
-"NEUTRAL";
-
-const tacticalBias =
-executionState?.tacticalBias ??
-executionState?.bias ??
-"NEUTRAL";
-
-const executionMode =
-executionState?.executionMode ??
-executionState?.action ??
-"WAIT";
-
-const riskState =
-executionState?.riskState ??
-executionState?.risk ??
-"STABLE";
-
-const urgency =
-executionState?.urgency ??
-"LOW";
+const urgencyColor = getUrgencyColor(
+executionState?.urgency
+);
 
 const confidence =
-Number(
-executionState?.confidence ??
-regimeSync?.confidence ??
-0
-);
+Number(executionState?.confidence ?? 0);
 
-const regimeAligned =
+const regimeAlignment =
+Boolean(
 executionState?.regimeAlignment ??
-regimeSync?.aligned ??
-false;
-
-const regimeState =
-regimeSync?.state ??
-(
-regimeAligned
-? "ALIGNED"
-: "UNSTABLE"
+regimeSync?.aligned
 );
 
-const dangerLevel =
-dangerZone?.level ??
-"LOW";
 
-
-/*
-=======================================================
-COLORS
-=======================================================
-*/
-
-const phaseColor =
-getPhaseColor(currentPhase);
-
-const modeColor =
-getModeColor(marketMode);
-
-const riskColor =
-getRiskColor(riskState);
-
-const syncColor =
-getSyncColor(
-regimeState,
-regimeAligned
-);
-
-const dangerColor =
-getDangerColor(dangerLevel);
-
-const executionColor =
-getExecutionColor(executionMode);
-
-const biasColor =
-getBiasColor(tacticalBias);
-
-const urgencyColor =
-getUrgencyColor(urgency);
-
-
-/*
-=======================================================
-SUMMARY
-=======================================================
-*/
-
-const summary =
-`${marketMode} | ${tacticalBias} | ${executionMode}`;
-
-
-/*
-=======================================================
+/* ======================================================
 BLOCK
-=======================================================
-*/
+====================================================== */
 
 function block(
 label: string,
@@ -405,351 +300,252 @@ value: string,
 color: string
 ) {
 return (
-<div className="regime-ribbon-block">
-
-<div className="regime-ribbon-label">
+<div
+style={{
+padding: "10px",
+border: `1px solid ${color}`,
+background: "#111",
+textAlign: "center",
+minHeight: "72px",
+borderRadius: "6px",
+minWidth: 0
+}}
+>
+<div
+style={{
+fontSize: "10px",
+color: "#666",
+marginBottom: "6px",
+letterSpacing: "0.5px",
+whiteSpace: "nowrap"
+}}
+>
 {label}
 </div>
 
 <div
-className="regime-ribbon-value"
 style={{
-color
+color,
+fontWeight: "bold",
+fontSize: "14px",
+lineHeight: 1.2,
+overflowWrap: "anywhere"
 }}
 >
 {value}
 </div>
-
 </div>
 );
 }
 
 
-/*
-=======================================================
+/* ======================================================
+SUMMARY
+====================================================== */
+
+const summary =
+`${executionState?.marketMode ?? "UNKNOWN"} | ` +
+`${executionState?.tacticalBias ?? "NEUTRAL"} | ` +
+`${executionState?.executionMode ?? "WAIT"}`;
+
+
+/* ======================================================
 RENDER
-=======================================================
-*/
+====================================================== */
 
 return (
-<>
-<style jsx>{`
-
-.regime-ribbon {
-background: #0d0d0d;
-border-radius: 8px;
-padding: 16px;
-margin-bottom: 16px;
-}
-
-.regime-ribbon-header {
-margin-bottom: 14px;
-display: flex;
-justify-content: space-between;
-align-items: center;
-gap: 12px;
-}
-
-.regime-ribbon-title {
-color: #999;
-font-size: 13px;
-font-weight: bold;
-letter-spacing: 0.5px;
-}
-
-.regime-ribbon-confidence {
-font-size: 12px;
-font-weight: bold;
-white-space: nowrap;
-}
-
-.regime-ribbon-summary {
-margin-bottom: 16px;
-padding: 12px;
-font-weight: bold;
-text-align: center;
-font-size: 14px;
-border-radius: 6px;
-word-break: break-word;
-}
-
-.regime-ribbon-grid {
-display: grid;
-grid-template-columns:
-repeat(6, minmax(0, 1fr));
-gap: 10px;
-}
-
-.regime-ribbon-block {
-padding: 10px;
-border: 1px solid #333;
-background: #111;
-text-align: center;
-min-height: 72px;
-border-radius: 6px;
-
-display: flex;
-flex-direction: column;
-justify-content: center;
-
-min-width: 0;
-}
-
-.regime-ribbon-label {
-font-size: 10px;
-color: #666;
-margin-bottom: 6px;
-letter-spacing: 0.5px;
-}
-
-.regime-ribbon-value {
-font-weight: bold;
-font-size: 13px;
-line-height: 1.25;
-
-overflow-wrap: anywhere;
-word-break: break-word;
-}
-
-.regime-ribbon-footer {
-margin-top: 14px;
-padding-top: 12px;
-border-top: 1px solid #222;
-
-display: flex;
-justify-content: space-between;
-align-items: center;
-gap: 12px;
-
-font-size: 11px;
-color: #666;
-}
-
-.regime-ribbon-footer-item {
-white-space: nowrap;
-}
-
-@media (max-width: 1100px) {
-
-.regime-ribbon-grid {
-grid-template-columns:
-repeat(3, minmax(0, 1fr));
-}
-
-}
-
-@media (max-width: 700px) {
-
-.regime-ribbon {
-padding: 12px;
-}
-
-.regime-ribbon-header {
-align-items: flex-start;
-flex-direction: column;
-}
-
-.regime-ribbon-grid {
-grid-template-columns:
-repeat(2, minmax(0, 1fr));
-gap: 8px;
-}
-
-.regime-ribbon-block {
-min-height: 68px;
-padding: 9px;
-}
-
-.regime-ribbon-value {
-font-size: 12px;
-}
-
-.regime-ribbon-summary {
-font-size: 12px;
-padding: 10px;
-}
-
-.regime-ribbon-footer {
-flex-wrap: wrap;
-justify-content: flex-start;
-}
-
-}
-
-@media (max-width: 420px) {
-
-.regime-ribbon-grid {
-grid-template-columns: 1fr;
-}
-
-.regime-ribbon-footer {
-flex-direction: column;
-align-items: flex-start;
-gap: 6px;
-}
-
-}
-
-`}</style>
-
-
 <div
-className="regime-ribbon"
 style={{
-border:
-`1px solid ${phaseColor}`
+background: "#0d0d0d",
+border: `1px solid ${phaseColor}`,
+padding: "16px",
+marginBottom: "16px",
+borderRadius: "8px",
+width: "100%",
+boxSizing: "border-box"
 }}
 >
 
-{/* =================================================
+{/* ==================================================
 HEADER
-================================================= */}
+================================================== */}
 
-<div className="regime-ribbon-header">
-
-<div className="regime-ribbon-title">
+<div
+style={{
+marginBottom: "14px",
+display: "flex",
+justifyContent: "space-between",
+alignItems: "center",
+gap: "12px",
+flexWrap: "wrap"
+}}
+>
+<div
+style={{
+color: "#999",
+fontSize: "13px",
+fontWeight: "bold",
+letterSpacing: "0.5px"
+}}
+>
 REGIME COMMAND CENTER
 </div>
 
 <div
-className="regime-ribbon-confidence"
 style={{
-color: phaseColor
+color: phaseColor,
+fontSize: "12px",
+fontWeight: "bold"
 }}
 >
 Confidence: {confidence}%
 </div>
-
 </div>
 
 
-{/* =================================================
+{/* ==================================================
 SUMMARY
-================================================= */}
+================================================== */}
 
 <div
-className="regime-ribbon-summary"
 style={{
-border:
-`1px solid ${phaseColor}`,
-
+marginBottom: "16px",
+padding: "12px",
+border: `1px solid ${phaseColor}`,
 color: phaseColor,
-
-background:
-"rgba(255,255,255,0.02)"
+background: "rgba(255,255,255,0.02)",
+fontWeight: "bold",
+textAlign: "center",
+fontSize: "14px",
+borderRadius: "6px",
+overflowWrap: "anywhere"
 }}
 >
 {summary}
 </div>
 
 
-{/* =================================================
-COMMAND GRID
-================================================= */}
+{/* ==================================================
+GRID
 
-<div className="regime-ribbon-grid">
+Automatisch responsive:
+Desktop = mehrere Spalten
+Mobile = Blöcke umbrechen
+================================================== */}
+
+<div
+style={{
+display: "grid",
+gridTemplateColumns:
+"repeat(auto-fit, minmax(120px, 1fr))",
+gap: "10px",
+width: "100%"
+}}
+>
 
 {block(
 "PHASE",
-getPhaseLabel(currentPhase),
+phase ?? "UNKNOWN",
 phaseColor
 )}
 
 {block(
 "MODE",
-normalizeValue(marketMode),
+executionState?.marketMode ?? "N/A",
 modeColor
 )}
 
 {block(
 "RISK",
-normalizeValue(riskState),
+executionState?.riskState ?? "N/A",
 riskColor
 )}
 
 {block(
 "REGIME SYNC",
-normalizeValue(regimeState),
+regimeSync?.state ?? "N/A",
 syncColor
 )}
 
 {block(
 "DANGER",
-normalizeValue(dangerLevel),
+dangerZone?.level ?? "N/A",
 dangerColor
 )}
 
 {block(
 "EXECUTION",
-normalizeValue(executionMode),
-executionColor
+executionState?.executionMode ?? "N/A",
+"#40a9ff"
 )}
 
 </div>
 
 
-{/* =================================================
+{/* ==================================================
 FOOTER
-================================================= */}
+================================================== */}
 
-<div className="regime-ribbon-footer">
+<div
+style={{
+marginTop: "14px",
+paddingTop: "14px",
+borderTop: "1px solid #2a2a2a",
+display: "flex",
+justifyContent: "space-between",
+alignItems: "center",
+gap: "12px",
+flexWrap: "wrap",
+fontSize: "11px",
+color: "#666"
+}}
+>
 
-<div className="regime-ribbon-footer-item">
-
+<div>
 Bias:{" "}
-
 <span
 style={{
 color: biasColor,
 fontWeight: "bold"
 }}
 >
-{normalizeValue(tacticalBias)}
+{executionState?.tacticalBias ?? "NEUTRAL"}
 </span>
-
 </div>
 
 
-<div className="regime-ribbon-footer-item">
-
+<div>
 Urgency:{" "}
-
 <span
 style={{
 color: urgencyColor,
 fontWeight: "bold"
 }}
 >
-{normalizeValue(urgency)}
+{executionState?.urgency ?? "LOW"}
 </span>
-
 </div>
 
 
-<div className="regime-ribbon-footer-item">
-
+<div>
 Alignment:{" "}
-
 <span
 style={{
 color:
-regimeAligned
+regimeAlignment
 ? "#52c41a"
 : "#ff4d4f",
-
 fontWeight: "bold"
 }}
 >
-{regimeAligned
+{regimeAlignment
 ? "CONFIRMED"
 : "UNSTABLE"}
 </span>
-
 </div>
 
 </div>
 
 </div>
-</>
 );
 }
