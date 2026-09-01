@@ -393,9 +393,6 @@ rotationConfirm={engine.rotationConfirm}
 <TradeStackPanel
 tradeStack={engine.tradeStack}
 sizing={engine.sizing}
-edgeState={engine.edgeState}
-putTiming={engine.putTiming}
-russell={engine.russell}
 rotationConfirm={engine.rotationConfirm}
 />
 
