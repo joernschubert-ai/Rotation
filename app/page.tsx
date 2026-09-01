@@ -381,13 +381,13 @@ phase={engine.phase}
 MASTER GRID
 ===================================================== */}
 
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 mb-7">
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
 
 <MasterPanel
 master={engine.master}
 decision={engine.decision}
 signal={engine.signal}
-nasdaq={engine.nasdaq}
+nasdaq={engine.nasdaqCall}
 marketPhase={engine.phase}
 rotationConfirm={engine.rotationConfirm}
 />
@@ -409,7 +409,7 @@ exit={engine.exit?.long}
 />
 
 <NasdaqPanel
-nasdaq={engine.nasdaq}
+nasdaq={engine.nasdaqCall}
 exit={engine.exit}
 />
 
