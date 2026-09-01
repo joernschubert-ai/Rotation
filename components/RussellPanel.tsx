@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { getSignalColor } from "@/lib/engine/colorEngine";
 
 export default function RussellPanel({
 russell,
 exit
 }: any) {
+
+const [openSection, setOpenSection] =
+useState<string | null>(null);
 
 if (!russell) return null;
 
@@ -83,9 +87,6 @@ max: 7
 
 /* =====================================================
 SUPER SIGNAL
-
-IMPORTANT:
-UI follows ENGINE action only.
 ===================================================== */
 
 function getSuperSignal() {
@@ -179,7 +180,7 @@ case "EARLY":
 return {
 action: "SMALL STARTER",
 mode: "PROBE",
-note: "Early rotation – confirmation still required"
+note: "Early rotation – confirmation required"
 };
 
 
@@ -312,6 +313,19 @@ transition:
 }
 
 
+function formatNumber(
+value: any,
+digits = 0
+) {
+
+if (typeof value !== "number") {
+return "N/A";
+}
+
+return value.toFixed(digits);
+}
+
+
 /* =====================================================
 SETUP STATUS
 ===================================================== */
@@ -367,31 +381,18 @@ marketState.distributionConfirmationRequired === true;
 
 
 /* =====================================================
-FORMAT HELPERS
+ACCORDION
 ===================================================== */
 
-function formatNumber(
-value: any,
-digits = 0
+function toggleSection(
+section: string
 ) {
 
-if (typeof value !== "number") {
-return "N/A";
-}
-
-return value.toFixed(digits);
-}
-
-
-function getBooleanStatus(
-value: boolean | undefined,
-positiveLabel = "YES",
-negativeLabel = "NO"
-) {
-
-return value === true
-? positiveLabel
-: negativeLabel;
+setOpenSection(
+openSection === section
+? null
+: section
+);
 }
 
 
@@ -437,7 +438,7 @@ SUPER SIGNAL
 <div
 style={{
 marginBottom: "14px",
-padding: "10px",
+padding: "11px",
 border:
 `1px solid ${superSignal.border}`,
 background: "#111",
@@ -449,7 +450,8 @@ wordBreak: "break-word"
 <div
 style={{
 color: superSignal.color,
-fontWeight: "bold"
+fontWeight: "bold",
+fontSize: "15px"
 }}
 >
 {superSignal.text}
@@ -469,7 +471,7 @@ marginTop: "4px"
 
 
 {/* =================================================
-PRIMARY STATE
+PRIMARY DECISION
 ================================================= */}
 
 <InfoRow
@@ -491,29 +493,109 @@ label="Mode"
 value={execution.mode}
 />
 
-<InfoRow
-label="State"
-value={state}
-color={
-state === "LONG_SETUP"
-? "#52c41a"
-: "#999"
-}
-/>
-
 
 {/* =================================================
-EXECUTION NOTE
+SCORE + CONFIDENCE
 ================================================= */}
 
 <div
 style={{
-marginBottom: "14px",
-fontSize: "12px",
-opacity: 0.7
+display: "grid",
+gridTemplateColumns:
+"1fr 1fr",
+gap: "12px",
+marginTop: "14px",
+marginBottom: "14px"
 }}
 >
-{execution.note}
+
+<MetricBox
+label="RUSSELL SCORE"
+value={`${score}/${maxScore}`}
+color={
+getSignalColor(
+score,
+maxScore
+)
+}
+/>
+
+
+<MetricBox
+label="CONFIDENCE"
+value={`${confidence}%`}
+color={
+getSignalColor(
+confidence,
+100
+)
+}
+/>
+
+</div>
+
+
+{/* =================================================
+LONG GATE
+================================================= */}
+
+<div
+style={{
+padding: "10px",
+background: "#111",
+border: "1px solid #222",
+marginBottom: "14px"
+}}
+>
+
+<div
+style={{
+color: "#777",
+fontSize: "10px",
+marginBottom: "6px"
+}}
+>
+RUSSELL LONG GATE
+</div>
+
+<div
+style={{
+display: "flex",
+justifyContent: "space-between",
+gap: "10px"
+}}
+>
+
+<span
+style={{
+color: "#aaa",
+fontSize: "12px"
+}}
+>
+Entry Status
+</span>
+
+<span
+style={{
+color:
+gateOpen
+? "#52c41a"
+: blocked
+? "#ff4d4f"
+: "#999",
+fontWeight: "bold",
+fontSize: "12px"
+}}
+>
+{gateOpen
+? "OPEN"
+: blocked
+? "BLOCKED"
+: "CLOSED"}
+</span>
+
+</div>
+
 </div>
 
 
@@ -526,15 +608,17 @@ EXIT
 <div
 style={{
 marginBottom: "14px",
-paddingTop: "10px",
-borderTop: "1px solid #222"
+padding: "10px",
+border:
+`1px solid ${exitInfo.color}`,
+background: "#111"
 }}
 >
 
 <div
 style={{
 color: "#777",
-fontSize: "11px",
+fontSize: "10px",
 marginBottom: "5px"
 }}
 >
@@ -552,7 +636,7 @@ fontWeight: "bold"
 
 <div
 style={{
-fontSize: "12px",
+fontSize: "11px",
 opacity: 0.7,
 marginTop: "3px"
 }}
@@ -560,118 +644,13 @@ marginTop: "3px"
 {exitInfo.note}
 </div>
 
-{exitInfo.sizeReduction > 0 && (
-
-<div
-style={{
-fontSize: "11px",
-color: "#777",
-marginTop: "4px"
-}}
->
-Reduction: {exitInfo.sizeReduction}%
-</div>
-
-)}
-
 </div>
 
 )}
 
 
 {/* =================================================
-SCORE
-================================================= */}
-
-<div
-style={{
-marginBottom: "14px"
-}}
->
-
-<div
-style={{
-color: "#777",
-fontSize: "12px"
-}}
->
-Russell Score
-</div>
-
-<div
-style={{
-color:
-getSignalColor(
-score,
-maxScore
-),
-fontSize: "20px",
-fontWeight: "bold",
-marginTop: "3px"
-}}
->
-{score}/{maxScore}
-</div>
-
-<div
-style={{
-height: "6px",
-background: "#222",
-marginTop: "5px",
-width: "100%"
-}}
->
-
-<div
-style={bar(
-score,
-maxScore
-)}
-/>
-
-</div>
-
-</div>
-
-
-{/* =================================================
-CONFIDENCE
-================================================= */}
-
-<div
-style={{
-marginBottom: "14px"
-}}
->
-
-<div
-style={{
-color: "#777",
-fontSize: "12px"
-}}
->
-Confidence
-</div>
-
-<div
-style={{
-color:
-getSignalColor(
-confidence,
-100
-),
-fontWeight: "bold",
-marginTop: "3px"
-}}
->
-{confidence}%
-</div>
-
-</div>
-
-
-{/* =================================================
-COMPONENTS
+SETUP CHECK – ALWAYS VISIBLE
 ================================================= */}
 
 <div
@@ -684,128 +663,8 @@ paddingTop: "12px"
 <div
 style={{
 color: "#777",
-fontSize: "11px",
-marginBottom: "10px"
-}}
->
-ENGINE COMPONENTS
-</div>
-
-
-<ComponentRow
-label="Structure"
-value={structureComponent.value}
-max={structureComponent.max}
-bar={bar}
-/>
-
-
-<ComponentRow
-label="Regime"
-value={regimeComponent.value}
-max={regimeComponent.max}
-bar={bar}
-/>
-
-
-<ComponentRow
-label="Risk"
-value={riskComponent.value}
-max={riskComponent.max}
-bar={bar}
-/>
-
-</div>
-
-
-{/* =================================================
-LONG GATE
-================================================= */}
-
-<div
-style={{
-marginTop: "14px",
-paddingTop: "12px",
-borderTop: "1px solid #222"
-}}
->
-
-<div
-style={{
-color: "#777",
-fontSize: "11px",
-marginBottom: "10px"
-}}
->
-RUSSELL LONG GATE
-</div>
-
-
-<InfoRow
-label="Gate"
-value={
-gateOpen
-? "OPEN"
-: "CLOSED"
-}
-color={
-gateOpen
-? "#52c41a"
-: "#999"
-}
-bold
-/>
-
-
-<InfoRow
-label="Hard Block"
-value={
-blocked
-? "ACTIVE"
-: "CLEAR"
-}
-color={
-blocked
-? "#ff4d4f"
-: "#52c41a"
-}
-/>
-
-
-<InfoRow
-label="Distribution Check"
-value={
-distributionConfirmationRequired
-? "CONFIRMATION REQUIRED"
-: "CLEAR"
-}
-color={
-distributionConfirmationRequired
-? "#fa8c16"
-: "#52c41a"
-}
-/>
-
-</div>
-
-
-{/* =================================================
-SETUP CHECKLIST
-================================================= */}
-
-<div
-style={{
-marginTop: "14px",
-paddingTop: "12px",
-borderTop: "1px solid #222"
-}}
->
-
-<div
-style={{
-color: "#777",
-fontSize: "11px",
-marginBottom: "10px"
+fontSize: "10px",
+marginBottom: "9px"
 }}
 >
 SETUP CHECK
@@ -829,8 +688,8 @@ item.negative
 ? "WARNING"
 : "CLEAR"
 : item.active
-? "CONFIRMED"
-: "MISSING";
+? "YES"
+: "NO";
 
 
 return (
@@ -848,8 +707,7 @@ fontSize: "12px"
 
 <span
 style={{
-minWidth: 0,
-wordBreak: "break-word"
+color: "#bbb"
 }}
 >
 {item.label}
@@ -875,27 +733,79 @@ flexShrink: 0
 
 
 {/* =================================================
-ROTATION QUALITY
+EXECUTION NOTE
 ================================================= */}
 
 <div
 style={{
-marginTop: "14px",
-paddingTop: "12px",
+marginTop: "12px",
+fontSize: "11px",
+color: "#777"
+}}
+>
+{execution.note}
+</div>
+
+
+{/* =================================================
+DETAILS ACCORDION
+================================================= */}
+
+<div
+style={{
+marginTop: "16px",
 borderTop: "1px solid #222"
 }}
 >
 
-<div
-style={{
-color: "#777",
-fontSize: "11px",
-marginBottom: "8px"
-}}
->
-ROTATION QUALITY
-</div>
 
+{/* ENGINE COMPONENTS */}
+
+<AccordionSection
+title="ENGINE COMPONENTS"
+open={
+openSection === "components"
+}
+onClick={() =>
+toggleSection("components")
+}
+>
+
+<ComponentRow
+label="Structure"
+value={structureComponent.value}
+max={structureComponent.max}
+bar={bar}
+/>
+
+<ComponentRow
+label="Regime"
+value={regimeComponent.value}
+max={regimeComponent.max}
+bar={bar}
+/>
+
+<ComponentRow
+label="Risk"
+value={riskComponent.value}
+max={riskComponent.max}
+bar={bar}
+/>
+
+</AccordionSection>
+
+
+{/* ROTATION QUALITY */}
+
+<AccordionSection
+title="ROTATION QUALITY"
+open={
+openSection === "rotation"
+}
+onClick={() =>
+toggleSection("rotation")
+}
+>
 
 <InfoRow
 label="Rotation State"
@@ -905,32 +815,15 @@ meta.rotationConfirmState ??
 }
 />
 
-
 <InfoRow
 label="Confidence"
 value={`${formatNumber(meta.rotationConfidence)}%`}
-color={
-meta.rotationConfidence >= 70
-? "#52c41a"
-: meta.rotationConfidence >= 50
-? "#faad14"
-: "#999"
-}
 />
-
 
 <InfoRow
 label="Rotation Quality"
 value={`${formatNumber(meta.rotationQuality)}%`}
-color={
-meta.rotationQuality >= 65
-? "#52c41a"
-: meta.rotationQuality >= 50
-? "#faad14"
-: "#999"
-}
 />
-
 
 <InfoRow
 label="False Break Risk"
@@ -938,29 +831,19 @@ value={`${formatNumber(meta.falseBreakRisk)}%`}
 color={
 meta.falseBreakRisk >= 60
 ? "#ff4d4f"
-: meta.falseBreakRisk >= 40
-? "#faad14"
-: "#52c41a"
+: "#ddd"
 }
 />
-
 
 <InfoRow
 label="Rotation Decay"
-value={
-typeof meta.rotationDecayScore === "number"
-? `${meta.rotationDecayScore}`
-: "N/A"
-}
+value={formatNumber(meta.rotationDecayScore)}
 color={
 meta.rotationDecayScore >= 75
 ? "#ff4d4f"
-: meta.rotationDecayScore >= 50
-? "#faad14"
-: "#52c41a"
+: "#ddd"
 }
 />
-
 
 <InfoRow
 label="Decay State"
@@ -970,75 +853,35 @@ meta.rotationDecayState ??
 }
 />
 
-</div>
+</AccordionSection>
 
 
-{/* =================================================
-MARKET CONTEXT
-================================================= */}
+{/* MARKET CONTEXT */}
 
-<div
-style={{
-marginTop: "14px",
-paddingTop: "12px",
-borderTop: "1px solid #222"
-}}
+<AccordionSection
+title="MARKET CONTEXT"
+open={
+openSection === "market"
+}
+onClick={() =>
+toggleSection("market")
+}
 >
-
-<div
-style={{
-color: "#777",
-fontSize: "11px",
-marginBottom: "8px"
-}}
->
-MARKET CONTEXT
-</div>
-
 
 <InfoRow
 label="Market Quality"
-value={
-typeof meta.marketQualityScore === "number"
-? `${meta.marketQualityScore}`
-: "N/A"
-}
-color={
-meta.marketQualityScore >= 55
-? "#52c41a"
-: meta.marketQualityScore >= 40
-? "#faad14"
-: "#ff4d4f"
-}
+value={formatNumber(meta.marketQualityScore)}
 />
-
 
 <InfoRow
 label="Participation"
-value={
-typeof meta.participationScore === "number"
-? `${meta.participationScore}`
-: "N/A"
-}
-color={
-meta.participationScore >= 70
-? "#52c41a"
-: meta.participationScore >= 50
-? "#faad14"
-: "#ff4d4f"
-}
+value={formatNumber(meta.participationScore)}
 />
-
 
 <InfoRow
 label="Phase Confirmation"
-value={
-typeof meta.phaseConfirmationScore === "number"
-? `${meta.phaseConfirmationScore}`
-: "N/A"
-}
+value={formatNumber(meta.phaseConfirmationScore)}
 />
-
 
 <InfoRow
 label="Phase State"
@@ -1048,23 +891,10 @@ meta.phaseConfirmationState ??
 }
 />
 
-
 <InfoRow
 label="Price Momentum"
-value={
-typeof meta.priceMomentumScore === "number"
-? `${meta.priceMomentumScore}`
-: "N/A"
-}
-color={
-meta.priceMomentumScore >= 50
-? "#52c41a"
-: meta.priceMomentumScore >= 30
-? "#faad14"
-: "#ff4d4f"
-}
+value={formatNumber(meta.priceMomentumScore)}
 />
-
 
 <InfoRow
 label="Momentum State"
@@ -1074,128 +904,104 @@ meta.priceMomentumState ??
 }
 />
 
-
 <InfoRow
 label="Breadth 50"
-value={
-typeof meta.breadth50 === "number"
-? `${meta.breadth50.toFixed(1)}`
-: "N/A"
-}
+value={formatNumber(meta.breadth50, 1)}
 />
-
 
 <InfoRow
 label="Breadth 200"
-value={
-typeof meta.breadth200 === "number"
-? `${meta.breadth200.toFixed(1)}`
-: "N/A"
-}
+value={formatNumber(meta.breadth200, 1)}
 />
-
 
 <InfoRow
 label="VIX"
-value={
-typeof meta.vix === "number"
-? meta.vix.toFixed(1)
-: "N/A"
-}
+value={formatNumber(meta.vix, 1)}
 />
 
-</div>
+</AccordionSection>
 
 
-{/* =================================================
-MARKET CONDITIONS
-================================================= */}
+{/* MARKET CONDITIONS */}
 
-<div
-style={{
-marginTop: "14px",
-paddingTop: "12px",
-borderTop: "1px solid #222"
-}}
+<AccordionSection
+title="RISK CONDITIONS"
+open={
+openSection === "risk"
+}
+onClick={() =>
+toggleSection("risk")
+}
 >
 
-<div
-style={{
-color: "#777",
-fontSize: "11px",
-marginBottom: "8px"
-}}
->
-MARKET CONDITIONS
-</div>
-
+<StatusRow
+label="Hard Block"
+active={blocked}
+negative
+/>
 
 <StatusRow
 label="Absolute Risk Off"
-active={marketState.absoluteRiskOff === true}
+active={
+marketState.absoluteRiskOff === true
+}
 negative
 />
-
 
 <StatusRow
 label="Broad Market Weakness"
-active={marketState.broadMarketWeakness === true}
+active={
+marketState.broadMarketWeakness === true
+}
 negative
 />
-
 
 <StatusRow
 label="Severe Breakdown"
-active={marketState.severeMarketBreakdown === true}
+active={
+marketState.severeMarketBreakdown === true
+}
 negative
 />
-
 
 <StatusRow
 label="Rotation False Break"
-active={marketState.rotationFalseBreak === true}
+active={
+marketState.rotationFalseBreak === true
+}
 negative
 />
 
-
 <StatusRow
-label="Rotation Distribution"
-active={marketState.rotationDistribution === true}
+label="Distribution"
+active={
+marketState.rotationDistribution === true
+}
 negative
 />
 
-
 <StatusRow
-label="Russell Strong Breadth"
-active={marketState.russellStrongBreadth === true}
-positive
+label="Distribution Confirmation Required"
+active={
+distributionConfirmationRequired
+}
+negative
 />
 
-</div>
+</AccordionSection>
 
 
-{/* =================================================
-HISTORY
-================================================= */}
+{/* HISTORY */}
 
-<div
-style={{
-marginTop: "14px",
-paddingTop: "12px",
-borderTop: "1px solid #222"
-}}
+<AccordionSection
+title="MARKET HISTORY"
+open={
+openSection === "history"
+}
+onClick={() =>
+toggleSection("history")
+}
 >
-
-<div
-style={{
-color: "#777",
-fontSize: "11px",
-marginBottom: "8px"
-}}
->
-MARKET HISTORY
-</div>
-
 
 <InfoRow
 label="Russell 5D"
@@ -1206,7 +1012,6 @@ typeof history.russell5dReturn === "number"
 }
 />
 
-
 <InfoRow
 label="NASDAQ 5D"
 value={
@@ -1215,7 +1020,6 @@ typeof history.nasdaq5dReturn === "number"
 : "N/A"
 }
 />
-
 
 <InfoRow
 label="S&P 500 5D"
@@ -1226,46 +1030,161 @@ typeof history.sp5005dReturn === "number"
 }
 />
 
-
 <InfoRow
 label="Breadth Trend"
-value={
-typeof history.breadthTrend === "number"
-? history.breadthTrend.toFixed(1)
-: "N/A"
-}
+value={formatNumber(
+history.breadthTrend,
+1
+)}
 />
-
 
 <InfoRow
 label="Breadth Acceleration"
-value={
-typeof history.breadthAcceleration === "number"
-? history.breadthAcceleration.toFixed(1)
-: "N/A"
-}
+value={formatNumber(
+history.breadthAcceleration,
+1
+)}
 />
-
 
 <InfoRow
 label="Participation Decay"
-value={
-typeof history.participationDecay === "number"
-? history.participationDecay.toFixed(1)
-: "N/A"
-}
+value={formatNumber(
+history.participationDecay,
+1
+)}
 />
-
 
 <InfoRow
 label="Crash Trend"
-value={
-typeof history.crashTrend === "number"
-? history.crashTrend.toFixed(1)
-: "N/A"
-}
+value={formatNumber(
+history.crashTrend,
+1
+)}
 />
 
+</AccordionSection>
+
+</div>
+
+</div>
+
+);
+
+}
+
+
+/* =====================================================
+ACCORDION SECTION
+===================================================== */
+
+function AccordionSection({
+title,
+open,
+onClick,
+children
+}: any) {
+
+return (
+
+<div
+style={{
+borderBottom: "1px solid #222"
+}}
+>
+
+<button
+onClick={onClick}
+style={{
+width: "100%",
+background: "transparent",
+border: "none",
+color: "#888",
+padding: "13px 0",
+cursor: "pointer",
+display: "flex",
+justifyContent: "space-between",
+alignItems: "center",
+fontSize: "11px",
+fontWeight: "bold",
+textAlign: "left"
+}}
+>
+
+<span>
+{title}
+</span>
+
+<span
+style={{
+color: "#666",
+fontSize: "14px"
+}}
+>
+{open
+? "−"
+: "+"}
+</span>
+
+</button>
+
+
+{open && (
+
+<div
+style={{
+paddingBottom: "12px"
+}}
+>
+{children}
+</div>
+
+)}
+
+</div>
+
+);
+
+}
+
+
+/* =====================================================
+METRIC BOX
+===================================================== */
+
+function MetricBox({
+label,
+value,
+color
+}: any) {
+
+return (
+
+<div
+style={{
+background: "#111",
+border: "1px solid #222",
+padding: "9px"
+}}
+>
+
+<div
+style={{
+color: "#666",
+fontSize: "9px",
+marginBottom: "4px"
+}}
+>
+{label}
+</div>
+
+<div
+style={{
+color,
+fontWeight: "bold",
+fontSize: "18px"
+}}
+>
+{value}
 </div>
 
 </div>
@@ -1337,38 +1256,27 @@ STATUS ROW
 function StatusRow({
 label,
 active,
-negative = false,
-positive = false
+negative = false
 }: any) {
 
-let color = "#999";
-let value = "INACTIVE";
-
-if (negative) {
-
-color =
-active
+const color =
+negative
+? active
 ? "#ff4d4f"
-: "#52c41a";
-
-value =
-active
-? "ACTIVE"
-: "CLEAR";
-}
-
-if (positive) {
-
-color =
-active
+: "#52c41a"
+: active
 ? "#52c41a"
 : "#999";
 
-value =
-active
+const value =
+negative
+? active
+? "ACTIVE"
+: "CLEAR"
+: active
 ? "CONFIRMED"
 : "NO";
-}
+
 
 return (
 
