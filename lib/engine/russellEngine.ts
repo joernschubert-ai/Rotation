@@ -16,27 +16,40 @@ const marketQuality = data.marketQuality ?? {};
 const participation = data.participation ?? {};
 const phaseConfirmation = data.phaseConfirmation ?? {};
 
+const phase =
+data.phase ??
+data.marketPhase?.phase ??
+"UNKNOWN";
+
+
+/* =====================================================
+SAFE NUMBER HELPER
+===================================================== */
+
+function num(value: any, fallback = 0) {
+
+const parsed = Number(value);
+
+return Number.isFinite(parsed)
+? parsed
+: fallback;
+}
+
+
 /* =====================================================
 ABSOLUTE PERFORMANCE
 
-IMPORTANT:
-The old fields
+Old fields are not always present.
 
-nasdaq5dReturn
-russell5dReturn
-sp500_5dReturn
+Priority:
 
-are not reliably present in the current snapshot.
-
-Therefore use the real current momentum
-data as fallback.
-
-The values are percentage changes,
-e.g. +0.79 = +0.79%.
+1. history
+2. priceMomentum index object
+3. fallback
 ===================================================== */
 
 const nasdaq5dReturn =
-Number(
+num(
 history.nasdaq5dReturn ??
 history.ndxMomentum5D ??
 priceMomentum?.ndx?.momentum5D ??
@@ -45,7 +58,7 @@ priceMomentum?.momentum5D ??
 );
 
 const russell5dReturn =
-Number(
+num(
 history.russell5dReturn ??
 history.rutMomentum5D ??
 priceMomentum?.rut?.momentum5D ??
@@ -53,13 +66,39 @@ priceMomentum?.rut?.momentum5D ??
 );
 
 const sp5005dReturn =
-Number(
+num(
 history.sp500_5dReturn ??
 history.sp5005dReturn ??
 history.spxMomentum5D ??
 priceMomentum?.spx?.momentum5D ??
 0
 );
+
+
+/* =====================================================
+PRICE MOMENTUM – RUSSELL DETAIL
+===================================================== */
+
+const rutMomentum5D =
+num(
+priceMomentum?.rut?.momentum5D ??
+history.rutMomentum5D ??
+russell5dReturn
+);
+
+const rutMomentum20D =
+num(
+priceMomentum?.rut?.momentum20D ??
+history.rutMomentum20D ??
+0
+);
+
+const rutAcceleration =
+num(
+priceMomentum?.rut?.acceleration ??
+0
+);
+
 
 /* =====================================================
 BASE COMPONENTS
@@ -69,81 +108,85 @@ let structureScore = 0;
 let regimeScore = 0;
 let riskScore = 0;
 
+
 /* =====================================================
 RELATIVE STRENGTH
 ===================================================== */
 
 const rsSmall =
-Number(
+num(
 data.rsSmall ??
 rotationMetrics.rsSmall ??
 data.rotation?.rsSmall ??
+1,
 1
 );
 
 const rsGrowth =
-Number(
+num(
 data.rsGrowth ??
 rotationMetrics.rsGrowth ??
 data.rotation?.rsGrowth ??
+1,
 1
 );
+
 
 /* =====================================================
 BREADTH
 
-Current snapshot stores these primarily inside
-rotation.metrics.
+Support both:
 
-Support both flattened and nested structure.
+- flattened snapshot fields
+- rotation.metrics
+- 0..1
+- 0..100
 ===================================================== */
 
 const breadth50Raw =
-Number(
+num(
 data.breadth50 ??
 rotationMetrics.breadth50 ??
 0
 );
 
 const breadth200Raw =
-Number(
+num(
 data.breadth200 ??
 rotationMetrics.breadth200 ??
 0
 );
 
-/*
-If breadth is already 0..100 keep it.
-If it is 0..1 normalize it.
-*/
-
 const breadth50 =
-breadth50Raw <= 1
+breadth50Raw > 0 && breadth50Raw <= 1
 ? breadth50Raw * 100
 : breadth50Raw;
 
 const breadth200 =
-breadth200Raw <= 1
+breadth200Raw > 0 && breadth200Raw <= 1
 ? breadth200Raw * 100
 : breadth200Raw;
+
 
 /* =====================================================
 CONCENTRATION
 ===================================================== */
 
 const concentration =
-Number(
+num(
 data.concentrationScore ??
 rotationMetrics.concentrationScore ??
+data.master?.components?.concentration ??
 0
 );
+
 
 /* =====================================================
 ROTATION DECAY
 ===================================================== */
 
 const rotationDecayScore =
-Number(
+num(
 rotationDecay?.score ??
 data.rotationDecayScore ??
 data.master?.meta?.rotationDecayScore ??
@@ -155,50 +198,60 @@ const rotationDecayState =
 rotationDecay?.state ??
 rotationConfirm?.rotationDecayState ??
 data.master?.meta?.rotationDecayState ??
-"HEALTHY_ROTATION";
+"UNKNOWN";
+
 
 /* =====================================================
 ROTATION CONFIRM
 ===================================================== */
 
 const rotationConfidence =
-Number(
-rotationConfirm?.confidence ?? 50
+num(
+rotationConfirm?.confidence ??
+50,
+50
 );
 
 const rotationQuality =
-Number(
-rotationConfirm?.quality ?? 50
+num(
+rotationConfirm?.quality ??
+50,
+50
 );
 
 const falseBreakRisk =
-Number(
-rotationConfirm?.falseBreakRisk ?? 50
+num(
+rotationConfirm?.falseBreakRisk ??
+50,
+50
 );
 
 const rotationConfirmState =
 rotationConfirm?.state ??
 "UNKNOWN";
 
+
 /* =====================================================
 PARTICIPATION
 ===================================================== */
 
 const participationScore =
-Number(
+num(
 participation?.score ??
 data.participationScore ??
 rotationMetrics.participation ??
 data.master?.components?.participation ??
+50,
 50
 );
 
+
 /* =====================================================
-DIVERGENCE
+INTERNAL DIVERGENCE
 ===================================================== */
 
 const divergenceSeverity =
-Number(
+num(
 data.internalDivergence?.severity ??
 data.phaseData?.drivers?.divergenceSeverity ??
 0
@@ -218,27 +271,31 @@ data.phaseData?.drivers?.participationCollapse ??
 false
 );
 
+
 /* =====================================================
 MARKET QUALITY
 ===================================================== */
 
 const marketQualityScore =
-Number(
+num(
 marketQuality?.score ??
 marketQuality?.value ??
 data.master?.components?.marketQuality ??
-46
+50,
+50
 );
+
 
 /* =====================================================
 PHASE CONFIRMATION
 ===================================================== */
 
 const phaseConfirmationScore =
-Number(
+num(
 phaseConfirmation?.score ??
 phaseConfirmation?.confidence ??
 data.master?.meta?.phaseConfidence ??
+50,
 50
 );
 
@@ -246,14 +303,16 @@ const phaseConfirmationState =
 phaseConfirmation?.state ??
 "UNKNOWN";
 
+
 /* =====================================================
 PRICE MOMENTUM
 ===================================================== */
 
 const priceMomentumScore =
-Number(
+num(
 priceMomentum?.score ??
 data.master?.components?.priceMomentum ??
+50,
 50
 );
 
@@ -262,94 +321,66 @@ priceMomentum?.state ??
 "UNKNOWN";
 
 const ndxPriceScore =
-Number(
+num(
 priceMomentum?.ndx?.score ??
+priceMomentumScore,
 priceMomentumScore
 );
 
 const rutPriceScore =
-Number(
+num(
 priceMomentum?.rut?.score ??
+priceMomentumScore,
 priceMomentumScore
 );
 
-const rutMomentum5D =
-Number(
-priceMomentum?.rut?.momentum5D ??
-history.rutMomentum5D ??
-0
-);
-
-const rutMomentum20D =
-Number(
-priceMomentum?.rut?.momentum20D ??
-history.rutMomentum20D ??
-0
-);
-
-const rutAcceleration =
-Number(
-priceMomentum?.rut?.acceleration ??
-0
-);
 
 /* =====================================================
 VIX
 ===================================================== */
 
 const vix =
-Number(
+num(
 data.vix ??
 rotationMetrics.vix ??
 data.rotation?.metrics?.vix ??
+20,
 20
 );
+
 
 /* =====================================================
 HISTORY
 ===================================================== */
 
 const breadthTrend =
-Number(
-history.breadthTrend ?? 0
-);
+num(history.breadthTrend ?? 0);
 
 const breadthAcceleration =
-Number(
-history.breadthAcceleration ?? 0
-);
+num(history.breadthAcceleration ?? 0);
 
 const participationDecay =
-Number(
-history.participationDecay ?? 0
-);
+num(history.participationDecay ?? 0);
 
 const leadershipDecay =
-Number(
-history.leadershipDecay ?? 0
-);
+num(history.leadershipDecay ?? 0);
 
 const phasePersistence =
-Number(
-history.phasePersistence ?? 0
-);
+num(history.phasePersistence ?? 0);
 
 const relativeBreadthWeakness =
-Number(
-history.relativeBreadthWeakness ?? 0
-);
+num(history.relativeBreadthWeakness ?? 0);
 
 const regimePersistence =
-Number(
+num(
 history.regimePersistence ??
 data.master?.meta?.regimePersistenceHistory ??
 0
 );
 
 const crashTrend =
-Number(
-history.crashTrend ?? 0
-);
+num(history.crashTrend ?? 0);
+
 
 /* =====================================================
 ABSOLUTE MARKET STATE
@@ -368,6 +399,7 @@ const severeMarketBreakdown =
 russell5dReturn < -5 &&
 nasdaq5dReturn < -8;
 
+
 /* =====================================================
 RUSSELL RELATIVE STATE
 ===================================================== */
@@ -375,8 +407,13 @@ RUSSELL RELATIVE STATE
 const russellRelativeStrength =
 rsSmall > 1.02;
 
+const russellRelativeNeutral =
+rsSmall >= 0.99 &&
+rsSmall <= 1.02;
+
 const russellRelativeWeakness =
 rsSmall < 0.98;
+
 
 /* =====================================================
 RUSSELL ABSOLUTE STATE
@@ -385,8 +422,35 @@ RUSSELL ABSOLUTE STATE
 const russellAbsoluteStrength =
 russell5dReturn > 1;
 
+const russellModerateStrength =
+russell5dReturn > 0;
+
 const russellAbsoluteWeakness =
 russell5dReturn < -1;
+
+const russellSevereWeakness =
+russell5dReturn < -3;
+
+
+/* =====================================================
+RUSSELL MOMENTUM STATE
+===================================================== */
+
+const russellMomentumPositive =
+rutMomentum5D > 0 &&
+rutMomentum20D >= 0;
+
+const russellMomentumStrong =
+rutMomentum5D > 1 &&
+rutMomentum20D > 1;
+
+const russellMomentumAccelerating =
+rutAcceleration > 0;
+
+const russellMomentumWeak =
+rutMomentum5D < 0 &&
+rutMomentum20D < 0;
+
 
 /* =====================================================
 RUSSELL BREADTH STATE
@@ -404,6 +468,7 @@ const russellWeakBreadth =
 breadth50 < 45 ||
 breadth200 < 55;
 
+
 /* =====================================================
 ROTATION STATE
 ===================================================== */
@@ -412,6 +477,11 @@ const rotationConfirmed =
 rotationConfidence >= 70 &&
 rotationQuality >= 65 &&
 falseBreakRisk < 40;
+
+const rotationConstructive =
+rotationConfidence >= 60 &&
+rotationQuality >= 55 &&
+falseBreakRisk < 50;
 
 const rotationWeak =
 rotationConfidence < 50 ||
@@ -430,6 +500,7 @@ rotationDecayState === "DISTRIBUTION_ROTATION";
 const rotationExhausted =
 rotationDecayScore >= 75 ||
 rotationDecayState === "EXHAUSTED_ROTATION";
+
 
 /* =====================================================
 STRUCTURAL RISK FLAGS
@@ -468,8 +539,28 @@ participationDecay > 10;
 const severeParticipationErosion =
 participationDecay > 20;
 
+/*
+Important correction:
+
+Previous version:
+
+leadershipDecay >= -2
+
+was almost always true.
+
+A positive leadershipDecay should be interpreted
+as deterioration only if the history engine uses
+positive values for decay.
+
+Based on the existing history semantics:
+higher positive = stronger decay.
+*/
+
 const leadershipConcentration =
-leadershipDecay <= -2;
+leadershipDecay > 2;
+
+const severeLeadershipConcentration =
+leadershipDecay > 5;
 
 const risingCrashRisk =
 crashTrend >= 3;
@@ -477,15 +568,20 @@ crashTrend >= 3;
 const severeRisingCrashRisk =
 crashTrend >= 6;
 
+
 /* =====================================================
 STRUCTURE SCORE
+MAX 0..5
 
-Maximum output is normalized to 0..5.
+A Russell setup requires:
 
-Important:
-A Russell setup needs BOTH relative AND absolute
-strength. Relative strength alone is not enough.
+- relative strength
+- absolute strength
+- constructive breadth
+- participation
+- rotation confirmation
 ===================================================== */
+
 
 /* Relative strength */
 
@@ -499,23 +595,39 @@ else if (russellRelativeWeakness) {
 structureScore -= 2;
 }
 
+
 /* Absolute performance */
 
 if (russellAbsoluteStrength) {
 structureScore += 2;
+}
+else if (russellModerateStrength) {
+structureScore += 1;
 }
 
 if (russellAbsoluteWeakness) {
 structureScore -= 1;
 }
 
-if (russell5dReturn < -3) {
+if (russellSevereWeakness) {
 structureScore -= 2;
 }
 
-if (russell5dReturn < -5) {
-structureScore -= 2;
+
+/* Russell momentum */
+
+if (russellMomentumStrong) {
+structureScore += 1;
 }
+
+if (russellMomentumAccelerating) {
+structureScore += 1;
+}
+
+if (russellMomentumWeak) {
+structureScore -= 1;
+}
+
 
 /* Growth relationship */
 
@@ -525,6 +637,7 @@ structureScore += 1;
 else if (rsGrowth < 0.98) {
 structureScore -= 1;
 }
+
 
 /* Breadth */
 
@@ -537,8 +650,9 @@ structureScore += 1;
 }
 
 if (russellWeakBreadth) {
-structureScore -= 1;
+structureScore -= 2;
 }
+
 
 /* Concentration */
 
@@ -549,10 +663,14 @@ else if (concentration >= 3) {
 structureScore -= 1;
 }
 
+
 /* Participation */
 
 if (participationScore >= 70) {
 structureScore += 1;
+}
+else if (participationScore >= 60) {
+structureScore += 0.5;
 }
 
 if (participationScore < 50) {
@@ -563,9 +681,13 @@ if (participationScore < 40) {
 structureScore -= 1;
 }
 
+
 /* Rotation confirmation */
 
 if (rotationConfirmed) {
+structureScore += 2;
+}
+else if (rotationConstructive) {
 structureScore += 1;
 }
 
@@ -574,8 +696,9 @@ structureScore -= 1;
 }
 
 if (rotationFalseBreak) {
-structureScore -= 1;
+structureScore -= 2;
 }
+
 
 /* Normalize */
 
@@ -583,76 +706,124 @@ structureScore =
 Math.max(
 0,
 Math.min(
-structureScore,
+Math.round(structureScore),
 5
 )
 );
+
 
 /* =====================================================
 REGIME SCORE
 ===================================================== */
 
 if (
-data.phase === "PHASE_1_EXPANSION"
+phase === "PHASE_1_EXPANSION"
 ) {
+
 regimeScore = 3;
+
 }
 else if (
-data.phase === "PHASE_2_WARNING"
+phase === "PHASE_2_WARNING"
 ) {
+
 regimeScore = 2;
+
 }
 else if (
-data.phase === "PHASE_3_DISTRIBUTION"
+phase === "PHASE_3_DISTRIBUTION"
 ) {
-regimeScore = 1;
+
+/*
+Russell can theoretically work here,
+but only with confirmed rotation.
+*/
+
+regimeScore =
+rotationConfirmed
+? 1
+: 0;
+
 }
 else {
+
 regimeScore = 0;
+
 }
+
 
 /* =====================================================
 RISK SCORE
+RANGE -5 .. +2
 ===================================================== */
+
 
 /* Phase */
 
 if (
-data.phase === "PHASE_5_BREAKDOWN"
+phase === "PHASE_4_RISK"
+) {
+riskScore -= 1;
+}
+
+if (
+phase === "PHASE_5_BREAKDOWN"
 ) {
 riskScore -= 2;
 }
 
 if (
-data.phase === "PHASE_6_ACCELERATION"
+phase === "PHASE_6_ACCELERATION"
 ) {
-riskScore -= 1;
+riskScore -= 3;
 }
+
+if (
+phase === "PHASE_7_CAPITULATION"
+) {
+riskScore -= 4;
+}
+
 
 /* Crash */
 
 const crashProbability =
-Number(
-crash?.probability ?? 0
+num(
+crash?.probability ??
+data.master?.components?.crash ??
+0
 );
+
+if (crashProbability > 50) {
+riskScore -= 1;
+}
 
 if (crashProbability > 70) {
 riskScore -= 2;
 }
 
 if (crashProbability > 85) {
-riskScore -= 3;
+riskScore -= 2;
 }
+
 
 /* VIX */
 
-if (vix < 20) {
+if (vix < 18) {
 riskScore += 1;
+}
+else if (vix < 20) {
+riskScore += 0.5;
 }
 
 if (vix > 25) {
 riskScore -= 1;
 }
+
+if (vix > 30) {
+riskScore -= 1;
+}
+
 
 /* Absolute market */
 
@@ -668,6 +839,7 @@ if (severeMarketBreakdown) {
 riskScore -= 3;
 }
 
+
 /* Rotation lifecycle */
 
 if (rotationHealthy) {
@@ -682,69 +854,80 @@ if (rotationExhausted) {
 riskScore -= 2;
 }
 
+
 /* Divergence */
 
 if (divergenceSeverity > 40) {
 riskScore -= 1;
 }
 
-if (hiddenDistribution) {
+if (divergenceSeverity > 60) {
 riskScore -= 1;
+}
+
+if (hiddenDistribution) {
+riskScore -= 2;
 }
 
 if (participationCollapse) {
-riskScore -= 1;
+riskScore -= 2;
 }
+
 
 /* History */
 
-if (breadthTrend <= -2) {
+if (deterioratingBreadth) {
 riskScore -= 1;
 }
 
-if (breadthAcceleration <= -1) {
+if (acceleratingBreadthDecay) {
 riskScore -= 1;
 }
 
-if (participationDecay > 10) {
+if (participationErosion) {
 riskScore -= 1;
 }
 
-if (leadershipDecay >= -2) {
+if (severeParticipationErosion) {
 riskScore -= 1;
 }
 
-if (phasePersistence >= 60) {
+if (leadershipConcentration) {
 riskScore -= 1;
 }
 
-if (phasePersistence >= 85) {
+if (severeLeadershipConcentration) {
 riskScore -= 1;
 }
 
-if (relativeBreadthWeakness > 10) {
+if (prolongedDistribution) {
 riskScore -= 1;
 }
 
-if (relativeBreadthWeakness > 20) {
+if (broadParticipationFailure) {
 riskScore -= 1;
 }
 
-if (regimePersistence >= 60) {
+if (severeParticipationFailure) {
 riskScore -= 1;
 }
 
-if (regimePersistence >= 85) {
+if (prolongedBearRegime) {
 riskScore -= 1;
 }
 
-if (crashTrend >= 3) {
+if (severeBearRegime) {
 riskScore -= 1;
 }
 
-if (crashTrend >= 6) {
+if (risingCrashRisk) {
 riskScore -= 1;
 }
+
+if (severeRisingCrashRisk) {
+riskScore -= 1;
+}
+
 
 /* Market quality */
 
@@ -754,6 +937,7 @@ riskScore -= 2;
 else if (marketQualityScore < 55) {
 riskScore -= 1;
 }
+
 
 /* Phase confirmation */
 
@@ -765,7 +949,8 @@ if (phaseConfirmationScore < 30) {
 riskScore -= 1;
 }
 
-/* Price momentum */
+
+/* General momentum */
 
 if (priceMomentumScore < 40) {
 riskScore -= 1;
@@ -775,16 +960,29 @@ if (priceMomentumScore < 30) {
 riskScore -= 1;
 }
 
+
+/* Russell momentum */
+
+if (rutPriceScore < 40) {
+riskScore -= 1;
+}
+
+if (russellMomentumWeak) {
+riskScore -= 1;
+}
+
+
 /* Normalize */
 
 riskScore =
 Math.max(
 -5,
 Math.min(
-riskScore,
+Math.round(riskScore),
 2
 )
 );
+
 
 /* =====================================================
 TOTAL SCORE
@@ -801,29 +999,30 @@ riskScore,
 )
 );
 
+
+/* =====================================================
+PHASE STATE
+===================================================== */
+
+const acceptablePhase =
+phase === "PHASE_1_EXPANSION" ||
+phase === "PHASE_2_WARNING" ||
+phase === "PHASE_3_DISTRIBUTION" ||
+phase === "PHASE_4_RISK";
+
+
 /* =====================================================
 RUSSELL LONG GATE
 
-This is intentionally strict.
+Strict confirmation gate.
 
-A Russell CALL requires:
+Score alone can NEVER create a trade.
 
-    acceptable phase
-    Russell relative strength
-    Russell absolute strength
-    healthy breadth
-    confirmed rotation
-    no exhausted rotation
-    no distribution
-    no participation collapse
-    acceptable market quality
-    sufficient price momentum
-    ===================================================== */
+The score measures quality.
 
-const acceptablePhase =
-data.phase !== "PHASE_5_BREAKDOWN" &&
-data.phase !== "PHASE_6_ACCELERATION" &&
-data.phase !== "PHASE_7_CAPITULATION";
+The gate determines whether the setup is
+actually tradable.
+===================================================== */
 
 const russellLongGate =
 acceptablePhase &&
@@ -846,7 +1045,41 @@ rotationConfirmed &&
 
 marketQualityScore >= 55 &&
 
+participationScore >= 55 &&
+
+rutPriceScore >= 50 &&
+
 priceMomentumScore >= 50;
+
+
+/* =====================================================
+PHASE 4 SPECIAL GATE
+
+Phase 4 is structurally hostile.
+
+A Russell CALL is only allowed if the Russell
+itself proves exceptional leadership.
+
+This is intentionally extremely strict.
+===================================================== */
+
+const phase4RussellGate =
+phase !== "PHASE_4_RISK" ||
+
+(
+russellLongGate &&
+
+russellStrongBreadth &&
+
+russellMomentumPositive &&
+
+rutPriceScore >= 60 &&
+
+marketQualityScore >= 60 &&
+
+participationScore >= 60
+);
+
 
 /* =====================================================
 RUSSELL HARD BLOCK
@@ -869,33 +1102,41 @@ hiddenDistribution ||
 
 participationCollapse ||
 
+severeParticipationFailure ||
+
 marketQualityScore < 40 ||
+
+participationScore < 40 ||
 
 phaseConfirmationScore < 30 ||
 
 priceMomentumScore < 30 ||
 
-data.phase === "PHASE_5_BREAKDOWN" ||
+rutPriceScore < 30 ||
 
-data.phase === "PHASE_6_ACCELERATION" ||
+phase === "PHASE_5_BREAKDOWN" ||
 
-data.phase === "PHASE_7_CAPITULATION";
+phase === "PHASE_6_ACCELERATION" ||
+
+phase === "PHASE_7_CAPITULATION";
+
 
 /* =====================================================
-ADDITIONAL DISTRIBUTION BLOCK
+DISTRIBUTION CONFIRMATION BLOCK
 
-In PHASE 3 we allow Russell only if the market
-actually proves the rotation.
+Phase 3 allows Russell only with genuine rotation.
 
 This prevents:
 
-"Distribution + good breadth"
-from being interpreted as an automatic Russell CALL.
+"Distribution + temporarily good breadth"
+
+from being interpreted as a CALL setup.
 ===================================================== */
 
 const distributionConfirmationRequired =
-data.phase === "PHASE_3_DISTRIBUTION" &&
+phase === "PHASE_3_DISTRIBUTION" &&
 !rotationConfirmed;
+
 
 /* =====================================================
 MARKET STATE
@@ -911,11 +1152,25 @@ severeMarketBreakdown,
 
 russellRelativeStrength,
 
+russellRelativeNeutral,
+
 russellRelativeWeakness,
 
 russellAbsoluteStrength,
 
+russellModerateStrength,
+
 russellAbsoluteWeakness,
+
+russellSevereWeakness,
+
+russellMomentumPositive,
+
+russellMomentumStrong,
+
+russellMomentumAccelerating,
+
+russellMomentumWeak,
 
 russellHealthyBreadth,
 
@@ -924,6 +1179,8 @@ russellStrongBreadth,
 russellWeakBreadth,
 
 rotationConfirmed,
+
+rotationConstructive,
 
 rotationWeak,
 
@@ -935,13 +1192,110 @@ rotationDistribution,
 
 rotationExhausted,
 
+prolongedDistribution,
+
+prolongedBearRegime,
+
+severeBearRegime,
+
+broadParticipationFailure,
+
+severeParticipationFailure,
+
+participationErosion,
+
+severeParticipationErosion,
+
+leadershipConcentration,
+
+severeLeadershipConcentration,
+
+risingCrashRisk,
+
+severeRisingCrashRisk,
+
 russellLongGate,
+
+phase4RussellGate,
 
 russellLongBlocked,
 
 distributionConfirmationRequired
 
 };
+
+
+/* =====================================================
+BLOCK REASONS
+
+Important for dashboard transparency.
+===================================================== */
+
+const blockReasons: string[] = [];
+
+if (absoluteRiskOff) {
+blockReasons.push("ABSOLUTE_RISK_OFF");
+}
+
+if (severeMarketBreakdown) {
+blockReasons.push("SEVERE_MARKET_BREAKDOWN");
+}
+
+if (rotationExhausted) {
+blockReasons.push("ROTATION_EXHAUSTED");
+}
+
+if (rotationDistribution) {
+blockReasons.push("ROTATION_DISTRIBUTION");
+}
+
+if (rotationFalseBreak) {
+blockReasons.push("FALSE_BREAK_RISK");
+}
+
+if (russellWeakBreadth) {
+blockReasons.push("WEAK_BREADTH");
+}
+
+if (hiddenDistribution) {
+blockReasons.push("HIDDEN_DISTRIBUTION");
+}
+
+if (participationCollapse) {
+blockReasons.push("PARTICIPATION_COLLAPSE");
+}
+
+if (marketQualityScore < 40) {
+blockReasons.push("LOW_MARKET_QUALITY");
+}
+
+if (participationScore < 40) {
+blockReasons.push("LOW_PARTICIPATION");
+}
+
+if (rutPriceScore < 30) {
+blockReasons.push("WEAK_RUSSELL_MOMENTUM");
+}
+
+if (
+phase === "PHASE_5_BREAKDOWN" ||
+phase === "PHASE_6_ACCELERATION" ||
+phase === "PHASE_7_CAPITULATION"
+) {
+blockReasons.push("HOSTILE_MARKET_PHASE");
+}
+
+if (distributionConfirmationRequired) {
+blockReasons.push("UNCONFIRMED_DISTRIBUTION_ROTATION");
+}
+
+if (
+phase === "PHASE_4_RISK" &&
+!phase4RussellGate
+) {
+blockReasons.push("PHASE_4_NOT_EXCEPTIONAL_ENOUGH");
+}
+
 
 /* =====================================================
 DECISION
@@ -955,28 +1309,29 @@ if (russellLongBlocked) {
 return "NO_TRADE";
 }
 
+
 /* Distribution requires confirmation */
 
 if (distributionConfirmationRequired) {
 return "NO_TRADE";
 }
 
-/* Phase 4 requires complete confirmation */
 
-if (
-data.phase === "PHASE_4_RISK" &&
-!russellLongGate
-) {
-return "NO_TRADE";
-}
-
-/* General gate */
+/* General long gate */
 
 if (!russellLongGate) {
 return "NO_TRADE";
 }
 
-/* Score */
+
+/* Phase 4 requires exceptional leadership */
+
+if (!phase4RussellGate) {
+return "NO_TRADE";
+}
+
+
+/* Score classification */
 
 if (totalScore >= 8) {
 return "AGGRESSIVE";
@@ -995,10 +1350,13 @@ return "EARLY";
 }
 
 return "NO_TRADE";
+
 }
+
 
 const decision =
 getRussellDecision();
+
 
 /* =====================================================
 CONFIDENCE
@@ -1006,9 +1364,15 @@ CONFIDENCE
 
 let confidence = 0;
 
+
 if (
 decision === "NO_TRADE"
 ) {
+
+/*
+Confidence here means setup confidence,
+not confidence that the block is correct.
+*/
 
 confidence =
 Math.min(
@@ -1022,6 +1386,7 @@ else {
 confidence =
 totalScore * 10;
 
+
 if (rotationConfirmed) {
 confidence += 5;
 }
@@ -1034,19 +1399,128 @@ if (marketQualityScore >= 70) {
 confidence += 5;
 }
 
-if (rotationExhausted) {
-confidence -= 20;
+if (participationScore >= 70) {
+confidence += 5;
 }
+
+if (russellMomentumStrong) {
+confidence += 5;
+}
+
+if (russellMomentumAccelerating) {
+confidence += 3;
+}
+
+
+/*
+Phase 4 penalty.
+
+Even exceptional Russell leadership
+in a risk regime deserves less confidence.
+*/
+
+if (
+phase === "PHASE_4_RISK"
+) {
+confidence -= 10;
+}
+
 
 confidence =
 Math.max(
 0,
 Math.min(
-confidence,
+Math.round(confidence),
 100
 )
 );
+
 }
+
+
+/* =====================================================
+EXECUTION MODEL
+
+This is useful for the RussellPanel and Trade Engine.
+
+The action remains the strategic signal.
+
+execution gives sizing.
+===================================================== */
+
+let execution = "NONE";
+let executionMode = "NONE";
+let sizing = "0%";
+
+
+if (decision === "EARLY") {
+
+execution = "SMALL STARTER";
+executionMode = "PROBE";
+sizing = "25%";
+
+}
+else if (decision === "BUILD") {
+
+execution = "BUILD POSITION";
+executionMode = "SCALE_IN";
+sizing = "50%";
+
+}
+else if (decision === "ADD") {
+
+execution = "ADD POSITION";
+executionMode = "CONFIRMED_ROTATION";
+sizing = "75%";
+
+}
+else if (decision === "AGGRESSIVE") {
+
+execution = "FULL LONG";
+executionMode = "STRONG_ROTATION";
+sizing = "100%";
+
+}
+
+
+/* =====================================================
+SUMMARY
+===================================================== */
+
+let summary = "No structural Russell long edge";
+
+
+if (decision === "AGGRESSIVE") {
+
+summary =
+"Strong Russell leadership with confirmed rotation and broad market support";
+
+}
+else if (decision === "ADD") {
+
+summary =
+"Confirmed Russell rotation – constructive conditions for increasing exposure";
+
+}
+else if (decision === "BUILD") {
+
+summary =
+"Russell long structure is active – build exposure selectively";
+
+}
+else if (decision === "EARLY") {
+
+summary =
+"Early Russell leadership – use only small starter exposure";
+
+}
+else if (blockReasons.length > 0) {
+
+summary =
+`Russell long blocked: ${blockReasons.join(", ")}`;
+
+}
+
 
 /* =====================================================
 RETURN
@@ -1058,17 +1532,54 @@ action: decision,
 
 decision,
 
+
+/* =================================================
+SCORE
+================================================= */
+
 score: {
 value: totalScore,
 max: 10
 },
 
+
 confidence,
+
 
 state:
 decision === "NO_TRADE"
 ? "BLOCKED"
 : "LONG_SETUP",
+
+
+/* =================================================
+EXECUTION
+================================================= */
+
+execution,
+
+executionMode,
+
+sizing,
+
+
+/* =================================================
+SUMMARY
+================================================= */
+
+summary,
+
+
+/* =================================================
+BLOCK REASONS
+================================================= */
+
+blockReasons,
+
+
+/* =================================================
+SETUP
+================================================= */
 
 setup: {
 
@@ -1081,17 +1592,38 @@ russellAbsoluteStrength,
 healthyBreadth:
 russellHealthyBreadth,
 
+strongBreadth:
+russellStrongBreadth,
+
+momentumPositive:
+russellMomentumPositive,
+
+momentumStrong:
+russellMomentumStrong,
+
+momentumAccelerating:
+russellMomentumAccelerating,
+
 rotationConfirmed,
+
+rotationConstructive,
 
 rotationExhausted,
 
 marketQuality:
 marketQualityScore,
 
-phase:
-data.phase
+participation:
+participationScore,
+
+phase
 
 },
+
+
+/* =================================================
+HISTORY
+================================================= */
 
 history: {
 
@@ -1115,11 +1647,27 @@ nasdaq5dReturn,
 
 russell5dReturn,
 
-sp5005dReturn
+sp5005dReturn,
+
+rutMomentum5D,
+
+rutMomentum20D,
+
+rutAcceleration
 
 },
 
+
+/* =================================================
+MARKET STATE
+================================================= */
+
 marketState,
+
+
+/* =================================================
+COMPONENTS
+================================================= */
 
 components: {
 
@@ -1134,13 +1682,30 @@ max: 3
 },
 
 risk: {
+/*
+Display normalized positive value.
+
+Internal range:
+-5 .. +2
+
+Display:
+0 .. 7
+*/
+
 value: riskScore + 5,
 max: 7
 }
 
 },
 
+
+/* =================================================
+META
+================================================= */
+
 meta: {
+
+phase,
 
 rotationConfirmState,
 
@@ -1166,9 +1731,27 @@ priceMomentumScore,
 
 priceMomentumState,
 
+ndxPriceScore,
+
+rutPriceScore,
+
+rutMomentum5D,
+
+rutMomentum20D,
+
+rutAcceleration,
+
 breadth50,
 
 breadth200,
+
+rsSmall,
+
+rsGrowth,
+
+concentration,
+
+crashProbability,
 
 vix
 
