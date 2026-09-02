@@ -1,6 +1,6 @@
 /*
 =============================================================
-POSITION SIZING ENGINE V4
+POSITION SIZING ENGINE V5
 =============================================================
 
 PURPOSE
@@ -30,22 +30,22 @@ RUSSELL CALL
 IMPORTANT PRINCIPLES
 
 - No PRIMARY-flow overwrite
-- No hidden fallback to 50 for missing engine values
+- No hidden fallback to neutral 50
 - Missing values remain distinguishable from neutral values
 - Individual flow sizing remains independent
 - Portfolio layer is applied afterwards
 - Defensive PUT flow is not punished like bullish CALL flows
 - Portfolio rounding must not exceed portfolio cap
 
-V4 IMPORTANT FIXES
+V5 IMPORTANT FIXES
 
-1. WAIT does NOT automatically block defensive PUT setups
-2. TradeStack directionalConflict is NOT a global hard block
-3. Defensive NASDAQ PUT can enter as STARTER with moderate strength
-4. Structural confirmation can support PUT eligibility
-5. Defensive PUT receives direction-specific risk treatment
-6. Mixed exposure is handled at portfolio level
-7. Starter floor prevents structurally valid PUT from collapsing to 0
+1. Phase object is normalized correctly
+2. Structure values support both number and { value }
+3. CRISIS no longer globally blocks defensive PUTs
+4. CRISIS blocks bullish LONG flows
+5. Defensive PUT can survive crisis with reduced sizing
+6. PHASE_7_CAPITULATION remains a hard block for new PUTs
+7. Defensive structural confirmation actually reaches sizing
 =============================================================
 */
 
@@ -79,7 +79,6 @@ state: string;
 reason: string;
 };
 
-
 /* =========================================================
 HELPERS
 ========================================================= */
@@ -96,7 +95,6 @@ return Number.isFinite(n)
 : fallback;
 }
 
-
 function nullableNum(
 value: unknown
 ): number | null {
@@ -107,7 +105,6 @@ return Number.isFinite(n)
 ? n
 : null;
 }
-
 
 function clamp(
 value: number,
@@ -121,15 +118,93 @@ Math.min(max, value)
 );
 }
 
-
 function hasNumber(
 value: number | null
 ): value is number {
 
-return value !== null &&
-Number.isFinite(value);
+return (
+value !== null &&
+Number.isFinite(value)
+);
 }
 
+/*
+Supports both:
+
+b50: 44.9
+
+and:
+
+b50: {
+value: 44.9
+}
+*/
+
+function extractNumericValue(
+value: any
+): number | null {
+
+if (
+value !== null &&
+typeof value === "object"
+) {
+
+if (
+"value" in value
+) {
+return nullableNum(
+value.value
+);
+}
+}
+
+return nullableNum(value);
+}
+
+/*
+Normalize phase.
+
+Supports:
+
+engine.phase = "PHASE_3_DISTRIBUTION"
+
+and:
+
+engine.phase = {
+phase: "PHASE_3_DISTRIBUTION"
+}
+*/
+
+function normalizePhase(
+value: any
+): string {
+
+if (
+typeof value === "string"
+) {
+return value;
+}
+
+if (
+value &&
+typeof value === "object"
+) {
+
+if (
+typeof value.phase === "string"
+) {
+return value.phase;
+}
+
+if (
+typeof value.state === "string"
+) {
+return value.state;
+}
+}
+
+return "UNKNOWN";
+}
 
 /* =========================================================
 MAIN
@@ -189,7 +264,9 @@ const breadthThrust =
 engine?.breadthThrust ?? {};
 
 const squeeze =
-engine?.squeeze ?? {};
+engine?.squeeze ??
+engine?.squeezeRisk ??
+{};
 
 const structure =
 engine?.structure ?? {};
@@ -197,25 +274,29 @@ engine?.structure ?? {};
 const priceMomentum =
 engine?.priceMomentum ?? {};
 
-const phase =
-engine?.phase ??
-"UNKNOWN";
-
 const history =
 engine?.historyMetrics ?? {};
 
+/*
+IMPORTANT V5 FIX
+
+Snapshot phase is an object.
+Normalize it into a string.
+*/
+
+const phase =
+normalizePhase(
+engine?.phase
+);
 
 /* =====================================================
 EXPLICIT INPUT EXTRACTION
-
-Missing engine values remain null.
-
-Null is NOT converted to hidden neutral 50.
 ===================================================== */
 
 const input = {
 
 master: {
+
 score:
 nullableNum(master?.score),
 
@@ -225,13 +306,15 @@ master?.regime ??
 null
 },
 
-
 crash: {
+
 score:
 nullableNum(crash?.score),
 
 probability:
-nullableNum(crash?.probability),
+nullableNum(
+crash?.probability
+),
 
 state:
 crash?.state ??
@@ -239,81 +322,97 @@ crash?.label ??
 null
 },
 
-
 edge: {
+
 score:
-nullableNum(edgeState?.score),
+nullableNum(
+edgeState?.score
+),
 
 state:
 edgeState?.state ??
 null
 },
 
-
 liquidity: {
+
 score:
-nullableNum(liquidity?.score),
+nullableNum(
+liquidity?.score
+),
 
 state:
 liquidity?.state ??
 null
 },
 
-
 fragility: {
+
 score:
-nullableNum(fragility?.score),
+nullableNum(
+fragility?.score
+),
 
 state:
 fragility?.state ??
 null
 },
 
-
 participation: {
+
 score:
-nullableNum(participation?.score),
+nullableNum(
+participation?.score
+),
 
 state:
 participation?.state ??
 null
 },
 
-
 rotationDecay: {
+
 score:
-nullableNum(rotationDecay?.score),
+nullableNum(
+rotationDecay?.score
+),
 
 state:
 rotationDecay?.state ??
 null
 },
 
-
 rotationConfirm: {
+
 confidence:
-nullableNum(rotationConfirm?.confidence),
+nullableNum(
+rotationConfirm?.confidence
+),
 
 state:
 rotationConfirm?.state ??
 null,
 
 falseBreakRisk:
-nullableNum(rotationConfirm?.falseBreakRisk)
+nullableNum(
+rotationConfirm?.falseBreakRisk
+)
 },
 
-
 marketQuality: {
+
 score:
-nullableNum(marketQuality?.score),
+nullableNum(
+marketQuality?.score
+),
 
 state:
 marketQuality?.state ??
 null
 },
 
-
 breadthThrust: {
+
 score:
 nullableNum(
 breadthThrust?.strength ??
@@ -321,70 +420,86 @@ breadthThrust?.score
 )
 },
 
-
 squeeze: {
+
 risk:
-nullableNum(squeeze?.risk),
+nullableNum(
+squeeze?.risk ??
+squeeze?.score
+),
 
 state:
 squeeze?.state ??
 null
 },
 
-
 regimeSync: {
+
 score:
-nullableNum(regimeSync?.score),
+nullableNum(
+regimeSync?.score
+),
 
 state:
 regimeSync?.state ??
 null
 },
 
-
 danger: {
+
 score:
-nullableNum(dangerZone?.score),
+nullableNum(
+dangerZone?.score
+),
 
 state:
 dangerZone?.state ??
+dangerZone?.level ??
 null
 },
 
-
 systemHeat: {
-value:
-nullableNum(systemHeat?.value)
-},
 
+value:
+nullableNum(
+systemHeat?.value
+)
+},
 
 structure: {
 
 breadth50:
-nullableNum(
-structure?.breadth?.b50?.value
+extractNumericValue(
+structure?.breadth?.b50
 ),
 
 breadth200:
-nullableNum(
-structure?.breadth?.b200?.value
+extractNumericValue(
+structure?.breadth?.b200
 )
 },
-
 
 history: {
 
 breadthTrend:
-nullableNum(history?.breadthTrend),
+nullableNum(
+history?.breadthTrend
+),
 
 breadthAcceleration:
-nullableNum(history?.breadthAcceleration),
+nullableNum(
+history?.breadthAcceleration
+),
 
 participationDecay:
-nullableNum(history?.participationDecay),
+nullableNum(
+history?.participationDecay
+),
 
 leadershipDecay:
-nullableNum(history?.leadershipDecay),
+nullableNum(
+history?.leadershipDecay
+),
 
 relativeBreadthWeakness:
 nullableNum(
@@ -392,13 +507,16 @@ history?.relativeBreadthWeakness
 ),
 
 phasePersistence:
-nullableNum(history?.phasePersistence),
+nullableNum(
+history?.phasePersistence
+),
 
 regimePersistence:
-nullableNum(history?.regimePersistence)
+nullableNum(
+history?.regimePersistence
+)
 }
 };
-
 
 /* =====================================================
 SAFE CALCULATION VALUES
@@ -432,7 +550,9 @@ const rotationDecayScore =
 num(input.rotationDecay.score);
 
 const rotationConfidence =
-num(input.rotationConfirm.confidence);
+num(
+input.rotationConfirm.confidence
+);
 
 const marketQualityScore =
 num(input.marketQuality.score);
@@ -456,13 +576,19 @@ const breadthTrend =
 num(input.history.breadthTrend);
 
 const breadthAcceleration =
-num(input.history.breadthAcceleration);
+num(
+input.history.breadthAcceleration
+);
 
 const participationDecay =
-num(input.history.participationDecay);
+num(
+input.history.participationDecay
+);
 
 const leadershipDecay =
-num(input.history.leadershipDecay);
+num(
+input.history.leadershipDecay
+);
 
 const relativeBreadthWeakness =
 num(
@@ -470,11 +596,14 @@ input.history.relativeBreadthWeakness
 );
 
 const phasePersistence =
-num(input.history.phasePersistence);
+num(
+input.history.phasePersistence
+);
 
 const regimePersistence =
-num(input.history.regimePersistence);
-
+num(
+input.history.regimePersistence
+);
 
 /* =====================================================
 EXECUTION CONTEXT
@@ -493,35 +622,39 @@ const tacticalBias =
 executionState?.tacticalBias ??
 "NEUTRAL";
 
-
 /* =====================================================
 STRUCTURAL FLAGS
 ===================================================== */
 
 const deterioratingBreadth =
-hasNumber(input.history.breadthTrend) &&
+hasNumber(
+input.history.breadthTrend
+) &&
 breadthTrend <= -2;
 
-
 const acceleratingBreadthDamage =
-hasNumber(input.history.breadthAcceleration) &&
+hasNumber(
+input.history.breadthAcceleration
+) &&
 breadthAcceleration <= -1;
 
-
 const severeBreadthDamage =
-hasNumber(input.history.breadthAcceleration) &&
+hasNumber(
+input.history.breadthAcceleration
+) &&
 breadthAcceleration <= -3;
 
-
 const participationFailure =
-hasNumber(input.participation.score) &&
+hasNumber(
+input.participation.score
+) &&
 participationScore < 40;
 
-
 const severeParticipationFailure =
-hasNumber(input.participation.score) &&
+hasNumber(
+input.participation.score
+) &&
 participationScore < 30;
-
 
 const persistentWeakness =
 (
@@ -537,7 +670,6 @@ input.history.regimePersistence
 regimePersistence >= 60
 );
 
-
 const chronicWeakness =
 (
 hasNumber(
@@ -552,76 +684,89 @@ input.history.regimePersistence
 regimePersistence >= 85
 );
 
-
 const leadershipConcentration =
-hasNumber(input.history.leadershipDecay) &&
+hasNumber(
+input.history.leadershipDecay
+) &&
 leadershipDecay <= -2;
 
-
 const severeLeadershipConcentration =
-hasNumber(input.history.leadershipDecay) &&
+hasNumber(
+input.history.leadershipDecay
+) &&
 leadershipDecay <= -5;
 
-
 const poorMarketQuality =
-hasNumber(input.marketQuality.score) &&
+hasNumber(
+input.marketQuality.score
+) &&
 marketQualityScore < 45;
 
-
 const severeMarketQuality =
-hasNumber(input.marketQuality.score) &&
+hasNumber(
+input.marketQuality.score
+) &&
 marketQualityScore < 35;
 
-
 const weakLiquidity =
-hasNumber(input.liquidity.score) &&
+hasNumber(
+input.liquidity.score
+) &&
 liquidityScore < 40;
 
-
 const criticalLiquidity =
-hasNumber(input.liquidity.score) &&
+hasNumber(
+input.liquidity.score
+) &&
 liquidityScore < 25;
 
-
 const highFragility =
-hasNumber(input.fragility.score) &&
+hasNumber(
+input.fragility.score
+) &&
 fragilityScore >= 70;
 
-
 const extremeFragility =
-hasNumber(input.fragility.score) &&
+hasNumber(
+input.fragility.score
+) &&
 fragilityScore >= 85;
 
-
 const rotationBroken =
-hasNumber(input.rotationDecay.score) &&
+hasNumber(
+input.rotationDecay.score
+) &&
 rotationDecayScore >= 75;
 
-
 const rotationExhausted =
-hasNumber(input.rotationDecay.score) &&
+hasNumber(
+input.rotationDecay.score
+) &&
 rotationDecayScore >= 85;
 
-
 const negativeHeat =
-hasNumber(input.systemHeat.value) &&
+hasNumber(
+input.systemHeat.value
+) &&
 heat <= -0.7;
 
-
 const severeHeat =
-hasNumber(input.systemHeat.value) &&
+hasNumber(
+input.systemHeat.value
+) &&
 heat <= -1.4;
 
-
 const highDanger =
-hasNumber(input.danger.score) &&
+hasNumber(
+input.danger.score
+) &&
 dangerScore >= 60;
 
-
 const extremeDanger =
-hasNumber(input.danger.score) &&
+hasNumber(
+input.danger.score
+) &&
 dangerScore >= 80;
-
 
 /* =====================================================
 PHASE
@@ -633,33 +778,23 @@ phase === "PHASE_5_BREAKDOWN" ||
 phase === "PHASE_6_ACCELERATION" ||
 phase === "PHASE_7_CAPITULATION";
 
-
 const aggressiveLongPhase =
 phase === "PHASE_1_EXPANSION";
-
 
 const warningPhase =
 phase === "PHASE_2_WARNING";
 
-
 const distributionPhase =
 phase === "PHASE_3_DISTRIBUTION";
 
-
 /* =====================================================
 DEFENSIVE STRUCTURAL CONFIRMATION
-
-This is the central V4 addition.
-
-A NASDAQ PUT does not need a TradeStack strength of 65+
-when multiple independent structural engines already
-confirm defensive conditions.
 ===================================================== */
 
 const defensiveStructuralConfirmationCount = [
 
-defensivePhase ||
-distributionPhase,
+distributionPhase ||
+defensivePhase,
 
 crashProbability >= 30,
 
@@ -685,33 +820,22 @@ negativeHeat
 
 ].filter(Boolean).length;
 
-
 const defensiveStructuralConfirmed =
 defensiveStructuralConfirmationCount >= 3;
-
 
 const strongDefensiveStructuralConfirmed =
 defensiveStructuralConfirmationCount >= 5;
 
-
 /* =====================================================
-BASE GLOBAL RISK MULTIPLIER
-
-Global risk is primarily designed to control
-portfolio aggression.
-
-Direction-specific adjustments happen later.
-
-IMPORTANT:
-NASDAQ PUT receives compensating structural support
-later and is NOT treated like a bullish long.
+GLOBAL RISK MULTIPLIER
 ===================================================== */
 
 let globalRiskMultiplier = 1;
 
-
 if (
-hasNumber(input.crash.probability)
+hasNumber(
+input.crash.probability
+)
 ) {
 
 if (crashProbability >= 70)
@@ -724,9 +848,10 @@ else if (crashProbability >= 35)
 globalRiskMultiplier *= 0.92;
 }
 
-
 if (
-hasNumber(input.danger.score)
+hasNumber(
+input.danger.score
+)
 ) {
 
 if (dangerScore >= 80)
@@ -739,13 +864,11 @@ else if (dangerScore >= 40)
 globalRiskMultiplier *= 0.92;
 }
 
-
 if (criticalLiquidity)
 globalRiskMultiplier *= 0.65;
 
 else if (weakLiquidity)
 globalRiskMultiplier *= 0.85;
-
 
 if (extremeFragility)
 globalRiskMultiplier *= 0.60;
@@ -753,67 +876,55 @@ globalRiskMultiplier *= 0.60;
 else if (highFragility)
 globalRiskMultiplier *= 0.80;
 
-
 if (poorMarketQuality)
 globalRiskMultiplier *= 0.85;
-
 
 if (persistentWeakness)
 globalRiskMultiplier *= 0.90;
 
-
 if (chronicWeakness)
 globalRiskMultiplier *= 0.82;
-
 
 if (negativeHeat)
 globalRiskMultiplier *= 0.90;
 
-
 if (severeHeat)
 globalRiskMultiplier *= 0.80;
-
 
 if (riskState === "BREAKDOWN")
 globalRiskMultiplier *= 0.75;
 
+/*
+CRISIS reduces portfolio aggression.
+
+It does NOT automatically mean
+defensive PUT = invalid.
+*/
 
 if (riskState === "CRISIS")
-globalRiskMultiplier *= 0.45;
-
+globalRiskMultiplier *= 0.60;
 
 if (executionMode === "DEFENSIVE")
 globalRiskMultiplier *= 0.85;
 
-
 if (executionMode === "REDUCE_RISK")
 globalRiskMultiplier *= 0.80;
-
-
-/*
-WAIT reduces general portfolio aggression.
-
-It is NOT a direction decision.
-*/
 
 if (executionMode === "WAIT")
 globalRiskMultiplier *= 0.85;
 
-
 globalRiskMultiplier =
 clamp(
 globalRiskMultiplier * 100,
-25,
+20,
 110
 ) / 100;
-
 
 /* =====================================================
 BASE SIZE
 ===================================================== */
 
 const BASE_SIZE = 40;
-
 
 /* =====================================================
 TRADE STACK FLOWS
@@ -827,7 +938,6 @@ strength: 0,
 state: "NEUTRAL"
 };
 
-
 const nasdaqCall =
 tradeStack?.nasdaqCall ?? {
 instrument: "NASDAQ_CALL",
@@ -835,7 +945,6 @@ direction: "LONG",
 strength: 0,
 state: "NEUTRAL"
 };
-
 
 const russellCall =
 tradeStack?.russellCall ?? {
@@ -845,23 +954,9 @@ strength: 0,
 state: "NEUTRAL"
 };
 
-
-/* =====================================================
-TRADE STACK CONFLICT
-
-IMPORTANT V4 CHANGE
-
-This is informational.
-
-It does NOT globally invalidate all independent flows.
-
-Mixed exposure is handled later by the portfolio layer.
-===================================================== */
-
 const tradeStackDirectionalConflict =
 tradeStack?.meta?.directionalConflict === true ||
 tradeStack?.directionalConflict === true;
-
 
 /* =====================================================
 CONFIDENCE
@@ -874,71 +969,73 @@ strength: number
 
 let confidence = 50;
 
-
 confidence +=
 (strength - 50) * 0.55;
 
+if (
+hasNumber(
+input.master.score
+)
+) {
 
-/*
-Master score interpretation is direction-aware.
-
-A high master risk score supports defensive PUTs,
-but must NOT blindly boost bullish CALLs.
-*/
-
-if (hasNumber(input.master.score)) {
-
-if (flow === "NASDAQ_PUT") {
+if (
+flow === "NASDAQ_PUT"
+) {
 
 confidence +=
-(masterScore - 50) * 0.18;
+(masterScore - 50) *
+0.18;
 
 } else {
 
 confidence +=
-(50 - masterScore) * 0.10;
+(50 - masterScore) *
+0.10;
 }
 }
 
-
-if (hasNumber(input.regimeSync.score)) {
+if (
+hasNumber(
+input.regimeSync.score
+)
+) {
 
 confidence +=
-(regimeSyncScore - 50) * 0.08;
+(regimeSyncScore - 50) *
+0.08;
 }
-
 
 if (
 hasNumber(
 input.rotationConfirm.confidence
-)
+) &&
+flow === "RUSSELL_CALL"
 ) {
 
-if (flow === "RUSSELL_CALL") {
-
 confidence +=
-(rotationConfidence - 50) * 0.12;
+(rotationConfidence - 50) *
+0.12;
 }
-}
-
 
 if (
-hasNumber(input.marketQuality.score)
+hasNumber(
+input.marketQuality.score
+) &&
+flow !== "NASDAQ_PUT"
 ) {
 
-if (flow !== "NASDAQ_PUT") {
-
 confidence +=
-(marketQualityScore - 50) * 0.08;
+(marketQualityScore - 50) *
+0.08;
 }
-}
-
 
 /* ===================================================
 NASDAQ PUT
 =================================================== */
 
-if (flow === "NASDAQ_PUT") {
+if (
+flow === "NASDAQ_PUT"
+) {
 
 if (distributionPhase)
 confidence += 6;
@@ -979,31 +1076,43 @@ confidence += 4;
 if (persistentWeakness)
 confidence += 4;
 
-if (strongDefensiveStructuralConfirmed)
+if (
+strongDefensiveStructuralConfirmed
+) {
+
 confidence += 8;
 
-else if (defensiveStructuralConfirmed)
+} else if (
+defensiveStructuralConfirmed
+) {
+
 confidence += 4;
-
-/*
-A high squeeze risk does not invalidate the PUT.
-
-It only reduces confidence because of squeeze/rebound risk.
-*/
+}
 
 if (squeezeRisk >= 70)
 confidence -= 8;
 
 if (squeezeRisk >= 85)
 confidence -= 6;
-}
 
+/*
+Crisis is not automatically bearish edge.
+
+It increases reversal/squeeze risk,
+therefore modest confidence reduction.
+*/
+
+if (riskState === "CRISIS")
+confidence -= 4;
+}
 
 /* ===================================================
 NASDAQ CALL
 =================================================== */
 
-if (flow === "NASDAQ_CALL") {
+if (
+flow === "NASDAQ_CALL"
+) {
 
 if (aggressiveLongPhase)
 confidence += 10;
@@ -1028,14 +1137,18 @@ confidence -= 8;
 
 if (poorMarketQuality)
 confidence -= 6;
-}
 
+if (riskState === "CRISIS")
+confidence -= 20;
+}
 
 /* ===================================================
 RUSSELL CALL
 =================================================== */
 
-if (flow === "RUSSELL_CALL") {
+if (
+flow === "RUSSELL_CALL"
+) {
 
 if (rotationConfidence >= 75)
 confidence += 10;
@@ -1057,14 +1170,15 @@ confidence += 5;
 
 if (participationFailure)
 confidence -= 8;
-}
 
+if (riskState === "CRISIS")
+confidence -= 20;
+}
 
 return clamp(
 Math.round(confidence)
 );
 }
-
 
 /* =====================================================
 FLOW RISK MULTIPLIER
@@ -1077,17 +1191,13 @@ flow: FlowName
 let multiplier =
 globalRiskMultiplier;
 
-
 /* ===================================================
 NASDAQ PUT
-
-Defensive PUT receives structural compensation.
-
-High fragility / weak liquidity are reasons for
-defensive exposure, not reasons to erase it.
 =================================================== */
 
-if (flow === "NASDAQ_PUT") {
+if (
+flow === "NASDAQ_PUT"
+) {
 
 if (distributionPhase)
 multiplier *= 1.08;
@@ -1110,17 +1220,29 @@ multiplier *= 1.08;
 if (persistentWeakness)
 multiplier *= 1.05;
 
-if (strongDefensiveStructuralConfirmed)
+if (
+strongDefensiveStructuralConfirmed
+) {
+
 multiplier *= 1.15;
 
-else if (defensiveStructuralConfirmed)
-multiplier *= 1.08;
+} else if (
+defensiveStructuralConfirmed
+) {
 
+multiplier *= 1.08;
+}
 
 /*
-Capitulation is different.
+Crisis reduces size,
+but does NOT invalidate defensive PUT.
+*/
 
-New puts become dangerous because of reversal risk.
+if (riskState === "CRISIS")
+multiplier *= 0.80;
+
+/*
+Capitulation remains dangerous for NEW PUTs.
 */
 
 if (
@@ -1129,17 +1251,11 @@ phase === "PHASE_7_CAPITULATION"
 multiplier *= 0.45;
 }
 
-
-/*
-Squeeze risk reduces size but does not invalidate.
-*/
-
 if (squeezeRisk >= 70)
 multiplier *= 0.85;
 
 if (squeezeRisk >= 85)
 multiplier *= 0.75;
-
 
 if (
 priceMomentum?.bullishImpulse === true
@@ -1148,12 +1264,13 @@ multiplier *= 0.88;
 }
 }
 
-
 /* ===================================================
 NASDAQ CALL
 =================================================== */
 
-if (flow === "NASDAQ_CALL") {
+if (
+flow === "NASDAQ_CALL"
+) {
 
 if (defensivePhase)
 multiplier *= 0.30;
@@ -1167,6 +1284,9 @@ multiplier *= 0.70;
 if (criticalLiquidity)
 multiplier *= 0.70;
 
+if (riskState === "CRISIS")
+multiplier *= 0.20;
+
 if (
 aggressiveLongPhase &&
 marketQualityScore >= 65 &&
@@ -1176,12 +1296,13 @@ multiplier *= 1.10;
 }
 }
 
-
 /* ===================================================
 RUSSELL CALL
 =================================================== */
 
-if (flow === "RUSSELL_CALL") {
+if (
+flow === "RUSSELL_CALL"
+) {
 
 if (rotationConfidence < 60)
 multiplier *= 0.65;
@@ -1208,8 +1329,10 @@ multiplier *= 0.35;
 
 if (defensivePhase)
 multiplier *= 0.70;
-}
 
+if (riskState === "CRISIS")
+multiplier *= 0.20;
+}
 
 return clamp(
 multiplier,
@@ -1217,7 +1340,6 @@ multiplier,
 1.30
 );
 }
-
 
 /* =====================================================
 FLOW EDGE
@@ -1229,7 +1351,6 @@ strength: number
 ) {
 
 let score = 0;
-
 
 if (strength >= 75)
 score += 8;
@@ -1243,9 +1364,10 @@ score += 2;
 else
 score -= 4;
 
-
 if (
-hasNumber(input.edge.score)
+hasNumber(
+input.edge.score
+)
 ) {
 
 if (edgeScore >= 60)
@@ -1258,12 +1380,9 @@ else if (edgeScore < 20)
 score -= 3;
 }
 
-
-/* ===================================================
-NASDAQ PUT
-=================================================== */
-
-if (flow === "NASDAQ_PUT") {
+if (
+flow === "NASDAQ_PUT"
+) {
 
 if (distributionPhase)
 score += 3;
@@ -1301,19 +1420,23 @@ score += 2;
 if (persistentWeakness)
 score += 2;
 
-if (strongDefensiveStructuralConfirmed)
+if (
+strongDefensiveStructuralConfirmed
+) {
+
 score += 5;
 
-else if (defensiveStructuralConfirmed)
+} else if (
+defensiveStructuralConfirmed
+) {
+
 score += 3;
 }
+}
 
-
-/* ===================================================
-NASDAQ CALL
-=================================================== */
-
-if (flow === "NASDAQ_CALL") {
+if (
+flow === "NASDAQ_CALL"
+) {
 
 if (aggressiveLongPhase)
 score += 4;
@@ -1332,12 +1455,9 @@ if (rotationBroken)
 score -= 3;
 }
 
-
-/* ===================================================
-RUSSELL CALL
-=================================================== */
-
-if (flow === "RUSSELL_CALL") {
+if (
+flow === "RUSSELL_CALL"
+) {
 
 if (rotationConfidence >= 75)
 score += 4;
@@ -1352,10 +1472,8 @@ if (rotationBroken)
 score -= 5;
 }
 
-
 return score;
 }
-
 
 /* =====================================================
 FALSE BREAK RISK
@@ -1366,28 +1484,14 @@ function falseBreakRisk() {
 const value =
 input.rotationConfirm.falseBreakRisk;
 
-return value !== null &&
-value > 65;
+return (
+value !== null &&
+value > 65
+);
 }
-
 
 /* =====================================================
 DEFENSIVE PUT ELIGIBILITY
-
-V4 CORE FIX
-
-A defensive PUT can become eligible through:
-
-A) strong TradeStack candidate
-OR
-B) moderate candidate + structural confirmation
-
-This prevents the exact screenshot situation where:
-
-NASDAQ PUT = 53 strength
-defensive market = confirmed
-
-but PositionSizing = 0
 ===================================================== */
 
 function isDefensivePutEligible(
@@ -1395,22 +1499,14 @@ strength: number,
 direction: Direction
 ) {
 
-if (direction !== "SHORT")
+if (
+direction !== "SHORT"
+) {
 return false;
-
-
-/*
-Strong candidate always qualifies
-unless crisis/capitulation rules block it later.
-*/
+}
 
 if (strength >= 60)
 return true;
-
-
-/*
-Moderate candidate with strong structural confirmation.
-*/
 
 if (
 strength >= 45 &&
@@ -1418,13 +1514,6 @@ defensiveStructuralConfirmed
 ) {
 return true;
 }
-
-
-/*
-Earlier starter entry during distribution/risk.
-
-Requires several independent confirmations.
-*/
 
 if (
 strength >= 35 &&
@@ -1437,10 +1526,8 @@ defensivePhase
 return true;
 }
 
-
 return false;
 }
-
 
 /* =====================================================
 FLOW SIZER
@@ -1456,16 +1543,13 @@ clamp(
 num(candidate?.strength)
 );
 
-
 const state =
 candidate?.state ??
 "NEUTRAL";
 
-
 const direction =
 candidate?.direction ??
 "NONE";
-
 
 /* ===================================================
 ELIGIBILITY
@@ -1474,20 +1558,19 @@ ELIGIBILITY
 let eligible =
 strength >= 20;
 
-
-if (direction === "NONE")
+if (
+direction === "NONE"
+) {
 eligible = false;
-
+}
 
 /*
-IMPORTANT V4:
-
-Defensive PUT uses dedicated eligibility.
-
-It is not blocked by generic WAIT rules.
+Defensive PUT has dedicated eligibility.
 */
 
-if (flow === "NASDAQ_PUT") {
+if (
+flow === "NASDAQ_PUT"
+) {
 
 eligible =
 isDefensivePutEligible(
@@ -1497,52 +1580,55 @@ direction
 
 } else {
 
-/*
-Long flows retain stronger execution discipline.
-*/
-
 if (
 executionMode === "WAIT" &&
 strength < 65
 ) {
+
 eligible = false;
 }
 }
-
 
 /*
-Directional conflict is NOT a hard block.
+V5 CRISIS RULE
 
-Independent flows remain independent.
+Crisis blocks bullish LONG flows.
+
+It does NOT automatically block
+structurally confirmed defensive PUTs.
 */
 
-
 if (
-riskState === "CRISIS"
+riskState === "CRISIS" &&
+flow !== "NASDAQ_PUT"
 ) {
+
 eligible = false;
 }
 
+/*
+New PUTs are blocked in capitulation.
+*/
 
 if (
 phase === "PHASE_7_CAPITULATION"
 ) {
+
 eligible = false;
 }
-
 
 if (!eligible) {
 
 let reason =
 "Trade strength below entry threshold";
 
-
-if (direction === "NONE") {
+if (
+direction === "NONE"
+) {
 
 reason =
 "No valid trade direction";
 }
-
 
 if (
 flow === "NASDAQ_PUT"
@@ -1551,7 +1637,6 @@ flow === "NASDAQ_PUT"
 reason =
 "Defensive PUT lacks sufficient structural confirmation";
 }
-
 
 if (
 flow !== "NASDAQ_PUT" &&
@@ -1563,13 +1648,14 @@ reason =
 "Execution WAIT with insufficient strength";
 }
 
-
-if (riskState === "CRISIS") {
+if (
+riskState === "CRISIS" &&
+flow !== "NASDAQ_PUT"
+) {
 
 reason =
-"Crisis regime";
+"Crisis regime blocks bullish exposure";
 }
-
 
 if (
 phase === "PHASE_7_CAPITULATION"
@@ -1579,11 +1665,9 @@ reason =
 "Capitulation regime";
 }
 
-
 return {
 
 instrument: flow,
-
 direction,
 
 eligible: false,
@@ -1593,19 +1677,15 @@ rawSize: 0,
 prePortfolioSize: 0,
 
 strength,
-
 confidence: 0,
-
 riskMultiplier: 0,
 
 mode: "NO_TRADE",
 
 state,
-
 reason
 };
 }
-
 
 /* ===================================================
 CONFIDENCE
@@ -1617,7 +1697,6 @@ flow,
 strength
 );
 
-
 /* ===================================================
 EDGE
 =================================================== */
@@ -1628,7 +1707,6 @@ flow,
 strength
 );
 
-
 /* ===================================================
 RISK
 =================================================== */
@@ -1637,7 +1715,6 @@ const riskMultiplier =
 calculateFlowRiskMultiplier(
 flow
 );
-
 
 /* ===================================================
 RAW SIZE
@@ -1650,31 +1727,25 @@ let rawSize =
 0.62
 );
 
-
 rawSize *=
 0.70 +
 (
 confidence / 100
 ) * 0.45;
 
-
 rawSize +=
 flowEdge * 1.25;
-
 
 rawSize *=
 riskMultiplier;
 
-
 /* ===================================================
-FLOW SAFETY
+NASDAQ CALL SAFETY
 =================================================== */
 
-/* ---------------------------------------------------
-NASDAQ CALL
---------------------------------------------------- */
-
-if (flow === "NASDAQ_CALL") {
+if (
+flow === "NASDAQ_CALL"
+) {
 
 if (participationFailure)
 rawSize *= 0.60;
@@ -1689,12 +1760,13 @@ if (highFragility)
 rawSize *= 0.70;
 }
 
+/* ===================================================
+RUSSELL CALL SAFETY
+=================================================== */
 
-/* ---------------------------------------------------
-RUSSELL CALL
---------------------------------------------------- */
-
-if (flow === "RUSSELL_CALL") {
+if (
+flow === "RUSSELL_CALL"
+) {
 
 if (
 rotationConfidence < 55
@@ -1702,40 +1774,32 @@ rotationConfidence < 55
 rawSize *= 0.55;
 }
 
-
 if (
 rotationDecayScore >= 70
 ) {
 rawSize *= 0.50;
 }
 
-
 if (falseBreakRisk())
 rawSize *= 0.60;
 }
 
+/* ===================================================
+NASDAQ PUT SAFETY
+=================================================== */
 
-/* ---------------------------------------------------
-NASDAQ PUT
---------------------------------------------------- */
-
-if (flow === "NASDAQ_PUT") {
+if (
+flow === "NASDAQ_PUT"
+) {
 
 const bullishImpulse =
 priceMomentum?.bullishImpulse === true;
-
 
 const ndxPriceScore =
 nullableNum(
 priceMomentum?.ndx?.score ??
 priceMomentum?.score
 );
-
-
-/*
-Strong bullish impulse reduces PUT sizing,
-but does not invalidate a structural defensive trade.
-*/
 
 if (
 bullishImpulse &&
@@ -1745,12 +1809,6 @@ ndxPriceScore >= 70
 rawSize *= 0.72;
 }
 
-
-/*
-Extremely weak momentum can mean the move is already
-extended and should not be chased aggressively.
-*/
-
 if (
 ndxPriceScore !== null &&
 ndxPriceScore <= 25
@@ -1758,19 +1816,18 @@ ndxPriceScore <= 25
 rawSize *= 0.80;
 }
 
-
-/*
-Structural confirmation supports the defensive trade.
-*/
-
-if (defensiveStructuralConfirmed)
+if (
+defensiveStructuralConfirmed
+) {
 rawSize *= 1.08;
-
-
-if (strongDefensiveStructuralConfirmed)
-rawSize *= 1.10;
 }
 
+if (
+strongDefensiveStructuralConfirmed
+) {
+rawSize *= 1.10;
+}
+}
 
 /* ===================================================
 MAX FLOW SIZE
@@ -1778,7 +1835,6 @@ MAX FLOW SIZE
 
 let maxFlowSize =
 BASE_SIZE;
-
 
 if (
 strength >= 75 &&
@@ -1798,11 +1854,8 @@ maxFlowSize = 32;
 maxFlowSize = 22;
 }
 
-
 /*
-Structural weakness caps bullish LONG exposure.
-
-It does NOT automatically cap defensive NASDAQ PUTs.
+Long flow caps.
 */
 
 if (
@@ -1835,8 +1888,9 @@ maxFlowSize,
 );
 }
 
-
-if (chronicWeakness) {
+if (
+chronicWeakness
+) {
 
 maxFlowSize =
 Math.min(
@@ -1846,9 +1900,8 @@ maxFlowSize,
 }
 }
 
-
 /*
-Defensive PUT has its own structural ceiling.
+Defensive PUT structural ceiling.
 */
 
 if (
@@ -1862,26 +1915,38 @@ confidence >= 70
 ) {
 
 maxFlowSize = 45;
-}
 
-else if (
+} else if (
 defensivePhase &&
 strength >= 55 &&
 confidence >= 60
 ) {
 
 maxFlowSize = 35;
-}
 
-else if (
+} else if (
 defensiveStructuralConfirmed &&
 strength >= 45
 ) {
 
 maxFlowSize = 25;
 }
-}
 
+/*
+Crisis keeps PUT defensive.
+*/
+
+if (
+riskState === "CRISIS"
+) {
+
+maxFlowSize =
+Math.min(
+maxFlowSize,
+20
+);
+}
+}
 
 if (
 direction === "LONG" &&
@@ -1895,7 +1960,6 @@ maxFlowSize,
 );
 }
 
-
 if (
 flow === "RUSSELL_CALL" &&
 rotationConfidence < 75
@@ -1908,13 +1972,11 @@ maxFlowSize,
 );
 }
 
-
 rawSize =
 Math.min(
 rawSize,
 maxFlowSize
 );
-
 
 /* ===================================================
 STARTER LOGIC
@@ -1923,7 +1985,6 @@ STARTER LOGIC
 const earlyStarterState =
 state === "EARLY_DEFENSIVE_SHORT" ||
 state === "EARLY_LONG";
-
 
 if (
 earlyStarterState
@@ -1936,19 +1997,8 @@ rawSize,
 );
 }
 
-
 /*
-V4 DEFENSIVE PUT STARTER FLOOR
-
-This is specifically designed for the situation:
-
-- NASDAQ PUT candidate exists
-- Strength is moderate, e.g. 45-59
-- Defensive structural environment confirmed
-- Execution is WAIT / early timing
-
-Result should be SMALL STARTER,
-not 0%.
+Defensive PUT starter floor.
 */
 
 if (
@@ -1963,7 +2013,6 @@ strongDefensiveStructuralConfirmed
 ? 12
 : 8;
 
-
 rawSize =
 Math.max(
 rawSize,
@@ -1971,10 +2020,8 @@ starterFloor
 );
 }
 
-
 /*
-Stronger defensive candidate receives a larger minimum
-if structure confirms it.
+Stronger structural PUT.
 */
 
 if (
@@ -1990,6 +2037,28 @@ rawSize,
 );
 }
 
+/*
+Crisis starter floor.
+
+Important:
+confirmed defensive hedge should not
+collapse to zero merely because the
+execution layer labels the environment CRISIS.
+*/
+
+if (
+flow === "NASDAQ_PUT" &&
+riskState === "CRISIS" &&
+strongDefensiveStructuralConfirmed &&
+strength >= 45
+) {
+
+rawSize =
+Math.max(
+rawSize,
+10
+);
+}
 
 /* ===================================================
 FINAL INDIVIDUAL SIZE
@@ -2000,10 +2069,8 @@ clamp(
 Math.round(rawSize)
 );
 
-
 let mode =
 "MODERATE";
-
 
 if (size >= 35)
 mode = "AGGRESSIVE";
@@ -2014,20 +2081,14 @@ mode = "STARTER";
 else if (size < 25)
 mode = "DEFENSIVE";
 
-
-/*
-Capital preservation applies primarily to bullish flows.
-
-Defensive PUT remains a valid hedge.
-*/
-
 if (
 flow !== "NASDAQ_PUT" &&
 (
 severeMarketQuality ||
 extremeFragility ||
 chronicWeakness ||
-riskState === "BREAKDOWN"
+riskState === "BREAKDOWN" ||
+riskState === "CRISIS"
 )
 ) {
 
@@ -2036,11 +2097,6 @@ size > 0
 ? "CAPITAL_PRESERVATION"
 : "NO_TRADE";
 }
-
-
-/*
-Defensive PUT should communicate its role.
-*/
 
 if (
 flow === "NASDAQ_PUT" &&
@@ -2058,11 +2114,9 @@ else if (size < 25)
 mode = "DEFENSIVE_BUILD";
 }
 
-
 return {
 
 instrument: flow,
-
 direction,
 
 eligible: true,
@@ -2076,7 +2130,6 @@ prePortfolioSize:
 size,
 
 strength,
-
 confidence,
 
 riskMultiplier:
@@ -2095,7 +2148,6 @@ candidate?.reason ??
 };
 }
 
-
 /* =====================================================
 INDIVIDUAL FLOWS
 ===================================================== */
@@ -2106,13 +2158,11 @@ sizeFlow(
 nasdaqPut
 );
 
-
 const sizedNasdaqCall =
 sizeFlow(
 "NASDAQ_CALL",
 nasdaqCall
 );
-
 
 const sizedRussellCall =
 sizeFlow(
@@ -2120,14 +2170,8 @@ sizeFlow(
 russellCall
 );
 
-
 /* =====================================================
 PORTFOLIO CONFLICT CHECK
-
-Individual flows remain independent.
-
-Portfolio layer determines whether simultaneous
-opposite exposure is allowed.
 ===================================================== */
 
 const individualFlows = [
@@ -2136,7 +2180,6 @@ sizedNasdaqCall,
 sizedRussellCall
 ];
 
-
 const activeBeforePortfolio =
 individualFlows.filter(
 flow =>
@@ -2144,13 +2187,11 @@ flow.eligible &&
 flow.size > 0
 );
 
-
 const hasShortCandidate =
 activeBeforePortfolio.some(
 flow =>
 flow.direction === "SHORT"
 );
-
 
 const hasLongCandidate =
 activeBeforePortfolio.some(
@@ -2158,18 +2199,15 @@ flow =>
 flow.direction === "LONG"
 );
 
-
 const portfolioDirectionalConflict =
 hasShortCandidate &&
 hasLongCandidate;
-
 
 /* =====================================================
 PORTFOLIO CAP
 ===================================================== */
 
 let portfolioCap = 60;
-
 
 if (
 marketQualityScore >= 70 &&
@@ -2183,8 +2221,9 @@ dangerScore < 35 &&
 portfolioCap = 75;
 }
 
-
-if (defensivePhase) {
+if (
+defensivePhase
+) {
 
 portfolioCap =
 Math.min(
@@ -2192,7 +2231,6 @@ portfolioCap,
 60
 );
 }
-
 
 if (
 distributionPhase
@@ -2205,11 +2243,6 @@ portfolioCap,
 );
 }
 
-
-/*
-Mixed exposure is allowed but receives a reduced cap.
-*/
-
 if (
 portfolioDirectionalConflict
 ) {
@@ -2220,13 +2253,6 @@ portfolioCap,
 50
 );
 }
-
-
-/*
-Severe structural weakness reduces total portfolio exposure.
-
-This is still compatible with a defensive PUT.
-*/
 
 if (
 severeMarketQuality ||
@@ -2241,7 +2267,6 @@ portfolioCap,
 );
 }
 
-
 if (
 riskState === "BREAKDOWN"
 ) {
@@ -2253,14 +2278,26 @@ portfolioCap,
 );
 }
 
+/*
+V5 IMPORTANT
+
+Crisis does NOT mean portfolioCap = 0.
+
+It means severely restricted exposure.
+
+A defensive hedge must remain possible.
+*/
 
 if (
 riskState === "CRISIS"
 ) {
 
-portfolioCap = 0;
+portfolioCap =
+Math.min(
+portfolioCap,
+25
+);
 }
-
 
 /* =====================================================
 RAW PORTFOLIO SIZE
@@ -2273,7 +2310,6 @@ total + flow.size,
 0
 );
 
-
 const portfolioScale =
 rawPortfolioSize > portfolioCap &&
 rawPortfolioSize > 0
@@ -2283,7 +2319,6 @@ rawPortfolioSize
 
 : 1;
 
-
 /* =====================================================
 PORTFOLIO ALLOCATION
 ===================================================== */
@@ -2292,10 +2327,6 @@ function applyPortfolioLayer(
 flow: SizedFlow
 ): SizedFlow {
 
-/*
-Ineligible flows remain zero.
-*/
-
 if (
 !flow.eligible ||
 flow.size <= 0
@@ -2303,16 +2334,15 @@ flow.size <= 0
 
 return {
 ...flow,
-prePortfolioSize: flow.size,
+prePortfolioSize:
+flow.size,
 size: 0
 };
 }
 
-
 const scaledSize =
 flow.size *
 portfolioScale;
-
 
 return {
 
@@ -2328,31 +2358,26 @@ scaledSize
 };
 }
 
-
 let finalNasdaqPut =
 applyPortfolioLayer(
 sizedNasdaqPut
 );
-
 
 let finalNasdaqCall =
 applyPortfolioLayer(
 sizedNasdaqCall
 );
 
-
 let finalRussellCall =
 applyPortfolioLayer(
 sizedRussellCall
 );
-
 
 let finalFlows = [
 finalNasdaqPut,
 finalNasdaqCall,
 finalRussellCall
 ];
-
 
 /* =====================================================
 LARGEST REMAINDER ALLOCATION
@@ -2365,23 +2390,24 @@ total + flow.size,
 0
 );
 
-
 let remaining =
 Math.max(
 0,
 Math.floor(
-portfolioCap - currentTotal
+portfolioCap -
+currentTotal
 )
 );
-
 
 if (
 portfolioScale < 1 &&
 remaining > 0
 ) {
 
-const ranked = individualFlows
-.map((flow, index) => {
+const ranked =
+individualFlows
+.map(
+(flow, index) => {
 
 const exact =
 flow.size *
@@ -2399,9 +2425,11 @@ eligible:
 flow.eligible &&
 flow.size > 0
 };
-})
+}
+)
 .filter(
-item => item.eligible
+item =>
+item.eligible
 )
 .sort(
 (a, b) =>
@@ -2409,9 +2437,7 @@ b.remainder -
 a.remainder
 );
 
-
 let cursor = 0;
-
 
 while (
 remaining > 0 &&
@@ -2420,13 +2446,9 @@ ranked.length > 0
 
 const item =
 ranked[
-cursor % ranked.length
+cursor %
+ranked.length
 ];
-
-
-/*
-Never exceed portfolio cap.
-*/
 
 const projectedTotal =
 finalFlows.reduce(
@@ -2435,22 +2457,21 @@ total + flow.size,
 0
 );
 
-
 if (
-projectedTotal >= portfolioCap
+projectedTotal >=
+portfolioCap
 ) {
 break;
 }
-
 
 finalFlows[item.index] = {
 
 ...finalFlows[item.index],
 
 size:
-finalFlows[item.index].size + 1
+finalFlows[item.index]
+.size + 1
 };
-
 
 remaining--;
 
@@ -2458,13 +2479,11 @@ cursor++;
 }
 }
 
-
 [
 finalNasdaqPut,
 finalNasdaqCall,
 finalRussellCall
 ] = finalFlows;
-
 
 /* =====================================================
 FINAL FLOWS
@@ -2476,14 +2495,12 @@ flow =>
 flow.size > 0
 );
 
-
 const totalSize =
 finalFlows.reduce(
 (total, flow) =>
 total + flow.size,
 0
 );
-
 
 /* =====================================================
 PORTFOLIO DIRECTION
@@ -2495,13 +2512,11 @@ flow =>
 flow.direction === "LONG"
 );
 
-
 const hasShort =
 activeFinalFlows.some(
 flow =>
 flow.direction === "SHORT"
 );
-
 
 let direction:
 | "LONG"
@@ -2509,7 +2524,6 @@ let direction:
 | "MIXED"
 | "NEUTRAL" =
 "NEUTRAL";
-
 
 if (hasLong && hasShort)
 direction = "MIXED";
@@ -2520,14 +2534,12 @@ direction = "LONG";
 else if (hasShort)
 direction = "SHORT";
 
-
 /* =====================================================
 PORTFOLIO MODE
 ===================================================== */
 
 let mode =
 "NO_TRADE";
-
 
 if (totalSize >= 55)
 mode = "AGGRESSIVE";
@@ -2537,7 +2549,6 @@ mode = "MODERATE";
 
 else if (totalSize > 0)
 mode = "DEFENSIVE";
-
 
 if (
 totalSize > 0 &&
@@ -2552,10 +2563,8 @@ mode =
 "CAPITAL_PRESERVATION";
 }
 
-
 /*
-If the portfolio consists only of a defensive PUT,
-communicate that explicitly.
+Single defensive PUT.
 */
 
 if (
@@ -2563,20 +2572,25 @@ activeFinalFlows.length === 1 &&
 finalNasdaqPut.size > 0
 ) {
 
-if (finalNasdaqPut.size < 15)
-mode = "DEFENSIVE_STARTER";
+if (
+finalNasdaqPut.size < 15
+) {
 
-else
-mode = "DEFENSIVE_PUT_BUILD";
+mode =
+"DEFENSIVE_STARTER";
+
+} else {
+
+mode =
+"DEFENSIVE_PUT_BUILD";
 }
-
+}
 
 const activeInstruments =
 activeFinalFlows.map(
 flow =>
 flow.instrument
 );
-
 
 /* =====================================================
 PIPELINE
@@ -2641,7 +2655,6 @@ defensiveStructuralConfirmed,
 strongDefensiveStructuralConfirmed
 };
 
-
 /* =====================================================
 FLOW PIPELINE
 ===================================================== */
@@ -2690,7 +2703,6 @@ flow.reason
 };
 }
 
-
 const flowPipeline = {
 
 nasdaqPut:
@@ -2709,7 +2721,6 @@ finalRussellCall
 )
 };
 
-
 /* =====================================================
 RETURN
 ===================================================== */
@@ -2727,13 +2738,8 @@ direction,
 
 mode,
 
-
 /* ===================================================
 PRIMARY COMPATIBILITY
-
-Primary is presentation compatibility only.
-
-It does NOT control or overwrite independent flows.
 =================================================== */
 
 primary:
@@ -2744,11 +2750,11 @@ activeFinalFlows.length > 0
 .slice()
 .sort(
 (a, b) =>
-b.size - a.size
+b.size -
+a.size
 )[0]
 
 : null,
-
 
 /* ===================================================
 FLOWS
@@ -2770,7 +2776,6 @@ activeFlows:
 activeFinalFlows,
 
 activeInstruments,
-
 
 /* ===================================================
 PORTFOLIO
@@ -2803,7 +2808,6 @@ portfolioDirectionalConflict,
 
 tradeStackDirectionalConflict
 },
-
 
 /* ===================================================
 RISK
@@ -2856,11 +2860,8 @@ defensiveStructuralConfirmed,
 strongDefensiveStructuralConfirmed
 },
 
-
 /* ===================================================
 COMPONENTS
-
-Compatibility layer
 =================================================== */
 
 components: {
@@ -2944,7 +2945,6 @@ defensiveStructuralConfirmed,
 strongDefensiveStructuralConfirmed
 },
 
-
 /* ===================================================
 PIPELINE
 =================================================== */
@@ -2952,7 +2952,6 @@ PIPELINE
 pipeline,
 
 flowPipeline,
-
 
 /* ===================================================
 META
@@ -2976,20 +2975,9 @@ riskState,
 
 tacticalBias,
 
-
-/*
-V4 distinction:
-
-TradeStack conflict is informational.
-
-Portfolio conflict reflects actual simultaneous
-active exposure.
-*/
-
 tradeStackDirectionalConflict,
 
 portfolioDirectionalConflict,
-
 
 persistentWeakness,
 
