@@ -7,6 +7,10 @@ engine,
 map: any;
 engine: any;
 }) {
+/* =====================================================
+BASE OBJECTS
+===================================================== */
+
 const structure = engine.structure ?? {};
 const breadth = structure.breadth ?? {};
 const highsLows = structure.highsLows ?? {};
@@ -43,8 +47,62 @@ const edgeState = engine.edgeState ?? {};
 const signal = engine.signal ?? {};
 const superSignal = engine.superSignal ?? {};
 
+/*
+=========================================================
+POSITION SIZING
+
+Supports multiple possible engine property names.
+
+Primary expected property:
+
+engine.positionSizing
+
+Compatibility fallbacks:
+
+engine.positionSizingV2
+engine.positionSize
+=========================================================
+*/
+
+const positionSizing =
+engine.positionSizing ??
+engine.positionSizingV2 ??
+engine.positionSize ??
+{};
+
+
+/* =====================================================
+HELPER
+
+Structure values may exist either as:
+
+value
+
+OR
+
+{ value }
+===================================================== */
+
+function extractValue(value: any) {
+if (
+value !== null &&
+typeof value === "object" &&
+"value" in value
+) {
+return value.value;
+}
+
+return value;
+}
+
+
+/* =====================================================
+RETURN SNAPSHOT
+===================================================== */
+
 return {
 timestamp: new Date().toISOString(),
+
 
 /* =====================================================
 MARKET REGIME
@@ -52,59 +110,116 @@ MARKET REGIME
 
 phase: {
 phase: engine.phase,
-regimeState: phase.regimeState,
-subPhase: phase.subPhase,
-confidence: phase.confidence,
+
+regimeState:
+phase.regimeState,
+
+subPhase:
+phase.subPhase,
+
+confidence:
+phase.confidence,
 },
+
 
 /* =====================================================
 MASTER / CENTRAL DECISION
 ===================================================== */
 
 master: {
-score: master.score,
-mode: master.mode,
-regime: master.regime,
-netExposure: master.netExposure,
+score:
+master.score,
 
-components: master.components
+mode:
+master.mode,
+
+regime:
+master.regime,
+
+netExposure:
+master.netExposure,
+
+components:
+
+master.components
+
 ? {
-crash: master.components.crash,
-rotation: master.components.rotation,
-timing: master.components.timing,
-russell: master.components.russell,
-participation: master.components.participation,
-breadthThrust: master.components.breadthThrust,
-breadthVelocity: master.components.breadthVelocity,
-rotationDecay: master.components.rotationDecay,
-liquidity: master.components.liquidity,
-marketQuality: master.components.marketQuality,
-fragility: master.components.fragility,
+crash:
+master.components.crash,
+
+rotation:
+master.components.rotation,
+
+timing:
+master.components.timing,
+
+russell:
+master.components.russell,
+
+participation:
+master.components.participation,
+
+breadthThrust:
+master.components.breadthThrust,
+
+breadthVelocity:
+master.components.breadthVelocity,
+
+rotationDecay:
+master.components.rotationDecay,
+
+liquidity:
+master.components.liquidity,
+
+marketQuality:
+master.components.marketQuality,
+
+fragility:
+master.components.fragility,
 }
+
 : undefined,
 },
+
 
 /* =====================================================
 CRASH / RISK
 ===================================================== */
 
 crash: {
-score: crash.score,
-probability: crash.probability,
-label: crash.label,
-eventType: crash.eventType,
+score:
+crash.score,
+
+probability:
+crash.probability,
+
+label:
+crash.label,
+
+eventType:
+crash.eventType,
 
 structuralFragility:
+
 crash.structuralFragility
+
 ? {
-score: crash.structuralFragility.score,
-state: crash.structuralFragility.state,
+score:
+crash.structuralFragility.score,
+
+state:
+crash.structuralFragility.state,
 }
+
 : undefined,
 
-trigger: crash.trigger,
-momentum: crash.momentum,
+trigger:
+crash.trigger,
+
+momentum:
+crash.momentum,
 },
+
 
 /* =====================================================
 MARKET STRUCTURE / BREADTH
@@ -112,37 +227,62 @@ MARKET STRUCTURE / BREADTH
 
 structure: {
 breadth: {
-b20: breadth.b20?.value,
-b50: breadth.b50?.value,
-b200: breadth.b200?.value,
+b20:
+extractValue(breadth.b20),
+
+b50:
+extractValue(breadth.b50),
+
+b200:
+extractValue(breadth.b200),
 },
 
-health: structure.health?.value,
+health:
+extractValue(structure.health),
 
 advanceDecline:
-structure.advanceDecline?.value,
+extractValue(
+structure.advanceDecline
+),
 
 highsLows: {
-highs: highsLows.highs,
-lows: highsLows.lows,
+highs:
+extractValue(highsLows.highs),
+
+lows:
+extractValue(highsLows.lows),
 },
 
-marketStructure: structure.marketStructure,
+marketStructure:
+structure.marketStructure,
 },
+
 
 /* =====================================================
 ROTATION
 ===================================================== */
 
 rotation: {
-score: rotation.score,
-signal: rotation.signal,
-regime: rotation.regime,
-state: rotation.state,
+score:
+rotation.score,
 
-rsSmall: rotation.rsSmall,
-rsGrowth: rotation.rsGrowth,
-rsEqual: rotation.rsEqual,
+signal:
+rotation.signal,
+
+regime:
+rotation.regime,
+
+state:
+rotation.state,
+
+rsSmall:
+rotation.rsSmall,
+
+rsGrowth:
+rotation.rsGrowth,
+
+rsEqual:
+rotation.rsEqual,
 
 smallCapLeadership:
 rotation.smallCapLeadership,
@@ -151,30 +291,56 @@ growthLeadership:
 rotation.growthLeadership,
 },
 
+
 rotationDecay: {
-score: rotationDecay.score,
-state: rotationDecay.state,
-trend: rotationDecay.trend,
-persistence: rotationDecay.persistence,
-exhaustion: rotationDecay.exhaustion,
+score:
+rotationDecay.score,
+
+state:
+rotationDecay.state,
+
+trend:
+rotationDecay.trend,
+
+persistence:
+rotationDecay.persistence,
+
+exhaustion:
+rotationDecay.exhaustion,
 },
 
+
 rotationConfirm: {
-state: rotationConfirm.state,
-score: rotationConfirm.score,
+state:
+rotationConfirm.state,
+
+score:
+rotationConfirm.score,
+
+confidence:
+rotationConfirm.confidence,
+
 liquiditySupport:
 rotationConfirm.liquiditySupport,
+
 rotationDecayScore:
 rotationConfirm.rotationDecayScore,
+
+falseBreakRisk:
+rotationConfirm.falseBreakRisk,
 },
+
 
 /* =====================================================
 PARTICIPATION
 ===================================================== */
 
 participation: {
-score: participation.score,
-state: participation.state,
+score:
+participation.score,
+
+state:
+participation.state,
 
 breadth:
 participation.breadth,
@@ -189,57 +355,94 @@ participationFailure:
 participation.participationFailure,
 },
 
+
 breadthThrust: {
-score: breadthThrust.score,
-state: breadthThrust.state,
-signal: breadthThrust.signal,
+score:
+breadthThrust.score,
+
+state:
+breadthThrust.state,
+
+signal:
+breadthThrust.signal,
 },
+
 
 /* =====================================================
 LIQUIDITY / FRAGILITY
 ===================================================== */
 
 liquidity: {
-score: liquidity.score,
-state: liquidity.state,
-trend: liquidity.trend,
+score:
+liquidity.score,
+
+state:
+liquidity.state,
+
+trend:
+liquidity.trend,
 },
+
 
 fragility: {
-score: fragility.score,
-state: fragility.state,
-trend: fragility.trend,
+score:
+fragility.score,
+
+state:
+fragility.state,
+
+trend:
+fragility.trend,
 },
 
+
 marketQuality: {
-score: marketQuality.score,
-state: marketQuality.state,
-trend: marketQuality.trend,
+score:
+marketQuality.score,
+
+state:
+marketQuality.state,
+
+trend:
+marketQuality.trend,
 },
+
 
 /* =====================================================
 EARLY WARNING
 ===================================================== */
 
 earlyWarning: {
-active: earlyWarning.active,
+active:
+earlyWarning.active,
 
 score:
-typeof earlyWarning.score === "object"
+
+typeof earlyWarning.score ===
+"object"
+
 ? earlyWarning.score?.value
+
 : earlyWarning.score,
 
-state: earlyWarning.state,
-reasons: earlyWarning.reasons,
+state:
+earlyWarning.state,
+
+reasons:
+earlyWarning.reasons,
 },
+
 
 /* =====================================================
 REGIME PERSISTENCE
 ===================================================== */
 
 regimePersistence: {
-score: persistence.score,
-state: persistence.state,
+score:
+persistence.score,
+
+state:
+persistence.state,
 
 bearishPersistence:
 persistence.bearishPersistence,
@@ -269,6 +472,7 @@ marketFatigue:
 persistence.marketFatigue,
 },
 
+
 /* =====================================================
 PRICE MOMENTUM
 ===================================================== */
@@ -287,26 +491,40 @@ bearishImpulse:
 priceMomentum.bearishImpulse,
 
 ndx:
+
 priceMomentum.ndx
+
 ? {
-score: priceMomentum.ndx.score,
+score:
+priceMomentum.ndx.score,
+
 acceleration:
 priceMomentum.ndx.acceleration,
+
 direction:
 priceMomentum.ndx.direction,
 }
+
 : undefined,
 },
+
 
 /* =====================================================
 NASDAQ / PUT / CALL
 ===================================================== */
 
 putTiming: {
-decision: putTiming.decision,
-timing: putTiming.timing,
-execution: putTiming.execution,
-score: putTiming.score,
+decision:
+putTiming.decision,
+
+timing:
+putTiming.timing,
+
+execution:
+putTiming.execution,
+
+score:
+putTiming.score,
 
 institutionState:
 putTiming.institutionState,
@@ -315,53 +533,113 @@ reason:
 putTiming.reason,
 },
 
+
 nasdaqCall: {
-decision: nasdaqCall.decision,
-signal: nasdaqCall.signal,
-score: nasdaqCall.score,
-timing: nasdaqCall.timing,
-state: nasdaqCall.state,
+decision:
+nasdaqCall.decision,
+
+signal:
+nasdaqCall.signal,
+
+score:
+nasdaqCall.score,
+
+timing:
+nasdaqCall.timing,
+
+state:
+nasdaqCall.state,
 },
 
+
 russell: {
-action: russell.action,
-decision: russell.decision,
-score: russell.score,
-signal: russell.signal,
-state: russell.state,
-regime: russell.regime,
+action:
+russell.action,
+
+decision:
+russell.decision,
+
+score:
+russell.score,
+
+signal:
+russell.signal,
+
+state:
+russell.state,
+
+regime:
+russell.regime,
 },
+
 
 /* =====================================================
 REGIME SYNC / EXECUTION
 ===================================================== */
 
 regimeSync: {
-score: regimeSync.score,
-state: regimeSync.state,
-signal: regimeSync.signal,
-transition: regimeSync.transition,
+score:
+regimeSync.score,
+
+state:
+regimeSync.state,
+
+signal:
+regimeSync.signal,
+
+transition:
+regimeSync.transition,
 },
+
 
 executionState: {
-state: executionState.state,
-signal: executionState.signal,
-score: executionState.score,
+state:
+executionState.state,
+
+signal:
+executionState.signal,
+
+score:
+executionState.score,
+
+executionMode:
+executionState.executionMode ??
+executionState.mode,
+
+riskState:
+executionState.riskState,
+
+tacticalBias:
+executionState.tacticalBias,
 },
 
+
 dangerZone: {
-score: dangerZone.score,
-state: dangerZone.state,
-level: dangerZone.level,
+score:
+dangerZone.score,
+
+state:
+dangerZone.state,
+
+level:
+dangerZone.level,
 },
+
 
 /* =====================================================
 TRADE STACK
 ===================================================== */
 
 tradeStack: {
-decision: tradeStack.decision,
-state: tradeStack.state,
+decision:
+tradeStack.decision,
+
+state:
+tradeStack.state,
+
+directionalConflict:
+tradeStack.directionalConflict ??
+tradeStack.meta?.directionalConflict,
 
 nasdaqPut:
 tradeStack.nasdaqPut,
@@ -373,34 +651,194 @@ russellCall:
 tradeStack.russellCall,
 },
 
+
+/* =====================================================
+POSITION SIZING
+===================================================== */
+
+positionSizing: {
+
+/* -------------------------------------------------
+GLOBAL
+------------------------------------------------- */
+
+size:
+positionSizing.size,
+
+direction:
+positionSizing.direction,
+
+mode:
+positionSizing.mode,
+
+activeInstruments:
+positionSizing.activeInstruments,
+
+
+/* -------------------------------------------------
+PRIMARY
+------------------------------------------------- */
+
+primary:
+positionSizing.primary,
+
+
+/* -------------------------------------------------
+INDIVIDUAL FLOWS
+------------------------------------------------- */
+
+nasdaqPut:
+positionSizing.nasdaqPut,
+
+nasdaqCall:
+positionSizing.nasdaqCall,
+
+russellCall:
+positionSizing.russellCall,
+
+
+/* -------------------------------------------------
+FLOW ARRAYS
+------------------------------------------------- */
+
+flows:
+positionSizing.flows,
+
+activeFlows:
+positionSizing.activeFlows,
+
+
+/* -------------------------------------------------
+PORTFOLIO
+------------------------------------------------- */
+
+portfolio:
+
+positionSizing.portfolio
+
+? {
+totalSize:
+positionSizing.portfolio.totalSize,
+
+rawSize:
+positionSizing.portfolio.rawSize,
+
+cap:
+positionSizing.portfolio.cap,
+
+scale:
+positionSizing.portfolio.scale,
+
+activeFlows:
+positionSizing.portfolio.activeFlows,
+
+activeInstruments:
+positionSizing.portfolio.activeInstruments,
+
+direction:
+positionSizing.portfolio.direction,
+
+directionalConflict:
+positionSizing.portfolio.directionalConflict,
+}
+
+: undefined,
+
+
+/* -------------------------------------------------
+RISK
+------------------------------------------------- */
+
+risk:
+positionSizing.risk,
+
+
+/* -------------------------------------------------
+COMPONENTS
+------------------------------------------------- */
+
+components:
+positionSizing.components,
+
+
+/* -------------------------------------------------
+PIPELINE
+
+Important for debugging missing/null inputs.
+------------------------------------------------- */
+
+pipeline:
+positionSizing.pipeline,
+
+flowPipeline:
+positionSizing.flowPipeline,
+
+
+/* -------------------------------------------------
+META
+------------------------------------------------- */
+
+meta:
+positionSizing.meta,
+},
+
+
 /* =====================================================
 EDGE / SIGNAL
 ===================================================== */
 
 edgeState: {
-score: edgeState.score,
-state: edgeState.state,
-direction: edgeState.direction,
+score:
+edgeState.score,
+
+state:
+edgeState.state,
+
+direction:
+edgeState.direction,
 },
+
 
 signal: {
-active: signal.active,
-type: signal.type,
-direction: signal.direction,
-strength: signal.strength,
-score: signal.score,
+active:
+signal.active,
+
+type:
+signal.type,
+
+direction:
+signal.direction,
+
+strength:
+signal.strength,
+
+score:
+signal.score,
 },
+
 
 superSignal: {
-active: superSignal.active,
-signal: superSignal.signal,
-direction: superSignal.direction,
-score: superSignal.score,
-confidence: superSignal.confidence,
+active:
+superSignal.active,
+
+signal:
+superSignal.signal,
+
+direction:
+superSignal.direction,
+
+score:
+superSignal.score,
+
+confidence:
+superSignal.confidence,
 },
 
+
 /* =====================================================
-HISTORY — NUR DIE FÜR DIE REGIMEANALYSE WICHTIGEN WERTE
+HISTORY
+
+ONLY VALUES RELEVANT FOR REGIME ANALYSIS
 ===================================================== */
 
 historyMetrics: {
@@ -415,6 +853,9 @@ history.participationTrend,
 
 participationDecay:
 history.participationDecay,
+
+leadershipDecay:
+history.leadershipDecay,
 
 rotationTrend:
 history.rotationTrend,
@@ -433,6 +874,9 @@ history.crashTrend,
 
 phasePersistence:
 history.phasePersistence,
+
+regimePersistence:
+history.regimePersistence,
 
 daysInPhase:
 history.daysInPhase,
@@ -483,21 +927,34 @@ averageFragility:
 history.averageFragility,
 },
 
+
 /* =====================================================
-MACRO / DRIVERS — KOMPAKT
+MACRO / DRIVERS
 ===================================================== */
 
 marketDrivers: {
-score: engine.marketDrivers?.score,
-regime: engine.marketDrivers?.regime,
-state: engine.marketDrivers?.state,
+score:
+engine.marketDrivers?.score,
+
+regime:
+engine.marketDrivers?.regime,
+
+state:
+engine.marketDrivers?.state,
 },
 
+
 driversCore: {
-score: engine.driversCore?.score,
-regime: engine.driversCore?.regime,
-state: engine.driversCore?.state,
+score:
+engine.driversCore?.score,
+
+regime:
+engine.driversCore?.regime,
+
+state:
+engine.driversCore?.state,
 },
+
 
 /* =====================================================
 SYSTEM HEAT
@@ -513,6 +970,7 @@ engine.systemHeat?.value,
 state:
 engine.systemHeat?.state,
 },
+
 
 /* =====================================================
 INDICES
@@ -536,12 +994,26 @@ map.indices?.vix ??
 map.indices?.VIX,
 },
 
-futures: map.futures
+
+/* =====================================================
+FUTURES
+===================================================== */
+
+futures:
+
+map.futures
+
 ? {
-nasdaq: map.futures?.nasdaq,
-sp500: map.futures?.sp500,
-russell: map.futures?.russell,
+nasdaq:
+map.futures?.nasdaq,
+
+sp500:
+map.futures?.sp500,
+
+russell:
+map.futures?.russell,
 }
+
 : undefined,
 };
 }
