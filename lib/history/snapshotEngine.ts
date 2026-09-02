@@ -66,6 +66,7 @@ engine.positionSize
 
 const positionSizing =
 engine.positionSizing ??
+engine.sizing ??
 engine.positionSizingV2 ??
 engine.positionSize ??
 {};
