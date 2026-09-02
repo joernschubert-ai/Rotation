@@ -28,27 +28,59 @@ return Number.isFinite(n)
 }
 
 
+function isMissing(
+value: any
+): boolean {
+
+return (
+value === null ||
+value === undefined ||
+!Number.isFinite(Number(value))
+);
+}
+
+
 function displayNumber(
 value: any,
 decimals = 0,
 fallback = "—"
 ): string {
 
-if (
-value === null ||
-value === undefined
-) {
+if (isMissing(value)) {
 return fallback;
 }
 
 const n = Number(value);
 
-if (!Number.isFinite(n))
-return fallback;
-
 return decimals > 0
 ? n.toFixed(decimals)
 : String(Math.round(n));
+}
+
+
+function percent(
+value: any,
+decimals = 0
+): string {
+
+if (isMissing(value)) {
+return "—";
+}
+
+return `${displayNumber(value, decimals)}%`;
+}
+
+
+function multiplierPercent(
+value: any,
+decimals = 0
+): string {
+
+if (isMissing(value)) {
+return "—";
+}
+
+return `${displayNumber(num(value) * 100, decimals)}%`;
 }
 
 
@@ -77,29 +109,28 @@ function modeColor(
 value: string
 ) {
 
-switch (value) {
+const normalized =
+String(value ?? "").toUpperCase();
 
-case "AGGRESSIVE":
+if (normalized.includes("AGGRESSIVE"))
 return "#ff4d4f";
 
-case "MODERATE":
+if (normalized.includes("MODERATE"))
 return "#fa8c16";
 
-case "DEFENSIVE":
+if (normalized.includes("DEFENSIVE"))
 return "#fadb14";
 
-case "STARTER":
+if (normalized.includes("STARTER"))
 return "#69b1ff";
 
-case "CAPITAL_PRESERVATION":
+if (normalized.includes("CAPITAL"))
 return "#ff7875";
 
-case "NO_TRADE":
+if (normalized.includes("NO_TRADE"))
 return "#777";
 
-default:
 return "#aaa";
-}
 }
 
 
@@ -137,6 +168,47 @@ return "#ff4d4f";
 }
 
 
+function stateColor(
+value: string
+) {
+
+const state =
+String(value ?? "").toUpperCase();
+
+if (
+state.includes("CRISIS") ||
+state.includes("BREAKDOWN") ||
+state.includes("EXTREME")
+) {
+return "#ff4d4f";
+}
+
+if (
+state.includes("RISK") ||
+state.includes("WARNING") ||
+state.includes("STRESS")
+) {
+return "#fa8c16";
+}
+
+if (
+state.includes("DEFENSIVE") ||
+state.includes("SHORT")
+) {
+return "#fadb14";
+}
+
+if (
+state.includes("LONG") ||
+state.includes("EXPANSION")
+) {
+return "#52c41a";
+}
+
+return "#aaa";
+}
+
+
 function instrumentLabel(
 instrument: string
 ) {
@@ -153,7 +225,7 @@ case "RUSSELL_CALL":
 return "RUSSELL CALL";
 
 default:
-return instrument;
+return instrument || "UNKNOWN";
 }
 }
 
@@ -214,9 +286,7 @@ Array.isArray(sizing?.activeFlows)
 
 
 const activeInstruments =
-Array.isArray(
-sizing?.activeInstruments
-)
+Array.isArray(sizing?.activeInstruments)
 ? sizing.activeInstruments
 : [];
 
@@ -276,6 +346,79 @@ decisionDirection === direction;
 
 
 /* ===================================================
+STRUCTURAL CONFIRMATION
+=================================================== */
+
+const structuralConfirmationCount =
+num(
+risk?.defensiveStructuralConfirmationCount ??
+components?.defensiveStructuralConfirmationCount ??
+meta?.defensiveStructuralConfirmationCount
+);
+
+
+const defensiveConfirmed =
+risk?.defensiveStructuralConfirmed === true ||
+meta?.defensiveStructuralConfirmed === true;
+
+
+const strongDefensiveConfirmed =
+risk?.strongDefensiveStructuralConfirmed === true ||
+meta?.strongDefensiveStructuralConfirmed === true;
+
+
+/* ===================================================
+MARKET PRESSURE
+=================================================== */
+
+const fragilityScore =
+num(risk?.fragilityScore);
+
+const liquidityScore =
+num(risk?.liquidityScore);
+
+const qualityScore =
+num(risk?.marketQualityScore);
+
+const squeezeRisk =
+num(risk?.squeezeRisk);
+
+const crashProbability =
+num(risk?.crashProbability);
+
+const dangerScore =
+num(risk?.dangerScore);
+
+
+const defensiveEnvironment =
+executionMode === "DEFENSIVE" ||
+riskState === "CRISIS" ||
+tacticalBias === "SHORT_INDEX";
+
+
+const hasExtremeSqueeze =
+squeezeRisk >= 80;
+
+
+/* ===================================================
+DATA INTEGRITY
+=================================================== */
+
+const masterScore =
+num(components?.masterScore);
+
+const pipelineCrash =
+num(components?.crashScore);
+
+const pipelineRotation =
+num(components?.edgeScore);
+
+const hasDataConflict =
+Math.abs(masterScore - pipelineCrash) > 70 ||
+Math.abs(masterScore - pipelineRotation) > 70;
+
+
+/* ===================================================
 RENDER
 =================================================== */
 
@@ -288,7 +431,8 @@ border: "1px solid #222",
 padding: "clamp(10px, 2vw, 16px)",
 color: "#ddd",
 width: "100%",
-minWidth: 0
+minWidth: 0,
+overflow: "hidden"
 }}
 >
 
@@ -313,7 +457,8 @@ flexWrap: "wrap"
 style={{
 color: "#aaa",
 fontSize: "14px",
-fontWeight: "bold"
+fontWeight: "bold",
+letterSpacing: "0.4px"
 }}
 >
 POSITIONIERUNG
@@ -326,11 +471,19 @@ fontSize: "8px",
 marginTop: "3px"
 }}
 >
-POSITION SIZING V3
+POSITION SIZING V3 · PORTFOLIO EXECUTION LAYER
 </div>
 
 </div>
 
+
+<div
+style={{
+display: "flex",
+gap: "6px",
+flexWrap: "wrap"
+}}
+>
 
 <StatusBadge
 color={
@@ -344,6 +497,19 @@ aligned
 : "MISALIGNED"}
 </StatusBadge>
 
+
+{defensiveEnvironment && (
+
+<StatusBadge
+color="#fadb14"
+>
+DEFENSIVE
+</StatusBadge>
+
+)}
+
+</div>
+
 </div>
 
 
@@ -353,18 +519,43 @@ PORTFOLIO HERO
 
 <div
 style={{
-border: "1px solid #333",
-background: "#111",
-padding: "14px",
+border: `1px solid ${
+direction === "SHORT"
+? "#442020"
+: direction === "LONG"
+? "#1f4420"
+: "#333"
+}`,
+
+background:
+direction === "SHORT"
+? "#120d0d"
+: direction === "LONG"
+? "#0d120d"
+: "#111",
+
+padding: "clamp(11px, 2vw, 16px)",
 marginBottom: "14px"
 }}
 >
 
 <div
 style={{
+display: "flex",
+justifyContent: "space-between",
+alignItems: "flex-start",
+gap: "15px",
+flexWrap: "wrap"
+}}
+>
+
+<div>
+
+<div
+style={{
 color: "#666",
 fontSize: "8px",
-marginBottom: "8px"
+marginBottom: "7px"
 }}
 >
 PORTFOLIO POSITION
@@ -373,20 +564,10 @@ PORTFOLIO POSITION
 
 <div
 style={{
-display: "flex",
-justifyContent: "space-between",
-alignItems: "center",
-gap: "15px"
-}}
->
-
-<div>
-
-<div
-style={{
 color:
 directionColor(direction),
-fontSize: "20px",
+
+fontSize: "24px",
 fontWeight: "bold"
 }}
 >
@@ -398,10 +579,11 @@ fontWeight: "bold"
 style={{
 color: "#666",
 fontSize: "9px",
-marginTop: "4px"
+marginTop: "5px"
 }}
 >
-{activeFlows.length} ACTIVE FLOWS
+{activeFlows.length} ACTIVE FLOW
+{activeFlows.length !== 1 ? "S" : ""}
 </div>
 
 </div>
@@ -409,7 +591,8 @@ marginTop: "4px"
 
 <div
 style={{
-textAlign: "right"
+textAlign: "right",
+minWidth: "100px"
 }}
 >
 
@@ -423,7 +606,8 @@ totalSize,
 )
 : "#555",
 
-fontSize: "32px",
+fontSize: "38px",
+lineHeight: "1",
 fontWeight: "bold"
 }}
 >
@@ -437,7 +621,10 @@ color:
 modeColor(mode),
 
 fontSize: "10px",
-fontWeight: "bold"
+fontWeight: "bold",
+marginTop: "6px",
+
+overflowWrap: "anywhere"
 }}
 >
 {mode}
@@ -448,17 +635,22 @@ fontWeight: "bold"
 </div>
 
 
+{/* PRIMARY */}
+
 {primary && (
 
 <div
 style={{
-marginTop: "12px",
-paddingTop: "9px",
+marginTop: "14px",
+paddingTop: "10px",
 borderTop: "1px solid #222",
-display: "flex",
-justifyContent: "space-between",
-gap: "10px",
-flexWrap: "wrap"
+
+display: "grid",
+
+gridTemplateColumns:
+"repeat(auto-fit, minmax(110px, 1fr))",
+
+gap: "9px"
 }}
 >
 
@@ -477,13 +669,179 @@ value={`${num(primary?.size)}%`}
 />
 
 <SmallInfo
-label="ACTIVE"
-value={String(activeFlows.length)}
+label="STRENGTH"
+value={String(
+num(primary?.strength)
+)}
+/>
+
+<SmallInfo
+label="CONFIDENCE"
+value={`${num(primary?.confidence)}%`}
 />
 
 </div>
 
 )}
+
+</div>
+
+
+{/* ===============================================
+EXECUTION SUMMARY
+=============================================== */}
+
+<SectionTitle>
+EXECUTION SUMMARY
+</SectionTitle>
+
+
+<div
+style={{
+display: "grid",
+
+gridTemplateColumns:
+"repeat(auto-fit, minmax(145px, 1fr))",
+
+gap: "7px",
+
+marginBottom: "14px"
+}}
+>
+
+<StateCard
+label="REGIME"
+value={phase}
+/>
+
+<StateCard
+label="EXECUTION"
+value={executionMode}
+/>
+
+<StateCard
+label="RISK STATE"
+value={riskState}
+/>
+
+<StateCard
+label="TACTICAL BIAS"
+value={tacticalBias}
+/>
+
+</div>
+
+
+{/* ===============================================
+STRUCTURAL CONFIRMATION
+=============================================== */}
+
+<div
+style={{
+border: `1px solid ${
+strongDefensiveConfirmed
+? "#7a1f1f"
+: defensiveConfirmed
+? "#55451a"
+: "#222"
+}`,
+
+background:
+strongDefensiveConfirmed
+? "#160d0d"
+: defensiveConfirmed
+? "#15130b"
+: "#101010",
+
+padding: "11px",
+
+marginBottom: "14px"
+}}
+>
+
+<div
+style={{
+display: "flex",
+
+justifyContent: "space-between",
+
+alignItems: "center",
+
+gap: "12px",
+
+flexWrap: "wrap"
+}}
+>
+
+<div>
+
+<div
+style={{
+color: "#777",
+fontSize: "8px",
+marginBottom: "4px"
+}}
+>
+STRUCTURAL DEFENSIVE CONFIRMATION
+</div>
+
+
+<div
+style={{
+color:
+strongDefensiveConfirmed
+? "#ff4d4f"
+: defensiveConfirmed
+? "#fadb14"
+: "#777",
+
+fontSize: "14px",
+fontWeight: "bold"
+}}
+>
+{strongDefensiveConfirmed
+? "STRONG CONFIRMATION"
+: defensiveConfirmed
+? "DEFENSIVE CONFIRMED"
+: "NOT CONFIRMED"}
+</div>
+
+</div>
+
+
+<div
+style={{
+textAlign: "right"
+}}
+>
+
+<div
+style={{
+color:
+structuralConfirmationCount >= 4
+? "#fadb14"
+: "#777",
+
+fontSize: "26px",
+fontWeight: "bold"
+}}
+>
+{structuralConfirmationCount}
+</div>
+
+
+<div
+style={{
+color: "#555",
+fontSize: "7px"
+}}
+>
+CONFIRMATIONS
+</div>
+
+</div>
+
+</div>
 
 </div>
 
@@ -500,10 +858,12 @@ INDEPENDENT FLOWS
 <div
 style={{
 display: "grid",
+
 gridTemplateColumns:
 "repeat(auto-fit, minmax(220px, 1fr))",
 
 gap: "9px",
+
 marginBottom: "14px"
 }}
 >
@@ -553,17 +913,22 @@ minWidth={110}
 <Metric
 label="RAW TOTAL"
 value={portfolio?.rawSize}
+suffix="%"
 />
 
 <Metric
 label="CAP"
 value={portfolio?.cap}
+suffix="%"
 />
 
 <Metric
 label="SCALE"
 value={
-num(portfolio?.scale, 1) * 100
+num(
+portfolio?.scale,
+1
+) * 100
 }
 suffix="%"
 />
@@ -578,50 +943,7 @@ suffix="%"
 
 
 {/* ===============================================
-REGIME / EXECUTION
-=============================================== */}
-
-<SectionTitle>
-REGIME / EXECUTION
-</SectionTitle>
-
-
-<div
-style={{
-display: "grid",
-gridTemplateColumns:
-"repeat(auto-fit, minmax(150px, 1fr))",
-
-gap: "7px",
-marginBottom: "14px"
-}}
->
-
-<StateCard
-label="REGIME"
-value={phase}
-/>
-
-<StateCard
-label="EXECUTION"
-value={executionMode}
-/>
-
-<StateCard
-label="RISK STATE"
-value={riskState}
-/>
-
-<StateCard
-label="TACTICAL BIAS"
-value={tacticalBias}
-/>
-
-</div>
-
-
-{/* ===============================================
-GLOBAL RISK SUMMARY
+GLOBAL RISK
 =============================================== */}
 
 <SectionTitle>
@@ -645,34 +967,112 @@ suffix="%"
 
 <Metric
 label="CRASH PROB"
-value={risk?.crashProbability}
+value={crashProbability}
+suffix="%"
 inverse
 />
 
 <Metric
 label="DANGER"
-value={risk?.dangerScore}
+value={dangerScore}
 inverse
 />
 
 <Metric
 label="LIQUIDITY"
-value={risk?.liquidityScore}
+value={liquidityScore}
 inverse
 />
 
 <Metric
 label="FRAGILITY"
-value={risk?.fragilityScore}
+value={fragilityScore}
 inverse
 />
 
 <Metric
 label="QUALITY"
-value={risk?.marketQualityScore}
+value={qualityScore}
 />
 
 </MetricGrid>
+
+
+{/* ===============================================
+SQUEEZE WARNING
+=============================================== */}
+
+{hasExtremeSqueeze && (
+
+<div
+style={{
+border: "1px solid #5c3618",
+background: "#171008",
+
+padding: "10px",
+
+marginBottom: "14px"
+}}
+>
+
+<div
+style={{
+display: "flex",
+
+justifyContent: "space-between",
+
+gap: "12px",
+
+alignItems: "center",
+
+flexWrap: "wrap"
+}}
+>
+
+<div>
+
+<div
+style={{
+color: "#fa8c16",
+fontSize: "10px",
+fontWeight: "bold"
+}}
+>
+EXTREME SQUEEZE RISK
+</div>
+
+
+<div
+style={{
+color: "#777",
+fontSize: "8px",
+marginTop: "4px",
+lineHeight: "1.4"
+}}
+>
+Structural short setup remains valid,
+but timing risk for violent countertrend
+moves is elevated.
+</div>
+
+</div>
+
+
+<div
+style={{
+color: "#fa8c16",
+fontSize: "26px",
+fontWeight: "bold"
+}}
+>
+{squeezeRisk}
+</div>
+
+</div>
+
+</div>
+
+)}
 
 
 {/* ===============================================
@@ -721,6 +1121,7 @@ value={
 num(risk?.heat) * 100
 }
 decimals={1}
+suffix="%"
 inverse
 />
 
@@ -821,11 +1222,13 @@ minWidth={110}
 <Metric
 label="BREADTH 50"
 value={components?.breadth50}
+decimals={1}
 />
 
 <Metric
 label="BREADTH 200"
 value={components?.breadth200}
+decimals={1}
 />
 
 <Metric
@@ -881,6 +1284,7 @@ subtitle="Sizing calculation per independent instrument"
 <div
 style={{
 display: "grid",
+
 gridTemplateColumns:
 "repeat(auto-fit, minmax(210px, 1fr))",
 
@@ -915,23 +1319,28 @@ flowPipeline?.russellCall
 
 
 {/* ===============================================
-DATA INTEGRITY FOOTER
+DATA INTEGRITY
 =============================================== */}
 
 <div
 style={{
 marginTop: "12px",
-paddingTop: "9px",
+
+paddingTop: "10px",
+
 borderTop: "1px solid #1c1c1c",
 
-color: "#555",
-fontSize: "8px",
-
 display: "flex",
+
 justifyContent: "space-between",
 
 gap: "8px",
-flexWrap: "wrap"
+
+flexWrap: "wrap",
+
+color: "#555",
+
+fontSize: "8px"
 }}
 >
 
@@ -961,6 +1370,20 @@ CONFLICT{" "}
 portfolioDirectionalConflict
 ? "YES"
 : "NO"}
+</span>
+
+<span
+style={{
+color:
+hasDataConflict
+? "#fa8c16"
+: "#555"
+}}
+>
+DATA{" "}
+{hasDataConflict
+? "CHECK"
+: "OK"}
 </span>
 
 </div>
@@ -1064,18 +1487,22 @@ return (
 
 <div
 style={{
-border:
-`1px solid ${
+border: `1px solid ${
 eligible
-? "#252525"
-: "#1c1c1c"
+? directionColor(flowDirection)
+: "#222"
 }`,
 
 background: "#101010",
 
 padding: "12px",
 
-minWidth: 0
+minWidth: 0,
+
+opacity:
+eligible
+? 1
+: 0.78
 }}
 >
 
@@ -1084,9 +1511,13 @@ minWidth: 0
 <div
 style={{
 display: "flex",
+
 justifyContent: "space-between",
+
 alignItems: "center",
+
 gap: "8px",
+
 marginBottom: "10px"
 }}
 >
@@ -1124,8 +1555,11 @@ fontWeight: "bold"
 <div
 style={{
 display: "flex",
+
 justifyContent: "space-between",
+
 alignItems: "center",
+
 gap: "8px"
 }}
 >
@@ -1164,7 +1598,8 @@ fontWeight: "bold"
 
 <div
 style={{
-textAlign: "right"
+textAlign: "right",
+maxWidth: "50%"
 }}
 >
 
@@ -1174,7 +1609,9 @@ color:
 modeColor(flowMode),
 
 fontSize: "9px",
-fontWeight: "bold"
+fontWeight: "bold",
+
+overflowWrap: "anywhere"
 }}
 >
 {flowMode}
@@ -1207,7 +1644,9 @@ marginTop: "4px"
 <div
 style={{
 borderTop: "1px solid #222",
+
 paddingTop: "8px",
+
 marginTop: "9px"
 }}
 >
@@ -1224,9 +1663,13 @@ STATE
 
 <div
 style={{
-color: "#aaa",
+color:
+stateColor(flowState),
+
 fontSize: "9px",
+
 fontWeight: "bold",
+
 marginTop: "3px",
 
 overflowWrap: "anywhere"
@@ -1265,8 +1708,9 @@ value={confidence}
 
 <MiniMetric
 label="RISK"
-value={flowRisk}
-decimals={2}
+value={flowRisk * 100}
+decimals={1}
+suffix="%"
 />
 
 </div>
@@ -1307,16 +1751,19 @@ marginTop: "8px"
 <MiniMetric
 label="RAW"
 value={rawSize}
+suffix="%"
 />
 
 <MiniMetric
 label="PRE-CAP"
 value={preCap}
+suffix="%"
 />
 
 <MiniMetric
 label="FINAL"
 value={finalSize}
+suffix="%"
 />
 
 </div>
@@ -1325,7 +1772,9 @@ value={finalSize}
 <div
 style={{
 marginTop: "8px",
+
 paddingTop: "7px",
+
 borderTop: "1px solid #222"
 }}
 >
@@ -1349,6 +1798,7 @@ eligible
 : "#777",
 
 fontSize: "8px",
+
 lineHeight: "1.4",
 
 overflowWrap: "anywhere"
@@ -1480,7 +1930,8 @@ style={{
 color: "#999",
 fontSize: "9px",
 fontWeight: "bold",
-marginBottom: "7px"
+marginBottom: "7px",
+letterSpacing: "0.3px"
 }}
 >
 {children}
@@ -1508,7 +1959,7 @@ style={{
 display: "grid",
 
 gridTemplateColumns:
-`repeat(auto-fit, minmax(${minWidth}px, 1fr))`,
+`repeat(auto-fit, minmax(min(${minWidth}px, 100%), 1fr))`,
 
 gap: "7px",
 
@@ -1543,9 +1994,7 @@ const numeric =
 num(value);
 
 const missing =
-value === null ||
-value === undefined ||
-!Number.isFinite(Number(value));
+isMissing(value);
 
 
 return (
@@ -1608,11 +2057,13 @@ MINI METRIC
 function MiniMetric({
 label,
 value,
-decimals = 0
+decimals = 0,
+suffix = ""
 }: {
 label: string;
 value: number;
 decimals?: number;
+suffix?: string;
 }) {
 
 return (
@@ -1650,6 +2101,8 @@ marginTop: "2px"
 {decimals > 0
 ? value.toFixed(decimals)
 : Math.round(value)}
+
+{suffix}
 </div>
 
 </div>
@@ -1692,10 +2145,14 @@ fontSize: "7px"
 
 <div
 style={{
-color: "#aaa",
+color:
+stateColor(value),
+
 fontSize: "9px",
 fontWeight: "bold",
+
 marginTop: "4px",
+
 lineHeight: "1.35",
 
 overflowWrap: "anywhere"
@@ -1750,7 +2207,8 @@ return (
 style={{
 border: "1px solid #222",
 background: "#0f0f0f",
-padding: "10px"
+padding: "10px",
+minWidth: 0
 }}
 >
 
@@ -1790,6 +2248,7 @@ value={confidence}
 <MiniMetric
 label="FINAL"
 value={finalSize}
+suffix="%"
 />
 
 </div>
@@ -1828,11 +2287,13 @@ marginTop: "7px"
 <MiniMetric
 label="RAW"
 value={rawSize}
+suffix="%"
 />
 
 <MiniMetric
 label="PRE-CAP"
 value={preCap}
+suffix="%"
 />
 
 </div>
@@ -1888,7 +2349,9 @@ padding:
 "4px 7px",
 
 fontSize: "8px",
-fontWeight: "bold"
+fontWeight: "bold",
+
+whiteSpace: "nowrap"
 }}
 >
 {children}
@@ -1911,7 +2374,11 @@ value: string;
 
 return (
 
-<div>
+<div
+style={{
+minWidth: 0
+}}
+>
 
 <div
 style={{
@@ -1926,9 +2393,13 @@ fontSize: "7px"
 <div
 style={{
 color: "#999",
-fontSize: "8px",
+fontSize: "9px",
 fontWeight: "bold",
-marginTop: "2px"
+marginTop: "2px",
+
+overflow: "hidden",
+textOverflow: "ellipsis",
+whiteSpace: "nowrap"
 }}
 >
 {value}
