@@ -57,7 +57,6 @@ import replay2025 from "@/data/replay/2025.json";
 
 import { historicalReplay } from "./historicalReplay";
 
-
 export function marketEngine(data: any) {
 
 /* =====================================================
@@ -70,14 +69,12 @@ driversEngine(data);
 const marketDrivers =
 marketDriversEngine(data);
 
-
 /* =====================================================
 STRUCTURE
 ===================================================== */
 
 const structure =
 structureEngine(data);
-
 
 /* =====================================================
 CLEAN INPUT
@@ -106,26 +103,9 @@ data.marketData?.["^VIX"]?.current ?? 20
 const historyMetrics =
 data.historyMetrics ?? {};
 
-
 /* =====================================================
 HISTORY ACCESS
 ===================================================== */
-
-/*
-* WICHTIG:
-*
-* structure.breadth.b20 / b50 / b200 besitzen laut
-* TypeScript-Typ nur { value, delta }.
-*
-* Deshalb darf hier NICHT mehr auf
-*
-* structure.breadth.b20.history
-*
-* zugegriffen werden.
-*
-* Historische Werte werden stattdessen bevorzugt aus
-* historyMetrics bzw. data.history gelesen.
-*/
 
 const history =
 Array.isArray(data.history)
@@ -133,20 +113,6 @@ Array.isArray(data.history)
 : Array.isArray(historyMetrics?.history)
 ? historyMetrics.history
 : [];
-
-
-/*
-* Liefert einen historischen Wert aus einem Snapshot.
-*
-* offset:
-* 5 = ungefähr 5 Snapshots zurück
-* 10 = ungefähr 10 Snapshots zurück
-* 20 = ungefähr 20 Snapshots zurück
-*
-* Mehrere mögliche Pfade werden unterstützt, damit
-* unterschiedliche Snapshot-Strukturen nicht den
-* kompletten Engine-Lauf zerstören.
-*/
 
 function getHistoryValue(
 offset: number,
@@ -201,16 +167,6 @@ return numeric;
 return fallback;
 }
 
-
-/*
-* HistoryMetrics kann ebenfalls bereits fertige
-* historische Reihen enthalten.
-*
-* Diese Funktion versucht zuerst eine solche Reihe
-* zu verwenden und fällt danach auf data.history
-* zurück.
-*/
-
 function getHistorySeriesValue(
 seriesNames: string[],
 offset: number,
@@ -248,7 +204,6 @@ fallback
 );
 }
 
-
 /* =====================================================
 HISTORICAL BREADTH VALUES
 ===================================================== */
@@ -267,7 +222,6 @@ getHistorySeriesValue(
 breadth20
 );
 
-
 const breadth50_5dAgo =
 getHistorySeriesValue(
 [
@@ -281,7 +235,6 @@ getHistorySeriesValue(
 ],
 breadth50
 );
-
 
 const breadth50_10dAgo =
 getHistorySeriesValue(
@@ -297,7 +250,6 @@ getHistorySeriesValue(
 breadth50
 );
 
-
 const breadth200_10dAgo =
 getHistorySeriesValue(
 [
@@ -312,7 +264,6 @@ getHistorySeriesValue(
 breadth200
 );
 
-
 const breadth200_20dAgo =
 getHistorySeriesValue(
 [
@@ -326,7 +277,6 @@ getHistorySeriesValue(
 ],
 breadth200
 );
-
 
 const advanceDecline_5dAgo =
 getHistorySeriesValue(
@@ -345,15 +295,12 @@ structure?.advanceDecline?.value ?? 0
 )
 );
 
-
 const spxCurrent =
 Number(
-
 data.indices?.spx ??
 data.indices?.SPX ??
 0
 );
-
 
 const spx5dAgo =
 getHistorySeriesValue(
@@ -372,7 +319,6 @@ getHistorySeriesValue(
 spxCurrent
 );
 
-
 /* =====================================================
 PRICE MOMENTUM
 ===================================================== */
@@ -385,18 +331,9 @@ indices:
 data.indices ?? {}
 });
 
-
 /* =====================================================
 DIVERGENCE — LEGACY
 ===================================================== */
-
-/*
-* Bestehende Divergence-Logik bleibt
-* zunächst bewusst erhalten.
-*
-* Sie wird parallel zur neuen
-* internalDivergenceEngine geführt.
-*/
 
 const divergence = (() => {
 
@@ -439,7 +376,6 @@ score > 1
 };
 
 })();
-
 
 /* =====================================================
 LIQUIDITY
@@ -487,7 +423,6 @@ data.correlationScore ?? 0
 historyMetrics
 });
 
-
 /* =====================================================
 FRAGILITY
 ===================================================== */
@@ -529,7 +464,6 @@ data.volOfVolRatio ?? 1
 structure
 });
 
-
 /* =====================================================
 SQUEEZE
 ===================================================== */
@@ -551,7 +485,6 @@ data.moveIndex ?? 80
 
 breadth50
 });
-
 
 /* =====================================================
 ROTATION BASE
@@ -596,7 +529,6 @@ historyMetrics?.relativeBreadthWeakness ?? 0,
 
 structure
 });
-
 
 /* =====================================================
 PARTICIPATION
@@ -646,7 +578,6 @@ rotationBase?.score ?? 50
 )
 });
 
-
 /* =====================================================
 BREADTH THRUST
 ===================================================== */
@@ -686,21 +617,9 @@ divergenceState:
 divergence.state
 });
 
-
 /* =====================================================
 BREADTH VELOCITY
 ===================================================== */
-
-/*
-* Neuer zentraler Breadth-Velocity-State.
-*
-* WICHTIG:
-* Keine .history-Properties mehr aus
-* structure.breadth.* lesen.
-*
-* Historische Werte kommen aus den oben
-* vorbereiteten History-Variablen.
-*/
 
 const breadthVelocity =
 breadthVelocityEngine({
@@ -708,19 +627,14 @@ breadthVelocityEngine({
 structure,
 
 breadth20,
-
 breadth20_5dAgo,
 
 breadth50,
-
 breadth50_5dAgo,
-
 breadth50_10dAgo,
 
 breadth200,
-
 breadth200_10dAgo,
-
 breadth200_20dAgo,
 
 advanceDecline:
@@ -734,19 +648,11 @@ spx:
 spxCurrent,
 
 spx5dAgo
-
 });
-
 
 /* =====================================================
 INTERNAL DIVERGENCE
 ===================================================== */
-
-/*
-* Neuer institutioneller Divergence-State.
-*
-* Parallel zur Legacy-Divergence.
-*/
 
 const internalDivergence =
 internalDivergenceEngine({
@@ -833,7 +739,6 @@ data.gammaExposure ?? 0
 )
 });
 
-
 /* =====================================================
 REGIME PERSISTENCE — PRE PHASE
 ===================================================== */
@@ -880,7 +785,6 @@ historyMetrics?.rotationDecayHistory ?? [],
 phase:
 "PRE_PHASE"
 });
-
 
 /* =====================================================
 FINAL ROTATION
@@ -929,7 +833,6 @@ historyMetrics?.relativeBreadthWeakness ?? 0,
 structure
 });
 
-
 /* =====================================================
 CRASH
 ===================================================== */
@@ -974,7 +877,6 @@ drivers:
 driversCore
 });
 
-
 /* =====================================================
 EARLY WARNING
 ===================================================== */
@@ -986,7 +888,6 @@ earlyWarningEngine({
 
 historyMetrics
 });
-
 
 /* =====================================================
 TEMP PUT
@@ -1005,7 +906,6 @@ earlyWarning,
 historyMetrics,
 priceMomentum
 });
-
 
 /* =====================================================
 TEMP RUSSELL
@@ -1036,7 +936,6 @@ vix,
 historyMetrics
 });
 
-
 /* =====================================================
 PHASE
 ===================================================== */
@@ -1064,10 +963,8 @@ regimePersistence:
 regimePersistencePre
 });
 
-
 const phase =
 phaseData.phase;
-
 
 const regime = {
 
@@ -1076,9 +973,7 @@ phase,
 
 score:
 crash.score
-
 };
-
 
 /* =====================================================
 PHASE STAGE
@@ -1088,9 +983,7 @@ const phaseStage = {
 
 phase,
 phaseData
-
 };
-
 
 /* =====================================================
 CONFIDENCE
@@ -1104,9 +997,7 @@ confidenceEngine({
 crash,
 rotation,
 phase
-
 });
-
 
 /* =====================================================
 SYSTEM HEAT
@@ -1133,9 +1024,7 @@ data.vixTermRatio,
 
 gammaExposure:
 data.gammaExposure
-
 });
-
 
 /* =====================================================
 REGIME SYNC — PRE
@@ -1174,9 +1063,7 @@ breadth200,
 fragility,
 participation,
 breadthThrust
-
 });
-
 
 /* =====================================================
 DANGER ZONE
@@ -1227,9 +1114,7 @@ vix,
 
 history:
 historyMetrics
-
 });
-
 
 /* =====================================================
 EXECUTION STATE — PRE
@@ -1335,9 +1220,7 @@ masterScore:
 Number(
 data.masterScore ?? 50
 )
-
 });
-
 
 /* =====================================================
 ROTATION DECAY
@@ -1406,9 +1289,7 @@ historyMetrics?.leadershipDecay,
 
 relativeBreadthWeakness:
 historyMetrics?.relativeBreadthWeakness
-
 });
-
 
 /* =====================================================
 ROTATION CONFIRM
@@ -1448,9 +1329,7 @@ breadthThrust,
 rotationDecay,
 
 historyMetrics
-
 });
-
 
 /* =====================================================
 FINAL RUSSELL
@@ -1488,9 +1367,7 @@ participation,
 internalDivergence,
 
 priceMomentum
-
 });
-
 
 /* =====================================================
 PHASE CONFIRMATION
@@ -1516,9 +1393,7 @@ fragility,
 rotationDecay,
 
 historyMetrics
-
 });
-
 
 /* =====================================================
 MARKET QUALITY
@@ -1550,9 +1425,7 @@ concentrationScore:
 Number(
 data.concentrationScore ?? 50
 )
-
 });
-
 
 /* =====================================================
 REGIME SYNC — FINAL
@@ -1593,9 +1466,7 @@ participation,
 breadthThrust,
 
 marketQuality
-
 });
-
 
 /* =====================================================
 REGIME PERSISTENCE — FINAL
@@ -1648,9 +1519,7 @@ historyMetrics?.rotationDecayHistory ?? [],
 
 phase:
 phase ?? "UNKNOWN"
-
 });
-
 
 /* =====================================================
 FINAL PUT TIMING
@@ -1688,35 +1557,11 @@ marketQuality,
 rotationDecay,
 
 regimePersistence
-
 });
-
 
 /* =====================================================
 MASTER
 ===================================================== */
-
-const masterInput = {
-crash,
-rotation,
-putTiming,
-russell,
-phaseData,
-structure,
-participation,
-breadthThrust,
-liquidity,
-fragility,
-marketQuality,
-rotationDecay,
-phaseConfirmation,
-regimeSync,
-phaseStage,
-historyMetrics,
-priceMomentum,
-regimePersistence
-};
-
 
 const master =
 masterScoreEngine({
@@ -1750,9 +1595,7 @@ historyMetrics,
 priceMomentum,
 
 regimePersistence
-
 });
-
 
 /* =====================================================
 EXECUTION STATE — FINAL
@@ -1859,9 +1702,7 @@ masterScore:
 Number(
 master?.score ?? 50
 )
-
 });
-
 
 /* =====================================================
 EDGE
@@ -1895,9 +1736,7 @@ dangerZone,
 
 marketData:
 data.marketData ?? {}
-
 });
-
 
 /* =====================================================
 NASDAQ CALL
@@ -1929,9 +1768,7 @@ regimeSync,
 executionState,
 
 master
-
 });
-
 
 /* =====================================================
 POSITIONING
@@ -1966,9 +1803,7 @@ Math.round(
 (Number(structure?.health?.value ?? 0) * 0.3) -
 (Number(crash?.probability ?? 0) * 0.2)
 )
-
 };
-
 
 /* =====================================================
 TRADE STACK
@@ -1999,33 +1834,53 @@ regimeSync,
 historyMetrics,
 
 regimePersistence
-
 });
 
-
 /* =====================================================
-STATE
+POSITION STATE — PRE
 ===================================================== */
 
-const state =
-positionStateEngine({
+/*
+* Der PRE-State repräsentiert ausschließlich
+* die tatsächlich bekannte Position aus dem
+* vorherigen Snapshot.
+*
+* Wichtig:
+*
+* Hier wird KEINE künstliche Position mit size: 0
+* erzeugt.
+*/
 
-prevState:
-data.positionState ?? null,
+const statePre =
+data.positionState ?? null;
 
-sizing: {
-size: 0
-},
+/*
+* Tatsächlich aktuell gehaltene Positionsgröße.
+*
+* Diese Größe wird für die Exit Engine verwendet.
+*/
 
-exit: {},
+const currentPositionSize =
+Number(
+statePre?.size ?? 0
+);
 
+/*
+* Stabiler Fallback für den ersten Lauf.
+*/
+
+const sizingState =
+statePre ?? {
+size: 0,
+entryPrice: 0,
 pnl:
 Number(
 data.pnl ?? 0
-)
-
-});
-
+),
+realized: 0,
+hasReduced: false,
+isRunner: false
+};
 
 /* =====================================================
 SIZING
@@ -2041,7 +1896,14 @@ putTiming,
 russell,
 
 positioning,
-state,
+
+/*
+* PositionSizing erhält den aktuell bekannten
+* Positionszustand.
+*/
+
+state:
+sizingState,
 
 systemHeat,
 earlyWarning,
@@ -2072,20 +1934,30 @@ historyMetrics,
 priceMomentum,
 
 regimePersistence
-
 });
-
 
 /* =====================================================
 EXIT
 ===================================================== */
+
+/*
+* EXTREM WICHTIG:
+*
+* Die Exit Engine arbeitet mit der tatsächlich
+* bestehenden Position.
+*
+* NICHT mit sizing.size.
+*
+* sizing.size = gewünschte Zielgröße
+* currentPositionSize = tatsächlich gehaltene Größe
+*/
 
 const exit =
 exitEngine({
 
 position: {
 size:
-sizing.size
+currentPositionSize
 },
 
 crash,
@@ -2110,9 +1982,38 @@ systemHeat,
 fragility,
 liquidity,
 participation
-
 });
 
+/* =====================================================
+POSITION STATE — FINAL
+===================================================== */
+
+/*
+* Hier werden jetzt zusammengeführt:
+*
+* 1. Vorheriger Positionszustand
+* 2. Neues Target Sizing
+* 3. Exit-Entscheidung
+* 4. Aktuelles PnL
+*
+* Das Ergebnis ist der finale State.
+*/
+
+const state =
+positionStateEngine({
+
+prevState:
+statePre,
+
+sizing,
+
+exit,
+
+pnl:
+Number(
+data.pnl ?? 0
+)
+});
 
 /* =====================================================
 POSITION
@@ -2129,9 +2030,7 @@ data.pnl ?? 0
 phase,
 crash,
 rotation
-
 });
-
 
 /* =====================================================
 DECISION
@@ -2152,9 +2051,7 @@ earlyWarning,
 master,
 positioning,
 edgeState
-
 });
-
 
 /* =====================================================
 SIGNAL
@@ -2197,9 +2094,7 @@ marketQuality,
 priceMomentum,
 
 regimePersistence
-
 });
-
 
 const signal = {
 
@@ -2208,9 +2103,7 @@ active: false
 }),
 
 phase
-
 };
-
 
 /* =====================================================
 SUPER SIGNAL
@@ -2248,9 +2141,7 @@ participation,
 marketQuality,
 
 regimePersistence
-
 });
-
 
 /* =====================================================
 EXECUTION
@@ -2282,9 +2173,7 @@ breadthThrust,
 fragility,
 squeeze,
 participation
-
 });
-
 
 /* =====================================================
 RISK
@@ -2296,9 +2185,7 @@ riskLoopEngine({
 sizing,
 exit,
 state
-
 });
-
 
 /* =====================================================
 HISTORICAL REPLAY
@@ -2315,12 +2202,10 @@ const replaySnapshots = [
 
 ];
 
-
 const replay =
 historicalReplay(
 replaySnapshots
 );
-
 
 /* =====================================================
 RETURN
@@ -2343,25 +2228,12 @@ rotation,
 rotationConfirm,
 rotationDecay,
 
-/*
-* Neuer Breadth-Velocity-State.
-*/
 breadthVelocity,
 
-/*
-* Neuer institutioneller Divergence-State.
-*/
 internalDivergence,
 
-/*
-* Finaler Persistence-State.
-*/
 regimePersistence,
 
-/*
-* PRE-State bewusst separat verfügbar,
-* damit Debugging möglich bleibt.
-*/
 regimePersistencePre,
 
 signal,
@@ -2372,10 +2244,6 @@ decision,
 execution,
 
 executionState,
-
-/*
-* PRE-State ebenfalls nur für Debugging.
-*/
 executionStatePre,
 
 regimeSync,
@@ -2393,8 +2261,31 @@ marketQuality,
 position,
 positioning,
 
+/*
+* Target Position Sizing.
+*/
 sizing,
+
+/*
+* Exit-Entscheidung.
+*/
 exit,
+
+/*
+* Finaler tatsächlicher Positionszustand.
+*/
+state,
+
+/*
+* PRE-State zusätzlich für Debugging.
+*/
+statePre,
+
+/*
+* Tatsächlich gehaltene Größe vor dem Update.
+*/
+currentPositionSize,
+
 risk,
 
 putTiming,
@@ -2412,18 +2303,12 @@ structure,
 tradeStack,
 edgeState,
 
-/*
-* Legacy divergence bleibt vorerst
-* für Vergleich/Regression verfügbar.
-*/
 divergence,
 
 driversCore,
 marketDrivers,
 
 replay,
-
-state,
 
 historyMetrics,
 
