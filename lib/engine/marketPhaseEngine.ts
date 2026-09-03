@@ -343,17 +343,34 @@ breadth200 < 45;
 const extremeBreadth =
 breadth50 > 90;
 
+/* =====================================================
+INTERNAL MARKET HEALTH
+===================================================== */
+
+/*
+AD is treated as a normalized market-internals score.
+
+Typical interpretation:
+
+70+ = strong
+55–70 = healthy
+45–55 = neutral
+30–45 = weak
+<30 = severe weakness
+*/
+
 const weakInternals =
-ad <= 0;
+ad < 45;
 
 const severeInternalWeakness =
-ad < 0 &&
+ad < 30 &&
 highs < lows &&
 breadth50 < 58;
 
 const healthyInternals =
-ad > 0 &&
+ad >= 55 &&
 highs >= lows;
+
 
 const rotationActive =
 [
@@ -1087,6 +1104,18 @@ regimeState,
 subPhase,
 
 confidence,
+
+marketRegime: {
+
+label: regimeState,
+
+score: confidence,
+
+subPhase,
+
+confidence
+
+},
 
 drivers: {
 
