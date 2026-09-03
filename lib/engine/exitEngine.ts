@@ -1,7 +1,34 @@
-// /lib/engine/exitEngine.ts
-
 import { exitShortEngine } from "./exitShortEngine";
 import { exitLongEngine } from "./exitLongEngine";
+
+// =====================================================
+// EXIT ENGINE V2
+// =====================================================
+//
+// PURPOSE:
+//
+// Central exit orchestration layer.
+//
+// Handles:
+//
+// - NASDAQ PUT
+// - NASDAQ CALL
+// - RUSSELL CALL
+//
+// Important:
+//
+// Portfolio action is NOT simply the maximum
+// instrument reduction.
+//
+// A short exit can mean:
+// bullish recovery / short thesis weakening.
+//
+// A long exit can mean:
+// defensive portfolio reduction.
+//
+// Therefore:
+// directional reductions are separated.
+// =====================================================
 
 export function exitEngine(input: any) {
 
@@ -19,7 +46,9 @@ crash = {},
 dangerZone = {},
 master = {},
 tradeStack = {}
+
 } = input;
+
 
 /* =====================================================
 SAFE PHASE
@@ -30,58 +59,59 @@ phase ??
 marketPhase ??
 "PHASE_3_DISTRIBUTION";
 
+
 const heat =
 Number(systemHeat?.value ?? 0);
+
 
 const decayScore =
 Number(rotationDecay?.score ?? 0);
 
+
 const fragilityScore =
 Number(fragility?.score ?? 50);
 
-const liquidityScore =
-Number(liquidity?.score ?? 50);
 
 const crashProbability =
 Number(crash?.probability ?? 0);
 
+
 const dangerScore =
 Number(dangerZone?.score ?? 0);
 
+
 /* =====================================================
 1. SYSTEMIC EXIT
-
-This is NOT an instrument decision.
-It means the entire portfolio should be
-treated defensively.
 ===================================================== */
 
 const systemicExit =
 
 currentPhase === "PHASE_7_CAPITULATION" ||
 
-crashProbability >= 80 ||
-
-heat <= -2.2 ||
+crashProbability >= 85 ||
 
 dangerScore >= 95 ||
+
+heat <= -2.2 ||
 
 (
 decayScore >= 90 &&
 fragilityScore >= 90
 );
 
+
 if (systemicExit) {
 
-const short = {
+const nasdaqPut = {
 instrument: "NASDAQ_PUT",
 direction: "SHORT",
 action: "EXIT MAJORITY",
 sizeReduction: 80,
 reason:
-"Systemic collapse / reversal regime",
+"Systemic collapse / extreme reversal regime",
 priority: "CRITICAL"
 };
+
 
 const nasdaqCall = {
 instrument: "NASDAQ_CALL",
@@ -93,6 +123,7 @@ reason:
 priority: "CRITICAL"
 };
 
+
 const russellCall = {
 instrument: "RUSSELL_CALL",
 direction: "LONG",
@@ -103,198 +134,382 @@ reason:
 priority: "CRITICAL"
 };
 
+
 return {
 
-short,
-long: nasdaqCall,
-
-nasdaqPut: short,
+nasdaqPut,
 nasdaqCall,
 russellCall,
 
+short: nasdaqPut,
+long: nasdaqCall,
+
 net: {
+
 action: "SYSTEM EXIT",
+
 sizeReduction: 100,
+
 reason:
 "Systemic collapse regime"
+
 },
 
-bias: "SYSTEM_EXIT",
+bias:
+"SYSTEM_EXIT",
 
-systemic: true
+systemic:
+true,
+
+activeExits: [
+
+nasdaqPut,
+nasdaqCall,
+russellCall
+
+],
+
+summary: {
+
+shortReduction:
+80,
+
+longReduction:
+100,
+
+maxReduction:
+100,
+
+activeExitCount:
+3
+
+}
 
 };
+
 }
+
 
 /* =====================================================
 2. INDIVIDUAL EXIT ENGINES
 ===================================================== */
 
-const nasdaqPut =
-exitShortEngine({
+const engineInput = {
+
 ...input,
 
-phase: currentPhase,
-marketPhase: currentPhase,
+phase:
+currentPhase,
+
+marketPhase:
+currentPhase,
 
 tradeStack,
 
 master,
+
 rotationDecay,
+
 rotationConfirm,
+
 fragility,
+
 liquidity,
+
 participation,
+
 crash,
+
 systemHeat,
+
 dangerZone
-});
+
+};
+
+
+const nasdaqPut =
+exitShortEngine(
+engineInput
+);
+
 
 const nasdaqCall =
 exitLongEngine(
-{
-...input,
-
-phase: currentPhase,
-marketPhase: currentPhase,
-
-tradeStack,
-
-master,
-rotationDecay,
-rotationConfirm,
-fragility,
-liquidity,
-participation,
-crash,
-systemHeat,
-dangerZone
-},
+engineInput,
 "NASDAQ_CALL"
 );
 
+
 const russellCall =
 exitLongEngine(
-{
-...input,
-
-phase: currentPhase,
-marketPhase: currentPhase,
-
-tradeStack,
-
-master,
-rotationDecay,
-rotationConfirm,
-fragility,
-liquidity,
-participation,
-crash,
-systemHeat,
-dangerZone
-},
+engineInput,
 "RUSSELL_CALL"
 );
 
-/* =====================================================
-3. ACTIVE EXIT
-
-Highest individual reduction wins.
-We deliberately DO NOT average them.
-===================================================== */
-
-const reductions = [
-nasdaqPut.sizeReduction ?? 0,
-nasdaqCall.sizeReduction ?? 0,
-russellCall.sizeReduction ?? 0
-];
-
-const maxReduction =
-Math.max(...reductions);
 
 /* =====================================================
-NET ACTION
-===================================================== */
-
-let netAction = "HOLD";
-
-if (maxReduction >= 100) {
-netAction = "EXIT POSITION";
-}
-else if (maxReduction >= 70) {
-netAction = "REDUCE HARD";
-}
-else if (maxReduction >= 50) {
-netAction = "TRIM FAST";
-}
-else if (maxReduction >= 30) {
-netAction = "TRIM EXPOSURE";
-}
-else if (maxReduction > 0) {
-netAction = "ACTIVE MANAGEMENT";
-}
-
-/* =====================================================
-DIRECTIONAL INFORMATION
+3. REDUCTION ANALYSIS
 ===================================================== */
 
 const shortReduction =
-nasdaqPut.sizeReduction ?? 0;
+Number(
+nasdaqPut?.sizeReduction ?? 0
+);
+
+
+const nasdaqCallReduction =
+Number(
+nasdaqCall?.sizeReduction ?? 0
+);
+
+
+const russellCallReduction =
+Number(
+russellCall?.sizeReduction ?? 0
+);
+
 
 const longReduction =
 Math.max(
-nasdaqCall.sizeReduction ?? 0,
-russellCall.sizeReduction ?? 0
+nasdaqCallReduction,
+russellCallReduction
 );
 
-let bias = "STABLE";
 
-if (
-shortReduction >= 70 &&
-longReduction < 30
-) {
-bias = "SHORT_EXIT_RISK";
-}
-else if (
-longReduction >= 70 &&
-shortReduction < 30
-) {
-bias = "LONG_EXIT_RISK";
-}
-else if (
-shortReduction >= 30 &&
-longReduction >= 30
-) {
-bias = "MULTI_DIRECTIONAL_RISK";
-}
-else if (
-maxReduction >= 25
-) {
-bias = "CAUTION";
-}
+const maxReduction =
+Math.max(
+shortReduction,
+longReduction
+);
+
 
 /* =====================================================
-ACTIVE INSTRUMENTS
+4. LONG SIDE PORTFOLIO ACTION
+===================================================== */
+
+let netAction =
+"HOLD";
+
+
+let portfolioReduction =
+0;
+
+
+/*
+Important:
+
+Long reduction represents actual
+defensive portfolio de-risking.
+
+Short reduction represents
+short thesis exit risk.
+*/
+
+
+if (longReduction >= 100) {
+
+netAction =
+"EXIT LONG EXPOSURE";
+
+portfolioReduction =
+100;
+
+}
+
+else if (longReduction >= 70) {
+
+netAction =
+"REDUCE HARD";
+
+portfolioReduction =
+70;
+
+}
+
+else if (longReduction >= 50) {
+
+netAction =
+"TRIM FAST";
+
+portfolioReduction =
+50;
+
+}
+
+else if (longReduction >= 30) {
+
+netAction =
+"TRIM EXPOSURE";
+
+portfolioReduction =
+30;
+
+}
+
+else if (longReduction > 0) {
+
+netAction =
+"ACTIVE MANAGEMENT";
+
+portfolioReduction =
+longReduction;
+
+}
+
+
+/* =====================================================
+5. DIRECTIONAL BIAS
+===================================================== */
+
+let bias =
+"STABLE";
+
+
+if (
+
+shortReduction >= 70 &&
+longReduction < 30
+
+) {
+
+bias =
+"SHORT_EXIT_RISK";
+
+}
+
+
+else if (
+
+longReduction >= 70 &&
+shortReduction < 30
+
+) {
+
+bias =
+"LONG_EXIT_RISK";
+
+}
+
+
+else if (
+
+shortReduction >= 30 &&
+longReduction >= 30
+
+) {
+
+bias =
+"MULTI_DIRECTIONAL_RISK";
+
+}
+
+
+else if (
+
+longReduction >= 25
+
+) {
+
+bias =
+"LONG_CAUTION";
+
+}
+
+
+else if (
+
+shortReduction >= 25
+
+) {
+
+bias =
+"SHORT_CAUTION";
+
+}
+
+
+/* =====================================================
+6. ACTIVE EXITS
 ===================================================== */
 
 const activeExits = [
+
 nasdaqPut,
 nasdaqCall,
 russellCall
+
 ]
+
 .filter(
+
 item =>
-Number(item?.sizeReduction ?? 0) > 0
+Number(
+item?.sizeReduction ?? 0
+) > 0
+
 )
+
 .map(
+
 item => ({
-instrument: item.instrument,
-action: item.action,
-sizeReduction: item.sizeReduction,
-reason: item.reason,
-priority: item.priority
+
+instrument:
+item.instrument,
+
+direction:
+item.direction,
+
+action:
+item.action,
+
+sizeReduction:
+item.sizeReduction,
+
+reason:
+item.reason,
+
+priority:
+item.priority
+
 })
+
 );
+
+
+/* =====================================================
+7. NET REASON
+===================================================== */
+
+let netReason =
+"No confirmed long portfolio reduction trigger";
+
+
+if (
+bias === "SHORT_EXIT_RISK"
+) {
+
+netReason =
+"Short exposure is facing confirmed exit risk while long-side risk remains limited";
+
+}
+
+
+else if (
+activeExits.length > 0
+) {
+
+netReason =
+activeExits
+
+.map(
+item =>
+`${item.instrument}: ${item.reason}`
+)
+
+.join(" | ");
+
+}
+
 
 /* =====================================================
 RETURN
@@ -302,50 +517,60 @@ RETURN
 
 return {
 
-/* -----------------------------------------------
-NEW THREE-WAY STRUCTURE
------------------------------------------------ */
+
+/* ============================================
+THREE WAY STRUCTURE
+============================================ */
 
 nasdaqPut,
+
 nasdaqCall,
+
 russellCall,
 
-/* -----------------------------------------------
+
+/* ============================================
 COMPATIBILITY
-Existing consumers can still access:
-exit.short / exit.long
------------------------------------------------ */
+============================================ */
 
-short: nasdaqPut,
-long: nasdaqCall,
+short:
+nasdaqPut,
 
-/* -----------------------------------------------
+long:
+nasdaqCall,
+
+
+/* ============================================
 NET
------------------------------------------------ */
+============================================ */
 
 net: {
-action: netAction,
-sizeReduction: maxReduction,
+
+action:
+netAction,
+
+sizeReduction:
+portfolioReduction,
+
 reason:
-activeExits.length === 0
-? "No active exit trigger"
-: activeExits
-.map(
-item =>
-`${item.instrument}: ${item.reason}`
-)
-.join(" | ")
+netReason
+
 },
+
 
 bias,
 
-systemic: false,
+
+systemic:
+false,
+
 
 activeExits,
 
-/* -----------------------------------------------
+
+/* ============================================
 SUMMARY
------------------------------------------------ */
+============================================ */
 
 summary: {
 
@@ -355,14 +580,14 @@ shortReduction,
 
 longReduction,
 
+portfolioReduction,
+
 nasdaqPutReduction:
-nasdaqPut.sizeReduction,
+shortReduction,
 
-nasdaqCallReduction:
-nasdaqCall.sizeReduction,
+nasdaqCallReduction,
 
-russellCallReduction:
-russellCall.sizeReduction,
+russellCallReduction,
 
 activeExitCount:
 activeExits.length
@@ -370,4 +595,5 @@ activeExits.length
 }
 
 };
+
 }

@@ -112,56 +112,52 @@ tradeStack?.nasdaqCall?.state ??
 PRICE
 ===================================================== */
 
-const priceScore =
-Number(
+const priceData =
 instrument === "RUSSELL_CALL"
 ? (
-priceMomentum?.rut?.score ??
-priceMomentum?.score ??
-50
+priceMomentum?.rut ??
+priceMomentum
 )
 : (
-priceMomentum?.ndx?.score ??
-priceMomentum?.score ??
-50
-)
+priceMomentum?.ndx ??
+priceMomentum
 );
+
+
+const priceScore =
+Number(
+priceData?.score ??
+50
+);
+
 
 const momentum5D =
 Number(
-instrument === "RUSSELL_CALL"
-? (
-priceMomentum?.rut?.momentum5D ??
+priceData?.momentum5D ??
 0
-)
-: (
-priceMomentum?.ndx?.momentum5D ??
-0
-)
 );
+
 
 const acceleration =
 Number(
-instrument === "RUSSELL_CALL"
-? (
-priceMomentum?.rut?.acceleration ??
+priceData?.acceleration ??
 0
-)
-: (
-priceMomentum?.ndx?.acceleration ??
-0
-)
 );
+
 
 const bullishImpulse =
 Boolean(
+priceData?.bullishImpulse ??
 priceMomentum?.bullishImpulse
 );
 
+
 const bearishImpulse =
 Boolean(
+priceData?.bearishImpulse ??
 priceMomentum?.bearishImpulse
 );
+
 
 /* =====================================================
 RUSSELL-SPECIFIC ROTATION DATA

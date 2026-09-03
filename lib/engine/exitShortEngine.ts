@@ -81,27 +81,37 @@ tradeStack?.nasdaqPut?.state ??
 PRICE
 ===================================================== */
 
+const ndxPrice =
+priceMomentum?.ndx ??
+priceMomentum ??
+{};
+
+
 const ndxPriceScore =
 Number(
-priceMomentum?.ndx?.score ??
-priceMomentum?.score ??
+ndxPrice?.score ??
 50
 );
 
+
 const bearishImpulse =
 Boolean(
+ndxPrice?.bearishImpulse ??
 priceMomentum?.bearishImpulse
 );
 
+
 const bullishImpulse =
 Boolean(
+ndxPrice?.bullishImpulse ??
 priceMomentum?.bullishImpulse
 );
 
+
 const priceDirection =
-priceMomentum?.ndx?.direction ??
-priceMomentum?.direction ??
+ndxPrice?.direction ??
 "FLAT";
+
 
 /* =====================================================
 FULL SYSTEM COLLAPSE
