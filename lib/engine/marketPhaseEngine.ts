@@ -12,16 +12,16 @@ const rotation = engine.rotation ?? {};
 const earlyWarning = engine.earlyWarning ?? {};
 const structure = engine.structure ?? {};
 const russell = engine.russell ?? {};
+
 const breadthVelocity =
 engine.breadthVelocity ?? {};
-
-/* ================= NEW ================= */
 
 const internalDivergence =
 engine.internalDivergence ?? {};
 
 const regimePersistence =
 engine.regimePersistence ?? {};
+
 
 /* =====================================================
 HISTORY METRICS
@@ -57,29 +57,37 @@ averageBreadth = 0,
 averageParticipation = 0,
 averageRotation = 0,
 averageLiquidity = 0,
-averageFragility = 0,
+averageFragility = 0
 
 } = historyMetrics;
 
 
 /* =====================================================
-SAFE
+SAFE INPUTS
 ===================================================== */
 
 const masterScore =
-Number(master.score ?? 0);
+Number(master?.score ?? 0);
 
 const crashScore =
-Number(crash.score ?? 0);
+Number(crash?.score ?? 0);
 
 const crashProbability =
-Number(crash.probability ?? 0);
+Number(crash?.probability ?? 0);
 
 const rotationScore =
-Number(rotation.score ?? 0);
+Number(rotation?.score ?? 0);
+
+
+/* =====================================================
+EARLY WARNING
+===================================================== */
 
 const early =
-earlyWarning?.active ?? false;
+Boolean(
+earlyWarning?.active ??
+false
+);
 
 const earlyScore =
 Number(
@@ -87,6 +95,11 @@ earlyWarning?.score?.value ??
 earlyWarning?.score ??
 0
 );
+
+
+/* =====================================================
+STRUCTURE
+===================================================== */
 
 const breadth20 =
 Number(
@@ -123,8 +136,9 @@ Number(
 structure?.highsLows?.lows ?? 0
 );
 
+
 /* =====================================================
-NEW BREADTH VELOCITY INPUTS
+BREADTH VELOCITY
 ===================================================== */
 
 const breadthVelocityScore =
@@ -146,24 +160,38 @@ const velocityState =
 breadthVelocity?.state ??
 "STABLE";
 
-const russellDecision =
-russell?.decision ?? "NONE";
 
 /* =====================================================
-ROTATION INPUTS
+RUSSELL
+===================================================== */
+
+const russellDecision =
+russell?.decision ??
+"NONE";
+
+
+/* =====================================================
+ROTATION
 ===================================================== */
 
 const rsSmall =
-Number(rotation?.rsSmall ?? 1);
+Number(
+rotation?.rsSmall ?? 1
+);
 
 const rsGrowth =
-Number(rotation?.rsGrowth ?? 1);
+Number(
+rotation?.rsGrowth ?? 1
+);
 
 const rsEqual =
-Number(rotation?.rsEqual ?? 1);
+Number(
+rotation?.rsEqual ?? 1
+);
+
 
 /* =====================================================
-NEW INTERNAL DIVERGENCE
+INTERNAL DIVERGENCE
 ===================================================== */
 
 const divergenceSeverity =
@@ -176,16 +204,23 @@ internalDivergence?.state ??
 "NONE";
 
 const hiddenDistribution =
+Boolean(
 internalDivergence?.hiddenDistribution ??
-false;
+false
+);
 
 const participationCollapse =
+Boolean(
 internalDivergence?.participationCollapse ??
-false;
+false
+);
 
 const narrowLeadershipDivergence =
+Boolean(
 internalDivergence?.narrowLeadership ??
-false;
+false
+);
+
 
 /* =====================================================
 REGIME PERSISTENCE
@@ -201,12 +236,16 @@ regimePersistence?.state ??
 "NEUTRAL";
 
 const bearishPersistence =
+Boolean(
 regimePersistence?.bearishPersistence ??
-false;
+false
+);
 
 const bullishPersistence =
+Boolean(
 regimePersistence?.bullishPersistence ??
-false;
+false
+);
 
 const persistenceTrend =
 regimePersistence?.trend ??
@@ -242,17 +281,22 @@ Number(
 regimePersistence?.marketFatigue ?? 0
 );
 
+
+/* =====================================================
+PERSISTENCE FLAGS
+===================================================== */
+
 const persistentWeakness =
-(
+
 bearishPersistence &&
-persistenceScore >= 60
-);
+persistenceScore >= 60;
+
 
 const severePersistentWeakness =
-(
+
 bearishPersistence &&
-persistenceScore >= 75
-);
+persistenceScore >= 75;
+
 
 /* =====================================================
 HISTORY FLAGS
@@ -261,38 +305,54 @@ HISTORY FLAGS
 const deterioratingBreadth =
 breadthTrend < -10;
 
+
 const acceleratingBreadthDecay =
 breadthAcceleration < -5;
+
 
 const participationErosion =
 participationDecay > 10;
 
+
 const severeParticipationErosion =
 participationDecay > 20;
+
 
 const risingCrashRisk =
 crashTrend > 5;
 
+
 const severeRisingCrashRisk =
 crashTrend > 10;
+
 
 const prolongedDistribution =
 phasePersistence >= 6;
 
+
 const prolongedBearHistory =
-prolongedBearRegime;
+Boolean(
+prolongedBearRegime
+);
+
 
 const severeBearRegime =
 
 prolongedBearRegime &&
-
 institutionalPressure > 75;
+
 
 const broadParticipationFailure =
 relativeBreadthWeakness > 10;
 
+
 const severeParticipationFailure =
 relativeBreadthWeakness > 20;
+
+
+/* =====================================================
+STRUCTURAL DETERIORATION
+===================================================== */
 
 const structuralDeterioration =
 
@@ -323,107 +383,128 @@ deterioratingBreadth
 );
 
 
-
 /* =====================================================
-FLAGS
+BREADTH FLAGS
 ===================================================== */
 
 const strongBreadth =
+
 breadth50 > 80 &&
 breadth200 > 70;
 
+
 const mediumBreadth =
+
 breadth50 > 65 &&
 breadth200 > 55;
 
+
 const weakBreadth =
+
 breadth50 < 50 ||
 breadth200 < 45;
 
-const extremeBreadth =
-breadth50 > 90;
 
 /* =====================================================
-INTERNAL MARKET HEALTH
+INTERNALS
 ===================================================== */
 
-/*
-AD is treated as a normalized market-internals score.
-
-Typical interpretation:
-
-70+ = strong
-55–70 = healthy
-45–55 = neutral
-30–45 = weak
-<30 = severe weakness
-*/
-
 const weakInternals =
-ad < 45;
+ad <= 0;
+
 
 const severeInternalWeakness =
-ad < 30 &&
+
+ad < 0 &&
 highs < lows &&
 breadth50 < 58;
 
+
 const healthyInternals =
-ad >= 55 &&
+
+ad > 0 &&
 highs >= lows;
 
+
+/* =====================================================
+ROTATION FLAGS
+===================================================== */
 
 const rotationActive =
 [
 "BUILD",
 "ADD",
 "AGGRESSIVE"
-].includes(russellDecision);
+].includes(
+russellDecision
+);
+
 
 const narrowLeadership =
+
 rsGrowth > 1.05 &&
 rsSmall < 0.97 &&
 rsEqual < 0.97;
 
+
 const severeNarrowLeadership =
+
 rsSmall < 0.94 &&
 rsEqual < 0.94;
 
+
 const broadParticipation =
+
 rsSmall > 1 &&
 rsEqual > 1 &&
 breadth50 > 65;
 
+
 const rotationalWeakness =
+
 rsSmall < 0.98 ||
 rsEqual < 0.98;
 
+
 /* =====================================================
-NEW TRANSITION FLAGS
+TRANSITION FLAGS
 ===================================================== */
 
 const equalWeightWeakness =
 rsEqual < 0.985;
 
+
 const smallCapWeakness =
 rsSmall < 0.985;
 
+
 /* =====================================================
-NEW BREADTH VELOCITY FLAGS
+BREADTH MOMENTUM
 ===================================================== */
 
 const breadthMomentumLoss =
+
 velocity20 < 0 &&
 velocity50 < 0;
 
+
 const aggressiveBreadthMomentumLoss =
+
 velocity20 < -4 &&
 velocity50 < -3;
+
 
 const breadthImpulseBreak =
 breadthVelocityScore < 42;
 
+
 const severeBreadthImpulseBreak =
 breadthVelocityScore < 30;
+
+
+/* =====================================================
+EARLY DISTRIBUTION
+===================================================== */
 
 const earlyDistributionDynamics =
 
@@ -434,8 +515,9 @@ narrowLeadership ||
 rotationalWeakness
 );
 
+
 /* =====================================================
-NEW INTERNAL DISTRIBUTION FLAGS
+HIDDEN DISTRIBUTION
 ===================================================== */
 
 const hiddenInstitutionalDistribution =
@@ -447,6 +529,7 @@ divergenceSeverity >= 35 ||
 participationCollapse
 );
 
+
 const severeHiddenDistribution =
 
 hiddenDistribution &&
@@ -454,6 +537,7 @@ hiddenDistribution &&
 divergenceSeverity >= 50 &&
 
 participationCollapse;
+
 
 /* =====================================================
 PERSISTENT DISTRIBUTION
@@ -469,6 +553,7 @@ breadthMomentumLoss ||
 weakInternals
 );
 
+
 const severePersistentDistribution =
 
 severePersistentWeakness &&
@@ -478,38 +563,60 @@ severeHiddenDistribution ||
 aggressiveBreadthMomentumLoss
 );
 
+
 /* =====================================================
-NEW PHASE REGIME MAP
+PHASE INITIALIZATION
 ===================================================== */
+
+let primaryPhase =
+"PHASE_1_EXPANSION";
 
 let regimeState =
 "RISK_ON";
 
-/* =====================================================
-NEW PHASE 4 SUBPHASES
-===================================================== */
-
 let subPhase =
 "HEALTHY_EXPANSION";
 
+let confidence =
+50;
+
+
 /* =====================================================
-PHASE
+PHASE PRESSURE SYSTEM
+
+This is NEW.
+
+The primary phase remains the current regime.
+
+phasePressure shows where the market is
+structurally moving.
 ===================================================== */
 
-let phase =
+let phasePressure =
+"STABLE";
+
+
+let secondaryPhase =
 "PHASE_1_EXPANSION";
 
-let confidence = 50;
+
+let phaseDirection =
+"NEUTRAL";
+
+
+let phaseProgression =
+0;
+
 
 /* =====================================================
-🔴 CAPITULATION
+PHASE 7 — CAPITULATION
 ===================================================== */
 
 if (
 crashScore > 85
 ) {
 
-phase =
+primaryPhase =
 "PHASE_7_CAPITULATION";
 
 regimeState =
@@ -518,18 +625,21 @@ regimeState =
 subPhase =
 "FORCED_LIQUIDATION";
 
-confidence = 95;
+confidence =
+95;
+
 }
 
+
 /* =====================================================
-🔴 ACCELERATION
+PHASE 6 — ACCELERATION
 ===================================================== */
 
 else if (
 crashScore > 75
 ) {
 
-phase =
+primaryPhase =
 "PHASE_6_ACCELERATION";
 
 regimeState =
@@ -538,18 +648,21 @@ regimeState =
 subPhase =
 "LIQUIDITY_BREAK";
 
-confidence = 90;
+confidence =
+90;
+
 }
 
+
 /* =====================================================
-🔴 BREAKDOWN
+PHASE 5 — BREAKDOWN
 ===================================================== */
 
 else if (
 crashScore > 65
 ) {
 
-phase =
+primaryPhase =
 "PHASE_5_BREAKDOWN";
 
 regimeState =
@@ -558,12 +671,14 @@ regimeState =
 subPhase =
 "STRUCTURAL_BREAKDOWN";
 
-confidence = 85;
+confidence =
+85;
+
 }
 
+
 /* =====================================================
-🟠 PHASE 4 — FRAGILE
-INSTITUTIONAL TRANSITION DETECTION
+PHASE 4 — RISK
 ===================================================== */
 
 else if (
@@ -595,9 +710,7 @@ hiddenDistribution
 
 ||
 
-(
 persistentDistribution
-)
 
 ||
 
@@ -622,21 +735,15 @@ narrowLeadership
 
 ||
 
-(
 aggressiveBreadthMomentumLoss
-)
 
 ||
 
-(
 severePersistentDistribution
-)
 
 ||
 
-(
 crashScore > 55
-)
 
 ||
 
@@ -656,23 +763,18 @@ marketFatigue > 75
 
 ) {
 
-phase =
+primaryPhase =
 "PHASE_4_RISK";
 
 regimeState =
 "FRAGILE";
 
-/* =====================================================
-PRE-CRASH TRANSITION
-===================================================== */
+
+/* PRE CRASH */
 
 if (
 
-(
-severePersistentDistribution
-)
-
-||
+severePersistentDistribution ||
 
 (
 participationCollapse &&
@@ -689,11 +791,10 @@ severeBreadthImpulseBreak
 
 ||
 
-(
 crashScore > 62
-)
 
 ||
+
 (
 severeBearRegime &&
 severeParticipationFailure
@@ -704,12 +805,13 @@ severeParticipationFailure
 subPhase =
 "PRE_CRASH_TRANSITION";
 
-confidence = 90;
+confidence =
+90;
+
 }
 
-/* =====================================================
-INTERNAL DISTRIBUTION
-===================================================== */
+
+/* INTERNAL DISTRIBUTION */
 
 else if (
 
@@ -741,21 +843,20 @@ rotationScore < 50
 
 ||
 
-(
 persistentDistribution
-)
 
 ) {
 
 subPhase =
 "INTERNAL_DISTRIBUTION";
 
-confidence = 84;
+confidence =
+84;
+
 }
 
-/* =====================================================
-PASSIVE LIQUIDITY TRAP
-===================================================== */
+
+/* LIQUIDITY TRAP */
 
 else if (
 
@@ -776,12 +877,13 @@ rotationScore < 52 &&
 subPhase =
 "PASSIVE_LIQUIDITY_TRAP";
 
-confidence = 73;
+confidence =
+73;
+
 }
 
-/* =====================================================
-ROTATIONAL BREAKDOWN
-===================================================== */
+
+/* ROTATION BREAKDOWN */
 
 else if (
 
@@ -797,24 +899,29 @@ rsEqual < 0.97
 subPhase =
 "ROTATIONAL_BREAKDOWN";
 
-confidence = 78;
+confidence =
+78;
+
 }
 
-/* =====================================================
-DEFAULT
-===================================================== */
+
+/* DEFAULT */
 
 else {
 
 subPhase =
 "HEALTHY_PULLBACK";
 
-confidence = 64;
-}
+confidence =
+64;
+
 }
 
+}
+
+
 /* =====================================================
-🟡 DISTRIBUTION = TRANSITION
+PHASE 3 — DISTRIBUTION
 ===================================================== */
 
 else if (
@@ -833,10 +940,11 @@ breadthImpulseBreak
 
 ||
 
-persistentDistribution ||
+persistentDistribution
+
+||
 
 hiddenInstitutionalDistribution
-
 
 ||
 
@@ -846,14 +954,14 @@ distributionRisk > 55
 
 marketFatigue > 60
 
-
 ) {
 
-phase =
+primaryPhase =
 "PHASE_3_DISTRIBUTION";
 
 regimeState =
 "TRANSITION";
+
 
 if (
 
@@ -866,73 +974,99 @@ hiddenInstitutionalDistribution
 subPhase =
 "PERSISTENT_HIDDEN_DISTRIBUTION";
 
-confidence = 86;
+confidence =
+86;
+
 }
 
+
 else if (
+
 breadthMomentumLoss &&
 narrowLeadership
+
 ) {
 
 subPhase =
 "EARLY_INSTITUTIONAL_DISTRIBUTION";
 
-confidence = 80;
+confidence =
+80;
 
 }
+
 
 else {
 
 subPhase =
 "EARLY_DISTRIBUTION";
 
-confidence = 72;
-}
+confidence =
+72;
+
 }
 
+}
+
+
 /* =====================================================
-🟡 WARNING / LATE EXPANSION
+PHASE 2 — WARNING
 ===================================================== */
 
 else if (
+
 early &&
 strongBreadth
+
 ) {
 
-phase =
+primaryPhase =
 "PHASE_2_WARNING";
 
 regimeState =
 "LATE_EXPANSION";
 
+
 if (
+
 breadthMomentumLoss ||
 persistentWeakness
+
 ) {
 
 subPhase =
 "ROLLING_OVER_BREADTH";
 
-confidence = 80;
+confidence =
+80;
 
-} else {
+}
+
+else {
 
 subPhase =
 "LATE_EXPANSION";
 
-confidence = 75;
-}
+confidence =
+75;
+
 }
 
+}
+
+
 /* =====================================================
-🟢 ROTATION EXPANSION
+PHASE 2 — ROTATIONAL EXPANSION
 ===================================================== */
 
 else if (
 
 rotationActive &&
+
 rotationScore >= 40 &&
+
 crashScore < 30 &&
+
 !persistentWeakness &&
 
 trendStability > 60 &&
@@ -941,23 +1075,29 @@ recoveryQuality > 55
 
 ) {
 
-phase =
+primaryPhase =
 "PHASE_2_WARNING";
 
 regimeState =
 "ROTATIONAL_EXPANSION";
 
+
 if (
+
 broadParticipation &&
 breadthVelocityScore > 60 &&
 bullishPersistence
+
 ) {
 
 subPhase =
 "BROADENING_EXPANSION";
 
-confidence = 76;
+confidence =
+76;
+
 }
+
 
 else if (
 narrowLeadership
@@ -966,51 +1106,69 @@ narrowLeadership
 subPhase =
 "NARROW_AI_EXPANSION";
 
-confidence = 62;
+confidence =
+62;
+
 }
+
 
 else {
 
 subPhase =
 "ROTATION_BUILD";
 
-confidence = 65;
-}
+confidence =
+65;
+
 }
 
+}
+
+
 /* =====================================================
-🟢 CLEAN EXPANSION
+PHASE 1 — CLEAN EXPANSION
 ===================================================== */
 
 else if (
 
 strongBreadth &&
+
 !early &&
+
 crashScore < 30 &&
+
 !breadthMomentumLoss &&
+
 !persistentWeakness &&
+
 !hiddenInstitutionalDistribution
 
 ) {
 
-phase =
+primaryPhase =
 "PHASE_1_EXPANSION";
 
 regimeState =
 "RISK_ON";
 
+
 if (
+
 broadParticipation &&
 health > 80 &&
 breadthVelocityScore > 68 &&
 bullishPersistence
+
 ) {
 
 subPhase =
 "INSTITUTIONAL_EXPANSION";
 
-confidence = 88;
+confidence =
+88;
+
 }
+
 
 else if (
 narrowLeadership
@@ -1019,17 +1177,24 @@ narrowLeadership
 subPhase =
 "AI_MELTUP";
 
-confidence = 72;
+confidence =
+72;
+
 }
+
 
 else {
 
 subPhase =
 "HEALTHY_EXPANSION";
 
-confidence = 70;
+confidence =
+70;
+
 }
+
 }
+
 
 /* =====================================================
 FALLBACK
@@ -1037,26 +1202,35 @@ FALLBACK
 
 else {
 
-phase =
+primaryPhase =
+
 persistentWeakness
 ? "PHASE_3_DISTRIBUTION"
 : "PHASE_2_WARNING";
 
+
 regimeState =
+
 persistentWeakness
 ? "TRANSITION"
 : "RISK_ON";
 
+
 subPhase =
+
 persistentWeakness
 ? "PERSISTENT_TRANSITION"
 : "TRANSITION";
 
+
 confidence =
+
 persistentWeakness
 ? 68
 : 50;
+
 }
+
 
 /* =====================================================
 ANTI SNAPBACK FILTER
@@ -1066,20 +1240,18 @@ if (
 
 (
 persistentWeakness ||
-
 persistentDistribution ||
-
 structuralDeterioration
-
 )
 
 &&
 
-phase==="PHASE_1_EXPANSION"
+primaryPhase ===
+"PHASE_1_EXPANSION"
 
 ) {
 
-phase =
+primaryPhase =
 "PHASE_2_WARNING";
 
 regimeState =
@@ -1089,33 +1261,553 @@ subPhase =
 "PERSISTENT_INTERNAL_WEAKNESS";
 
 confidence =
-Math.min(confidence, 68);
+Math.min(
+confidence,
+68
+);
+
 }
 
+
 /* =====================================================
-OUTPUT
+PHASE PRESSURE CALCULATION
+
+This determines the SECONDARY PHASE.
+
+Primary phase = where we are.
+
+Secondary phase = where pressure is building.
+===================================================== */
+
+const phaseNumber =
+Number(
+primaryPhase
+.replace("PHASE_", "")
+.split("_")[0]
+);
+
+
+/* =====================================================
+DOWNWARD PRESSURE
+===================================================== */
+
+const downsidePressure =
+
+(
+crashScore * 0.30
+)
+
++
+
+(
+distributionRisk * 0.15
+)
+
++
+
+(
+falseRecoveryRisk * 0.10
+)
+
++
+
+(
+marketFatigue * 0.10
+)
+
++
+
+(
+persistentWeakness
+? 15
+: 0
+)
+
++
+
+(
+persistentDistribution
+? 15
+: 0
+)
+
++
+
+(
+structuralDeterioration
+? 15
+: 0
+)
+
++
+
+(
+aggressiveBreadthMomentumLoss
+? 10
+: 0
+)
+
++
+
+(
+participationCollapse
+? 15
+: 0
+);
+
+
+/* =====================================================
+UPSIDE PRESSURE
+===================================================== */
+
+const upsidePressure =
+
+(
+recoveryQuality * 0.20
+)
+
++
+
+(
+trendStability * 0.20
+)
+
++
+
+(
+bullishPersistence
+? 20
+: 0
+)
+
++
+
+(
+broadParticipation
+? 15
+: 0
+)
+
++
+
+(
+breadthVelocityScore > 60
+? 15
+: 0
+)
+
++
+
+(
+health > 70
+? 10
+: 0
+);
+
+
+/* =====================================================
+PRESSURE DIFFERENCE
+===================================================== */
+
+const pressureDelta =
+downsidePressure -
+upsidePressure;
+
+
+/* =====================================================
+PHASE DIRECTION
+===================================================== */
+
+if (
+pressureDelta > 25
+) {
+
+phaseDirection =
+"DETERIORATING";
+
+}
+
+else if (
+pressureDelta > 10
+) {
+
+phaseDirection =
+"WEAKENING";
+
+}
+
+else if (
+pressureDelta < -25
+) {
+
+phaseDirection =
+"RECOVERING";
+
+}
+
+else if (
+pressureDelta < -10
+) {
+
+phaseDirection =
+"STABILIZING";
+
+}
+
+else {
+
+phaseDirection =
+"STABLE";
+
+}
+
+
+/* =====================================================
+SECONDARY PHASE
+===================================================== */
+
+if (
+
+phaseDirection ===
+"DETERIORATING"
+
+) {
+
+secondaryPhase =
+`PHASE_${Math.min(
+7,
+phaseNumber + 1
+)}_`;
+
+}
+
+else if (
+
+phaseDirection ===
+"WEAKENING"
+
+) {
+
+secondaryPhase =
+`PHASE_${Math.min(
+7,
+phaseNumber + 1
+)}_`;
+
+}
+
+else if (
+
+phaseDirection ===
+"RECOVERING"
+
+) {
+
+secondaryPhase =
+`PHASE_${Math.max(
+1,
+phaseNumber - 1
+)}_`;
+
+}
+
+else if (
+
+phaseDirection ===
+"STABILIZING"
+
+) {
+
+secondaryPhase =
+`PHASE_${Math.max(
+1,
+phaseNumber - 1
+)}_`;
+
+}
+
+else {
+
+secondaryPhase =
+primaryPhase;
+
+}
+
+
+/* =====================================================
+FIX SECONDARY PHASE FORMAT
+===================================================== */
+
+const phaseMap: Record<number,string> = {
+
+1:
+"PHASE_1_EXPANSION",
+
+2:
+"PHASE_2_WARNING",
+
+3:
+"PHASE_3_DISTRIBUTION",
+
+4:
+"PHASE_4_RISK",
+
+5:
+"PHASE_5_BREAKDOWN",
+
+6:
+"PHASE_6_ACCELERATION",
+
+7:
+"PHASE_7_CAPITULATION"
+
+};
+
+
+/* =====================================================
+NORMALIZE SECONDARY PHASE
+===================================================== */
+
+if (
+
+phaseDirection ===
+"DETERIORATING"
+
+||
+
+phaseDirection ===
+"WEAKENING"
+
+) {
+
+secondaryPhase =
+phaseMap[
+Math.min(
+7,
+phaseNumber + 1
+)
+];
+
+}
+
+
+else if (
+
+phaseDirection ===
+"RECOVERING"
+
+||
+
+phaseDirection ===
+"STABILIZING"
+
+) {
+
+secondaryPhase =
+phaseMap[
+Math.max(
+1,
+phaseNumber - 1
+)
+];
+
+}
+
+else {
+
+secondaryPhase =
+primaryPhase;
+
+}
+
+
+/* =====================================================
+PHASE PRESSURE LABEL
+===================================================== */
+
+if (
+phaseDirection ===
+"DETERIORATING"
+) {
+
+phasePressure =
+"STRONG DOWNWARD PRESSURE";
+
+}
+
+else if (
+phaseDirection ===
+"WEAKENING"
+) {
+
+phasePressure =
+"DOWNWARD PRESSURE";
+
+}
+
+else if (
+phaseDirection ===
+"RECOVERING"
+) {
+
+phasePressure =
+"STRONG RECOVERY PRESSURE";
+
+}
+
+else if (
+phaseDirection ===
+"STABILIZING"
+) {
+
+phasePressure =
+"RECOVERY PRESSURE";
+
+}
+
+else {
+
+phasePressure =
+"STABLE";
+
+}
+
+
+/* =====================================================
+PHASE PROGRESSION
+
+0–100 indicates position inside current phase.
+===================================================== */
+
+let progressionBase =
+50;
+
+
+/* Downside progression */
+
+if (
+phaseDirection ===
+"DETERIORATING"
+) {
+
+progressionBase =
+Math.min(
+100,
+60 +
+Math.max(
+0,
+pressureDelta
+)
+);
+
+}
+
+
+/* Weakening */
+
+else if (
+phaseDirection ===
+"WEAKENING"
+) {
+
+progressionBase =
+Math.min(
+75,
+50 +
+Math.max(
+0,
+pressureDelta
+)
+);
+
+}
+
+
+/* Recovery */
+
+else if (
+
+phaseDirection ===
+"RECOVERING"
+
+) {
+
+progressionBase =
+Math.max(
+0,
+40 +
+pressureDelta
+);
+
+}
+
+
+/* Stable */
+
+else {
+
+progressionBase =
+50;
+
+}
+
+
+phaseProgression =
+Math.round(
+Math.max(
+0,
+Math.min(
+100,
+progressionBase
+)
+)
+);
+
+
+/* =====================================================
+PHASE OUTPUT
 ===================================================== */
 
 return {
 
-phase,
+/* =================================================
+COMPATIBILITY
+Existing engines use phase.
+================================================= */
+
+phase:
+primaryPhase,
+
+
+/* =================================================
+NEW PHASE STRUCTURE
+================================================= */
+
+primaryPhase,
+
+secondaryPhase,
+
+phasePressure,
+
+phaseDirection,
+
+phaseProgression,
+
+
+/* =================================================
+REGIME
+================================================= */
+
 regimeState,
 
 subPhase,
 
 confidence,
 
-marketRegime: {
 
-label: regimeState,
-
-score: confidence,
-
-subPhase,
-
-confidence
-
-},
+/* =================================================
+DRIVERS
+================================================= */
 
 drivers: {
 
@@ -1174,8 +1866,10 @@ russellDecision,
 
 persistenceScore,
 persistenceState,
+
 bearishPersistence,
 bullishPersistence,
+
 persistenceTrend,
 
 divergenceSeverity,
@@ -1199,12 +1893,12 @@ breadthAcceleration,
 
 participationDecay,
 
-
 crashTrend,
 
 phasePersistence,
 
 regimeAge,
+
 relativeBreadthWeakness,
 
 prolongedBearRegime,
@@ -1250,10 +1944,18 @@ daysInPhase,
 
 institutionalPressure,
 
-marketCharacter
+marketCharacter,
 
+/* NEW */
+
+downsidePressure,
+
+upsidePressure,
+
+pressureDelta
 
 }
+
 };
 
 }
