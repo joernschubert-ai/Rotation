@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+/* =====================================================
+TYPES
+===================================================== */
+
 type FilterType =
 | "ALL"
 | "LONG"
@@ -9,221 +13,473 @@ type FilterType =
 | "REDUCE"
 | "SYSTEM";
 
+interface SignalHistoryItem {
+timestamp?: number | string;
+
+type?: string;
+phase?: string;
+
+message?: string;
+
+strength?: number;
+
+masterScore?: number;
+dangerScore?: number;
+tradeStack?: number;
+systemHeat?: number;
+
+reason?: string;
+summary?: string;
+}
+
+/* =====================================================
+COMPONENT
+===================================================== */
+
 export default function SignalHistoryPanel() {
 
-const [signals,setSignals]=useState<any[]>([]);
+const [signals, setSignals] =
+useState<SignalHistoryItem[]>([]);
 
-const [filter,setFilter]=
-useState<FilterType>("ALL");
+const [filter, setFilter] =
+useState("ALL");
+
+const [loading, setLoading] =
+useState(true);
+
+const [error, setError] =
+useState(false);
 
 /* =====================================================
 LOAD
 ===================================================== */
 
-useEffect(()=>{
+useEffect(() => {
 
-load();
+loadSignals();
 
-},[]);
+}, []);
 
-async function load(){
+async function loadSignals() {
 
-try{
+try {
 
-const res=
-await fetch("/api/signal");
+  setLoading(true);
+  setError(false);
 
-const json=
-await res.json();
+  const res =
+    await fetch("/api/signal");
 
-setSignals(json ?? []);
+  if (!res.ok) {
+    throw new Error(
+      `Signal API error: ${res.status}`
+    );
+  }
 
-}catch(e){
+  const json =
+    await res.json();
 
-console.error(e);
+  setSignals(
+    Array.isArray(json)
+      ? json
+      : []
+  );
+
+} catch (e) {
+
+  console.error(
+    "Signal History Load Error:",
+    e
+  );
+
+  setSignals([]);
+  setError(true);
+
+} finally {
+
+  setLoading(false);
 
 }
 
 }
+
+/* =====================================================
+NORMALIZE TIMESTAMP
+===================================================== */
+
+function getTimestamp(
+value: number | string | undefined
+): number {
+
+if (!value)
+  return 0;
+
+if (typeof value === "number")
+  return value;
+
+const parsed =
+  new Date(value).getTime();
+
+return Number.isFinite(parsed)
+  ? parsed
+  : 0;
+
+}
+
+/* =====================================================
+SORTED SIGNALS
+===================================================== */
+
+const sortedSignals =
+useMemo(() => {
+
+  return [...signals]
+    .sort(
+      (a, b) =>
+        getTimestamp(b.timestamp) -
+        getTimestamp(a.timestamp)
+    );
+
+}, [signals]);
 
 /* =====================================================
 FILTER
 ===================================================== */
 
-const filteredSignals=
-useMemo(()=>{
+const filteredSignals =
+useMemo(() => {
 
-if(filter==="ALL")
-return signals;
+  if (filter === "ALL")
+    return sortedSignals;
 
-return signals.filter((s)=>{
+  return sortedSignals.filter(
+    signal => {
 
-const type=
-String(s.type ?? "").toUpperCase();
+      const type =
+        String(
+          signal.type ?? ""
+        ).toUpperCase();
 
-switch(filter){
 
-case "LONG":
+      switch (filter) {
 
-return type.includes("LONG");
+        case "LONG":
 
-case "PUT":
+          return (
+            type.includes("LONG") ||
+            type.includes("CALL")
+          );
 
-return type.includes("PUT");
 
-case "REDUCE":
+        case "PUT":
+
+          return (
+            type.includes("PUT") ||
+            type.includes("SHORT")
+          );
+
+
+        case "REDUCE":
+
+          return (
+            type.includes("REDUCE") ||
+            type.includes("TRIM") ||
+            type.includes("EXIT")
+          );
+
+
+        case "SYSTEM":
+
+          return (
+            type.includes("SYSTEM") ||
+            type.includes("FORCE")
+          );
+
+
+        default:
+
+          return true;
+
+      }
+
+    }
+  );
+
+}, [
+  sortedSignals,
+  filter
+]);
+
+/* =====================================================
+TODAY CHECK
+===================================================== */
+
+function isToday(
+timestamp: number | string | undefined
+): boolean {
+
+const time =
+  getTimestamp(timestamp);
+
+if (!time)
+  return false;
+
+const date =
+  new Date(time);
+
+const today =
+  new Date();
 
 return (
-type.includes("REDUCE") ||
-type.includes("TRIM") ||
-type.includes("EXIT")
+  date.getFullYear() ===
+    today.getFullYear() &&
+
+  date.getMonth() ===
+    today.getMonth() &&
+
+  date.getDate() ===
+    today.getDate()
 );
-
-case "SYSTEM":
-
-return (
-type.includes("SYSTEM") ||
-type.includes("FORCE")
-);
-
-default:
-
-return true;
 
 }
-
-});
-
-},[signals,filter]);
 
 /* =====================================================
 STATS
 ===================================================== */
 
-const todaySignals=
+const totalSignals =
 filteredSignals.length;
 
-const strongSignals=
+const todaySignals =
 filteredSignals.filter(
-s=>(s.strength ?? 0)>=80
+signal =>
+isToday(signal.timestamp)
 ).length;
 
-const weakSignals=
+const strongSignals =
 filteredSignals.filter(
-s=>(s.strength ?? 0)<40
+signal =>
+Number(signal.strength ?? 0) >= 80
 ).length;
 
-const avgStrength=
-filteredSignals.length===0
-?0
-:Math.round(
+const weakSignals =
+filteredSignals.filter(
+signal =>
+Number(signal.strength ?? 0) < 40
+).length;
 
-filteredSignals.reduce(
+const averageStrength =
+filteredSignals.length === 0
+? 0
+: Math.round(
 
-(a,b)=>
+      filteredSignals.reduce(
+        (total, signal) =>
+          total +
+          Number(
+            signal.strength ?? 0
+          ),
+        0
+      )
 
-a+(b.strength ??0),
+      /
+      filteredSignals.length
 
-0
+    );
 
-)
-
-/
-
-filteredSignals.length
-
-);
-
-const lastSignal=
-filteredSignals[0];
+const lastSignal =
+sortedSignals[0];
 
 /* =====================================================
 HELPERS
 ===================================================== */
 
-function formatTime(ts:number){
+function formatTime(
+timestamp: number | string | undefined
+) {
 
-if(!ts)
-return "--:--";
+const time =
+  getTimestamp(timestamp);
 
-return new Date(ts)
-.toLocaleTimeString([],{
+if (!time)
+  return "--:--";
 
-hour:"2-digit",
-minute:"2-digit"
-
-});
+return new Date(time)
+  .toLocaleTimeString(
+    "de-DE",
+    {
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  );
 
 }
 
-function signalColor(type:string){
+function formatDate(
+timestamp: number | string | undefined
+) {
 
-const t=
-String(type ?? "").toUpperCase();
+const time =
+  getTimestamp(timestamp);
 
-if(t.includes("PUT"))
-return "#ff4d4f";
+if (!time)
+  return "--";
 
-if(t.includes("LONG"))
-return "#52c41a";
+return new Date(time)
+  .toLocaleDateString(
+    "de-DE",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    }
+  );
 
-if(t.includes("REDUCE"))
-return "#faad14";
+}
 
-if(t.includes("EXIT"))
-return "#ff7875";
+function signalColor(
+type?: string
+) {
 
-if(t.includes("SYSTEM"))
-return "#9254de";
+const value =
+  String(type ?? "")
+    .toUpperCase();
+
+
+if (
+  value.includes("PUT") ||
+  value.includes("SHORT")
+) {
+
+  return "#ff4d4f";
+
+}
+
+
+if (
+  value.includes("LONG") ||
+  value.includes("CALL")
+) {
+
+  return "#52c41a";
+
+}
+
+
+if (
+  value.includes("REDUCE") ||
+  value.includes("TRIM")
+) {
+
+  return "#faad14";
+
+}
+
+
+if (
+  value.includes("EXIT")
+) {
+
+  return "#ff7875";
+
+}
+
+
+if (
+  value.includes("SYSTEM") ||
+  value.includes("FORCE")
+) {
+
+  return "#9254de";
+
+}
+
 
 return "#888";
 
 }
 
-function strengthColor(value:number){
+function strengthColor(
+value: number
+) {
 
-if(value>=80)
-return "#52c41a";
+if (value >= 80)
+  return "#52c41a";
 
-if(value>=60)
-return "#faad14";
+if (value >= 60)
+  return "#faad14";
 
-if(value>=40)
-return "#d4b106";
+if (value >= 40)
+  return "#d4b106";
 
 return "#666";
 
 }
 
-function phaseColor(phase:string){
+function phaseColor(
+phase?: string
+) {
 
-switch(phase){
+switch (phase) {
 
-case "PHASE_1_EXPANSION":
-return "#52c41a";
+  case "PHASE_1_EXPANSION":
+    return "#52c41a";
 
-case "PHASE_2_WARNING":
-return "#95de64";
+  case "PHASE_2_WARNING":
+    return "#95de64";
 
-case "PHASE_3_DISTRIBUTION":
-return "#faad14";
+  case "PHASE_3_DISTRIBUTION":
+    return "#faad14";
 
-case "PHASE_4_RISK":
-return "#fa8c16";
+  case "PHASE_4_RISK":
+    return "#fa8c16";
 
-case "PHASE_5_BREAKDOWN":
-return "#ff4d4f";
+  case "PHASE_5_BREAKDOWN":
+    return "#ff4d4f";
 
-case "PHASE_6_ACCELERATION":
-return "#cf1322";
+  case "PHASE_6_ACCELERATION":
+    return "#cf1322";
 
-case "PHASE_7_CAPITULATION":
-return "#820014";
+  case "PHASE_7_CAPITULATION":
+    return "#820014";
 
-default:
-return "#666";
+  default:
+    return "#666";
 
 }
+
+}
+
+function phaseLabel(
+phase?: string
+) {
+
+if (!phase)
+  return "UNKNOWN";
+
+return phase
+  .replace("PHASE_", "P")
+  .replace("_EXPANSION", " EXPANSION")
+  .replace("_WARNING", " WARNING")
+  .replace("_DISTRIBUTION", " DISTRIBUTION")
+  .replace("_RISK", " RISK")
+  .replace("_BREAKDOWN", " BREAKDOWN")
+  .replace("_ACCELERATION", " ACCELERATION")
+  .replace("_CAPITULATION", " CAPITULATION");
+
+}
+
+function normalizeStrength(
+value?: number
+) {
+
+return Math.min(
+  100,
+  Math.max(
+    0,
+    Math.round(value ?? 0)
+  )
+);
 
 }
 
@@ -232,645 +488,788 @@ RENDER
 ===================================================== */
 
 return (
-<div
-style={{
-background:"#0d0d0d",
-border:"1px solid #222",
-padding:"16px"
-}}
->
-
-{/* =====================================================
-HEADER
-===================================================== */}
 
 <div
-style={{
-display:"flex",
-justifyContent:"space-between",
-alignItems:"center",
-marginBottom:"18px"
-}}
+  style={{
+    background: "#0d0d0d",
+    border: "1px solid #222",
+    padding: "16px"
+  }}
 >
 
-<div>
 
-<h3
-style={{
-margin:0,
-color:"#bbb"
-}}
->
+  {/* =====================================================
+  HEADER
+  ===================================================== */}
 
-SIGNAL HISTORY
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: "20px",
+      marginBottom: "18px",
+      flexWrap: "wrap"
+    }}
+  >
 
-</h3>
 
-<div
-style={{
-fontSize:"11px",
-color:"#666",
-marginTop:"3px"
-}}
->
+    <div>
 
-Institutional Signal Journal
+      <h3
+        style={{
+          margin: 0,
+          color: "#ddd",
+          fontSize: "15px",
+          letterSpacing: "0.5px"
+        }}
+      >
 
-</div>
+        SIGNAL HISTORY
 
-</div>
+      </h3>
 
-<div
-style={{
-display:"flex",
-gap:"18px",
-fontSize:"11px",
-color:"#888"
-}}
->
 
-<div>
+      <div
+        style={{
+          fontSize: "11px",
+          color: "#666",
+          marginTop: "4px"
+        }}
+      >
 
-<div>Today</div>
+        Institutional Signal Journal
 
-<b style={{color:"#ddd"}}>
+      </div>
 
-{todaySignals}
 
-</b>
+      {lastSignal && (
 
-</div>
+        <div
+          style={{
+            marginTop: "8px",
+            fontSize: "10px",
+            color: "#555"
+          }}
+        >
 
-<div>
+          LAST SIGNAL ·{" "}
+
+          <span
+            style={{
+              color:
+                signalColor(
+                  lastSignal.type
+                )
+            }}
+          >
+
+            {lastSignal.type ?? "-"}
+
+          </span>
+
+          {" · "}
+
+          {formatDate(
+            lastSignal.timestamp
+          )}
+
+          {" "}
+
+          {formatTime(
+            lastSignal.timestamp
+          )}
+
+        </div>
+
+      )}
+
+    </div>
+
+
+    {/* =====================================================
+    STATS
+    ===================================================== */}
+
+    <div
+      style={{
+        display: "flex",
+        gap: "18px",
+        flexWrap: "wrap"
+      }}
+    >
+
+      <StatItem
+        label="Total"
+        value={totalSignals}
+        color="#ddd"
+      />
+
+      <StatItem
+        label="Today"
+        value={todaySignals}
+        color="#bbb"
+      />
+
+      <StatItem
+        label="Strong"
+        value={strongSignals}
+        color="#52c41a"
+      />
+
+      <StatItem
+        label="Weak"
+        value={weakSignals}
+        color="#faad14"
+      />
+
+      <StatItem
+        label="Avg"
+        value={averageStrength}
+        color="#ddd"
+      />
+
+    </div>
+
+  </div>
+
 
-<div>Strong</div>
+  {/* =====================================================
+  FILTER
+  ===================================================== */}
 
-<b style={{color:"#52c41a"}}>
+  <div
+    style={{
+      display: "flex",
+      gap: "7px",
+      marginBottom: "18px",
+      flexWrap: "wrap"
+    }}
+  >
+
+    {(
+      [
+        "ALL",
+        "LONG",
+        "PUT",
+        "REDUCE",
+        "SYSTEM"
+      ] as FilterType[]
+    ).map(
+      currentFilter => (
 
-{strongSignals}
+        <button
+          key={currentFilter}
 
-</b>
+          onClick={() =>
+            setFilter(
+              currentFilter
+            )
+          }
+
+          style={{
+            padding: "5px 10px",
+
+            background:
+              filter === currentFilter
+                ? "#2a2a2a"
+                : "#151515",
+
+            border:
+              filter === currentFilter
+                ? "1px solid #555"
+                : "1px solid #292929",
 
-</div>
+            color:
+              filter === currentFilter
+                ? "#fff"
+                : "#777",
 
-<div>
+            cursor: "pointer",
 
-<div>Weak</div>
+            fontSize: "10px",
 
-<b style={{color:"#faad14"}}>
+            fontWeight:
+              filter === currentFilter
+                ? "bold"
+                : "normal"
+          }}
+        >
+
+          {currentFilter}
 
-{weakSignals}
+        </button>
 
-</b>
+      )
+    )}
+
+  </div>
 
-</div>
 
-<div>
+  {/* =====================================================
+  LOADING
+  ===================================================== */}
 
-<div>Avg</div>
+  {loading && (
+
+    <div
+      style={{
+        padding: "35px",
+        textAlign: "center",
+        color: "#555",
+        fontSize: "12px",
+        border: "1px dashed #292929"
+      }}
+    >
 
-<b style={{color:"#ddd"}}>
+      Loading signal history...
 
-{avgStrength}
+    </div>
 
-</b>
+  )}
 
-</div>
 
-</div>
+  {/* =====================================================
+  ERROR
+  ===================================================== */}
 
-</div>
+  {!loading &&
+    error && (
 
-{/* =====================================================
-FILTER
-===================================================== */}
+      <div
+        style={{
+          padding: "30px",
+          textAlign: "center",
+          color: "#ff7875",
+          fontSize: "12px",
+          border:
+            "1px solid #3a1f1f"
+        }}
+      >
 
-<div
-style={{
-display:"flex",
-gap:"8px",
-marginBottom:"18px",
-flexWrap:"wrap"
-}}
->
+        Signal history could not be loaded.
 
-{(["ALL","LONG","PUT","REDUCE","SYSTEM"] as FilterType[]).map(f=>(
+      </div>
 
-<button
+    )}
 
-key={f}
 
-onClick={()=>setFilter(f)}
+  {/* =====================================================
+  EMPTY
+  ===================================================== */}
 
-style={{
+  {!loading &&
+    !error &&
+    filteredSignals.length === 0 && (
 
-padding:"5px 10px",
+      <div
+        style={{
+          padding: "35px",
+          textAlign: "center",
+          color: "#555",
+          border:
+            "1px dashed #333",
+          fontSize: "12px"
+        }}
+      >
 
-background:
+        No historical signals available
 
-filter===f
-? "#2b2b2b"
-: "#151515",
+      </div>
 
-border:"1px solid #333",
+    )}
 
-color:
 
-filter===f
-? "#fff"
-: "#777",
+  {/* =====================================================
+  SIGNAL LIST
+  ===================================================== */}
 
-cursor:"pointer",
+  {!loading &&
+    !error &&
+    filteredSignals.length > 0 && (
 
-fontSize:"11px"
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px"
+        }}
+      >
 
-}}
+        {filteredSignals.map(
+          (signal, index) => {
 
->
+            const color =
+              signalColor(
+                signal.type
+              );
 
-{f}
+            const strength =
+              normalizeStrength(
+                signal.strength
+              );
 
-</button>
+            const phase =
+              signal.phase ?? "";
 
-))}
+            const currentPhaseColor =
+              phaseColor(phase);
 
-</div>
 
-{/* =====================================================
-EMPTY
-===================================================== */}
+            return (
 
-{filteredSignals.length===0 && (
+              <div
+                key={
+                  `${getTimestamp(
+                    signal.timestamp
+                  )}-${index}`
+                }
 
-<div
+                style={{
+                  background: "#101010",
 
-style={{
+                  border:
+                    "1px solid #222",
 
-padding:"35px",
+                  borderLeft:
+                    `4px solid ${color}`,
 
-textAlign:"center",
+                  padding: "13px"
+                }}
+              >
 
-color:"#666",
 
-border:"1px dashed #333"
+                {/* =====================================================
+                SIGNAL HEADER
+                ===================================================== */}
 
-}}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent:
+                      "space-between",
 
->
+                    alignItems:
+                      "flex-start",
 
-No historical signals available
+                    gap: "15px"
+                  }}
+                >
 
-</div>
 
-)}
+                  <div>
 
-{/* =====================================================
-LIST
-===================================================== */}
+                    <div
+                      style={{
+                        fontWeight: "bold",
+                        color,
+                        fontSize: "13px"
+                      }}
+                    >
 
-<div
+                      {signal.type ?? "UNKNOWN"}
 
-style={{
+                    </div>
 
-display:"flex",
 
-flexDirection:"column",
+                    <div
+                      style={{
+                        marginTop: "6px",
 
-gap:"10px"
+                        display:
+                          "inline-flex",
 
-}}
+                        padding:
+                          "3px 7px",
 
->
+                        border:
+                          `1px solid ${currentPhaseColor}`,
 
-{filteredSignals.map((s,i)=>{
+                        color:
+                          currentPhaseColor,
 
-const color=
-signalColor(s.type);
+                        fontSize:
+                          "9px",
 
-const strength=
-Math.round(s.strength ?? 0);
+                        letterSpacing:
+                          "0.3px"
+                      }}
+                    >
 
-return(
+                      {phaseLabel(
+                        phase
+                      )}
 
-<div
+                    </div>
 
-key={i}
+                  </div>
 
-style={{
 
-background:"#101010",
+                  <div
+                    style={{
+                      textAlign:
+                        "right",
 
-border:"1px solid #222",
+                      fontSize:
+                        "10px",
 
-borderLeft:`5px solid ${color}`,
+                      color:
+                        "#666",
 
-padding:"12px"
+                      lineHeight:
+                        "1.5"
+                    }}
+                  >
 
-}}
+                    <div>
 
->
+                      {formatDate(
+                        signal.timestamp
+                      )}
 
-<div
+                    </div>
 
-style={{
+                    <div>
 
-display:"flex",
+                      {formatTime(
+                        signal.timestamp
+                      )}
 
-justifyContent:"space-between",
+                    </div>
 
-alignItems:"center"
+                  </div>
 
-}}
+                </div>
 
->
 
-<div
+                {/* =====================================================
+                MESSAGE
+                ===================================================== */}
 
-style={{
+                {signal.message && (
 
-fontWeight:"bold",
+                  <div
+                    style={{
+                      marginTop:
+                        "11px",
 
-color,
+                      fontSize:
+                        "12px",
 
-fontSize:"13px"
+                      color:
+                        "#c0c0c0",
 
-}}
+                      lineHeight:
+                        "1.5"
+                    }}
+                  >
 
->
+                    {signal.message}
 
-{s.type}
+                  </div>
 
-</div>
+                )}
 
-<div
 
-style={{
+                {/* =====================================================
+                STRENGTH
+                ===================================================== */}
 
-fontSize:"11px",
+                <div
+                  style={{
+                    marginTop:
+                      "13px"
+                  }}
+                >
 
-color:"#777"
+                  <div
+                    style={{
+                      display:
+                        "flex",
 
-}}
+                      justifyContent:
+                        "space-between",
 
->
+                      fontSize:
+                        "10px",
 
-{formatTime(s.timestamp)}
+                      color:
+                        "#666",
 
-</div>
+                      marginBottom:
+                        "5px"
+                    }}
+                  >
 
-</div>
+                    <span>
 
-<div
+                      SIGNAL STRENGTH
 
-style={{
+                    </span>
 
-marginTop:"6px",
 
-display:"inline-block",
+                    <span
+                      style={{
+                        color:
+                          strengthColor(
+                            strength
+                          ),
 
-padding:"2px 8px",
+                        fontWeight:
+                          "bold"
+                      }}
+                    >
 
-border:`1px solid ${phaseColor(s.phase)}`,
+                      {strength}/100
 
-color:phaseColor(s.phase),
+                    </span>
 
-fontSize:"10px"
+                  </div>
 
-}}
 
->
+                  <div
+                    style={{
+                      height:
+                        "5px",
 
-{s.phase ?? "-"}
+                      background:
+                        "#222",
 
-</div>
+                      overflow:
+                        "hidden"
+                    }}
+                  >
 
-<div
+                    <div
+                      style={{
+                        height:
+                          "100%",
 
-style={{
+                        width:
+                          `${strength}%`,
 
-marginTop:"8px",
+                        background:
+                          strengthColor(
+                            strength
+                          ),
 
-fontSize:"12px",
+                        transition:
+                          "width 0.3s"
+                      }}
+                    />
 
-color:"#bbb"
+                  </div>
 
-}}
+                </div>
 
->
 
-{s.message}
+                {/* =====================================================
+                MARKET CONTEXT
+                ===================================================== */}
 
-</div>
+                <div
+                  style={{
+                    marginTop:
+                      "14px",
 
-<div
+                    paddingTop:
+                      "12px",
 
-style={{
+                    borderTop:
+                      "1px solid #1d1d1d"
+                  }}
+                >
 
-marginTop:"10px",
+                  <div
+                    style={{
+                      fontSize:
+                        "9px",
 
-display:"flex",
+                      color:
+                        "#555",
 
-justifyContent:"space-between",
+                      letterSpacing:
+                        "0.7px",
 
-fontSize:"11px",
+                      marginBottom:
+                        "9px"
+                    }}
+                  >
 
-color:"#777"
+                    MARKET CONTEXT
 
-}}
+                  </div>
 
->
 
-<div>
+                  <div
+                    style={{
+                      display:
+                        "grid",
 
-Strength
+                      gridTemplateColumns:
+                        "repeat(4, minmax(0, 1fr))",
 
-</div>
+                      gap:
+                        "8px"
+                    }}
+                  >
 
-<div>
+                    <MetricBox
+                      label="MASTER"
+                      value={
+                        signal.masterScore
+                      }
+                    />
 
-{strength}/100
+                    <MetricBox
+                      label="DANGER"
+                      value={
+                        signal.dangerScore
+                      }
+                    />
 
-</div>
+                    <MetricBox
+                      label="TRADE"
+                      value={
+                        signal.tradeStack
+                      }
+                    />
 
-</div>
+                    <MetricBox
+                      label="HEAT"
+                      value={
+                        signal.systemHeat
+                      }
+                    />
 
-<div
+                  </div>
 
-style={{
+                </div>
 
-height:"6px",
 
-background:"#222",
+                {/* =====================================================
+                REASON
+                ===================================================== */}
 
-marginTop:"4px",
+                {signal.reason && (
 
-overflow:"hidden"
+                  <div
+                    style={{
+                      marginTop:
+                        "13px",
 
-}}
+                      padding:
+                        "9px 10px",
 
->
+                      background:
+                        "#0c0c0c",
 
-<div
+                      borderLeft:
+                        "2px solid #333"
+                    }}
+                  >
 
-style={{
+                    <div
+                      style={{
+                        fontSize:
+                          "9px",
 
-height:"100%",
+                        color:
+                          "#555",
 
-width:`${strength}%`,
+                        marginBottom:
+                          "4px",
 
-background:strengthColor(strength),
+                        letterSpacing:
+                          "0.5px"
+                      }}
+                    >
 
-transition:"0.3s"
+                      SIGNAL REASON
 
-}}
+                    </div>
 
->
 
-</div>
+                    <div
+                      style={{
+                        fontSize:
+                          "11px",
 
-</div>
+                        color:
+                          "#aaa",
 
-<div
+                        lineHeight:
+                          "1.45"
+                      }}
+                    >
 
-style={{
+                      {signal.reason}
 
-marginTop:"12px",
+                    </div>
 
-display:"grid",
+                  </div>
 
-gridTemplateColumns:"1fr 1fr",
+                )}
 
-rowGap:"5px",
 
-fontSize:"11px"
+                {/* =====================================================
+                SUMMARY
+                ===================================================== */}
 
-}}
+                {signal.summary && (
 
->
+                  <div
+                    style={{
+                      marginTop:
+                        "10px",
 
-<div style={{color:"#666"}}>
+                      fontSize:
+                        "11px",
 
-Master
+                      color:
+                        "#777",
 
-</div>
+                      lineHeight:
+                        "1.5"
+                    }}
+                  >
 
-<div style={{color:"#ddd"}}>
+                    <span
+                      style={{
+                        color:
+                          "#555",
 
-{s.masterScore ?? "--"}
+                        marginRight:
+                          "6px",
 
-</div>
+                        fontSize:
+                          "9px",
 
-<div style={{color:"#666"}}>
+                        letterSpacing:
+                          "0.5px"
+                      }}
+                    >
 
-Danger
+                      SUMMARY
 
-</div>
+                    </span>
 
-<div style={{color:"#ddd"}}>
+                    {signal.summary}
 
-{s.dangerScore ?? "--"}
+                  </div>
 
-</div>
+                )}
 
-<div style={{color:"#666"}}>
+              </div>
 
-Trade
+            );
 
-</div>
+          }
+        )}
 
-<div style={{color:"#ddd"}}>
+      </div>
 
-{s.tradeStack ?? "--"}
-
-</div>
-
-<div style={{color:"#666"}}>
-
-Heat
-
-</div>
-
-<div style={{color:"#ddd"}}>
-
-{s.systemHeat ?? "--"}
-
-</div>
-
-<div style={{color:"#666"}}>
-
-Reason
-
-</div>
-
-<div style={{color:"#aaa"}}>
-
-{s.reason ?? "-"}
-
-</div>
-
-<div style={{color:"#666"}}>
-
-Summary
-
-</div>
-
-<div style={{color:"#aaa"}}>
-
-{s.summary ?? "-"}
-
-</div>
-
-</div>
-
-</div>
-
-);
-
-})}
-
-</div>
-{/* ================= EMPTY ================= */}
-
-{filteredSignals.length === 0 && (
-
-<div
-style={{
-padding: "30px",
-textAlign: "center",
-color: "#666",
-fontSize: "13px"
-}}
->
-No historical signals available.
-</div>
-
-)}
-
-{/* ================= SIGNAL LIST ================= */}
-
-{filteredSignals.map((s, i) => {
-
-const color =
-signalColor(s.type);
-
-return (
-
-<div
-key={i}
-style={{
-borderBottom: "1px solid #181818",
-padding: "12px 0"
-}}
->
-
-{/* HEADER */}
-
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-fontSize: "11px",
-color: "#666"
-}}
->
-
-<div>
-{formatTime(s.timestamp)}
-</div>
-
-<div
-style={{
-color: phaseColor(s.phase)
-}}
->
-{s.phase ?? "-"}
-</div>
-
-</div>
-
-{/* TYPE */}
-
-<div
-style={{
-marginTop: "4px",
-fontWeight: "bold",
-color,
-fontSize: "13px"
-}}
->
-{s.type}
-</div>
-
-{/* MESSAGE */}
-
-<div
-style={{
-marginTop: "4px",
-fontSize: "12px",
-color: "#aaa"
-}}
->
-{s.message}
-</div>
-
-{/* STRENGTH */}
-
-<div
-style={{
-marginTop: "8px",
-display: "flex",
-justifyContent: "space-between",
-fontSize: "11px",
-color: "#777"
-}}
->
-
-<div>
-Strength
-</div>
-
-<div
-style={{
-color: strengthColor(
-s.strength ?? 0
-)
-}}
->
-{Math.round(s.strength ?? 0)}
-</div>
-
-</div>
-
-<div
-style={{
-width: "100%",
-height: "5px",
-background: "#222",
-marginTop: "3px"
-}}
->
-
-<div
-style={{
-width: `${Math.min(
-100,
-Math.max(
-0,
-s.strength ?? 0
-)
-)}%`,
-height: "100%",
-background: color
-}}
-/>
-
-</div>
-
-</div>
-
-);
-
-})}
+    )}
 
 </div>
 
@@ -878,3 +1277,168 @@ background: color
 
 }
 
+/* =====================================================
+STAT ITEM
+===================================================== */
+
+function StatItem({
+label,
+value,
+color
+}: {
+label: string;
+value: number;
+color: string;
+}) {
+
+return (
+
+<div
+  style={{
+    minWidth: "35px"
+  }}
+>
+
+  <div
+    style={{
+      fontSize: "9px",
+      color: "#666",
+      marginBottom: "3px"
+    }}
+  >
+
+    {label}
+
+  </div>
+
+
+  <div
+    style={{
+      fontSize: "13px",
+      color,
+      fontWeight: "bold"
+    }}
+  >
+
+    {value}
+
+  </div>
+
+</div>
+
+);
+
+}
+
+/* =====================================================
+METRIC BOX
+===================================================== */
+
+function MetricBox({
+label,
+value
+}: {
+label: string;
+value?: number;
+}) {
+
+const numericValue =
+typeof value === "number"
+? Math.round(value)
+: null;
+
+let color =
+"#aaa";
+
+if (
+numericValue !== null
+) {
+
+if (
+  label === "DANGER" ||
+  label === "HEAT"
+) {
+
+  if (numericValue >= 75)
+    color = "#ff4d4f";
+
+  else if (numericValue >= 50)
+    color = "#faad14";
+
+  else
+    color = "#52c41a";
+
+}
+
+else {
+
+  if (numericValue >= 70)
+    color = "#52c41a";
+
+  else if (numericValue >= 40)
+    color = "#faad14";
+
+  else
+    color = "#ff7875";
+
+}
+
+}
+
+return (
+
+<div
+  style={{
+    background:
+      "#0c0c0c",
+
+    border:
+      "1px solid #1e1e1e",
+
+    padding:
+      "8px"
+  }}
+>
+
+  <div
+    style={{
+      fontSize:
+        "8px",
+
+      color:
+        "#555",
+
+      marginBottom:
+        "5px",
+
+      letterSpacing:
+        "0.5px"
+    }}
+  >
+
+    {label}
+
+  </div>
+
+
+  <div
+    style={{
+      fontSize:
+        "13px",
+
+      fontWeight:
+        "bold",
+
+      color
+    }}
+  >
+
+    {numericValue ?? "--"}
+
+  </div>
+
+</div>
+
+);
+
+}
