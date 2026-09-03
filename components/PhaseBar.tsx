@@ -1,369 +1,897 @@
 "use client";
 
-export default function PhaseBar({ phase, regime }: any) {
+export default function PhaseBar({
+phase,
+regime,
+marketPhase
+}: any) {
 
-/* ================= PHASES ================= */
+/* =====================================================
+PHASE SOURCE
+===================================================== */
+
+const phaseData =
+marketPhase ?? {};
+
+
+/* =====================================================
+SAFE VALUES
+===================================================== */
+
+const currentPhaseKey =
+phase ??
+phaseData?.phase ??
+"PHASE_1_EXPANSION";
+
+
+const regimeState =
+phaseData?.regimeState ??
+regime?.label ??
+"UNKNOWN";
+
+
+const subPhase =
+phaseData?.subPhase ??
+regime?.subPhase ??
+"UNKNOWN";
+
+
+const confidence =
+Number(
+phaseData?.confidence ??
+regime?.confidence ??
+regime?.score ??
+0
+);
+
+
+/* =====================================================
+PHASES
+===================================================== */
 
 const phases = [
+
 {
 key: "PHASE_1_EXPANSION",
 label: "Phase 1 – Expansion",
 description: "Broad Participation"
 },
+
 {
 key: "PHASE_2_WARNING",
 label: "Phase 2 – Warning",
 description: "Internal Divergences"
 },
+
 {
 key: "PHASE_3_DISTRIBUTION",
 label: "Phase 3 – Distribution",
-description: "Institutional Selling"
+description: "Institutional Distribution"
 },
+
 {
 key: "PHASE_4_RISK",
 label: "Phase 4 – Risk",
 description: "Structural Deterioration"
 },
+
 {
 key: "PHASE_5_BREAKDOWN",
 label: "Phase 5 – Breakdown",
-description: "200 DMA Failure"
+description: "Structural Breakdown"
 },
+
 {
 key: "PHASE_6_ACCELERATION",
 label: "Phase 6 – Acceleration",
 description: "Forced Liquidation"
 },
+
 {
 key: "PHASE_7_CAPITULATION",
 label: "Phase 7 – Capitulation",
 description: "Panic Exhaustion"
 }
+
 ];
 
+
 const activeIndex =
+Math.max(
+0,
 phases.findIndex(
-p => p.key === phase
+p =>
+p.key === currentPhaseKey
+)
 );
 
-/* ================= PHASE COLORS ================= */
+
+/* =====================================================
+PHASE COLORS
+===================================================== */
 
 function getPhaseColor(index: number) {
 
-if (index === 0) return "#52c41a";
+if (index === 0)
+return "#52c41a";
 
-if (index === 1) return "#faad14";
+if (index === 1)
+return "#faad14";
 
-if (index === 2) return "#fa8c16";
+if (index === 2)
+return "#fa8c16";
 
-if (index === 3) return "#fa541c";
+if (index === 3)
+return "#fa541c";
 
-if (index === 4) return "#ff4d4f";
+if (index === 4)
+return "#ff4d4f";
 
-if (index === 5) return "#722ed1";
+if (index === 5)
+return "#722ed1";
 
-if (index === 6) return "#391085";
+if (index === 6)
+return "#391085";
 
 return "#999";
+
 }
 
-/* ================= REGIME COLOR ================= */
 
-function getRegimeColor(label: string) {
+/* =====================================================
+REGIME COLORS
+===================================================== */
 
-if (!label) return "#999";
+function getRegimeColor(
+state?: string
+) {
 
-const l =
-label.toLowerCase();
+const s =
+String(
+state ?? ""
+).toUpperCase();
+
 
 if (
-l.includes("expansion") ||
-l.includes("risk_on")
+s.includes("RISK_ON") ||
+s.includes("EXPANSION")
 ) {
 return "#52c41a";
 }
 
+
 if (
-l.includes("warning")
+s.includes("LATE")
 ) {
 return "#faad14";
 }
 
+
 if (
-l.includes("distribution")
+s.includes("TRANSITION")
 ) {
 return "#fa8c16";
 }
 
+
 if (
-l.includes("risk")
+s.includes("FRAGILE")
 ) {
 return "#fa541c";
 }
 
+
 if (
-l.includes("breakdown")
+s.includes("RISK_OFF") ||
+s.includes("BREAKDOWN")
 ) {
 return "#ff4d4f";
 }
 
+
 if (
-l.includes("acceleration")
+s.includes("CRISIS")
 ) {
 return "#722ed1";
 }
 
+
 if (
-l.includes("capitulation")
+s.includes("CAPITULATION")
 ) {
 return "#391085";
 }
 
+
 return "#999";
+
 }
 
-/* ================= REGIME MODE ================= */
 
-function getRegimeMode() {
+/* =====================================================
+EXECUTION MODE
+===================================================== */
+
+function getExecutionMode() {
 
 if (
-phase === "PHASE_1_EXPANSION" ||
-phase === "PHASE_2_WARNING"
+currentPhaseKey ===
+"PHASE_1_EXPANSION"
 ) {
+
 return {
 label: "LONG REGIME",
 color: "#52c41a"
 };
+
 }
 
+
 if (
-phase === "PHASE_3_DISTRIBUTION"
+currentPhaseKey ===
+"PHASE_2_WARNING"
 ) {
+
+return {
+label: "LONG / SELECTIVE",
+color: "#faad14"
+};
+
+}
+
+
+if (
+currentPhaseKey ===
+"PHASE_3_DISTRIBUTION"
+) {
+
 return {
 label: "TRANSITION",
 color: "#fa8c16"
 };
+
 }
 
+
 if (
-phase === "PHASE_4_RISK"
+currentPhaseKey ===
+"PHASE_4_RISK"
 ) {
+
 return {
 label: "DEFENSIVE",
 color: "#fa541c"
 };
+
 }
+
+
+if (
+currentPhaseKey ===
+"PHASE_5_BREAKDOWN"
+) {
 
 return {
-label: "CRASH REGIME",
+label: "RISK OFF",
 color: "#ff4d4f"
 };
+
 }
 
-/* ================= SAFE ================= */
+
+if (
+currentPhaseKey ===
+"PHASE_6_ACCELERATION"
+) {
+
+return {
+label: "CRISIS MANAGEMENT",
+color: "#722ed1"
+};
+
+}
+
+
+return {
+label: "CAPITULATION MANAGEMENT",
+color: "#391085"
+};
+
+}
+
+
+const executionMode =
+getExecutionMode();
+
 
 const currentPhase =
-phases[activeIndex] ??
+phases.find(
+p =>
+p.key === currentPhaseKey
+) ??
 phases[0];
 
-const regimeLabel =
-regime?.label ?? "UNKNOWN";
 
-const regimeScore =
-Number(regime?.score ?? 0);
+const phaseColor =
+getPhaseColor(
+activeIndex
+);
 
-const regimeMode =
-getRegimeMode();
 
-/* ================= RENDER ================= */
+const regimeColor =
+getRegimeColor(
+regimeState
+);
+
+
+/* =====================================================
+CONFIDENCE COLOR
+===================================================== */
+
+function getConfidenceColor(
+value: number
+) {
+
+if (value >= 85)
+return "#52c41a";
+
+if (value >= 70)
+return "#13c2c2";
+
+if (value >= 55)
+return "#faad14";
+
+return "#777";
+
+}
+
+
+/* =====================================================
+RENDER
+===================================================== */
 
 return (
 
 <div
 style={{
+
 background: "#0d0d0d",
+
 border: "1px solid #222",
-padding: "16px"
+
+padding: "16px",
+
+width: "100%",
+
+boxSizing: "border-box"
+
 }}
 >
+
+
+{/* =================================================
+HEADER
+================================================= */}
+
+<div
+style={{
+
+display: "flex",
+
+justifyContent: "space-between",
+
+alignItems: "flex-start",
+
+gap: "12px",
+
+marginBottom: "16px",
+
+flexWrap: "wrap"
+
+}}
+>
+
+<div>
 
 <h3
 style={{
-color: "#888",
-marginBottom: "12px"
+
+margin: 0,
+
+color: "#bbb",
+
+fontSize: "15px"
+
 }}
 >
+
 MARKET REGIME
+
 </h3>
 
-{/* ================= CURRENT PHASE ================= */}
 
 <div
 style={{
-marginBottom: "12px"
-}}
->
 
-<div
-style={{
-color: "#888",
-fontSize: "12px"
-}}
->
-CURRENT PHASE
-</div>
-
-<div
-style={{
-color:
-getPhaseColor(
-activeIndex
-),
-fontWeight: "bold",
-fontSize: "15px"
-}}
->
-● {currentPhase.label}
-</div>
-
-<div
-style={{
-color: "#777",
 fontSize: "11px",
-marginTop: "2px"
+
+color: "#666",
+
+marginTop: "3px"
+
 }}
 >
-{currentPhase.description}
-</div>
+
+Institutional Market Phase Model
 
 </div>
 
-{/* ================= PHASE BAR ================= */}
+</div>
+
 
 <div
 style={{
-display: "flex",
-gap: "6px",
-marginBottom: "10px"
+
+color: executionMode.color,
+
+border:
+`1px solid ${executionMode.color}`,
+
+padding: "4px 8px",
+
+fontSize: "10px",
+
+whiteSpace: "nowrap"
+
 }}
 >
 
-{phases.map((p, i) => {
+{executionMode.label}
+
+</div>
+
+</div>
+
+
+{/* =================================================
+CURRENT PHASE
+================================================= */}
+
+<div
+style={{
+
+background: "#101010",
+
+border:
+`1px solid ${phaseColor}`,
+
+borderLeft:
+`4px solid ${phaseColor}`,
+
+padding: "12px",
+
+marginBottom: "14px"
+
+}}
+>
+
+<div
+style={{
+
+fontSize: "10px",
+
+color: "#666",
+
+marginBottom: "4px"
+
+}}
+>
+
+CURRENT PHASE
+
+</div>
+
+
+<div
+style={{
+
+color: phaseColor,
+
+fontWeight: "bold",
+
+fontSize: "17px"
+
+}}
+>
+
+● {currentPhase.label}
+
+</div>
+
+
+<div
+style={{
+
+fontSize: "11px",
+
+color: "#777",
+
+marginTop: "4px"
+
+}}
+>
+
+{currentPhase.description}
+
+</div>
+
+</div>
+
+
+{/* =================================================
+PHASE BAR
+================================================= */}
+
+<div
+style={{
+
+marginBottom: "6px",
+
+overflowX: "auto",
+
+paddingBottom: "4px"
+
+}}
+>
+
+<div
+style={{
+
+display: "flex",
+
+gap: "6px",
+
+minWidth: "420px"
+
+}}
+>
+
+{phases.map(
+(p, i) => {
 
 const isActive =
 i === activeIndex;
+
+
+const isPast =
+i < activeIndex;
+
 
 return (
 
 <div
 key={p.key}
 style={{
+
 flex: 1,
+
 height: "10px",
+
 background:
+
 isActive
 ? getPhaseColor(i)
-: "#222",
+
+: isPast
+? "#333"
+
+: "#1c1c1c",
+
 borderRadius: "4px",
+
 transition:
 "all 0.3s ease"
+
 }}
 />
 
 );
-})}
+
+}
+)}
 
 </div>
 
-{/* ================= NUMBERS ================= */}
+</div>
+
+
+{/* PHASE NUMBERS */}
 
 <div
 style={{
+
 display: "flex",
+
 justifyContent: "space-between",
-fontSize: "11px",
+
+minWidth: "420px",
+
+fontSize: "10px",
+
 color: "#666",
+
 marginBottom: "16px"
-}}
->
-{phases.map((_, i) => (
-<span key={i}>
-{i + 1}
-</span>
-))}
-</div>
 
-{/* ================= REGIME STATE ================= */}
-
-<div
-style={{
-marginBottom: "14px",
-padding: "12px",
-border:
-`1px solid ${regimeMode.color}`,
-background: "#111"
 }}
 >
 
-<div
+{phases.map(
+(_, i) => (
+
+<span
+key={i}
 style={{
-color: "#666",
-fontSize: "11px"
-}}
->
-EXECUTION REGIME
-</div>
 
-<div
-style={{
-color: regimeMode.color,
-fontWeight: "bold",
-fontSize: "18px"
-}}
->
-{regimeMode.label}
-</div>
-
-</div>
-
-{/* ================= REGIME ================= */}
-
-<div>
-
-<div
-style={{
-color: "#888",
-fontSize: "12px"
-}}
->
-MARKET REGIME
-</div>
-
-<div
-style={{
 color:
-getRegimeColor(
-regimeLabel
-),
-fontWeight: "bold",
-fontSize: "16px"
+i === activeIndex
+? phaseColor
+: "#666"
+
 }}
 >
-{regimeLabel}
+
+{i + 1}
+
+</span>
+
+)
+)}
+
 </div>
+
+
+{/* =================================================
+REGIME STATE
+================================================= */}
 
 <div
 style={{
-color: "#888",
-fontSize: "12px"
+
+display: "grid",
+
+gridTemplateColumns:
+"repeat(auto-fit, minmax(180px, 1fr))",
+
+gap: "10px",
+
+marginBottom: "14px"
+
 }}
 >
-Score {regimeScore}
+
+
+{/* REGIME */}
+
+<div
+style={{
+
+background: "#101010",
+
+border: "1px solid #222",
+
+padding: "10px"
+
+}}
+>
+
+<div
+style={{
+
+fontSize: "10px",
+
+color: "#666"
+
+}}
+>
+
+REGIME STATE
+
 </div>
+
+
+<div
+style={{
+
+marginTop: "4px",
+
+color: regimeColor,
+
+fontWeight: "bold",
+
+fontSize: "15px",
+
+wordBreak: "break-word"
+
+}}
+>
+
+{regimeState}
 
 </div>
 
 </div>
+
+
+{/* SUBPHASE */}
+
+<div
+style={{
+
+background: "#101010",
+
+border: "1px solid #222",
+
+padding: "10px"
+
+}}
+>
+
+<div
+style={{
+
+fontSize: "10px",
+
+color: "#666"
+
+}}
+>
+
+SUB PHASE
+
+</div>
+
+
+<div
+style={{
+
+marginTop: "4px",
+
+color: "#ccc",
+
+fontWeight: "bold",
+
+fontSize: "13px",
+
+wordBreak: "break-word"
+
+}}
+>
+
+{subPhase}
+
+</div>
+
+</div>
+
+
+{/* CONFIDENCE */}
+
+<div
+style={{
+
+background: "#101010",
+
+border: "1px solid #222",
+
+padding: "10px"
+
+}}
+>
+
+<div
+style={{
+
+fontSize: "10px",
+
+color: "#666"
+
+}}
+>
+
+PHASE CONFIDENCE
+
+</div>
+
+
+<div
+style={{
+
+marginTop: "4px",
+
+fontSize: "16px",
+
+fontWeight: "bold",
+
+color:
+getConfidenceColor(
+confidence
+)
+
+}}
+>
+
+{Math.round(confidence)}%
+
+</div>
+
+</div>
+
+</div>
+
+
+{/* =================================================
+INTERPRETATION
+================================================= */}
+
+<div
+style={{
+
+padding: "10px",
+
+border: "1px solid #222",
+
+fontSize: "11px",
+
+lineHeight: "1.5",
+
+color: "#999"
+
+}}
+>
+
+Current market classification:
+
+{" "}
+
+<span
+style={{
+
+color: phaseColor,
+
+fontWeight: "bold"
+
+}}
+>
+
+{currentPhase.label}
+
+</span>
+
+{" · "}
+
+<span
+style={{
+
+color: regimeColor,
+
+fontWeight: "bold"
+
+}}
+>
+
+{regimeState}
+
+</span>
+
+{" · "}
+
+{subPhase}
+
+</div>
+
+
+</div>
+
 );
+
 }
