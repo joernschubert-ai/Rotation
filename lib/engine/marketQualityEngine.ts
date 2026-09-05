@@ -1,37 +1,41 @@
 // /lib/engine/marketQualityEngine.ts
 
 export interface MarketQualityEngineInput {
-structure?: any
-participation?: any
-rotation?: any
-breadthThrust?: any
-rotationDecay?: any
+structure?: any;
 
-liquidity?: any
-fragility?: any
-phaseConfirmation?: any
+participation?: any;
+rotation?: any;
+breadthThrust?: any;
+rotationDecay?: any;
 
-breadth50?: number
-breadth200?: number
+liquidity?: any;
+fragility?: any;
 
-participationScore?: number
-rotationScore?: number
-breadthThrustScore?: number
+phaseConfirmation?: any;
 
-rsEqual?: number
-rsSmall?: number
-rsGrowth?: number
+breadth50?: number;
+breadth200?: number;
 
-concentrationScore?: number
+participationScore?: number;
+rotationScore?: number;
+breadthThrustScore?: number;
 
-internalDivergence?: any
-regimeSync?: any
+rsEqual?: number;
+rsSmall?: number;
+rsGrowth?: number;
+
+concentrationScore?: number;
+
+internalDivergence?: any;
+regimeSync?: any;
 }
 
-export interface MarketQualityEngineOutput {
-score: number
 
-marketIntegrity: number
+export interface MarketQualityEngineOutput {
+
+score: number;
+
+marketIntegrity: number;
 
 state:
 | "INSTITUTIONAL_EXPANSION"
@@ -39,516 +43,828 @@ state:
 | "FRAGILE"
 | "INTERNALLY_WEAK"
 | "DISTRIBUTION"
-| "STRUCTURAL_BREAKDOWN"
+| "STRUCTURAL_BREAKDOWN";
 
 quality:
 | "HIGH"
 | "MEDIUM"
-| "LOW"
+| "LOW";
 
-institutionalParticipation: boolean
+institutionalParticipation: boolean;
 
-internalSynchronization: boolean
+internalSynchronization: boolean;
 
 leadership:
 | "BROAD"
 | "NARROW"
-| "MEGA_CAP_DISTORTED"
+| "MEGA_CAP_DISTORTED";
 
-institutionalDistortion: boolean
+institutionalDistortion: boolean;
 
-/*
-NEW
-*/
+leadershipBreadth: number;
 
-leadershipBreadth: number
-passiveDependence: number
+passiveDependence: number;
 
 liquidityCharacter:
 | "BROAD"
 | "PASSIVE"
 | "NARROW"
 | "FRAGILE"
-| "ILLUSION"
+| "ILLUSION";
 
-summary: string
+summary: string;
 
 metrics: {
-breadth50: number
-breadth200: number
 
-participationScore: number
-rotationScore: number
-breadthThrustScore: number
+breadth50: number;
+breadth200: number;
 
-rsEqual: number
-rsSmall: number
-rsGrowth: number
+participationScore: number;
+rotationScore: number;
+breadthThrustScore: number;
 
-concentrationScore: number
+rsEqual: number;
+rsSmall: number;
+rsGrowth: number;
 
-rotationDecayScore: number
+concentrationScore: number;
 
-divergenceScore: number
-regimeSyncScore: number
+rotationDecayScore: number;
 
-liquidityScore: number
-fragilityScore: number
-phaseConfidence: number
+divergenceScore: number;
+regimeSyncScore: number;
 
-participationIntegrity: number
-breadthIntegrity: number
-rotationIntegrity: number
-leadershipIntegrity: number
-liquidityIntegrity: number
+liquidityScore: number;
+fragilityScore: number;
 
-leadershipBreadth: number
-passiveDependence: number
+phaseConfidence: number;
+
+participationIntegrity: number;
+breadthIntegrity: number;
+rotationIntegrity: number;
+leadershipIntegrity: number;
+liquidityIntegrity: number;
+
+leadershipBreadth: number;
+passiveDependence: number;
+
+};
+
 }
-}
+
 
 function clamp(
 value: number,
 min = 0,
 max = 100
 ) {
-return Math.max(min, Math.min(max, value))
+
+if (!Number.isFinite(value)) {
+return min;
 }
+
+return Math.max(
+min,
+Math.min(max, value)
+);
+
+}
+
 
 export function marketQualityEngine(
 input: MarketQualityEngineInput
 ): MarketQualityEngineOutput {
+
 
 /* =====================================================
 INPUT
 ===================================================== */
 
 const breadth50 =
+clamp(
 Number(
 input.breadth50 ??
 input.structure?.breadth?.b50?.value ??
 50
 )
+);
+
 
 const breadth200 =
+clamp(
 Number(
 input.breadth200 ??
 input.structure?.breadth?.b200?.value ??
 50
 )
+);
+
 
 const participationScore =
+clamp(
 Number(
 input.participationScore ??
 input.participation?.score ??
 50
 )
+);
+
 
 const rotationScore =
+clamp(
 Number(
 input.rotationScore ??
 input.rotation?.score ??
 50
 )
+);
+
 
 const breadthThrustScore =
+clamp(
 Number(
 input.breadthThrustScore ??
 input.breadthThrust?.score ??
 50
 )
+);
+
 
 const rsEqual =
 Number(
 input.rsEqual ??
 input.rotation?.rsEqual ??
 1
-)
+);
+
 
 const rsSmall =
 Number(
 input.rsSmall ??
 input.rotation?.rsSmall ??
 1
-)
+);
+
 
 const rsGrowth =
 Number(
 input.rsGrowth ??
 input.rotation?.rsGrowth ??
 1
-)
+);
+
 
 const concentrationScore =
+clamp(
 Number(
 input.concentrationScore ??
+input.rotation?.concentrationScore ??
 50
 )
+);
+
 
 const rotationDecayScore =
+clamp(
 Number(
 input.rotationDecay?.score ??
 0
 )
+);
+
+
+/*
+* HIGH divergence score = structural deterioration.
+*/
 
 const divergenceScore =
+clamp(
 Number(
 input.internalDivergence?.score ??
 0
 )
+);
+
+
+/*
+* HIGH regime sync = constructive synchronization.
+*/
 
 const regimeSyncScore =
+clamp(
 Number(
 input.regimeSync?.score ??
 50
 )
+);
+
+
+/*
+* Liquidity score:
+*
+* HIGH = healthy liquidity
+* LOW = liquidity stress
+*/
 
 const liquidityScore =
+clamp(
 Number(
 input.liquidity?.score ??
 50
 )
+);
+
+
+/*
+* Fragility:
+*
+* HIGH = structural risk
+*/
 
 const fragilityScore =
+clamp(
 Number(
 input.fragility?.score ??
 50
 )
+);
+
+
+/*
+* Confidence is diagnostic only.
+*
+* High confidence does NOT mean
+* high market quality.
+*/
 
 const phaseConfidence =
+clamp(
 Number(
 input.phaseConfirmation?.confidence ??
 50
 )
+);
+
+
+const liquidityEngineCharacter =
+input.liquidity?.liquidityState ??
+null;
+
+
 
 /* =====================================================
-LEADERSHIP
+LEADERSHIP STRUCTURE
 ===================================================== */
 
-const narrowLeadership = (
+const narrowLeadership =
 
 rsGrowth > 1.03 &&
 
 rsEqual < 0.99 &&
 
-rsSmall < 0.99
+rsSmall < 0.99;
 
-)
 
-const severeNarrowLeadership = (
+const severeNarrowLeadership =
 
 rsGrowth > 1.06 &&
 
 rsEqual < 0.97 &&
 
-rsSmall < 0.97
+rsSmall < 0.97;
 
-)
 
-const institutionalDistortion = (
+const institutionalDistortion =
 
 severeNarrowLeadership &&
 
-concentrationScore >= 80
+concentrationScore >= 80;
 
-)
+
 
 /* =====================================================
-NEW:
 LEADERSHIP BREADTH
 ===================================================== */
 
-let leadershipBreadth = 58
+let leadershipBreadth = 58;
+
 
 leadershipBreadth +=
-Math.round((breadth50 - 50) * 0.22)
+Math.round(
+(breadth50 - 50) * 0.22
+);
+
 
 leadershipBreadth +=
-Math.round((breadth200 - 50) * 0.18)
+Math.round(
+(breadth200 - 50) * 0.18
+);
+
 
 if (rsEqual < 0.99) {
-leadershipBreadth -= 10
+
+leadershipBreadth -= 10;
+
 }
+
 
 if (rsSmall < 0.99) {
-leadershipBreadth -= 10
+
+leadershipBreadth -= 10;
+
 }
+
 
 if (narrowLeadership) {
-leadershipBreadth -= 14
+
+leadershipBreadth -= 12;
+
 }
+
 
 if (institutionalDistortion) {
-leadershipBreadth -= 16
+
+leadershipBreadth -= 14;
+
 }
 
+
 leadershipBreadth =
-clamp(Math.round(leadershipBreadth))
+clamp(
+Math.round(
+leadershipBreadth
+)
+);
+
+
 
 /* =====================================================
-NEW:
 PASSIVE DEPENDENCE
 ===================================================== */
 
-let passiveDependence = 18
+let passiveDependence = 18;
+
 
 if (narrowLeadership) {
-passiveDependence += 18
+
+passiveDependence += 18;
+
 }
+
 
 if (breadth50 < 50) {
-passiveDependence += 12
+
+passiveDependence += 10;
+
 }
+
 
 if (participationScore < 48) {
-passiveDependence += 14
+
+passiveDependence += 12;
+
 }
+
 
 if (concentrationScore >= 75) {
-passiveDependence += 14
+
+passiveDependence += 14;
+
 }
+
 
 if (rsEqual < 0.97) {
-passiveDependence += 10
+
+passiveDependence += 8;
+
 }
 
+
+if (divergenceScore >= 60) {
+
+passiveDependence += 8;
+
+}
+
+
 passiveDependence =
-clamp(Math.round(passiveDependence))
+clamp(
+Math.round(
+passiveDependence
+)
+);
+
+
 
 /* =====================================================
 PARTICIPATION
 ===================================================== */
 
-const strongParticipation = (
+const strongParticipation =
 
 participationScore >= 68 &&
 
 breadth50 >= 68 &&
 
-breadth200 >= 60
+breadth200 >= 60;
 
-)
 
 const weakParticipation =
-participationScore < 50
+participationScore < 50;
+
+
 
 /* =====================================================
-BASE
+PARTICIPATION INTEGRITY
 ===================================================== */
 
-let participationIntegrity = 55
+let participationIntegrity = 55;
+
 
 participationIntegrity +=
-Math.round((participationScore - 50) * 0.65)
+Math.round(
+(participationScore - 50) * 0.65
+);
+
 
 participationIntegrity +=
-Math.round((breadth50 - 50) * 0.18)
+Math.round(
+(breadth50 - 50) * 0.18
+);
+
 
 participationIntegrity +=
-Math.round((breadth200 - 50) * 0.14)
+Math.round(
+(breadth200 - 50) * 0.14
+);
+
 
 if (weakParticipation) {
-participationIntegrity -= 12
+
+participationIntegrity -= 10;
+
 }
+
+
+if (divergenceScore >= 70) {
+
+participationIntegrity -= 8;
+
+}
+
 
 participationIntegrity =
-clamp(participationIntegrity)
+clamp(
+participationIntegrity
+);
+
+
 
 /* =====================================================
-BREADTH
+BREADTH INTEGRITY
 ===================================================== */
 
-let breadthIntegrity = 55
+let breadthIntegrity = 55;
+
 
 breadthIntegrity +=
-Math.round((breadth50 - 50) * 0.38)
+Math.round(
+(breadth50 - 50) * 0.38
+);
+
 
 breadthIntegrity +=
-Math.round((breadth200 - 50) * 0.32)
+Math.round(
+(breadth200 - 50) * 0.32
+);
+
 
 breadthIntegrity +=
-Math.round((breadthThrustScore - 50) * 0.18)
+Math.round(
+(breadthThrustScore - 50) * 0.18
+);
+
 
 if (breadth50 < 45) {
-breadthIntegrity -= 10
+
+breadthIntegrity -= 10;
+
 }
+
 
 if (breadth200 < 40) {
-breadthIntegrity -= 10
+
+breadthIntegrity -= 10;
+
 }
+
+
+if (divergenceScore >= 75) {
+
+breadthIntegrity -= 8;
+
+}
+
 
 breadthIntegrity =
-clamp(breadthIntegrity)
+clamp(
+breadthIntegrity
+);
+
+
 
 /* =====================================================
-ROTATION
+ROTATION INTEGRITY
 ===================================================== */
 
-let rotationIntegrity = 55
+let rotationIntegrity = 55;
+
 
 rotationIntegrity +=
-Math.round((rotationScore - 50) * 0.40)
+Math.round(
+(rotationScore - 50) * 0.40
+);
+
 
 rotationIntegrity -=
-Math.round(rotationDecayScore * 0.28)
+Math.round(
+rotationDecayScore * 0.28
+);
+
 
 if (rotationScore < 40) {
-rotationIntegrity -= 10
+
+rotationIntegrity -= 8;
+
 }
+
+
+if (divergenceScore >= 70) {
+
+rotationIntegrity -= 6;
+
+}
+
 
 rotationIntegrity =
-clamp(rotationIntegrity)
+clamp(
+rotationIntegrity
+);
+
+
 
 /* =====================================================
-LEADERSHIP
+LEADERSHIP INTEGRITY
 ===================================================== */
 
-let leadershipIntegrity = 60
+let leadershipIntegrity = 60;
+
 
 leadershipIntegrity +=
-Math.round((leadershipBreadth - 50) * 0.35)
+Math.round(
+(leadershipBreadth - 50) * 0.35
+);
+
 
 if (narrowLeadership) {
-leadershipIntegrity -= 18
+
+leadershipIntegrity -= 15;
+
 }
+
 
 if (institutionalDistortion) {
-leadershipIntegrity -= 20
+
+leadershipIntegrity -= 18;
+
 }
 
-/*
-NEW:
-passive distortion
-*/
 
 if (
 narrowLeadership &&
 rsEqual < 0.97
 ) {
-leadershipIntegrity -= 15
+
+leadershipIntegrity -= 10;
+
 }
 
+
 leadershipIntegrity =
-clamp(leadershipIntegrity)
+clamp(
+leadershipIntegrity
+);
+
+
 
 /* =====================================================
-LIQUIDITY
+LIQUIDITY INTEGRITY
 ===================================================== */
 
-let liquidityIntegrity = 55
+let liquidityIntegrity = 55;
+
 
 liquidityIntegrity +=
-Math.round((liquidityScore - 50) * 0.45)
+Math.round(
+(liquidityScore - 50) * 0.45
+);
+
 
 liquidityIntegrity +=
-Math.round((regimeSyncScore - 50) * 0.15)
+Math.round(
+(regimeSyncScore - 50) * 0.15
+);
 
-liquidityIntegrity +=
-Math.round((phaseConfidence - 50) * 0.15)
 
 liquidityIntegrity -=
-Math.round((fragilityScore - 50) * 0.35)
+Math.round(
+Math.max(
+0,
+fragilityScore - 50
+) * 0.35
+);
 
-if (passiveDependence >= 70)
-liquidityIntegrity -= 10
+
+if (
+liquidityEngineCharacter === "ILLUSION"
+) {
+
+liquidityIntegrity -= 14;
+
+}
+
+else if (
+liquidityEngineCharacter === "FRAGILE"
+) {
+
+liquidityIntegrity -= 8;
+
+}
+
+else if (
+liquidityEngineCharacter === "NARROW"
+) {
+
+liquidityIntegrity -= 5;
+
+}
+
+
+if (passiveDependence >= 70) {
+
+liquidityIntegrity -= 8;
+
+}
+
 
 liquidityIntegrity =
-clamp(liquidityIntegrity)
+clamp(
+liquidityIntegrity
+);
+
+
 
 /* =====================================================
 MARKET INTEGRITY
 ===================================================== */
 
-let marketIntegrity = Math.round(
+let marketIntegrity =
 
-(participationIntegrity * 0.34) +
+participationIntegrity * 0.32 +
 
-(breadthIntegrity * 0.24) +
+breadthIntegrity * 0.25 +
 
-(rotationIntegrity * 0.18) +
+rotationIntegrity * 0.18 +
 
-(leadershipIntegrity * 0.14) +
+leadershipIntegrity * 0.15 +
 
-(liquidityIntegrity * 0.10)
+liquidityIntegrity * 0.10;
 
-)
+
 
 /* =====================================================
-OVERLAYS
+STRUCTURAL OVERLAYS
 ===================================================== */
 
-if (
-narrowLeadership &&
-rsEqual < 0.97
-) {
-marketIntegrity -= 15
+/*
+* Divergence is a direct structural warning.
+*/
+
+if (divergenceScore >= 80) {
+
+marketIntegrity -= 12;
+
 }
 
-if (
-passiveDependence >= 65
-) {
-marketIntegrity -= 10
+else if (divergenceScore >= 65) {
+
+marketIntegrity -= 8;
+
 }
+
+else if (divergenceScore >= 50) {
+
+marketIntegrity -= 4;
+
+}
+
+
+/*
+* Passive market structure.
+*/
+
+if (passiveDependence >= 75) {
+
+marketIntegrity -= 10;
+
+}
+
+else if (passiveDependence >= 65) {
+
+marketIntegrity -= 6;
+
+}
+
+
+/*
+* Strong synchronized expansion.
+*/
 
 if (
 strongParticipation &&
-leadershipBreadth >= 65
+leadershipBreadth >= 65 &&
+regimeSyncScore >= 60 &&
+divergenceScore < 35
 ) {
-marketIntegrity += 6
+
+marketIntegrity += 5;
+
 }
 
-if (
-phaseConfidence >= 80
-) {
-marketIntegrity += 6
-}
-
-if (
-fragilityScore >= 80
-) {
-marketIntegrity -= 12
-}
 
 /*
-=====================================================
-PHASE 8 FIX
-=====================================================
+* Severe fragility.
+*/
+
+if (fragilityScore >= 80) {
+
+marketIntegrity -= 10;
+
+}
+
+
+/*
+* Internal leadership failure.
 */
 
 if (
 narrowLeadership &&
 weakParticipation
 ) {
-marketIntegrity -= 10
+
+marketIntegrity -= 8;
+
 }
 
-marketIntegrity =
-clamp(Math.round(marketIntegrity))
 
-const score = marketIntegrity
+marketIntegrity =
+clamp(
+Math.round(
+marketIntegrity
+)
+);
+
+
+const score =
+marketIntegrity;
+
+
 
 /* =====================================================
-SYNC
+INTERNAL SYNCHRONIZATION
 ===================================================== */
 
-const internalSynchronization = (
+const internalSynchronization =
 
 breadth50 >= 60 &&
+
 breadth200 >= 55 &&
 
 participationScore >= 58 &&
 
 rotationScore >= 55 &&
 
-phaseConfidence >= 65 &&
-
 liquidityScore >= 55 &&
 
 fragilityScore < 60 &&
 
-!narrowLeadership
+regimeSyncScore >= 60 &&
 
-)
+divergenceScore < 40 &&
+
+!narrowLeadership;
+
+
 
 /* =====================================================
 LIQUIDITY CHARACTER
@@ -559,43 +875,74 @@ let liquidityCharacter:
 | "PASSIVE"
 | "NARROW"
 | "FRAGILE"
-| "ILLUSION"
+| "ILLUSION";
+
+
+/*
+* Liquidity Engine is the primary source.
+*/
 
 if (
+liquidityEngineCharacter === "BROAD" ||
+liquidityEngineCharacter === "PASSIVE" ||
+liquidityEngineCharacter === "NARROW" ||
+liquidityEngineCharacter === "FRAGILE" ||
+liquidityEngineCharacter === "ILLUSION"
+) {
+
+liquidityCharacter =
+liquidityEngineCharacter;
+
+}
+
+
+else if (
 strongParticipation &&
-leadershipBreadth > 65 &&
+leadershipBreadth >= 65 &&
 passiveDependence < 40
 ) {
-liquidityCharacter = "BROAD"
+
+liquidityCharacter =
+"BROAD";
+
 }
 
-else if (
-passiveDependence >= 75
-) {
-liquidityCharacter = "ILLUSION"
-}
 
 else if (
-narrowLeadership
-) {
-liquidityCharacter = "NARROW"
-}
-
-else if (
-weakParticipation
-) {
-liquidityCharacter = "FRAGILE"
-}
-
-else if (
+passiveDependence >= 75 ||
 fragilityScore >= 75
 ) {
-liquidityCharacter = "ILLUSION"
+
+liquidityCharacter =
+"ILLUSION";
+
 }
 
-else {
-liquidityCharacter = "PASSIVE"
+
+else if (narrowLeadership) {
+
+liquidityCharacter =
+"NARROW";
+
 }
+
+
+else if (weakParticipation) {
+
+liquidityCharacter =
+"FRAGILE";
+
+}
+
+
+else {
+
+liquidityCharacter =
+"PASSIVE";
+
+}
+
+
 
 /* =====================================================
 STATE
@@ -607,42 +954,95 @@ let state:
 | "FRAGILE"
 | "INTERNALLY_WEAK"
 | "DISTRIBUTION"
-| "STRUCTURAL_BREAKDOWN"
+| "STRUCTURAL_BREAKDOWN";
+
+
+/*
+* Structural breakdown has highest priority.
+*/
 
 if (
-marketIntegrity >= 78 &&
-internalSynchronization
+
+marketIntegrity < 35 ||
+
+(
+fragilityScore >= 85 &&
+divergenceScore >= 70
+)
+
 ) {
-state = "INSTITUTIONAL_EXPANSION"
+
+state =
+"STRUCTURAL_BREAKDOWN";
+
 }
+
+
+/*
+* Distribution is structural and must not be hidden
+* behind a medium integrity score.
+*/
+
+else if (
+
+passiveDependence >= 70 ||
+
+(
+narrowLeadership &&
+weakParticipation &&
+divergenceScore >= 55
+)
+
+) {
+
+state =
+"DISTRIBUTION";
+
+}
+
+
+else if (
+
+marketIntegrity >= 78 &&
+
+internalSynchronization
+
+) {
+
+state =
+"INSTITUTIONAL_EXPANSION";
+
+}
+
 
 else if (
 marketIntegrity >= 64
 ) {
-state = "HEALTHY"
+
+state =
+"HEALTHY";
+
 }
+
 
 else if (
 marketIntegrity >= 52
 ) {
-state = "FRAGILE"
+
+state =
+"FRAGILE";
+
 }
 
-else if (
-marketIntegrity >= 40
-) {
-state = "INTERNALLY_WEAK"
-}
-
-else if (
-passiveDependence >= 70
-) {
-state = "DISTRIBUTION"
-}
 
 else {
-state = "STRUCTURAL_BREAKDOWN"
+
+state =
+"INTERNALLY_WEAK";
+
 }
+
+
 
 /* =====================================================
 QUALITY
@@ -651,17 +1051,31 @@ QUALITY
 let quality:
 | "HIGH"
 | "MEDIUM"
-| "LOW"
+| "LOW";
+
 
 if (marketIntegrity >= 72) {
-quality = "HIGH"
+
+quality =
+"HIGH";
+
 }
+
 else if (marketIntegrity >= 48) {
-quality = "MEDIUM"
+
+quality =
+"MEDIUM";
+
 }
+
 else {
-quality = "LOW"
+
+quality =
+"LOW";
+
 }
+
+
 
 /* =====================================================
 LEADERSHIP
@@ -670,45 +1084,139 @@ LEADERSHIP
 let leadership:
 | "BROAD"
 | "NARROW"
-| "MEGA_CAP_DISTORTED"
+| "MEGA_CAP_DISTORTED";
+
 
 if (institutionalDistortion) {
-leadership = "MEGA_CAP_DISTORTED"
+
+leadership =
+"MEGA_CAP_DISTORTED";
+
 }
+
 else if (narrowLeadership) {
-leadership = "NARROW"
+
+leadership =
+"NARROW";
+
 }
+
 else {
-leadership = "BROAD"
+
+leadership =
+"BROAD";
+
 }
+
+
 
 /* =====================================================
 SUMMARY
 ===================================================== */
 
 let summary =
-"Institutional market quality stable"
+"Institutional market quality stable";
+
+
+if (
+state === "INSTITUTIONAL_EXPANSION"
+) {
+
+summary =
+"Broad synchronized institutional expansion";
+
+}
+
+
+else if (
+state === "HEALTHY"
+) {
+
+summary =
+"Healthy institutional market structure";
+
+}
+
+
+else if (
+state === "FRAGILE"
+) {
+
+summary =
+"Market structure remains fragile";
+
+}
+
+
+else if (
+state === "INTERNALLY_WEAK"
+) {
+
+summary =
+"Internal market structure deteriorating";
+
+}
+
+
+else if (
+state === "DISTRIBUTION"
+) {
+
+summary =
+"Distribution structure developing beneath headline market strength";
+
+}
+
+
+else if (
+state === "STRUCTURAL_BREAKDOWN"
+) {
+
+summary =
+"Structural market breakdown active";
+
+}
+
 
 if (narrowLeadership) {
+
 summary +=
-" | Narrow leadership"
+" | Narrow leadership";
+
 }
+
 
 if (passiveDependence >= 65) {
+
 summary +=
-" | Passive dependence elevated"
+" | Passive dependence elevated";
+
 }
 
+
 if (liquidityCharacter === "ILLUSION") {
+
 summary +=
-" | Liquidity illusion"
+" | Liquidity illusion";
+
 }
+
+
+if (divergenceScore >= 60) {
+
+summary +=
+" | Internal divergence elevated";
+
+}
+
+
 
 /* =====================================================
 RETURN
 ===================================================== */
 
 return {
+
 score,
 
 marketIntegrity,
@@ -734,7 +1242,9 @@ liquidityCharacter,
 
 summary,
 
+
 metrics: {
+
 breadth50,
 breadth200,
 
@@ -751,20 +1261,31 @@ concentrationScore,
 rotationDecayScore,
 
 divergenceScore,
+
 regimeSyncScore,
 
 liquidityScore,
+
 fragilityScore,
+
 phaseConfidence,
 
 participationIntegrity,
+
 breadthIntegrity,
+
 rotationIntegrity,
+
 leadershipIntegrity,
+
 liquidityIntegrity,
 
 leadershipBreadth,
+
 passiveDependence
+
 }
-}
+
+};
+
 }
