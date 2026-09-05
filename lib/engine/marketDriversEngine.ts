@@ -1,592 +1,1085 @@
 // /lib/engine/marketDrivers.ts
 
+/* =====================================================
+MARKET DRIVERS ENGINE
+=====================================================
+
+SEMANTICS
+
+This engine evaluates the external and structural
+market-driver environment.
+
+POSITIVE:
+- healthy volatility structure
+- sufficient liquidity
+- constructive gamma
+- broad participation
+
+RISK:
+- volatility stress
+- negative gamma
+- narrow leadership
+- weak participation
+- dealer compression
+- passive flow concentration
+
+IMPORTANT:
+
+marketDrivers.score is a DRIVER QUALITY SCORE.
+
+HIGHER = MORE CONSTRUCTIVE
+LOWER = MORE DEFENSIVE
+
+Fragility and compression metrics are separate
+RISK metrics.
+
+===================================================== */
+
 function clamp(
 value: number,
 min = 0,
 max = 100
 ) {
-return Math.max(min, Math.min(max, value))
+
+if (!Number.isFinite(value)) {
+return min;
 }
 
-export function marketDriversEngine(data: any) {
+return Math.max(
+min,
+Math.min(max, value)
+);
 
-/* ================= RAW ================= */
+}
+
+function round(
+value: number,
+decimals = 1
+) {
+
+const factor =
+Math.pow(10, decimals);
+
+return (
+Math.round(value * factor) /
+factor
+);
+
+}
+
+export function marketDriversEngine(
+data: any
+) {
+
+/* =====================================================
+RAW INPUT
+===================================================== */
 
 const vix =
 Number(
-data.marketData?.["^VIX"]?.current ?? 0
-)
+data.marketData?.["^VIX"]?.current ??
+0
+);
 
 const vixTerm =
-Number(data.vixTermRatio ?? 1)
+Number(
+data.vixTermRatio ?? 1
+);
 
 const volOfVol =
-Number(data.volOfVolRatio ?? 1)
+Number(
+data.volOfVolRatio ?? 1
+);
 
 const skew =
-Number(data.optionsSkewRatio ?? 100)
+Number(
+data.optionsSkewRatio ?? 100
+);
 
 const rawGamma =
-Number(data.gammaExposure ?? 0)
+Number(
+data.gammaExposure ?? 0
+);
 
 const liquidity =
-Number(data.marketLiquidityScore ?? 50)
+clamp(
+Number(
+data.marketLiquidityScore ?? 50
+)
+);
 
 const credit =
-Number(data.creditRatio ?? 1)
+Number(
+data.creditRatio ?? 1
+);
 
 const correlation =
-Number(data.correlationScore ?? 0)
+Number(
+data.correlationScore ?? 0
+);
 
 const breadth =
-Number(data.breadth50 ?? 0) * 100
+clamp(
+Number(
+data.breadth50 ?? 0
+) * 100
+);
+
+/*
+* MOVE is rounded to one decimal place.
+*/
 
 const move =
-Number(data.moveIndex ?? 0)
+round(
+Number(
+data.moveIndex ?? 0
+),
+1
+);
 
 const rsSmall =
-Number(data.rsSmall ?? 1)
+Number(
+data.rsSmall ?? 1
+);
 
 const rsEqual =
-Number(data.rsEqual ?? 1)
+Number(
+data.rsEqual ?? 1
+);
 
 const rsGrowth =
-Number(data.rsGrowth ?? 1)
+Number(
+data.rsGrowth ?? 1
+);
 
 const participationScore =
-Number(data.participationScore ?? 50)
+clamp(
+Number(
+data.participationScore ?? 50
+)
+);
+
 
 /* =====================================================
 STRUCTURAL FLAGS
 ===================================================== */
 
 const calmContango =
+
 vix < 20 &&
+
 vixTerm >= 0.95 &&
-vixTerm <= 1.08
+
+vixTerm <= 1.08;
+
 
 const weakInternals =
-breadth < 60
+breadth < 60;
 
 const veryWeakInternals =
-breadth < 52
+breadth < 52;
+
+
+/* =====================================================
+LEADERSHIP
+===================================================== */
 
 const narrowLeadership =
+
 rsGrowth > 1.03 &&
+
 rsSmall < 0.995 &&
-rsEqual < 0.995
+
+rsEqual < 0.995;
+
 
 const megaCapLeadership =
+
 rsGrowth > 1.05 &&
+
 rsSmall < 0.98 &&
-rsEqual < 0.98
+
+rsEqual < 0.98;
+
+
+/* =====================================================
+PARTICIPATION
+===================================================== */
 
 const weakParticipation =
-participationScore < 50
+participationScore < 50;
 
 const severeWeakParticipation =
-participationScore < 42
+participationScore < 42;
+
+
+/* =====================================================
+EQUAL WEIGHT
+===================================================== */
 
 const equalWeightWeakness =
-rsEqual < 0.99
+rsEqual < 0.99;
 
 const severeEqualWeightWeakness =
-rsEqual < 0.97
+rsEqual < 0.97;
+
+
+/* =====================================================
+SMALL CAPS
+===================================================== */
 
 const smallCapWeakness =
-rsSmall < 0.99
+rsSmall < 0.99;
 
 const severeSmallCapWeakness =
-rsSmall < 0.97
+rsSmall < 0.97;
+
 
 /* =====================================================
 STRUCTURAL GAMMA FLOOR
+=====================================================
+
+Calm markets with strong dealer positioning can
+suppress volatility.
+
+This is NOT automatically bullish.
+
+Therefore effectiveGamma is used only for
+compression diagnostics.
+
 ===================================================== */
 
-let effectiveGamma = rawGamma
+let effectiveGamma =
+rawGamma;
+
 
 if (
 calmContango
 ) {
+
 effectiveGamma =
 Math.max(
 effectiveGamma,
 35
-)
+);
+
 }
+
 
 if (
 calmContango &&
 weakInternals
 ) {
+
 effectiveGamma =
 Math.max(
 effectiveGamma,
 45
-)
+);
+
 }
+
 
 if (
 calmContango &&
 megaCapLeadership
 ) {
+
 effectiveGamma =
 Math.max(
 effectiveGamma,
 55
-)
+);
+
 }
 
-/* ================= TERM STRUCTURE ================= */
 
-let termState = "CONTANGO"
+/* =====================================================
+TERM STRUCTURE
+===================================================== */
+
+let termState:
+| "CONTANGO"
+| "FLAT"
+| "BACKWARDATION" =
+"CONTANGO";
+
 
 if (
 vix > 22 &&
-(vixTerm < 0.9 || vixTerm > 1.1)
+(
+vixTerm < 0.90 ||
+vixTerm > 1.10
+)
 ) {
-termState = "BACKWARDATION"
+
+termState =
+"BACKWARDATION";
+
 }
 
 else if (
-vixTerm > 0.95 &&
-vixTerm < 1.05
+vixTerm >= 0.95 &&
+vixTerm <= 1.05
 ) {
-termState = "FLAT"
+
+termState =
+"FLAT";
+
 }
 
-/* ================= STATES ================= */
-
-const volState =
-vix < 18 ? "LOW" :
-vix < 25 ? "NORMAL" :
-"HIGH"
-
-const volOfVolState =
-volOfVol > 1.3 ? "STRESS" :
-volOfVol > 1.1 ? "ELEVATED" :
-"NORMAL"
-
-const skewState =
-skew > 120 ? "CRASH_HEDGE" :
-skew > 105 ? "ELEVATED" :
-"NORMAL"
-
-const gammaState =
-effectiveGamma < 0 ? "NEGATIVE" :
-effectiveGamma > 0 ? "POSITIVE" :
-"NEUTRAL"
-
-/* ================= MOVE ================= */
-
-let moveState = "NORMAL"
-
-if (move > 90) {
-moveState = "EXTREME"
-}
-
-else if (move > 75) {
-moveState = "ELEVATED"
-}
 
 /* =====================================================
-DEALER COMPRESSION
+VOLATILITY STATES
 ===================================================== */
 
-let dealerCompression = 0
+const volState =
 
-if (effectiveGamma >= 15) {
-dealerCompression += 25
+vix < 18
+? "LOW"
+
+: vix < 25
+? "NORMAL"
+
+: "HIGH";
+
+
+const volOfVolState =
+
+volOfVol > 1.30
+? "STRESS"
+
+: volOfVol > 1.10
+? "ELEVATED"
+
+: "NORMAL";
+
+
+const skewState =
+
+skew > 120
+? "CRASH_HEDGE"
+
+: skew > 105
+? "ELEVATED"
+
+: "NORMAL";
+
+
+const gammaState =
+
+effectiveGamma < 0
+? "NEGATIVE"
+
+: effectiveGamma > 0
+? "POSITIVE"
+
+: "NEUTRAL";
+
+
+/* =====================================================
+MOVE
+===================================================== */
+
+let moveState:
+| "NORMAL"
+| "ELEVATED"
+| "EXTREME" =
+"NORMAL";
+
+
+if (
+move > 90
+) {
+
+moveState =
+"EXTREME";
+
 }
 
-if (effectiveGamma >= 25) {
-dealerCompression += 20
+else if (
+move > 75
+) {
+
+moveState =
+"ELEVATED";
+
 }
 
-if (vix < 18) {
-dealerCompression += 20
+
+/* =====================================================
+DEALER COMPRESSION RISK
+=====================================================
+
+HIGH = MORE COMPRESSION RISK
+
+===================================================== */
+
+let dealerCompression = 0;
+
+
+if (
+effectiveGamma >= 15
+) {
+
+dealerCompression += 20;
+
 }
 
-if (breadth < 60) {
-dealerCompression += 20
+
+if (
+effectiveGamma >= 25
+) {
+
+dealerCompression += 15;
+
 }
+
+
+if (
+vix < 18
+) {
+
+dealerCompression += 15;
+
+}
+
+
+if (
+breadth < 60
+) {
+
+dealerCompression += 15;
+
+}
+
 
 if (
 effectiveGamma >= 25 &&
 vix < 18 &&
 breadth < 60
 ) {
-dealerCompression += 15
+
+dealerCompression += 15;
+
 }
+
 
 if (
 megaCapLeadership
 ) {
-dealerCompression += 10
+
+dealerCompression += 10;
+
 }
+
+
+if (
+narrowLeadership
+) {
+
+dealerCompression += 5;
+
+}
+
 
 dealerCompression =
 clamp(
-Math.round(dealerCompression)
+Math.round(
+dealerCompression
 )
+);
+
 
 /* =====================================================
 PASSIVE FLOW RISK
+=====================================================
+
+HIGH = MORE PASSIVE FLOW CONCENTRATION RISK
+
 ===================================================== */
 
-let passiveFlowRisk = 0
+let passiveFlowRisk = 0;
 
-if (vix < 17) {
-passiveFlowRisk += 25
+
+if (
+vix < 17
+) {
+
+passiveFlowRisk += 20;
+
 }
 
-if (breadth < 58) {
-passiveFlowRisk += 25
+
+if (
+breadth < 58
+) {
+
+passiveFlowRisk += 20;
+
 }
 
-if (liquidity > 65) {
-passiveFlowRisk += 15
+
+if (
+liquidity > 65
+) {
+
+passiveFlowRisk += 10;
+
 }
 
-if (effectiveGamma >= 20) {
-passiveFlowRisk += 15
+
+if (
+effectiveGamma >= 20
+) {
+
+passiveFlowRisk += 15;
+
 }
 
-if (narrowLeadership) {
-passiveFlowRisk += 12
+
+if (
+narrowLeadership
+) {
+
+passiveFlowRisk += 15;
+
 }
 
-if (megaCapLeadership) {
-passiveFlowRisk += 15
+
+if (
+megaCapLeadership
+) {
+
+passiveFlowRisk += 15;
+
 }
+
 
 if (
 calmContango &&
 weakInternals
 ) {
-passiveFlowRisk += 10
+
+passiveFlowRisk += 10;
+
 }
+
+
+if (
+weakParticipation
+) {
+
+passiveFlowRisk += 10;
+
+}
+
 
 passiveFlowRisk =
 clamp(
-Math.round(passiveFlowRisk)
+Math.round(
+passiveFlowRisk
 )
+);
+
 
 /* =====================================================
-VOL SUPPRESSION
+VOLATILITY SUPPRESSION RISK
+=====================================================
+
+HIGH = VOLATILITY MAY BE ARTIFICIALLY SUPPRESSED
+
 ===================================================== */
 
-let volSuppression = 0
+let volSuppression = 0;
 
-if (vix < 17) {
-volSuppression += 30
+
+if (
+vix < 17
+) {
+
+volSuppression += 25;
+
 }
+
 
 if (
 vixTerm >= 0.95 &&
 vixTerm <= 1.08
 ) {
-volSuppression += 25
+
+volSuppression += 20;
+
 }
 
-if (effectiveGamma >= 15) {
-volSuppression += 15
+
+if (
+effectiveGamma >= 15
+) {
+
+volSuppression += 15;
+
 }
 
-if (breadth < 60) {
-volSuppression += 15
+
+if (
+breadth < 60
+) {
+
+volSuppression += 15;
+
 }
 
-if (megaCapLeadership) {
-volSuppression += 10
+
+if (
+megaCapLeadership
+) {
+
+volSuppression += 10;
+
 }
+
+
+if (
+weakParticipation
+) {
+
+volSuppression += 10;
+
+}
+
 
 volSuppression =
 clamp(
-Math.round(volSuppression)
+Math.round(
+volSuppression
 )
+);
+
 
 /* =====================================================
-GLOBAL STATE
+STRUCTURAL FRAGILITY
+=====================================================
+
+HIGH = FRAGILE
+
 ===================================================== */
 
-let globalState = "NEUTRAL"
+let fragility = 0;
+
+
+/* ================= VOLATILITY ================= */
 
 if (
-vix < 18 &&
-termState === "CONTANGO" &&
-gammaState === "POSITIVE" &&
-liquidity > 70
+volOfVol > 1.20
 ) {
-globalState = "RISK_ON"
+
+fragility += 8;
+
 }
+
+
+if (
+skew > 110
+) {
+
+fragility += 8;
+
+}
+
+
+if (
+correlation > 2
+) {
+
+fragility += 8;
+
+}
+
+
+/* ================= COMPRESSION ================= */
+
+if (
+dealerCompression >= 60
+) {
+
+fragility += 15;
+
+}
+
+
+if (
+volSuppression >= 60
+) {
+
+fragility += 15;
+
+}
+
+
+if (
+passiveFlowRisk >= 60
+) {
+
+fragility += 15;
+
+}
+
+
+/* ================= INTERNALS ================= */
+
+if (
+narrowLeadership &&
+weakParticipation
+) {
+
+fragility += 15;
+
+}
+
+
+if (
+equalWeightWeakness
+) {
+
+fragility += 6;
+
+}
+
+
+if (
+smallCapWeakness
+) {
+
+fragility += 6;
+
+}
+
+
+if (
+veryWeakInternals
+) {
+
+fragility += 8;
+
+}
+
+
+if (
+megaCapLeadership &&
+severeWeakParticipation
+) {
+
+fragility += 10;
+
+}
+
+
+if (
+severeEqualWeightWeakness &&
+severeSmallCapWeakness
+) {
+
+fragility += 10;
+
+}
+
+
+fragility =
+clamp(
+Math.round(
+fragility
+)
+);
+
+
+/* =====================================================
+GLOBAL MARKET STATE
+===================================================== */
+
+let globalState:
+| "RISK_ON"
+| "FRAGILE_RISK_ON"
+| "COMPRESSED_MELTUP"
+| "INTERNAL_DISTRIBUTION"
+| "RISK_OFF"
+| "NEUTRAL" =
+"NEUTRAL";
+
+
+/* ================= HARD RISK CONDITIONS ================= */
 
 if (
 vix > 25 ||
 termState === "BACKWARDATION" ||
 gammaState === "NEGATIVE"
 ) {
-globalState = "RISK_OFF"
+
+globalState =
+"RISK_OFF";
+
 }
 
-/*
-IMPORTANT:
-calm tape can be dangerous
-*/
 
-if (
+/* ================= INTERNAL DISTRIBUTION ================= */
+
+else if (
+megaCapLeadership &&
+severeWeakParticipation &&
+veryWeakInternals
+) {
+
+globalState =
+"INTERNAL_DISTRIBUTION";
+
+}
+
+
+/* ================= COMPRESSED MELTUP ================= */
+
+else if (
 dealerCompression >= 60 &&
 passiveFlowRisk >= 55
 ) {
+
 globalState =
-"COMPRESSED_MELTUP"
+"COMPRESSED_MELTUP";
+
 }
 
-/* =====================================================
-FRAGILITY
-===================================================== */
 
-let fragility = 0
+/* ================= RISK ON ================= */
 
-if (volOfVol > 1.2) {
-fragility += 1
-}
-
-if (skew > 110) {
-fragility += 1
-}
-
-if (correlation > 2) {
-fragility += 1
-}
-
-if (dealerCompression >= 60) {
-fragility += 2
-}
-
-if (volSuppression >= 60) {
-fragility += 2
-}
-
-if (
-passiveFlowRisk >= 60
-) {
-fragility += 2
-}
-
-/* =====================================================
-NEW STRUCTURAL FRAGILITY
-===================================================== */
-
-/*
-CRITICAL FIX:
-MarketDrivers must reflect:
-- narrow leadership
-- weak participation
-- weak equal weight
-- weak small caps
-Otherwise:
-globalState becomes falsely bullish.
-*/
-
-if (
-narrowLeadership &&
-weakParticipation
-) {
-fragility += 15;
-}
-
-if (
-equalWeightWeakness
-) {
-fragility += 6;
-}
-
-if (
-smallCapWeakness
-) {
-fragility += 6;
-}
-
-if (
-veryWeakInternals
-) {
-fragility += 8;
-}
-
-if (
-megaCapLeadership &&
-severeWeakParticipation
-) {
-fragility += 10;
-}
-
-if (
-severeEqualWeightWeakness &&
-severeSmallCapWeakness
-) {
-fragility += 10;
-}
-
-fragility =
-clamp(fragility)
-
-/* =====================================================
-SCORE
-===================================================== */
-
-let score = 0
-
-/* ================= POSITIVE ================= */
-
-if (
-globalState === "RISK_ON"
-) {
-score += 15
-}
-
-if (
-globalState === "COMPRESSED_MELTUP"
-) {
-score += 8
-}
-
-if (
+else if (
+vix < 18 &&
+termState === "CONTANGO" &&
+gammaState === "POSITIVE" &&
 liquidity > 70
 ) {
-score += 6
+
+globalState =
+"RISK_ON";
+
 }
 
-if (
-gammaState === "POSITIVE"
-) {
-score += 6
-}
-
-if (
-vix < 18
-) {
-score += 5
-}
-
-/* ================= NEGATIVE ================= */
-
-if (
-narrowLeadership &&
-weakParticipation
-) {
-score -= 10;
-}
-
-if (
-equalWeightWeakness
-) {
-score -= 4;
-}
-
-if (
-smallCapWeakness
-) {
-score -= 4;
-}
-
-if (
-weakInternals
-) {
-score -= 6;
-}
-
-if (
-veryWeakInternals
-) {
-score -= 8;
-}
-
-if (
-passiveFlowRisk >= 60
-) {
-score -= 6;
-}
-
-if (
-dealerCompression >= 60
-) {
-score -= 5;
-}
-
-if (
-megaCapLeadership
-) {
-score -= 5;
-}
-
-if (
-severeWeakParticipation
-) {
-score -= 8;
-}
-
-if (
-globalState === "RISK_OFF"
-) {
-score -= 20;
-}
 
 /* =====================================================
-STRUCTURAL GLOBAL STATE OVERRIDE
+STRUCTURAL RISK-ON OVERRIDE
 ===================================================== */
 
-/*
-Institutional override:
-Do NOT allow pure RISK_ON
-when internals are weak.
-*/
-
 if (
-
 globalState === "RISK_ON" &&
-
 (
 narrowLeadership ||
 weakParticipation ||
 equalWeightWeakness ||
 smallCapWeakness
 )
-
 ) {
 
 globalState =
 "FRAGILE_RISK_ON";
+
 }
 
+
 /* =====================================================
-SEVERE INTERNAL DETERIORATION
+DRIVER QUALITY SCORE
+=====================================================
+
+HIGHER = MORE CONSTRUCTIVE
+
 ===================================================== */
+
+let score = 50;
+
+
+/* ================= VOLATILITY ================= */
 
 if (
-
-megaCapLeadership &&
-
-severeWeakParticipation &&
-
-veryWeakInternals
-
+vix < 18
 ) {
 
-globalState =
-"INTERNAL_DISTRIBUTION";
+score += 8;
+
 }
 
-/* =====================================================
-FINAL SCORE
-===================================================== */
+else if (
+vix > 25
+) {
+
+score -= 15;
+
+}
+
+
+/* ================= TERM ================= */
+
+if (
+termState === "CONTANGO"
+) {
+
+score += 5;
+
+}
+
+else if (
+termState === "BACKWARDATION"
+) {
+
+score -= 12;
+
+}
+
+
+/* ================= LIQUIDITY ================= */
+
+if (
+liquidity > 70
+) {
+
+score += 8;
+
+}
+
+else if (
+liquidity < 40
+) {
+
+score -= 10;
+
+}
+
+
+/* ================= GAMMA ================= */
+
+if (
+gammaState === "POSITIVE"
+) {
+
+score += 5;
+
+}
+
+else if (
+gammaState === "NEGATIVE"
+) {
+
+score -= 15;
+
+}
+
+
+/* ================= INTERNALS ================= */
+
+if (
+narrowLeadership &&
+weakParticipation
+) {
+
+score -= 10;
+
+}
+
+
+if (
+equalWeightWeakness
+) {
+
+score -= 5;
+
+}
+
+
+if (
+smallCapWeakness
+) {
+
+score -= 5;
+
+}
+
+
+if (
+weakInternals
+) {
+
+score -= 6;
+
+}
+
+
+if (
+veryWeakInternals
+) {
+
+score -= 8;
+
+}
+
+
+if (
+severeWeakParticipation
+) {
+
+score -= 8;
+
+}
+
+
+if (
+megaCapLeadership
+) {
+
+score -= 5;
+
+}
+
+
+/* ================= COMPRESSION ================= */
+
+if (
+passiveFlowRisk >= 60
+) {
+
+score -= 5;
+
+}
+
+
+if (
+dealerCompression >= 60
+) {
+
+score -= 5;
+
+}
+
+
+if (
+globalState === "RISK_OFF"
+) {
+
+score -= 10;
+
+}
+
+
+if (
+globalState ===
+"INTERNAL_DISTRIBUTION"
+) {
+
+score -= 12;
+
+}
+
 
 score =
 clamp(
-Math.round(score),
--100,
-100
-)
+Math.round(score)
+);
+
 
 /* =====================================================
 RETURN
@@ -594,32 +1087,62 @@ RETURN
 
 return {
 
+/*
+* Driver quality score.
+*
+* HIGH = CONSTRUCTIVE
+* LOW = DEFENSIVE
+*/
+
 score,
+
+
+/* ================= STATES ================= */
 
 states: {
 
-vol: volState,
+vol:
+volState,
 
-term: termState,
+term:
+termState,
 
-volOfVol: volOfVolState,
+volOfVol:
+volOfVolState,
 
-skew: skewState,
+skew:
+skewState,
 
-gamma: gammaState,
+gamma:
+gammaState,
 
 liquidity:
+
 liquidity > 70
 ? "ABUNDANT"
+
+: liquidity < 40
+? "STRESSED"
+
 : "NORMAL",
 
 credit:
-credit > 0.9
+
+credit > 0.90
 ? "RISK_ON"
+
+: credit < 0.80
+? "STRESSED"
+
 : "NEUTRAL",
 
-move: moveState
+move:
+moveState,
+
 },
+
+
+/* ================= RISK METRICS ================= */
 
 fragility,
 
@@ -631,31 +1154,80 @@ passiveFlowRisk,
 
 volSuppression,
 
+
+/* ================= RAW ================= */
+
 raw: {
-vix,
-vixTerm,
-volOfVol,
-skew,
 
-rawGamma,
-effectiveGamma,
+vix:
+round(vix, 1),
 
-liquidity,
-credit,
-correlation,
-breadth,
-move,
+vixTerm:
+round(vixTerm, 3),
 
-participationScore,
+volOfVol:
+round(volOfVol, 3),
+
+skew:
+round(skew, 1),
+
+/*
+* Keep both gamma values explicitly.
+*/
+
+rawGamma:
+round(rawGamma, 1),
+
+effectiveGamma:
+round(effectiveGamma, 1),
+
+liquidity:
+round(liquidity, 1),
+
+credit:
+round(credit, 3),
+
+correlation:
+round(correlation, 2),
+
+breadth:
+round(breadth, 1),
+
+/*
+* MOVE explicitly rounded to one decimal.
+*/
+
+move:
+round(move, 1),
+
+participationScore:
+round(participationScore, 1),
+
+
+/* ================= STRUCTURAL FLAGS ================= */
 
 narrowLeadership,
+
 megaCapLeadership,
 
 weakParticipation,
+
 severeWeakParticipation,
 
 equalWeightWeakness,
-smallCapWeakness
-}
-}
+
+severeEqualWeightWeakness,
+
+smallCapWeakness,
+
+severeSmallCapWeakness,
+
+weakInternals,
+
+veryWeakInternals,
+
+},
+
+};
+
 }
