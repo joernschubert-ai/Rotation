@@ -2,277 +2,742 @@
 
 export function structureEngine(data: any) {
 
-/* ================= BREADTH ================= */
+/* =====================================================
+HELPERS
+===================================================== */
+
+function clamp(
+value: number,
+min = 0,
+max = 100
+) {
+
+return Math.max(
+min,
+Math.min(max, value)
+);
+
+}
+
+
+function safeNumber(
+value: any,
+fallback = 0
+) {
+
+const numeric =
+Number(value);
+
+return Number.isFinite(numeric)
+? numeric
+: fallback;
+
+}
+
+
+/* =====================================================
+BREADTH
+===================================================== */
+
+/*
+* Breadth values are expected as decimals
+* from the backend.
+*
+* Example:
+*
+* 0.65 -> 65%
+*/
 
 const breadth20 =
-Number(data.breadth20 ?? 0) * 100;
+clamp(
+safeNumber(
+data.breadth20,
+0
+) * 100
+);
 
 const breadth50 =
-Number(data.breadth50 ?? 0) * 100;
+clamp(
+safeNumber(
+data.breadth50,
+0
+) * 100
+);
 
 const breadth200 =
-Number(data.breadth200 ?? 0) * 100;
+clamp(
+safeNumber(
+data.breadth200,
+0
+) * 100
+);
+
 
 const breadth = {
+
 b20: {
-value: breadth20,
-delta: Number(data.breadth20Delta ?? 0)
+
+value:
+Math.round(
+breadth20
+),
+
+delta:
+safeNumber(
+data.breadth20Delta,
+0
+)
+
 },
 
 b50: {
-value: breadth50,
-delta: Number(data.breadth50Delta ?? 0)
+
+value:
+Math.round(
+breadth50
+),
+
+delta:
+safeNumber(
+data.breadth50Delta,
+0
+)
+
 },
 
 b200: {
-value: breadth200,
-delta: Number(data.breadth200Delta ?? 0)
+
+value:
+Math.round(
+breadth200
+),
+
+delta:
+safeNumber(
+data.breadth200Delta,
+0
+)
+
 }
+
 };
 
-/* ================= ADVANCE / DECLINE ================= */
 
-const advances = Number(
+/* =====================================================
+ADVANCE / DECLINE
+===================================================== */
+
+const advances =
+safeNumber(
 data.advances ??
-data.advanceDecline?.advances ??
+data.advanceDecline?.advances,
 0
 );
 
-const declines = Number(
+const declines =
+safeNumber(
 data.declines ??
-data.advanceDecline?.declines ??
+data.advanceDecline?.declines,
 0
 );
 
-const adValue = advances - declines;
+
+const adValue =
+advances -
+declines;
+
 
 const advanceDecline = {
+
 advances,
+
 declines,
-value: adValue,
-delta: Number(data.adDelta ?? 0)
+
+value:
+adValue,
+
+delta:
+safeNumber(
+data.adDelta ??
+data.advanceDecline?.delta,
+0
+)
+
 };
 
-/* ================= HIGHS / LOWS ================= */
 
-const highs = Number(
+/* =====================================================
+HIGHS / LOWS
+===================================================== */
+
+const highs =
+safeNumber(
 data.highs ??
-data.newHighs ??
+data.newHighs,
 0
 );
 
-const lows = Number(
+const lows =
+safeNumber(
 data.lows ??
-data.newLows ??
+data.newLows,
 0
 );
+
 
 const highsLows = {
+
 highs,
+
 lows,
-deltaHighs: Number(data.highsDelta ?? 0),
-deltaLows: Number(data.lowsDelta ?? 0)
-};
 
-/* ================= DISTRIBUTION ================= */
-
-const distribution = {
-value: Number(data.distributionScore ?? 0),
-max: 7
-};
-
-/* ================= INTERNAL STRUCTURE INPUTS ================= */
-
-const rsEqual =
-Number(
-data.rsEqual ??
-data.rotation?.rsEqual ??
-1
-);
-
-const rsSmall =
-Number(
-data.rsSmall ??
-data.rotation?.rsSmall ??
-1
-);
-
-const rotationScore =
-Number(
-data.rotationScore ??
-data.rotation?.score ??
-50
-);
-
-const participationScore =
-Number(
-data.participationScore ??
-data.participation?.score ??
-50
-);
-
-const rotationDecayScore =
-Number(
-data.rotationDecayScore ??
-data.rotationDecay?.score ??
+deltaHighs:
+safeNumber(
+data.highsDelta,
 0
-);
+),
 
-const earlyWarning =
-Boolean(
-data.earlyWarning?.active ??
-false
-);
+deltaLows:
+safeNumber(
+data.lowsDelta,
+0
+)
 
-/* ================= BASE HEALTH ================= */
+};
+
+
+/* =====================================================
+DISTRIBUTION
+===================================================== */
 
 /*
-Institutional Logic:
+* Distribution is a direct structural input.
+*
+* 0 = no distribution
+* 7 = maximum distribution
+*/
 
-Breadth50:
-Intermediate participation
+const distributionValue =
+Math.max(
+0,
+Math.min(
+7,
+safeNumber(
+data.distributionScore,
+0
+)
+)
+);
 
-Breadth200:
-Structural participation
 
-Breadth20:
-Momentum participation
+const distribution = {
 
-Breadth200 receives LOWER weighting than before
-because structural breadth lags heavily during
-distribution regimes.
+value:
+distributionValue,
+
+max:
+7
+
+};
+
+
+/* =====================================================
+HIGH / LOW STRUCTURE
+===================================================== */
+
+const hasHighLowData =
+highs !== 0 ||
+lows !== 0;
+
+
+const totalHighLow =
+highs +
+lows;
+
+
+const highLowStrength =
+hasHighLowData &&
+totalHighLow > 0
+
+? (
+highs - lows
+) /
+totalHighLow
+
+: 0;
+
+
+/*
+* Convert High/Low strength
+* into a 0..100 structural score.
+*
+* -1 = 0
+* 0 = 50
+* +1 = 100
+*/
+
+const highLowScore =
+clamp(
+50 +
+(
+highLowStrength *
+50
+)
+);
+
+
+/* =====================================================
+ADVANCE / DECLINE STRUCTURE
+===================================================== */
+
+/*
+* A/D can have different absolute ranges
+* depending on the universe.
+*
+* Therefore normalize the net result
+* relative to total activity.
+*/
+
+const totalAD =
+advances +
+declines;
+
+
+const adStrength =
+totalAD > 0
+
+? adValue /
+totalAD
+
+: 0;
+
+
+/*
+* -1 = 0
+* 0 = 50
+* +1 = 100
+*/
+
+const adScore =
+clamp(
+50 +
+(
+adStrength *
+50
+)
+);
+
+
+/* =====================================================
+DISTRIBUTION RISK
+===================================================== */
+
+/*
+* Distribution:
+*
+* 0 = healthy
+* 7 = maximum structural risk
+*/
+
+const distributionRisk =
+clamp(
+(
+distributionValue /
+7
+) * 100
+);
+
+
+const distributionHealth =
+100 -
+distributionRisk;
+
+
+/* =====================================================
+BREADTH HEALTH
+===================================================== */
+
+/*
+* Breadth hierarchy:
+*
+* Breadth 20:
+* short-term momentum participation
+*
+* Breadth 50:
+* intermediate participation
+*
+* Breadth 200:
+* long-term structural participation
+*
+* Breadth50 receives the highest weighting
+* because it reacts faster than Breadth200
+* but is more stable than Breadth20.
+*/
+
+const breadthHealth =
+(
+breadth20 * 0.20
+) +
+
+(
+breadth50 * 0.45
+) +
+
+(
+breadth200 * 0.35
+);
+
+
+/* =====================================================
+BREADTH DIVERGENCE
+===================================================== */
+
+/*
+* A structurally dangerous environment can occur
+* when longer-term breadth still looks healthy
+* while short/intermediate breadth deteriorates.
+*
+* This is a structural divergence,
+* independent from RotationComposite.
+*/
+
+let divergencePenalty = 0;
+
+
+/*
+* Breadth200 remains strong
+* while Breadth50 deteriorates.
+*/
+
+if (
+breadth200 >= 70 &&
+breadth50 < 55
+) {
+
+divergencePenalty += 8;
+
+}
+
+
+/*
+* Strong long-term breadth but weak short-term
+* participation.
+*/
+
+if (
+breadth200 >= 70 &&
+breadth20 < 45
+) {
+
+divergencePenalty += 6;
+
+}
+
+
+/*
+* Severe intermediate deterioration.
+*/
+
+if (
+breadth50 < 40 &&
+breadth200 >= 65
+) {
+
+divergencePenalty += 8;
+
+}
+
+
+/*
+* Breadth collapse across all horizons.
+*/
+
+if (
+breadth20 < 35 &&
+breadth50 < 40 &&
+breadth200 < 50
+) {
+
+divergencePenalty += 10;
+
+}
+
+
+/* =====================================================
+A/D DIVERGENCE
+===================================================== */
+
+/*
+* Strong Breadth50 with negative A/D can indicate
+* weakening internal participation.
+*/
+
+let adPenalty = 0;
+
+
+if (
+breadth50 > 75 &&
+adStrength < 0
+) {
+
+adPenalty += 6;
+
+}
+
+
+/*
+* Strong Breadth200 while current A/D
+* is significantly negative.
+*/
+
+if (
+breadth200 > 70 &&
+adStrength < -0.10
+) {
+
+adPenalty += 8;
+
+}
+
+
+/* =====================================================
+HIGH / LOW DIVERGENCE
+===================================================== */
+
+let highLowPenalty = 0;
+
+
+/*
+* Breadth appears strong,
+* but new lows dominate.
+*/
+
+if (
+hasHighLowData &&
+breadth50 > 70 &&
+highLowStrength < 0
+) {
+
+highLowPenalty += 6;
+
+}
+
+
+/*
+* Severe new-low dominance.
+*/
+
+if (
+hasHighLowData &&
+highLowStrength < -0.30
+) {
+
+highLowPenalty += 8;
+
+}
+
+
+/* =====================================================
+STRUCTURAL HEALTH
+===================================================== */
+
+/*
+* IMPORTANT:
+*
+* Structure Health intentionally uses only
+* Structure Engine data.
+*
+* It does NOT directly include:
+*
+* - Rotation Score
+* - RotationConfirm
+* - RotationDecay
+* - Participation Engine
+* - Fragility Engine
+* - Liquidity Engine
+* - Early Warning Engine
+*
+* Those engines already have their own panels
+* and are integrated at higher composite levels.
+*
+* This prevents hidden double-counting.
 */
 
 let healthScore =
 (
-(breadth20 * 0.20) +
-(breadth50 * 0.45) +
-(breadth200 * 0.35)
+breadthHealth *
+0.60
+) +
+
+(
+adScore *
+0.15
+) +
+
+(
+highLowScore *
+0.10
+) +
+
+(
+distributionHealth *
+0.15
 );
 
-/* ================= QUALITY PENALTIES ================= */
 
-/* ----- Negative A/D despite strong breadth ----- */
+/* =====================================================
+STRUCTURAL PENALTIES
+===================================================== */
 
-if (
-breadth50 > 75 &&
-adValue < 0
-) {
-healthScore -= 8;
-}
+healthScore -=
+divergencePenalty;
 
-/* ----- Strong structural breadth but weak Equal Weight ----- */
+healthScore -=
+adPenalty;
 
-if (
-breadth200 > 70 &&
-rsEqual < 0.97
-) {
-healthScore -= 10;
-}
+healthScore -=
+highLowPenalty;
 
-/* ----- Structural divergence ----- */
 
-if (
-breadth200 > 70 &&
-adValue < 0 &&
-rsEqual < 0.97
-) {
-healthScore -= 15;
-}
+/* =====================================================
+CLAMP
+===================================================== */
 
-/* ----- Weak small caps ----- */
-
-if (rsSmall < 0.95) {
-healthScore -= 8;
-}
-
-/* ----- Narrow leadership ----- */
-
-if (
-rsEqual < 0.96 &&
-rsSmall < 0.95
-) {
-healthScore -= 10;
-}
-
-/* ----- Participation deterioration ----- */
-
-if (participationScore < 40) {
-healthScore -= 10;
-}
-
-if (participationScore < 30) {
-healthScore -= 8;
-}
-
-/* ----- Rotation deterioration ----- */
-
-if (rotationScore < 40) {
-healthScore -= 8;
-}
-
-if (rotationScore < 30) {
-healthScore -= 6;
-}
-
-/* ----- Rotation decay / distribution ----- */
-
-if (rotationDecayScore > 70) {
-healthScore -= 10;
-}
-
-if (rotationDecayScore > 85) {
-healthScore -= 10;
-}
-
-/* ----- Early warning active ----- */
-
-if (earlyWarning) {
-healthScore -= 6;
-}
-
-/* ----- Highs vs lows deterioration ----- */
-
-if (
-highs <= lows &&
-breadth50 > 70
-) {
-healthScore -= 6;
-}
-
-/* ----- Severe internal divergence ----- */
-
-if (
-breadth50 > 80 &&
-breadth200 > 70 &&
-adValue < 0 &&
-participationScore < 35
-) {
-healthScore -= 12;
-}
-
-/* ================= CLAMP ================= */
-
-healthScore = Math.max(
-0,
-Math.min(100, healthScore)
+healthScore =
+clamp(
+healthScore
 );
 
-/* ================= HEALTH ================= */
+
+/* =====================================================
+HEALTH
+===================================================== */
 
 const health = {
-value: Math.round(healthScore),
-max: 100
+
+value:
+Math.round(
+healthScore
+),
+
+max:
+100
+
 };
 
-/* ================= RETURN ================= */
+
+/* =====================================================
+STRUCTURE STATE
+===================================================== */
+
+let structureState =
+"BALANCED";
+
+
+if (
+healthScore >= 75
+) {
+
+structureState =
+"HEALTHY";
+
+}
+
+else if (
+healthScore >= 60
+) {
+
+structureState =
+"STABLE";
+
+}
+
+else if (
+healthScore >= 45
+) {
+
+structureState =
+"TRANSITION";
+
+}
+
+else if (
+healthScore >= 30
+) {
+
+structureState =
+"WEAKENING";
+
+}
+
+else {
+
+structureState =
+"STRUCTURAL_FAILURE";
+
+}
+
+
+/* =====================================================
+DIAGNOSTICS
+===================================================== */
+
+const diagnostics = {
+
+breadthHealth:
+Math.round(
+breadthHealth
+),
+
+adScore:
+Math.round(
+adScore
+),
+
+highLowScore:
+Math.round(
+highLowScore
+),
+
+distributionHealth:
+Math.round(
+distributionHealth
+),
+
+divergencePenalty,
+
+adPenalty,
+
+highLowPenalty,
+
+distributionRisk:
+Math.round(
+distributionRisk
+)
+
+};
+
+
+/* =====================================================
+RETURN
+===================================================== */
 
 return {
+
 breadth,
+
 advanceDecline,
+
 highsLows,
+
 distribution,
-health
+
+health,
+
+structureState,
+
+diagnostics
+
 };
 
 }
