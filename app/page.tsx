@@ -857,9 +857,12 @@ return (
     <div className="mt-4">
 
       <MarketDrivers
-        drivers={engine.marketDrivers}
-        earlyWarning={engine.earlyWarning}
-      />
+drivers={engine.marketDrivers}
+earlyWarning={engine.earlyWarning}
+regimeSync={engine.regimeSync}
+executionState={engine.executionState}
+dangerZone={engine.dangerZone}
+/>
 
     </div>
 
