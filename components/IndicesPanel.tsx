@@ -1,108 +1,398 @@
+// /components/panels/IndicesPanel.tsx
+
 "use client";
 
-export default function IndicesPanel({ indices, futures }: any) {
 
-if (!indices) return null;
+/* =====================================================
+PROPS
+===================================================== */
 
-function getColor(value: number) {
-if (value > 0.5) return "#52c41a";
-if (value > 0) return "#a0d911";
-if (value === 0) return "#999";
-if (value > -0.5) return "#faad14";
-return "#ff4d4f";
+interface Props {
+indices?: any;
+futures?: any;
 }
 
-function safeNumber(n: any) {
-return typeof n === "number" && !isNaN(n) ? n : 0;
-}
 
-function renderRow(label: string, item: any) {
-const value = safeNumber(item?.value);
-const change = safeNumber(item?.change);
+/* =====================================================
+COMPONENT
+===================================================== */
+
+export default function IndicesPanel({
+indices,
+futures,
+}: Props) {
+
+const safeIndices =
+indices ?? {};
+
+const safeFutures =
+futures ?? {};
+
+
+/* =====================================================
+HELPERS
+===================================================== */
+
+function isValidNumber(
+value: unknown
+): value is number {
 
 return (
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-marginBottom: "12px",
-}}
->
-<span style={{ color: "#888", fontSize: "13px" }}>{label}</span>
-
-<div style={{ textAlign: "right" }}>
-<div style={{ fontSize: "18px", fontWeight: "bold" }}>
-{Math.round(value)}
-</div>
-
-<div
-style={{
-color: getColor(change),
-fontWeight: "bold",
-fontSize: "13px",
-}}
->
-{change > 0 ? "+" : ""}
-{change.toFixed(2)}%
-</div>
-</div>
-</div>
+typeof value === "number" &&
+Number.isFinite(value)
 );
+
 }
 
-/* 🔥 SAFETY FALLBACK */
-const safeFutures = futures ?? {};
-const safeIndices = indices ?? {};
 
-/* ================= RENDER ================= */
+function getChangeColor(
+change: unknown
+): string {
+
+if (!isValidNumber(change)) {
+return "text-zinc-500";
+}
+
+
+if (change > 0.5) {
+return "text-green-400";
+}
+
+
+if (change > 0) {
+return "text-green-300";
+}
+
+
+if (change === 0) {
+return "text-zinc-500";
+}
+
+
+if (change > -0.5) {
+return "text-yellow-400";
+}
+
+
+return "text-red-400";
+
+}
+
+
+function formatValue(
+value: unknown
+): string {
+
+if (!isValidNumber(value)) {
+return "—";
+}
+
+
+return Math.round(
+value
+).toLocaleString(
+"en-US"
+);
+
+}
+
+
+function formatChange(
+change: unknown
+): string {
+
+if (!isValidNumber(change)) {
+return "N/A";
+}
+
+
+return `${
+change > 0
+? "+"
+: ""
+}${change.toFixed(2)}%`;
+
+}
+
+
+/* =====================================================
+MARKET ROW
+===================================================== */
+
+function MarketRow({
+label,
+item,
+}: {
+label: string;
+item: any;
+}) {
+
+const value =
+item?.value;
+
+const change =
+item?.change;
+
 
 return (
-<div
-style={{
-background: "#0d0d0d",
-border: "1px solid #333",
-padding: "16px",
-}}
->
-
-<h3 style={{ color: "#aaa", marginBottom: "14px", fontSize: "14px" }}>
-INDEX MARKETS
-</h3>
 
 <div
-style={{
-display: "grid",
-gridTemplateColumns: "1fr 1fr",
-gap: "24px",
-}}
+className="
+flex
+items-center
+justify-between
+gap-4
+border-b
+border-zinc-800/70
+py-3
+last:border-b-0
+"
 >
 
-{/* ===== INDICES ===== */}
-<div>
-<div style={{ color: "#666", fontSize: "13px", marginBottom: "12px" }}>
-INDICES
+{/* =============================================
+LABEL
+============================================== */}
+
+<span
+className="
+min-w-0
+text-sm
+text-zinc-400
+"
+>
+{label}
+</span>
+
+
+{/* =============================================
+VALUE
+============================================== */}
+
+<div
+className="
+shrink-0
+text-right
+"
+>
+
+<div
+className="
+text-base
+font-semibold
+tabular-nums
+text-zinc-100
+sm:text-lg
+"
+>
+{formatValue(value)}
 </div>
 
-{renderRow("Dow Jones", safeIndices.dow)}
-{renderRow("NASDAQ", safeIndices.ndx)}
-{renderRow("S&P 500", safeIndices.spx)}
-{renderRow("Russell 2000", safeIndices.rut)}
+
+{/* ===========================================
+CHANGE
+=========================================== */}
+
+<div
+className={`
+mt-0.5
+text-sm
+font-semibold
+tabular-nums
+${getChangeColor(change)}
+`}
+>
+{formatChange(change)}
 </div>
 
-{/* ===== FUTURES ===== */}
-<div>
-<div style={{ color: "#666", fontSize: "13px", marginBottom: "12px" }}>
+</div>
+
+</div>
+
+);
+
+}
+
+
+/* =====================================================
+RENDER
+===================================================== */
+
+return (
+
+<div
+className="
+rounded-2xl
+border
+border-zinc-800
+bg-zinc-900
+p-4
+sm:p-5
+"
+>
+
+
+{/* =================================================
+HEADER
+================================================= */}
+
+<div
+className="
+mb-5
+flex
+items-start
+justify-between
+gap-4
+"
+>
+
+<div
+className="
+min-w-0
+"
+>
+
+<h2
+className="
+text-lg
+font-semibold
+text-zinc-100
+"
+>
+Index Markets
+</h2>
+
+
+<p
+className="
+mt-1
+text-xs
+leading-relaxed
+text-zinc-500
+"
+>
+Cash indices and futures market overview
+</p>
+
+</div>
+
+</div>
+
+
+{/* =================================================
+GRID
+================================================= */}
+
+<div
+className="
+grid
+grid-cols-1
+gap-6
+lg:grid-cols-2
+"
+>
+
+
+{/* =============================================
+CASH INDICES
+============================================== */}
+
+<section
+className="
+min-w-0
+"
+>
+
+<div
+className="
+mb-2
+text-xs
+font-semibold
+tracking-wider
+text-zinc-500
+"
+>
+CASH INDICES
+</div>
+
+
+<MarketRow
+label="Dow Jones"
+item={safeIndices.dow}
+/>
+
+
+<MarketRow
+label="NASDAQ"
+item={safeIndices.ndx}
+/>
+
+
+<MarketRow
+label="S&P 500"
+item={safeIndices.spx}
+/>
+
+
+<MarketRow
+label="Russell 2000"
+item={safeIndices.rut}
+/>
+
+</section>
+
+
+{/* =============================================
+FUTURES
+============================================== */}
+
+<section
+className="
+min-w-0
+"
+>
+
+<div
+className="
+mb-2
+text-xs
+font-semibold
+tracking-wider
+text-zinc-500
+"
+>
 FUTURES
 </div>
 
-{renderRow("Dow Futures", safeFutures.ym)}
-{renderRow("NASDAQ Futures", safeFutures.nq)}
-{renderRow("S&P Futures", safeFutures.es)}
-{renderRow("Russell Futures", safeFutures.rty)}
-</div>
+
+<MarketRow
+label="Dow Futures"
+item={safeFutures.ym}
+/>
+
+
+<MarketRow
+label="NASDAQ Futures"
+item={safeFutures.nq}
+/>
+
+
+<MarketRow
+label="S&P Futures"
+item={safeFutures.es}
+/>
+
+
+<MarketRow
+label="Russell Futures"
+item={safeFutures.rty}
+/>
+
+</section>
 
 </div>
 
 </div>
+
 );
+
 }
