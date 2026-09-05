@@ -1,79 +1,351 @@
 // /components/panels/StructurePanel.tsx
 
 "use client";
+/* ============================================================
 
-import { getSignalColor } from "@/lib/engine/colorEngine";
+STRUCTURE PANEL
+
+AUFGABE DES PANELS
+
+Das Structure Panel zeigt die interne Marktstruktur.
+
+ES ZEIGT:
+
+    Structure Health
+    Breadth Participation
+    Advance / Decline
+    Highs / Lows
+    Distribution Pressure
+    Regime / Execution Context
+
+WICHTIG:
+
+Rotation, Narrow Leadership und Rotation Decay
+werden NICHT erneut bewertet.
+
+Diese Logik gehört zu:
+
+    RotationCompositePanel
+    RotationInternalsPanel
+    RotationDecayPanel
+
+Das Structure Panel ist ausschließlich für:
+
+    MARKTBREITE
+    MARKTPARTIZIPATION
+    ADVANCE / DECLINE
+    HIGHS / LOWS
+    DISTRIBUTION PRESSURE
+
+zuständig.
+
+SEMANTIK:
+
+STRUCTURE HEALTH:
+HIGH = GOOD
+LOW  = WEAK
+
+BREADTH:
+HIGH = GOOD
+LOW  = WEAK
+
+A/D:
+POSITIVE = GOOD
+NEGATIVE = WEAK
+
+HIGHS / LOWS:
+POSITIVE = GOOD
+NEGATIVE = WEAK
+
+DISTRIBUTION:
+HIGH = RISK
+LOW  = HEALTHY
+
+REGIME SYNC UND EXECUTION:
+
+Diese Werte sind ausschließlich KONTEXT.
+
+Sie verändern NICHT die Structure-Bewertung
+im Panel.
+
+SINGLE SOURCE OF TRUTH:
+
+structure.health.value
+
+kommt direkt aus structureEngine.ts.
+
+Das Panel bewertet Structure Health NICHT erneut.
+
+============================================================ */
 
 export default function StructurePanel({
 structure,
 regimeSync,
-executionState
+executionState,
 }: any) {
 
-if (!structure) return null;
-
-/* ================= HELPERS ================= */
-
-function safe(n: any) {
-return typeof n === "number" && !isNaN(n) ? n : null;
+if (!structure) {
+return null;
 }
 
-function fmt(value: any, decimals = 1) {
-const v = safe(value);
+/* ==========================================================
+HELPERS
+========================================================== */
 
-if (v === null) return "–";
+function clamp(
+value: number,
+min = 0,
+max = 100
+) {
 
-return Number.isInteger(v)
-? v.toString()
-: v.toFixed(decimals);
+if (!Number.isFinite(value)) {
+  return min;
 }
 
-function bar(value: number) {
-return {
-width: `${value || 0}%`,
-height: "6px",
-background: getSignalColor(value || 0, 100)
-};
+return Math.max(
+  min,
+  Math.min(max, value)
+);
+
 }
 
-function barMax(value: number, max: number) {
-const pct = max > 0
-? (value / max) * 100
-: 0;
+function safeNumber(
+value: unknown,
+fallback: number | null = null
+) {
 
-return {
-width: `${pct}%`,
-height: "6px",
-background: getSignalColor(value, max)
-};
+if (
+  value === null ||
+  value === undefined ||
+  value === ""
+) {
+  return fallback;
 }
 
-function delta(d: number | null) {
-if (d === undefined || d === null) return "";
-if (d === 0) return "(0)";
-return d > 0 ? `(+${d})` : `(${d})`;
+const numeric =
+  Number(value);
+
+return Number.isFinite(numeric)
+  ? numeric
+  : fallback;
+
 }
 
-/* ================= SAFE ACCESS ================= */
+function fmt(
+value: number | null,
+decimals = 1
+) {
 
-const breadth = structure?.breadth || {};
-const ad = structure?.advanceDecline || {};
-const hl = structure?.highsLows || {};
-const dist = structure?.distribution || {};
-const health = structure?.health || {};
+if (
+  value === null ||
+  value === undefined
+) {
+  return "–";
+}
 
-/* ================= BREADTH ================= */
+if (
+  Number.isInteger(value)
+) {
+  return value.toString();
+}
 
-const b20 = safe(breadth?.b20?.value);
-const b50 = safe(breadth?.b50?.value);
-const b200 = safe(breadth?.b200?.value);
+return value.toFixed(decimals);
 
-/* ================= A/D ================= */
+}
 
-const advances = safe(ad?.advances);
-const declines = safe(ad?.declines);
+function delta(
+value: number | null
+) {
 
-const net = safe(
+if (
+  value === null ||
+  value === undefined
+) {
+  return "";
+}
+
+if (value === 0) {
+  return "(0)";
+}
+
+return value > 0
+  ? `(+${value})`
+  : `(${value})`;
+
+}
+
+/* ==========================================================
+POSITIVE METRIC COLOR
+
+HIGH = GOOD
+LOW  = WEAK
+========================================================== */
+
+function positiveColor(
+value: number
+) {
+
+const safeValue =
+  clamp(value);
+
+if (safeValue >= 75) {
+  return "#52c41a";
+}
+
+if (safeValue >= 60) {
+  return "#95de64";
+}
+
+if (safeValue >= 45) {
+  return "#faad14";
+}
+
+if (safeValue >= 30) {
+  return "#ff7875";
+}
+
+return "#ff4d4f";
+
+}
+
+/* ==========================================================
+RISK COLOR
+
+HIGH = BAD
+LOW  = GOOD
+========================================================== */
+
+function riskColor(
+value: number
+) {
+
+const safeValue =
+  clamp(value);
+
+if (safeValue >= 75) {
+  return "#ff4d4f";
+}
+
+if (safeValue >= 55) {
+  return "#ff7875";
+}
+
+if (safeValue >= 35) {
+  return "#faad14";
+}
+
+if (safeValue >= 20) {
+  return "#95de64";
+}
+
+return "#52c41a";
+
+}
+
+/* ==========================================================
+DIRECTION COLOR
+
+POSITIVE = GOOD
+NEGATIVE = BAD
+========================================================== */
+
+function directionColor(
+value: number | null,
+threshold = 0
+) {
+
+if (
+  value === null ||
+  value === undefined
+) {
+  return "#666";
+}
+
+if (
+  value > threshold
+) {
+  return "#52c41a";
+}
+
+if (
+  value < -threshold
+) {
+  return "#ff4d4f";
+}
+
+return "#faad14";
+
+}
+
+/* ==========================================================
+INPUT
+========================================================== */
+
+const breadth =
+structure?.breadth ?? {};
+
+const ad =
+structure?.advanceDecline ?? {};
+
+const hl =
+structure?.highsLows ?? {};
+
+const distribution =
+structure?.distribution ?? {};
+
+const health =
+structure?.health ?? {};
+
+/* ==========================================================
+BREADTH
+========================================================== */
+
+const b20 =
+safeNumber(
+breadth?.b20?.value
+);
+
+const b50 =
+safeNumber(
+breadth?.b50?.value
+);
+
+const b200 =
+safeNumber(
+breadth?.b200?.value
+);
+
+const b20Delta =
+safeNumber(
+breadth?.b20?.delta
+);
+
+const b50Delta =
+safeNumber(
+breadth?.b50?.delta
+);
+
+const b200Delta =
+safeNumber(
+breadth?.b200?.delta
+);
+
+/* ==========================================================
+ADVANCE / DECLINE
+========================================================== */
+
+const advances =
+safeNumber(
+ad?.advances
+);
+
+const declines =
+safeNumber(
+ad?.declines
+);
+
+const adNet =
+safeNumber(
 ad?.value ??
 (
 advances !== null &&
@@ -83,65 +355,147 @@ declines !== null
 )
 );
 
-const deltaValue = safe(ad?.delta);
+const adDelta =
+safeNumber(
+ad?.delta
+);
 
-/* ================= HIGH / LOW ================= */
+/* ==========================================================
+HIGHS / LOWS
+========================================================== */
 
-const highs = safe(hl?.highs);
-const lows = safe(hl?.lows);
+const highs =
+safeNumber(
+hl?.highs
+);
+
+const lows =
+safeNumber(
+hl?.lows
+);
+
+const highsDelta =
+safeNumber(
+hl?.deltaHighs
+);
+
+const lowsDelta =
+safeNumber(
+hl?.deltaLows
+);
 
 const hasHLData =
 highs !== null &&
 lows !== null &&
-(highs !== 0 || lows !== 0);
+(
+highs !== 0 ||
+lows !== 0
+);
 
-const netHL = hasHLData
+const netHL =
+hasHLData
 ? highs! - lows!
 : null;
 
-const totalHL = hasHLData
+const totalHL =
+hasHLData
 ? highs! + lows!
 : null;
 
+/*
+
+    Range:
+    ●
+    -1 = all lows
+    0 = balanced
+    +1 = all highs
+    */
+
 const hlStrength =
-totalHL && totalHL > 0
-? (highs! - lows!) / totalHL
+totalHL !== null &&
+totalHL > 0
+? (
+highs! - lows!
+) / totalHL
 : null;
 
-/* ================= COLORS ================= */
+/* ==========================================================
+DISTRIBUTION
 
-function strengthColor(v: number | null) {
+HIGH = RISK
 
-if (v === null) return "#666";
+IMPORTANT:
 
-if (v > 0.3) return "#52c41a";
-if (v > 0.1) return "#95de64";
-if (v > -0.1) return "#fadb14";
-if (v > -0.3) return "#ff7875";
+distribution.value is a raw value.
 
-return "#ff4d4f";
-}
+distributionPercent is used for visual
+normalization only.
 
-/* ================= DISTRIBUTION ================= */
+The engine remains the source of truth.
+========================================================== */
 
-const distValue =
-safe(dist.value ?? dist.score) ?? 0;
+const distributionValue =
+Math.max(
+0,
+safeNumber(
+distribution?.value ??
+distribution?.score,
+0
+) ?? 0
+);
 
-const distMax = dist.max ?? 7;
+const distributionMax =
+Math.max(
+1,
+safeNumber(
+distribution?.max,
+7
+) ?? 7
+);
 
-/* ================= HEALTH ================= */
+const distributionPercent =
+clamp(
+(
+distributionValue /
+distributionMax
+) * 100
+);
+
+/* ==========================================================
+HEALTH
+
+HIGH = GOOD
+
+SINGLE SOURCE OF TRUTH:
+
+structureEngine.ts
+========================================================== */
 
 const healthValue =
-safe(health.value ?? structure?.healthScore) ?? 0;
+clamp(
+safeNumber(
+health?.value ??
+structure?.healthScore,
+0
+) ?? 0
+);
 
-const healthMax = health.max ?? 100;
+/* ==========================================================
+REGIME SYNC
 
-/* ================= 🔥 REGIME SYNC ================= */
+CONTEXT ONLY
+
+HIGH = GOOD
+========================================================== */
 
 const syncScore =
+clamp(
+safeNumber(
 regimeSync?.score ??
-regimeSync?.regimeSyncScore ??
-50;
+regimeSync?.regimeSyncScore,
+50
+) ?? 50
+);
 
 const syncState =
 regimeSync?.state ??
@@ -150,257 +504,1018 @@ regimeSync?.regimeSyncState ??
 
 function syncColor() {
 
-if (syncState === "ALIGNED") return "#52c41a";
-if (syncState === "DIVERGING") return "#ff4d4f";
-
-return "#faad14";
+if (
+  syncState === "ALIGNED"
+) {
+  return "#52c41a";
 }
 
-/* ================= 🔥 EXECUTION OVERLAY ================= */
+if (
+  syncState === "DIVERGING"
+) {
+  return "#ff4d4f";
+}
+
+return "#faad14";
+
+}
+
+/* ==========================================================
+EXECUTION
+
+CONTEXT ONLY
+========================================================== */
 
 const executionMode =
-executionState?.executionMode ?? "WAIT";
+executionState?.executionMode ??
+"WAIT";
 
 const marketMode =
-executionState?.marketMode ?? "TRANSITION";
+executionState?.marketMode ??
+"TRANSITION";
 
-/* ================= RENDER ================= */
+function marketModeColor() {
+
+if (
+  marketMode === "RISK_ON"
+) {
+  return "#52c41a";
+}
+
+if (
+  marketMode === "RISK_OFF"
+) {
+  return "#ff4d4f";
+}
+
+return "#faad14";
+
+}
+
+/* ==========================================================
+STRUCTURE STATE
+
+IMPORTANT:
+
+This is ONLY a UI classification.
+
+The numeric Structure Health comes directly
+from structureEngine.ts.
+
+No new health score is calculated here.
+========================================================== */
+
+function structureState() {
+
+if (
+  healthValue < 35 ||
+  distributionPercent >= 80
+) {
+
+  return {
+    label:
+      "STRUCTURE BREAKDOWN",
+
+    description:
+      "Internal market participation is structurally deteriorating",
+
+    color:
+      "#ff4d4f",
+  };
+
+}
+
+if (
+  healthValue < 50 ||
+  distributionPercent >= 55
+) {
+
+  return {
+    label:
+      "STRUCTURE FRAGILE",
+
+    description:
+      "Market participation is weakening and requires defensive monitoring",
+
+    color:
+      "#ff7875",
+  };
+
+}
+
+if (
+  healthValue < 65 ||
+  distributionPercent >= 35
+) {
+
+  return {
+    label:
+      "STRUCTURAL TRANSITION",
+
+    description:
+      "Market internals are mixed and structural confirmation is incomplete",
+
+    color:
+      "#faad14",
+  };
+
+}
+
+return {
+  label:
+    "STRUCTURE HEALTHY",
+
+  description:
+    "Broad market participation supports the current market structure",
+
+  color:
+    "#52c41a",
+};
+
+}
+
+const currentStructure =
+structureState();
+
+/* ==========================================================
+BREADTH ROW
+========================================================== */
+
+function BreadthRow({
+label,
+value,
+change,
+}: {
+label: string;
+value: number | null;
+change: number | null;
+}) {
+
+const safeValue =
+  clamp(value ?? 0);
+
+const valueColor =
+  value !== null
+    ? positiveColor(safeValue)
+    : "#666";
 
 return (
-<div style={{
-background: "#0d0d0d",
-border: "1px solid #222",
-padding: "16px"
-}}>
 
-<h3 style={{
-color: "#888",
-marginBottom: "12px"
-}}>
-STRUCTURE
-</h3>
+  <div
+    style={{
+      marginBottom: "14px",
+    }}
+  >
 
-{/* ================= 🔥 REGIME SYNC ================= */}
+    <div
+      style={{
+        display: "flex",
 
-<div style={{
-marginBottom: "16px",
-padding: "10px",
-border: `1px solid ${syncColor()}`,
-background: "#111"
-}}>
+        justifyContent:
+          "space-between",
 
-<div style={{
-fontSize: "11px",
-color: "#666",
-marginBottom: "6px"
-}}>
-REGIME SYNCHRONIZATION
-</div>
+        alignItems:
+          "center",
 
-<div style={{
-display: "flex",
-justifyContent: "space-between",
-alignItems: "center"
-}}>
+        marginBottom:
+          "5px",
+      }}
+    >
 
-<div style={{
-color: syncColor(),
-fontWeight: "bold"
-}}>
-{syncState}
-</div>
+      <span
+        style={{
+          color: "#888",
 
-<div style={{
-color: syncColor(),
-fontWeight: "bold"
-}}>
-{syncScore}/100
-</div>
+          fontSize: "12px",
+        }}
+      >
+        {label}
+      </span>
 
-</div>
+      <div
+        style={{
+          display: "flex",
 
-<div style={{
-height: "6px",
-background: "#222",
-marginTop: "8px"
-}}>
-<div style={{
-width: `${syncScore}%`,
-height: "6px",
-background: syncColor()
-}} />
-</div>
+          gap: "8px",
 
-</div>
+          alignItems:
+            "center",
+        }}
+      >
 
-{/* ================= 🔥 EXECUTION STATE ================= */}
+        <span
+          style={{
+            color:
+              change !== null
+                ? directionColor(change)
+                : "#666",
 
-<div style={{
-marginBottom: "18px",
-display: "grid",
-gridTemplateColumns: "1fr 1fr",
-gap: "10px"
-}}>
+            fontSize:
+              "10px",
+          }}
+        >
+          {delta(change)}
+        </span>
 
-<div style={{
-border: "1px solid #222",
-padding: "10px",
-background: "#111"
-}}>
-<div style={{
-fontSize: "11px",
-color: "#666",
-marginBottom: "6px"
-}}>
-MARKET MODE
-</div>
+        <span
+          style={{
+            color:
+              valueColor,
 
-<div style={{
-color:
-marketMode === "RISK_ON"
-? "#52c41a"
-: marketMode === "RISK_OFF"
-? "#ff4d4f"
-: "#faad14",
-fontWeight: "bold"
-}}>
-{marketMode}
-</div>
-</div>
+            fontWeight:
+              "bold",
+          }}
+        >
+          {value !== null
+            ? `${fmt(value)}%`
+            : "–"}
+        </span>
 
-<div style={{
-border: "1px solid #222",
-padding: "10px",
-background: "#111"
-}}>
-<div style={{
-fontSize: "11px",
-color: "#666",
-marginBottom: "6px"
-}}>
-EXECUTION
-</div>
+      </div>
 
-<div style={{
-color: "#aaa",
-fontWeight: "bold",
-fontSize: "12px"
-}}>
-{executionMode}
-</div>
-</div>
+    </div>
 
-</div>
+    <div
+      style={{
+        height: "6px",
 
-{/* ================= BREADTH ================= */}
+        background:
+          "#222",
 
-<div style={{ marginBottom: "12px" }}>
+        borderRadius:
+          "4px",
 
-<div>Breadth</div>
+        overflow:
+          "hidden",
+      }}
+    >
 
-<div>
-20: {fmt(b20)}% {delta(breadth?.b20?.delta)}
-</div>
+      <div
+        style={{
+          width:
+            value !== null
+              ? `${safeValue}%`
+              : "0%",
 
-<div style={bar(b20 ?? 0)} />
+          height:
+            "100%",
 
-<div>
-50: {fmt(b50)}% {delta(breadth?.b50?.delta)}
-</div>
+          background:
+            valueColor,
 
-<div style={bar(b50 ?? 0)} />
+          transition:
+            "all 0.35s ease",
+        }}
+      />
 
-<div>
-200: {fmt(b200)}% {delta(breadth?.b200?.delta)}
-</div>
+    </div>
 
-<div style={bar(b200 ?? 0)} />
+  </div>
 
-</div>
-
-{/* ================= A/D ================= */}
-
-<div style={{ marginBottom: "12px" }}>
-
-<div>Advance / Decline</div>
-
-<div>Adv: {fmt(advances)}</div>
-<div>Dec: {fmt(declines)}</div>
-
-<div style={{
-color: getSignalColor(net ?? 0, 50),
-fontWeight: "bold"
-}}>
-Net: {fmt(net)} {delta(deltaValue)}
-</div>
-
-</div>
-
-{/* ================= HIGHS / LOWS ================= */}
-
-<div style={{ marginTop: "10px" }}>
-
-<div>Highs / Lows</div>
-
-<div>
-H: {fmt(highs)} {delta(hl?.deltaHighs)}
-</div>
-
-<div>
-L: {fmt(lows)} {delta(hl?.deltaLows)}
-</div>
-
-<div style={{
-color: getSignalColor(netHL ?? 0, 20),
-fontWeight: "bold"
-}}>
-Net: {netHL !== null ? fmt(netHL) : "–"}
-</div>
-
-<div style={{
-color: strengthColor(hlStrength),
-fontWeight: "bold"
-}}>
-Strength: {hlStrength !== null
-? hlStrength.toFixed(2)
-: "–"}
-</div>
-
-</div>
-
-{/* ================= DISTRIBUTION ================= */}
-
-<div style={{ marginTop: "12px" }}>
-
-<div>Distribution</div>
-
-<div style={{
-color: getSignalColor(distValue, distMax)
-}}>
-{distValue}/{distMax}
-</div>
-
-<div style={barMax(distValue, distMax)} />
-
-</div>
-
-{/* ================= HEALTH ================= */}
-
-<div style={{ marginTop: "10px" }}>
-
-<div>Health</div>
-
-<div style={{
-color: getSignalColor(
-healthValue,
-healthMax
-)
-}}>
-{healthValue}/{healthMax}
-</div>
-
-</div>
-
-</div>
 );
+
+}
+
+/* ==========================================================
+METRIC CARD
+========================================================== */
+
+function MetricCard({
+label,
+value,
+color,
+subLabel,
+}: {
+label: string;
+value: string;
+color: string;
+subLabel?: string;
+}) {
+
+return (
+
+  <div
+    style={{
+      background:
+        "#111",
+
+      border:
+        "1px solid #222",
+
+      padding:
+        "12px",
+    }}
+  >
+
+    <div
+      style={{
+        color:
+          "#666",
+
+        fontSize:
+          "10px",
+
+        marginBottom:
+          "6px",
+
+        letterSpacing:
+          "0.8px",
+      }}
+    >
+      {label}
+    </div>
+
+    <div
+      style={{
+        color,
+
+        fontSize:
+          "16px",
+
+        fontWeight:
+          700,
+      }}
+    >
+      {value}
+    </div>
+
+    {subLabel && (
+
+      <div
+        style={{
+          marginTop:
+            "5px",
+
+          color:
+            "#555",
+
+          fontSize:
+            "10px",
+        }}
+      >
+        {subLabel}
+      </div>
+
+    )}
+
+  </div>
+
+);
+
+}
+
+/* ==========================================================
+RENDER
+========================================================== */
+
+return (
+
+<div
+  style={{
+    background:
+      "#0d0d0d",
+
+    border:
+      `2px solid ${currentStructure.color}`,
+
+    padding:
+      "18px",
+
+    transition:
+      "all 0.35s ease",
+  }}
+>
+
+  {/* ======================================================
+  HEADER
+  ====================================================== */}
+
+  <div
+    className="
+      mb-5
+      flex
+      flex-col
+      gap-4
+      sm:flex-row
+      sm:items-start
+      sm:justify-between
+    "
+  >
+
+    <div>
+
+      <h3
+        style={{
+          color:
+            "#ddd",
+
+          margin:
+            "0 0 5px 0",
+
+          fontSize:
+            "18px",
+
+          fontWeight:
+            700,
+
+          letterSpacing:
+            "0.5px",
+        }}
+      >
+        MARKET STRUCTURE
+      </h3>
+
+      <div
+        style={{
+          color:
+            "#666",
+
+          fontSize:
+            "10px",
+
+          textTransform:
+            "uppercase",
+
+          letterSpacing:
+            "1px",
+        }}
+      >
+        Breadth & Internal Participation
+      </div>
+
+    </div>
+
+    <div
+      className="
+        text-left
+        sm:text-right
+      "
+    >
+
+      <div
+        style={{
+          color:
+            positiveColor(
+              healthValue
+            ),
+
+          fontSize:
+            "32px",
+
+          fontWeight:
+            800,
+
+          lineHeight:
+            1,
+        }}
+      >
+        {Math.round(
+          healthValue
+        )}
+      </div>
+
+      <div
+        style={{
+          color:
+            "#777",
+
+          fontSize:
+            "10px",
+
+          marginTop:
+            "5px",
+        }}
+      >
+        STRUCTURE HEALTH
+      </div>
+
+    </div>
+
+  </div>
+
+  {/* ======================================================
+  PRIMARY STATE
+  ====================================================== */}
+
+  <div
+    style={{
+      padding:
+        "14px",
+
+      marginBottom:
+        "18px",
+
+      border:
+        `1px solid ${currentStructure.color}`,
+
+      background:
+        `${currentStructure.color}10`,
+    }}
+  >
+
+    <div
+      style={{
+        color:
+          "#777",
+
+        fontSize:
+          "10px",
+
+        marginBottom:
+          "5px",
+
+        letterSpacing:
+          "1px",
+      }}
+    >
+      INTERNAL MARKET STATE
+    </div>
+
+    <div
+      style={{
+        color:
+          currentStructure.color,
+
+        fontSize:
+          "20px",
+
+        fontWeight:
+          800,
+
+        marginBottom:
+          "6px",
+      }}
+    >
+      {currentStructure.label}
+    </div>
+
+    <div
+      style={{
+        color:
+          "#aaa",
+
+        fontSize:
+          "12px",
+
+        lineHeight:
+          1.5,
+      }}
+    >
+      {currentStructure.description}
+    </div>
+
+  </div>
+
+  {/* ======================================================
+  BREADTH
+  ====================================================== */}
+
+  <div
+    style={{
+      borderTop:
+        "1px solid #222",
+
+      paddingTop:
+        "16px",
+
+      marginBottom:
+        "18px",
+    }}
+  >
+
+    <div
+      style={{
+        color:
+          "#666",
+
+        fontSize:
+          "10px",
+
+        marginBottom:
+          "14px",
+
+        textTransform:
+          "uppercase",
+
+        letterSpacing:
+          "1px",
+      }}
+    >
+      Breadth Participation
+    </div>
+
+    <BreadthRow
+      label="20 Day Breadth"
+      value={b20}
+      change={b20Delta}
+    />
+
+    <BreadthRow
+      label="50 Day Breadth"
+      value={b50}
+      change={b50Delta}
+    />
+
+    <BreadthRow
+      label="200 Day Breadth"
+      value={b200}
+      change={b200Delta}
+    />
+
+  </div>
+
+  {/* ======================================================
+  MARKET PARTICIPATION
+  ====================================================== */}
+
+  <div
+    style={{
+      borderTop:
+        "1px solid #222",
+
+      paddingTop:
+        "16px",
+
+      marginBottom:
+        "18px",
+    }}
+  >
+
+    <div
+      style={{
+        color:
+          "#666",
+
+        fontSize:
+          "10px",
+
+        marginBottom:
+          "14px",
+
+        textTransform:
+          "uppercase",
+
+        letterSpacing:
+          "1px",
+      }}
+    >
+      Market Participation
+    </div>
+
+    <div
+      className="
+        grid
+        grid-cols-1
+        gap-3
+        sm:grid-cols-2
+      "
+    >
+
+      <MetricCard
+        label="ADVANCE / DECLINE"
+
+        value={
+          adNet !== null
+            ? fmt(adNet)
+            : "–"
+        }
+
+        color={
+          directionColor(
+            adNet
+          )
+        }
+
+        subLabel={
+          `Adv ${fmt(
+            advances
+          )} / Dec ${fmt(
+            declines
+          )}`
+        }
+      />
+
+      <MetricCard
+        label="A/D MOMENTUM"
+
+        value={
+          adDelta !== null
+            ? delta(adDelta)
+            : "–"
+        }
+
+        color={
+          directionColor(
+            adDelta
+          )
+        }
+
+        subLabel="Change vs previous observation"
+      />
+
+      <MetricCard
+        label="NEW HIGHS / LOWS"
+
+        value={
+          netHL !== null
+            ? fmt(netHL)
+            : "–"
+        }
+
+        color={
+          directionColor(
+            netHL
+          )
+        }
+
+        subLabel={
+          `Highs ${fmt(
+            highs
+          )} / Lows ${fmt(
+            lows
+          )}`
+        }
+      />
+
+      <MetricCard
+        label="H/L STRENGTH"
+
+        value={
+          hlStrength !== null
+            ? (
+                hlStrength * 100
+              ).toFixed(0) + "%"
+            : "–"
+        }
+
+        color={
+          hlStrength !== null
+            ? directionColor(
+                hlStrength,
+                0.05
+              )
+            : "#666"
+        }
+
+        subLabel="Net new high / low balance"
+      />
+
+    </div>
+
+  </div>
+
+  {/* ======================================================
+  DISTRIBUTION
+  ====================================================== */}
+
+  <div
+    style={{
+      borderTop:
+        "1px solid #222",
+
+      paddingTop:
+        "16px",
+
+      marginBottom:
+        "18px",
+    }}
+  >
+
+    <div
+      style={{
+        display:
+          "flex",
+
+        justifyContent:
+          "space-between",
+
+        alignItems:
+          "center",
+
+        marginBottom:
+          "8px",
+      }}
+    >
+
+      <div>
+
+        <div
+          style={{
+            color:
+              "#666",
+
+            fontSize:
+              "10px",
+
+            marginBottom:
+              "4px",
+
+            textTransform:
+              "uppercase",
+
+            letterSpacing:
+              "1px",
+          }}
+        >
+          Distribution Pressure
+        </div>
+
+        <div
+          style={{
+            color:
+              "#888",
+
+            fontSize:
+              "11px",
+          }}
+        >
+          High distribution =
+          structural risk
+        </div>
+
+      </div>
+
+      <div
+        style={{
+          color:
+            riskColor(
+              distributionPercent
+            ),
+
+          fontSize:
+            "22px",
+
+          fontWeight:
+            800,
+        }}
+      >
+        {Math.round(
+          distributionValue
+        )}
+        /
+        {Math.round(
+          distributionMax
+        )}
+      </div>
+
+    </div>
+
+    <div
+      style={{
+        height:
+          "7px",
+
+        background:
+          "#222",
+
+        borderRadius:
+          "5px",
+
+        overflow:
+          "hidden",
+      }}
+    >
+
+      <div
+        style={{
+          width:
+            `${distributionPercent}%`,
+
+          height:
+            "100%",
+
+          background:
+            riskColor(
+              distributionPercent
+            ),
+
+          transition:
+            "all 0.35s ease",
+        }}
+      />
+
+    </div>
+
+  </div>
+
+  {/* ======================================================
+  REGIME + EXECUTION CONTEXT
+
+  CONTEXT ONLY
+
+  These values do not modify Structure Health.
+  ====================================================== */}
+
+  <div
+    style={{
+      borderTop:
+        "1px solid #222",
+
+      paddingTop:
+        "16px",
+    }}
+  >
+
+    <div
+      style={{
+        color:
+          "#666",
+
+        fontSize:
+          "10px",
+
+        marginBottom:
+          "14px",
+
+        textTransform:
+          "uppercase",
+
+        letterSpacing:
+          "1px",
+      }}
+    >
+      Regime Context
+    </div>
+
+    <div
+      className="
+        grid
+        grid-cols-1
+        gap-3
+        sm:grid-cols-2
+        xl:grid-cols-3
+      "
+    >
+
+      <MetricCard
+        label="REGIME SYNC"
+
+        value={syncState}
+
+        color={syncColor()}
+
+        subLabel={
+          `${Math.round(
+            syncScore
+          )}/100`
+        }
+      />
+
+      <MetricCard
+        label="MARKET MODE"
+
+        value={marketMode}
+
+        color={
+          marketModeColor()
+        }
+
+        subLabel="Execution environment"
+      />
+
+      <MetricCard
+        label="EXECUTION"
+
+        value={executionMode}
+
+        color="#aaa"
+
+        subLabel="Current execution posture"
+      />
+
+    </div>
+
+  </div>
+
+  {/* ======================================================
+  FOOTER
+  ====================================================== */}
+
+  <div
+    style={{
+      marginTop:
+        "18px",
+
+      color:
+        "#555",
+
+      fontSize:
+        "10px",
+
+      lineHeight:
+        1.5,
+    }}
+  >
+    Structure Health is calculated exclusively by the
+    Structure Engine from breadth, market participation,
+    Advance/Decline, High/Low behaviour and distribution
+    pressure. Rotation and leadership deterioration are
+    evaluated separately by the Rotation system panels.
+
+  </div>
+
+</div>
+
+);
+
 }
