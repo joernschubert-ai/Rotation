@@ -2,315 +2,431 @@
 
 import { getMarketStructureFlags } from "./marketStructureFlags";
 
+
 export interface FragilityEngineInput {
+history?: any[];
+historyMetrics?: any;
 
-history?: any[]
+crash?: any;
 
-historyMetrics?: any
+breadth50?: number;
+breadth200?: number;
 
-crash?: any
+gammaExposure?: number;
+correlationScore?: number;
 
-breadth50?: number
-breadth200?: number
+vix?: number;
+volOfVolRatio?: number;
+vixTermRatio?: number;
 
-gammaExposure?: number
-correlationScore?: number
-
-vix?: number
-volOfVolRatio?: number
-
-liquidity?: any
-
-structure?: any
-
-participation?: any
-breadthThrust?: any
-rotation?: any
-
-marketQuality?: any
-
-/*
-=====================================================
-NEW
-=====================================================
-*/
-
-vixTermRatio?: number
+liquidity?: any;
+structure?: any;
+participation?: any;
+breadthThrust?: any;
+rotation?: any;
+marketQuality?: any;
 }
 
+
 export interface FragilityEngineOutput {
-score: number
+score: number;
 
 state:
 | "RESILIENT"
 | "STRETCHED"
 | "FRAGILE"
 | "STRUCTURALLY_UNSTABLE"
-| "BREAKDOWN_RISK"
+| "BREAKDOWN_RISK";
 
-escalation: boolean
+escalation: boolean;
 
-breakdownRisk: number
+breakdownRisk: number;
+liquidityFragility: number;
 
-liquidityFragility: number
+liquidityIllusion: boolean;
+passiveFragility: boolean;
+dealerCompression: boolean;
 
-liquidityIllusion: boolean
+structuralGammaFloor: number;
+effectiveGamma: number;
 
-passiveFragility: boolean
-dealerCompression: boolean
-
-/*
-=====================================================
-NEW
-=====================================================
-*/
-
-structuralGammaFloor: number
-effectiveGamma: number
-
-summary: string
+summary: string;
 
 metrics: {
-crashProbability: number
+crashProbability: number;
 
-breadth50: number
-breadth200: number
+breadth50: number;
+breadth200: number;
 
-gamma: number
-effectiveGamma: number
-structuralGammaFloor: number
+gamma: number;
+effectiveGamma: number;
+structuralGammaFloor: number;
 
-correlation: number
+correlation: number;
+vix: number;
+volOfVol: number;
+vixTerm: number;
 
-vix: number
-volOfVol: number
+liquidity: number;
 
-liquidity: number
+participationScore: number;
+breadthThrustScore: number;
 
-participationScore: number
-breadthThrustScore: number
-rotationScore: number
-rotationDecayScore: number
+rotationScore: number;
+rotationDecayScore: number;
 
-marketQualityScore: number
+marketQualityScore: number;
 
-participationTrend: number
-breadthTrend: number
-liquidityTrend: number
-marketQualityTrend: number
+participationTrend: number;
+breadthTrend: number;
+liquidityTrend: number;
+marketQualityTrend: number;
 
-participationErosion: boolean
-breadthErosion: boolean
-liquidityErosion: boolean
-qualityErosion: boolean
+participationErosion: boolean;
+breadthErosion: boolean;
+liquidityErosion: boolean;
+qualityErosion: boolean;
+persistentErosion: boolean;
 
-persistentErosion: boolean
+narrowLeadership: boolean;
+severeNarrowLeadership: boolean;
+megaCapOnlyTape: boolean;
 
-narrowLeadership: boolean
-megaCapOnlyTape: boolean
+equalWeightWeakness: boolean;
+smallCapWeakness: boolean;
 
-internalSynchronization: boolean
-liquidityDependence: boolean
+internalSynchronization: boolean;
 
-liquidityIllusion: boolean
-latentFragility: boolean
+liquidityDependence: boolean;
+liquidityIllusion: boolean;
+latentFragility: boolean;
 
-passiveFragility: boolean
-dealerCompression: boolean
+passiveFragility: boolean;
+dealerCompression: boolean;
 
-phasePersistence: number
+phasePersistence: number;
+daysInPhase: number;
+institutionalPressure: number;
 
-daysInPhase: number
+participationDecay: number;
+breadthTrendHistory: number;
+breadthAcceleration: number;
 
-institutionalPressure: number
+crashTrend: number;
+relativeBreadthWeakness: number;
 
-participationDecay: number
+averageFragility: number;
 
-breadthTrendHistory: number
-
-breadthAcceleration: number
-
-crashTrend: number
-
-relativeBreadthWeakness: number
-
-averageFragility: number
-
-persistentDistribution: boolean
-
-prolongedBearRegime: boolean
-
-acceleratingWeakness: boolean
-
+persistentDistribution: boolean;
+prolongedBearRegime: boolean;
+acceleratingWeakness: boolean;
+};
 }
-}
+
+
+/* =====================================================
+HELPERS
+===================================================== */
 
 function clamp(
 value: number,
 min = 0,
 max = 100
 ) {
-return Math.max(min, Math.min(max, value))
+return Math.max(
+min,
+Math.min(max, value)
+);
 }
 
-function scoreSafe(
-value: any
+
+function safeNumber(
+value: any,
+fallback = 0
 ) {
-return Number.isFinite(Number(value))
-? Number(value)
-: 50
+const number = Number(value);
+
+return Number.isFinite(number)
+? number
+: fallback;
 }
+
+
+function getHistoryValue(
+snapshot: any,
+keys: string[],
+fallback: number
+) {
+if (!snapshot) {
+return fallback;
+}
+
+for (const key of keys) {
+const value = snapshot?.[key];
+
+if (
+value !== undefined &&
+value !== null &&
+Number.isFinite(Number(value))
+) {
+return Number(value);
+}
+}
+
+return fallback;
+}
+
+
+/* =====================================================
+ENGINE
+===================================================== */
 
 export function fragilityEngine(
 input: FragilityEngineInput
 ): FragilityEngineOutput {
 
+
+/* =====================================================
+CURRENT DATA
+===================================================== */
+
 const crashProbability =
-Number(input.crash?.probability ?? 0)
+safeNumber(
+input.crash?.probability,
+0
+);
+
 
 const breadth50 =
-Number(
+safeNumber(
 input.breadth50 ??
-input.structure?.breadth?.b50?.value ??
+input.structure?.breadth?.b50?.value,
 50
-)
+);
+
 
 const breadth200 =
-Number(
+safeNumber(
 input.breadth200 ??
-input.structure?.breadth?.b200?.value ??
+input.structure?.breadth?.b200?.value,
 50
-)
+);
+
 
 const rawGamma =
-Number(input.gammaExposure ?? 0)
+safeNumber(
+input.gammaExposure,
+0
+);
+
 
 const correlation =
-Number(input.correlationScore ?? 0)
+safeNumber(
+input.correlationScore,
+0
+);
+
 
 const vix =
-Number(input.vix ?? 20)
+safeNumber(
+input.vix,
+20
+);
+
 
 const volOfVol =
-Number(input.volOfVolRatio ?? 1)
+safeNumber(
+input.volOfVolRatio,
+1
+);
+
 
 const vixTerm =
-Number(input.vixTermRatio ?? 1)
+safeNumber(
+input.vixTermRatio,
+1
+);
+
 
 const liquidity =
-Number(
+safeNumber(
 input.liquidity?.score ??
 input.liquidity?.metrics?.liquidity ??
-input.liquidity?.liquidity ??
+input.liquidity?.liquidity,
 50
-)
+);
+
 
 const participationScore =
-Number(
-input.participation?.score ??
+safeNumber(
+input.participation?.score,
 50
-)
+);
+
 
 const breadthThrustScore =
-Number(
-input.breadthThrust?.score ??
+safeNumber(
+input.breadthThrust?.score,
 50
-)
+);
+
 
 const rotationScore =
-Number(
-input.rotation?.score ??
+safeNumber(
+input.rotation?.score,
 50
-)
+);
+
 
 const rotationDecayScore =
-Number(
+safeNumber(
 input.rotation?.decayScore ??
-input.rotation?.rotationDecayScore ??
+input.rotation?.rotationDecayScore,
 0
-)
+);
+
 
 const rotationDecayState =
 input.rotation?.rotationDecayState ??
-"HEALTHY_ROTATION"
+input.rotation?.state ??
+"HEALTHY_ROTATION";
+
 
 const rsSmall =
-Number(input.rotation?.rsSmall ?? 1)
+safeNumber(
+input.rotation?.rsSmall,
+1
+);
+
 
 const rsGrowth =
-Number(input.rotation?.rsGrowth ?? 1)
+safeNumber(
+input.rotation?.rsGrowth,
+1
+);
+
 
 const rsEqual =
-Number(input.rotation?.rsEqual ?? 1)
+safeNumber(
+input.rotation?.rsEqual,
+1
+);
+
 
 const marketQualityScore =
-Number(
-input.marketQuality?.score ??
+safeNumber(
+input.marketQuality?.score,
 50
-)
+);
+
+
+/*
+* IMPORTANT:
+*
+* Missing synchronization data must NOT automatically
+* be interpreted as synchronization failure.
+*/
 
 const internalSynchronization =
-Boolean(
-input.marketQuality?.internalSynchronization ??
-false
-)
+input.marketQuality?.internalSynchronization;
+
+const hasSynchronizationData =
+typeof internalSynchronization === "boolean";
+
+
 
 /* =====================================================
 HISTORY
 ===================================================== */
 
 const history =
-input.history ?? []
+input.history ?? [];
 
 const historyMetrics =
 input.historyMetrics ?? {};
 
-const h5 =
-history.length >= 5
-? history[history.length - 5]
-: null
 
 const h10 =
 history.length >= 10
 ? history[history.length - 10]
-: null
+: null;
+
 
 const h20 =
 history.length >= 20
 ? history[history.length - 20]
-: null
+: null;
+
+
 
 /* =====================================================
-FRAGILITY TRENDS
+CURRENT TRENDS
 ===================================================== */
+
+const historicalParticipation =
+getHistoryValue(
+h10,
+[
+"participationScore",
+"participation",
+"participation?.score"
+],
+participationScore
+);
+
+
+const historicalBreadth =
+getHistoryValue(
+h10,
+[
+"breadth50",
+"breadth"
+],
+breadth50
+);
+
+
+const historicalLiquidity =
+getHistoryValue(
+h10,
+[
+"liquidityScore",
+"marketLiquidityScore",
+"liquidity"
+],
+liquidity
+);
+
+
+const historicalQuality =
+getHistoryValue(
+h10,
+[
+"marketQualityScore"
+],
+marketQualityScore
+);
+
 
 const participationTrend =
 participationScore -
-Number(
-h10?.participationScore ??
-participationScore
-)
+historicalParticipation;
+
 
 const breadthTrend =
 breadth50 -
-Number(
-h10?.breadth50 ??
-breadth50
-)
+historicalBreadth;
+
 
 const liquidityTrend =
 liquidity -
-Number(
-h10?.liquidityScore ??
-liquidity
-)
+historicalLiquidity;
+
 
 const marketQualityTrend =
 marketQualityScore -
-Number(
-h10?.marketQualityScore ??
-marketQualityScore
-)
+historicalQuality;
+
 
 
 /* =====================================================
@@ -318,40 +434,85 @@ HISTORY METRICS
 ===================================================== */
 
 const phasePersistence =
-Number(historyMetrics?.phasePersistence ?? 0);
+safeNumber(
+historyMetrics.phasePersistence,
+0
+);
+
 
 const daysInPhase =
-Number(historyMetrics?.daysInPhase ?? 0);
+safeNumber(
+historyMetrics.daysInPhase,
+0
+);
+
 
 const institutionalPressure =
-Number(historyMetrics?.institutionalPressure ?? 0);
+safeNumber(
+historyMetrics.institutionalPressure,
+0
+);
+
 
 const participationDecayHistory =
-Number(historyMetrics?.participationDecay ?? 0);
+safeNumber(
+historyMetrics.participationDecay,
+0
+);
+
 
 const breadthTrendHistory =
-Number(historyMetrics?.breadthTrend ?? 0);
+safeNumber(
+historyMetrics.breadthTrend,
+0
+);
+
 
 const breadthAcceleration =
-Number(historyMetrics?.breadthAcceleration ?? 0);
+safeNumber(
+historyMetrics.breadthAcceleration,
+0
+);
+
 
 const crashTrend =
-Number(historyMetrics?.crashTrend ?? 0);
+safeNumber(
+historyMetrics.crashTrend,
+0
+);
+
 
 const relativeBreadthWeakness =
-Number(historyMetrics?.relativeBreadthWeakness ?? 0);
+safeNumber(
+historyMetrics.relativeBreadthWeakness,
+0
+);
+
 
 const averageFragility =
-Number(historyMetrics?.averageFragility ?? 50);
+safeNumber(
+historyMetrics.averageFragility,
+50
+);
+
 
 const prolongedBearRegime =
-Boolean(historyMetrics?.prolongedBearRegime);
+Boolean(
+historyMetrics.prolongedBearRegime
+);
+
 
 const persistentDistribution =
-Boolean(historyMetrics?.persistentDistribution);
+Boolean(
+historyMetrics.persistentDistribution
+);
+
 
 const acceleratingWeakness =
-Boolean(historyMetrics?.acceleratingWeakness);
+Boolean(
+historyMetrics.acceleratingWeakness
+);
+
 
 
 /* =====================================================
@@ -363,12 +524,11 @@ getMarketStructureFlags({
 rsGrowth,
 rsSmall,
 rsEqual,
-
 breadth50,
 breadth200,
-
 participationScore
-})
+});
+
 
 const {
 narrowLeadership,
@@ -376,107 +536,136 @@ severeNarrowLeadership,
 megaCapOnlyTape,
 equalWeightWeakness,
 smallCapWeakness
-} = structureFlags
+} = structureFlags;
+
+
 
 /* =====================================================
 STRUCTURAL GAMMA FLOOR
 ===================================================== */
 
-let structuralGammaFloor = 0
+/*
+* IMPORTANT:
+*
+* Positive dealer gamma in a calm market can suppress
+* volatility without making the market structurally healthy.
+*/
+
+let structuralGammaFloor = 0;
+
 
 if (
 vix < 20 &&
 vixTerm >= 0.95
 ) {
-structuralGammaFloor = 35
+structuralGammaFloor = 35;
 }
+
 
 if (
 vix < 18 &&
 vixTerm >= 1 &&
 narrowLeadership
 ) {
-structuralGammaFloor = 45
+structuralGammaFloor = 45;
 }
+
 
 if (
 vix < 17 &&
 narrowLeadership &&
 breadth50 < 55
 ) {
-structuralGammaFloor = 55
+structuralGammaFloor = 55;
 }
 
+
 const effectiveGamma =
-Math.max(rawGamma, structuralGammaFloor)
+Math.max(
+rawGamma,
+structuralGammaFloor
+);
+
+
 
 /* =====================================================
 STRUCTURAL CONDITIONS
 ===================================================== */
 
-const weakParticipation = (
+const weakParticipation =
 participationScore < 48 ||
-breadth50 < 48
-)
+breadth50 < 48;
 
-const severeParticipationFailure = (
+
+const severeParticipationFailure =
 participationScore < 38 &&
-breadth50 < 40
-)
+breadth50 < 40;
 
-const weakRotation = (
+
+const weakRotation =
 rotationScore < 45 ||
-rotationDecayScore >= 45
-)
+rotationDecayScore >= 45;
 
-const failedRotation = (
+
+const failedRotation =
 rotationScore < 35 ||
 rotationDecayScore >= 65 ||
 rotationDecayState === "ROTATION_FAILURE" ||
-rotationDecayState === "INTERNAL_BREAKDOWN"
-)
+rotationDecayState === "INTERNAL_BREAKDOWN";
 
-const weakBreadthStructure = (
+
+const weakBreadthStructure =
 breadth50 < 45 ||
 breadth200 < 42 ||
-breadthThrustScore < 42
-)
+breadthThrustScore < 42;
 
-const severeBreadthFailure = (
+
+const severeBreadthFailure =
 breadth50 < 35 &&
 breadth200 < 35 &&
-breadthThrustScore < 35
-)
+breadthThrustScore < 35;
 
-const liquidityDependence = (
+
+
+/* =====================================================
+SYNCHRONIZATION
+===================================================== */
+
+const synchronizationFailure =
+hasSynchronizationData
+? internalSynchronization === false
+: (
+weakParticipation &&
+weakRotation &&
+weakBreadthStructure
+);
+
+
+
+/* =====================================================
+LIQUIDITY CONDITIONS
+===================================================== */
+
+const liquidityDependence =
 liquidity >= 65 &&
 (
 weakParticipation ||
 narrowLeadership ||
 marketQualityScore < 45
-)
-)
+);
 
-const liquidityIllusion = (
+
+const liquidityIllusion =
 liquidity >= 68 &&
 (
 marketQualityScore < 42 ||
 weakParticipation ||
 failedRotation ||
-megaCapOnlyTape ||
-!internalSynchronization
-)
-)
+megaCapOnlyTape
+);
 
-const synchronizationFailure = (
-!internalSynchronization ||
-(
-weakParticipation &&
-weakRotation
-)
-)
 
-const latentFragility = (
+const latentFragility =
 vix < 20 &&
 liquidity >= 60 &&
 (
@@ -484,402 +673,512 @@ weakParticipation ||
 failedRotation ||
 narrowLeadership ||
 synchronizationFailure
-)
-)
+);
 
-/* =====================================================
-HISTORICAL EROSION
-===================================================== */
 
-const participationErosion =
-participationTrend < -8
-
-const breadthErosion =
-breadthTrend < -8
-
-const liquidityErosion =
-liquidityTrend < -10
-
-const qualityErosion =
-marketQualityTrend < -10
-
-const persistentErosion = (
-
-participationErosion &&
-breadthErosion
-
-) || (
-
-breadthErosion &&
-qualityErosion
-
-)
-
-/* =====================================================
-NEW CONDITIONS
-===================================================== */
-
-const passiveFragility = (
+const passiveFragility =
 vix < 18 &&
 liquidity >= 65 &&
 (
 weakParticipation ||
 narrowLeadership ||
 failedRotation
-)
-)
+);
 
-const dealerCompression = (
+
+const dealerCompression =
 effectiveGamma > 35 &&
 vix < 18 &&
 correlation < 3 &&
-weakParticipation
-)
+(
+weakParticipation ||
+narrowLeadership
+);
+
+
+
+/* =====================================================
+HISTORICAL EROSION
+===================================================== */
+
+const participationErosion =
+participationTrend < -8;
+
+
+const breadthErosion =
+breadthTrend < -8;
+
+
+const liquidityErosion =
+liquidityTrend < -10;
+
+
+const qualityErosion =
+marketQualityTrend < -10;
+
+
+const persistentErosion =
+(
+participationErosion &&
+breadthErosion
+) ||
+(
+breadthErosion &&
+qualityErosion
+);
+
+
 
 /* =====================================================
 SCORE
 ===================================================== */
 
-let score = 18
+/*
+* The score deliberately uses bounded layers.
+*
+* Avoid excessive double counting:
+*
+* - weak participation
+* - weak breadth
+* - failed rotation
+* - narrow leadership
+*
+* can all describe the same structural deterioration.
+*/
+
+let score = 18;
+
+
+
+/* =====================================================
+PARTICIPATION
+===================================================== */
 
 if (participationScore < 58) {
-score += 6
+score += 5;
 }
 
 if (participationScore < 48) {
-score += 10
+score += 8;
 }
 
 if (participationScore < 40) {
-score += 14
+score += 10;
 }
 
 if (participationScore < 32) {
-score += 18
+score += 10;
 }
 
+
+
+/* =====================================================
+BREADTH
+===================================================== */
+
 if (breadth50 < 55) {
-score += 5
+score += 4;
 }
 
 if (breadth50 < 45) {
-score += 8
+score += 7;
 }
 
 if (breadth50 < 35) {
-score += 12
+score += 9;
 }
 
+
 if (breadth200 < 50) {
-score += 5
+score += 4;
 }
 
 if (breadth200 < 40) {
-score += 10
+score += 7;
 }
 
 if (breadth200 < 32) {
-score += 14
+score += 8;
 }
 
+
 if (breadthThrustScore < 45) {
-score += 6
+score += 4;
 }
 
 if (breadthThrustScore < 35) {
-score += 10
+score += 6;
 }
 
+
+
+/* =====================================================
+ROTATION
+===================================================== */
+
 if (rotationScore < 48) {
-score += 6
+score += 5;
 }
 
 if (rotationScore < 40) {
-score += 10
+score += 7;
 }
 
 if (rotationScore < 32) {
-score += 14
+score += 8;
 }
 
+
 if (rotationDecayScore >= 35) {
-score += 6
+score += 4;
 }
 
 if (rotationDecayScore >= 50) {
-score += 10
+score += 7;
 }
 
 if (rotationDecayScore >= 65) {
-score += 14
+score += 8;
 }
 
-/*
-=====================================================
-NEW RECALIBRATION
-=====================================================
-*/
-
-if (
-rotationDecayScore > 30
-) {
-score += 6
-}
 
 if (failedRotation) {
-score += 10
+score += 8;
 }
+
+
+
+/* =====================================================
+CONCENTRATION
+===================================================== */
 
 if (narrowLeadership) {
-score += 10
+score += 7;
 }
+
+
+if (severeNarrowLeadership) {
+score += 4;
+}
+
 
 if (megaCapOnlyTape) {
-score += 16
+score += 8;
 }
 
-/*
-=====================================================
-STRUCTURAL CONCENTRATION OVERLAY
-=====================================================
-*/
 
 if (
 narrowLeadership &&
 equalWeightWeakness &&
 smallCapWeakness
 ) {
-score += 10
+score += 8;
 }
 
-if (synchronizationFailure) {
-score += 10
+
+
+/* =====================================================
+MARKET QUALITY
+===================================================== */
+
+if (marketQualityScore < 50) {
+score += 5;
 }
+
+if (marketQualityScore < 42) {
+score += 7;
+}
+
+if (marketQualityScore < 34) {
+score += 8;
+}
+
+
+
+/* =====================================================
+LIQUIDITY
+===================================================== */
+
+if (liquidity < 50) {
+score += 5;
+}
+
+if (liquidity < 40) {
+score += 7;
+}
+
+if (liquidity < 30) {
+score += 8;
+}
+
+
+/*
+* High liquidity can itself be structurally dangerous
+* when it is masking weak internals.
+*/
+
+if (liquidityDependence) {
+score += 10;
+}
+
+
+if (liquidityIllusion) {
+score += 12;
+}
+
+
+if (latentFragility) {
+score += 7;
+}
+
+
+
+/* =====================================================
+STRUCTURAL SYNCHRONIZATION
+===================================================== */
+
+if (synchronizationFailure) {
+score += 7;
+}
+
 
 if (
 weakParticipation &&
 weakRotation &&
 weakBreadthStructure
 ) {
-score += 12
+score += 8;
 }
 
-if (marketQualityScore < 50) {
-score += 6
-}
 
-if (marketQualityScore < 42) {
-score += 10
-}
-
-if (marketQualityScore < 34) {
-score += 14
-}
-
-if (liquidity < 50) {
-score += 6
-}
-
-if (liquidity < 40) {
-score += 10
-}
-
-if (liquidity < 30) {
-score += 14
-}
-
-if (liquidityDependence) {
-score += 16
-}
-
-if (liquidityIllusion) {
-score += 20
-}
-
-if (latentFragility) {
-score += 10
-}
 
 /* =====================================================
-HISTORY OVERLAYS
+HISTORICAL EROSION
 ===================================================== */
 
 if (participationErosion) {
-score += 8
+score += 6;
 }
 
 if (breadthErosion) {
-score += 8
+score += 6;
 }
 
 if (liquidityErosion) {
-score += 6
+score += 5;
 }
 
 if (qualityErosion) {
-score += 8
+score += 6;
 }
 
 if (persistentErosion) {
-score += 15
+score += 8;
 }
+
 
 
 /* =====================================================
-NEW OVERLAYS
+PASSIVE / DEALER STRUCTURE
 ===================================================== */
 
 if (passiveFragility) {
-score += 18
+score += 10;
 }
 
+
 if (dealerCompression) {
-score += 12
+score += 8;
 }
+
 
 if (
 liquidityIllusion &&
 failedRotation
 ) {
-score += 12
+score += 6;
 }
+
 
 if (
 megaCapOnlyTape &&
 breadth50 < 45
 ) {
-score += 12
+score += 6;
 }
+
 
 if (
 narrowLeadership &&
 weakParticipation &&
 weakRotation
 ) {
-score += 12
+score += 7;
 }
 
-if (
-liquidity >= 70 &&
-marketQualityScore < 42
-) {
-score += 16
-}
 
-if (
-liquidity >= 70 &&
-megaCapOnlyTape
-) {
-score += 12
-}
 
-if (
-liquidity >= 65 &&
-!internalSynchronization
-) {
-score += 10
-}
+/* =====================================================
+GAMMA
+===================================================== */
 
 /*
-Structural gamma floor risk
+* Structural gamma floor indicates suppressed volatility.
+*
+* Do not treat it as a direct crash signal.
 */
 
 if (
 structuralGammaFloor >= 35 &&
 weakParticipation
 ) {
-score += 10
+score += 6;
 }
+
 
 if (
 structuralGammaFloor >= 45 &&
 narrowLeadership
 ) {
-score += 10
+score += 5;
 }
+
 
 if (rawGamma < 0) {
-score += 4
+score += 4;
 }
+
 
 if (rawGamma < -10) {
-score += 6
+score += 6;
 }
 
+
+
+/* =====================================================
+VOLATILITY / CORRELATION
+===================================================== */
+
 if (correlation > 5) {
-score += 5
+score += 4;
 }
 
 if (correlation > 8) {
-score += 6
+score += 5;
 }
 
+
 if (vix > 28) {
-score += 4
+score += 4;
 }
 
 if (vix > 35) {
-score += 5
+score += 5;
 }
+
 
 if (volOfVol > 1.4) {
-score += 4
+score += 4;
 }
 
-score += Math.round(
-crashProbability * 0.10
-)
+
+score +=
+Math.round(
+crashProbability * 0.08
+);
+
+
 
 /* =====================================================
 HISTORY METRIC OVERLAY
 ===================================================== */
 
-if (phasePersistence >= 30)
+if (phasePersistence >= 30) {
 score += 3;
+}
 
-if (phasePersistence >= 50)
-score += 5;
-
-if (daysInPhase >= 40)
-score += 3;
-
-if (daysInPhase >= 60)
-score += 5;
-
-if (persistentDistribution)
-score += 6;
-
-if (prolongedBearRegime)
-score += 6;
-
-if (institutionalPressure > 60)
+if (phasePersistence >= 50) {
 score += 4;
+}
 
-if (participationDecayHistory > 20)
-score += 2;
 
-if (breadthTrendHistory < -1)
-score += 1;
-
-if (breadthAcceleration < -1)
+if (daysInPhase >= 40) {
 score += 3;
+}
 
-if (relativeBreadthWeakness > 10)
-score += 3;
-
-if (crashTrend > 5)
+if (daysInPhase >= 60) {
 score += 4;
+}
 
-if (acceleratingWeakness)
-score += 6;
 
-if (averageFragility > 65)
+if (persistentDistribution) {
+score += 5;
+}
+
+
+if (prolongedBearRegime) {
+score += 5;
+}
+
+
+if (institutionalPressure > 60) {
+score += 4;
+}
+
+
+if (participationDecayHistory > 20) {
+score += 3;
+}
+
+
+if (breadthTrendHistory < -1) {
 score += 2;
+}
 
 
-score = clamp(
+/*
+* Important:
+*
+* In your history logic a negative acceleration
+* represents accelerating deterioration.
+*/
+
+if (breadthAcceleration < -1) {
+score += 4;
+}
+
+
+if (relativeBreadthWeakness > 10) {
+score += 3;
+}
+
+
+if (crashTrend > 5) {
+score += 4;
+}
+
+
+if (acceleratingWeakness) {
+score += 5;
+}
+
+
+if (averageFragility > 65) {
+score += 3;
+}
+
+
+
+/* =====================================================
+FINAL SCORE
+===================================================== */
+
+score =
+clamp(
 Math.round(score)
-)
+);
+
+
 
 /* =====================================================
 STATE
@@ -890,7 +1189,8 @@ let state:
 | "STRETCHED"
 | "FRAGILE"
 | "STRUCTURALLY_UNSTABLE"
-| "BREAKDOWN_RISK"
+| "BREAKDOWN_RISK";
+
 
 if (
 score >= 82 ||
@@ -900,49 +1200,62 @@ failedRotation &&
 severeBreadthFailure
 )
 ) {
-state = "BREAKDOWN_RISK"
+
+state = "BREAKDOWN_RISK";
+
 }
 
 else if (
-score >= 60 ||
+score >= 62 ||
 liquidityIllusion ||
-passiveFragility ||
+(
+passiveFragility &&
+synchronizationFailure
+) ||
 (
 liquidityDependence &&
 synchronizationFailure
 )
 ) {
-state = "STRUCTURALLY_UNSTABLE"
+
+state = "STRUCTURALLY_UNSTABLE";
+
 }
 
 else if (
-score >= 44 ||
+score >= 45 ||
 (
 weakParticipation &&
 narrowLeadership
 )
 ) {
-state = "FRAGILE"
+
+state = "FRAGILE";
+
 }
 
 else if (
 score >= 30 ||
-weakRotation ||
-synchronizationFailure
+weakRotation
 ) {
-state = "STRETCHED"
+
+state = "STRETCHED";
+
 }
 
 else {
-state = "RESILIENT"
+
+state = "RESILIENT";
+
 }
+
+
 
 /* =====================================================
 ESCALATION
 ===================================================== */
 
-const escalation = (
-
+const escalation =
 state === "BREAKDOWN_RISK" ||
 
 (
@@ -959,82 +1272,94 @@ severeParticipationFailure
 (
 liquidityIllusion &&
 synchronizationFailure
-)
+);
 
-)
+
 
 /* =====================================================
 BREAKDOWN RISK
 ===================================================== */
 
-let breakdownRisk = 0
+let breakdownRisk = 0;
+
 
 if (severeParticipationFailure) {
-breakdownRisk += 25
+breakdownRisk += 20;
 }
 
 if (severeBreadthFailure) {
-breakdownRisk += 25
+breakdownRisk += 20;
 }
 
 if (failedRotation) {
-breakdownRisk += 20
+breakdownRisk += 18;
 }
 
 if (megaCapOnlyTape) {
-breakdownRisk += 12
+breakdownRisk += 10;
 }
 
 if (liquidityDependence) {
-breakdownRisk += 15
+breakdownRisk += 10;
 }
 
 if (liquidityIllusion) {
-breakdownRisk += 20
+breakdownRisk += 15;
 }
 
 if (passiveFragility) {
-breakdownRisk += 14
+breakdownRisk += 12;
 }
 
 if (dealerCompression) {
-breakdownRisk += 10
+breakdownRisk += 8;
 }
 
 if (synchronizationFailure) {
-breakdownRisk += 15
+breakdownRisk += 10;
 }
 
 if (marketQualityScore < 35) {
-breakdownRisk += 15
+breakdownRisk += 12;
 }
 
 if (persistentErosion) {
-breakdownRisk += 20
+breakdownRisk += 12;
 }
 
 if (
 participationErosion &&
 breadthErosion
 ) {
-breakdownRisk += 10
+breakdownRisk += 8;
 }
 
-if (persistentDistribution)
-breakdownRisk += 8;
 
-if (prolongedBearRegime)
-breakdownRisk += 6;
+if (persistentDistribution) {
+breakdownRisk += 7;
+}
 
-if (institutionalPressure > 60)
+if (prolongedBearRegime) {
 breakdownRisk += 5;
+}
 
-if (acceleratingWeakness)
-breakdownRisk += 8;
+if (institutionalPressure > 60) {
+breakdownRisk += 5;
+}
 
-breakdownRisk = clamp(
-Math.round(breakdownRisk)
+if (acceleratingWeakness) {
+breakdownRisk += 7;
+}
+
+
+breakdownRisk =
+clamp(
+Math.round(
+breakdownRisk
 )
+);
+
+
 
 /* =====================================================
 LIQUIDITY FRAGILITY
@@ -1043,73 +1368,92 @@ LIQUIDITY FRAGILITY
 let liquidityFragility =
 Math.round(
 (100 - liquidity) * 0.45
-)
+);
+
 
 if (liquidityDependence) {
-liquidityFragility += 25
+liquidityFragility += 20;
 }
 
 if (liquidityIllusion) {
-liquidityFragility += 35
+liquidityFragility += 25;
 }
 
 if (passiveFragility) {
-liquidityFragility += 14
+liquidityFragility += 12;
 }
 
 if (
 liquidity >= 65 &&
 marketQualityScore < 42
 ) {
-liquidityFragility += 15
+liquidityFragility += 10;
 }
 
-liquidityFragility = clamp(
+
+liquidityFragility =
+clamp(
 liquidityFragility
-)
+);
+
+
 
 /* =====================================================
 SUMMARY
 ===================================================== */
 
 let summary =
-"Structurally resilient market environment"
+"Structurally resilient market environment";
+
 
 if (state === "STRETCHED") {
 summary =
-"Market structure increasingly stretched beneath the surface"
+"Market structure increasingly stretched beneath the surface";
 }
+
 
 if (state === "FRAGILE") {
 summary =
-"Fragile institutional structure with weakening resilience"
+"Fragile institutional structure with weakening resilience";
 }
+
 
 if (state === "STRUCTURALLY_UNSTABLE") {
 summary =
-"Structurally unstable market dependent on narrowing support"
+"Structurally unstable market dependent on narrowing support";
 }
+
 
 if (state === "BREAKDOWN_RISK") {
 summary =
-"High structural breakdown risk across institutional internals"
+"High structural breakdown risk across institutional internals";
 }
+
 
 if (liquidityIllusion) {
-summary += " | Liquidity illusion regime"
+summary +=
+" | Liquidity illusion";
 }
+
 
 if (passiveFragility) {
-summary += " | Passive fragility"
+summary +=
+" | Passive fragility";
 }
+
 
 if (dealerCompression) {
-summary += " | Dealer compression"
+summary +=
+" | Dealer compression";
 }
 
+
 if (megaCapOnlyTape) {
-summary += " | Mega-cap stability distortion"
+summary +=
+" | Mega-cap concentration";
 }
+
+
 
 /* =====================================================
 RETURN
@@ -1139,53 +1483,82 @@ effectiveGamma,
 
 summary,
 
+
 metrics: {
+
 crashProbability,
 
 breadth50,
 breadth200,
 
-gamma: rawGamma,
+gamma:
+rawGamma,
+
 effectiveGamma,
+
 structuralGammaFloor,
 
 correlation,
 
 vix,
+
 volOfVol,
+
+vixTerm,
 
 liquidity,
 
 participationScore,
+
 breadthThrustScore,
+
 rotationScore,
+
 rotationDecayScore,
 
 marketQualityScore,
 
 participationTrend,
+
 breadthTrend,
+
 liquidityTrend,
+
 marketQualityTrend,
 
 participationErosion,
+
 breadthErosion,
+
 liquidityErosion,
+
 qualityErosion,
 
 persistentErosion,
 
 narrowLeadership,
+
+severeNarrowLeadership,
+
 megaCapOnlyTape,
 
-internalSynchronization,
+equalWeightWeakness,
+
+smallCapWeakness,
+
+internalSynchronization:
+hasSynchronizationData
+? Boolean(internalSynchronization)
+: true,
 
 liquidityDependence,
 
 liquidityIllusion,
+
 latentFragility,
 
 passiveFragility,
+
 dealerCompression,
 
 phasePersistence,
@@ -1214,5 +1587,7 @@ prolongedBearRegime,
 acceleratingWeakness
 
 }
-}
+
+};
+
 }

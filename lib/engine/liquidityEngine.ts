@@ -2,391 +2,706 @@
 
 import { getMarketStructureFlags } from "./marketStructureFlags";
 
+/* ============================================================
+LIQUIDITY ENGINE
+
+SEMANTICS
+
+score:
+HIGH = HEALTHY / SUPPORTIVE LIQUIDITY
+LOW  = LIQUIDITY STRESS
+
+state:
+Describes absolute liquidity conditions.
+
+liquidityState:
+Describes the QUALITY and DISTRIBUTION of liquidity.
+
+fragility:
+Describes structural vulnerability.
+
+IMPORTANT:
+
+High headline liquidity does NOT automatically mean
+healthy market liquidity.
+
+Liquidity can be:
+
+    broad
+    passive
+    narrow
+    fragile
+    illusory
+
+============================================================ */
+
+/* ============================================================
+INPUT
+============================================================ */
+
 export interface LiquidityEngineInput {
 
-history?: any[]
+history?: any[];
+historyMetrics?: any;
 
-historyMetrics?: any
+marketDrivers?: any;
+systemHeat?: any;
+driversCore?: any;
 
-marketDrivers?: any
+marketLiquidityScore?: number;
 
-systemHeat?: any
+gammaExposure?: number;
+creditRatio?: number;
 
-driversCore?: any
+vixTermRatio?: number;
+volOfVolRatio?: number;
 
-marketLiquidityScore?: number
+marketData?: any;
 
-gammaExposure?: number
-creditRatio?: number
-vixTermRatio?: number
-volOfVolRatio?: number
+breadth50?: number;
+breadth200?: number;
 
-marketData?: any
+correlationScore?: number;
 
-breadth50?: number
-breadth200?: number
+participationScore?: number;
 
-correlationScore?: number
+rsSmall?: number;
+rsEqual?: number;
+rsGrowth?: number;
 
-participationScore?: number
+rotationScore?: number;
 
-rsSmall?: number
-rsEqual?: number
-rsGrowth?: number
+rotationDecayScore?: number;
+rotationDecayState?: string;
 
-rotationScore?: number
+fragilityScore?: number;
 
-rotationDecayScore?: number
-rotationDecayState?: string
+hiddenDistribution?: boolean;
+participationCollapse?: boolean;
 
-fragilityScore?: number
-
-hiddenDistribution?: boolean
-participationCollapse?: boolean
 }
 
+/* ============================================================
+OUTPUT
+============================================================ */
+
 export interface LiquidityEngineOutput {
-score: number
+
+/*
+
+    HIGH = GOOD LIQUIDITY
+    LOW  = LIQUIDITY STRESS
+    */
+
+score: number;
 
 state:
 | "ABUNDANT"
 | "SUPPORTIVE"
 | "NEUTRAL"
 | "TIGHTENING"
-| "LIQUIDITY_STRESS"
+| "LIQUIDITY_STRESS";
+
+/*
+
+    Distribution / quality of liquidity.
+    */
 
 liquidityState:
 | "BROAD"
 | "PASSIVE"
 | "NARROW"
 | "FRAGILE"
-| "ILLUSION"
+| "ILLUSION";
 
-liquidityImpulse: number
+/*
+
+    Distance from neutral liquidity.
+    */
+
+liquidityImpulse: number;
 
 support:
 | "STRONG"
 | "MODERATE"
 | "WEAK"
-| "NEGATIVE"
+| "NEGATIVE";
 
 fragility:
 | "LOW"
 | "ELEVATED"
-| "HIGH"
+| "HIGH";
 
-summary: string
+summary: string;
 
 marketQuality:
 | "HEALTHY"
 | "FRAGILE"
 | "DETERIORATING"
-| "INTERNALLY_WEAK"
+| "INTERNALLY_WEAK";
 
-institutionalLiquidity:
-boolean
+institutionalLiquidity: boolean;
 
 metrics: {
-liquidity: number
 
-gamma: number
-effectiveGamma: number
-structuralGammaFloor: number
+liquidity: number;
 
-credit: number
-vixTerm: number
-volOfVol: number
-breadth50: number
-breadth200: number
-correlation: number
-vix: number
+gamma: number;
 
-participation: number
-rotation: number
-decay: number
-fragility: number
+effectiveGamma: number;
 
-marketQualityScore: number
+structuralGammaFloor: number;
 
-liquidityTrend: number
-creditTrend: number
-gammaTrend: number
-breadthTrend: number
+credit: number;
 
-narrowLeadership: boolean
-weakParticipation: boolean
-breadthFailure: boolean
-equalWeightWeakness: boolean
-smallCapWeakness: boolean
+vixTerm: number;
 
-passiveFragility: boolean
-liquidityIllusion: boolean
-dealerCompression: boolean
+volOfVol: number;
 
-liquidityAcceleration:number
+breadth50: number;
 
-averageLiquidity:number
+breadth200: number;
 
-liquidityPersistence:number
+correlation: number;
 
-institutionalPressure:number
+vix: number;
 
-passiveFlowRisk:number
+participation: number;
 
-dealerCompressionRaw:number
+rotation: number;
 
-driversLiquidity:number
+decay: number;
 
-systemHeatCredit:number
+fragility: number;
+
+marketQualityScore: number;
+
+
+/* =========================
+TRENDS
+========================= */
+
+liquidityTrend: number;
+
+creditTrend: number;
+
+gammaTrend: number;
+
+breadthTrend: number;
+
+liquidityAcceleration: number;
+
+
+/* =========================
+HISTORY
+========================= */
+
+averageLiquidity: number;
+
+liquidityPersistence: number;
+
+institutionalPressure: number;
+
+
+/* =========================
+DRIVER DIAGNOSTICS
+========================= */
+
+passiveFlowRisk: number;
+
+dealerCompressionRaw: number;
+
+driversLiquidity: number;
+
+systemHeatCredit: number;
+
+
+/* =========================
+STRUCTURAL FLAGS
+========================= */
+
+narrowLeadership: boolean;
+
+weakParticipation: boolean;
+
+breadthFailure: boolean;
+
+equalWeightWeakness: boolean;
+
+smallCapWeakness: boolean;
+
+passiveFragility: boolean;
+
+liquidityIllusion: boolean;
+
+dealerCompression: boolean;
+
+};
 
 }
-}
+
+/* ============================================================
+HELPERS
+============================================================ */
 
 function clamp(
 value: number,
 min = 0,
 max = 100
 ) {
-return Math.max(min, Math.min(max, value))
+
+if (!Number.isFinite(value)) {
+return min;
 }
+
+return Math.max(
+min,
+Math.min(max, value)
+);
+
+}
+
+function numberOr(
+value: unknown,
+fallback: number
+) {
+
+const numeric =
+Number(value);
+
+return Number.isFinite(numeric)
+? numeric
+: fallback;
+
+}
+
+/* ============================================================
+ENGINE
+============================================================ */
 
 export function liquidityEngine(
 input: LiquidityEngineInput
 ): LiquidityEngineOutput {
 
+/* ==========================================================
+RAW INPUT
+========================================================== */
+
 const liquidity =
-Number(input.marketLiquidityScore ?? 50)
+clamp(
+numberOr(
+input.marketLiquidityScore,
+50
+)
+);
 
 const rawGamma =
-Number(input.gammaExposure ?? 0)
+numberOr(
+input.gammaExposure,
+0
+);
 
 const credit =
-Number(input.creditRatio ?? 1)
+numberOr(
+input.creditRatio,
+1
+);
 
 const vixTerm =
-Number(input.vixTermRatio ?? 1)
+numberOr(
+input.vixTermRatio,
+1
+);
 
 const volOfVol =
-Number(input.volOfVolRatio ?? 1)
+numberOr(
+input.volOfVolRatio,
+1
+);
 
 const breadth50 =
-Number(input.breadth50 ?? 50)
+clamp(
+numberOr(
+input.breadth50,
+50
+)
+);
 
 const breadth200 =
-Number(input.breadth200 ?? 50)
+clamp(
+numberOr(
+input.breadth200,
+50
+)
+);
 
 const correlation =
-Number(input.correlationScore ?? 0)
+numberOr(
+input.correlationScore,
+0
+);
 
 const vix =
-Number(
-input.marketData?.["^VIX"]?.current ?? 20
-)
+numberOr(
+input.marketData?.["^VIX"]?.current,
+20
+);
 
 const participationScore =
-Number(input.participationScore ?? 50)
+clamp(
+numberOr(
+input.participationScore,
+50
+)
+);
 
 const rsSmall =
-Number(input.rsSmall ?? 1)
+numberOr(
+input.rsSmall,
+1
+);
 
 const rsEqual =
-Number(input.rsEqual ?? 1)
+numberOr(
+input.rsEqual,
+1
+);
 
 const rsGrowth =
-Number(input.rsGrowth ?? 1)
+numberOr(
+input.rsGrowth,
+1
+);
 
 const rotationScore =
-Number(input.rotationScore ?? 50)
+clamp(
+numberOr(
+input.rotationScore,
+50
+)
+);
 
 const rotationDecayScore =
-Number(input.rotationDecayScore ?? 0)
+clamp(
+numberOr(
+input.rotationDecayScore,
+0
+)
+);
 
 const fragilityScore =
-Number(input.fragilityScore ?? 50)
+clamp(
+numberOr(
+input.fragilityScore,
+50
+)
+);
 
-/* =====================================================
-HISTORY
-===================================================== */
-
-const history =
-input.history ?? []
-
-const historyMetrics =
-input.historyMetrics ?? {}
-
-const marketDrivers =
-input.marketDrivers ?? {}
-
-const systemHeat =
-input.systemHeat ?? {}
-
-const driversCore =
-input.driversCore ?? {}
-
-
-const passiveFlowRisk =
-Number(marketDrivers.passiveFlowRisk ?? 0)
-
-const dealerCompressionRaw =
-Number(marketDrivers.dealerCompression ?? 0)
-
-const systemHeatCredit =
-Number(systemHeat.components?.credit ?? 1)
-
-const driversLiquidity =
-Number(driversCore.score ?? 0)
-
-const liquidityPersistence =
-Number(historyMetrics.liquidityPersistence ?? 50)
-
-const averageLiquidity =
-Number(historyMetrics.averageLiquidity ?? liquidity)
-
-const institutionalPressure =
-Number(historyMetrics.institutionalPressure ?? 0)
+/* ==========================================================
+EXTERNAL FLAGS
+========================================================== */
 
 const hiddenDistribution =
-input.hiddenDistribution ?? false
+Boolean(
+input.hiddenDistribution
+);
 
 const participationCollapse =
-input.participationCollapse ?? false
+Boolean(
+input.participationCollapse
+);
 
+/* ==========================================================
+HISTORY
+========================================================== */
+
+const history =
+input.history ?? [];
+
+const historyMetrics =
+input.historyMetrics ?? {};
+
+const marketDrivers =
+input.marketDrivers ?? {};
+
+const systemHeat =
+input.systemHeat ?? {};
+
+const driversCore =
+input.driversCore ?? {};
+
+/* ==========================================================
+DRIVER DIAGNOSTICS
+========================================================== */
+
+const passiveFlowRisk =
+clamp(
+numberOr(
+marketDrivers?.passiveFlowRisk,
+0
+)
+);
+
+const dealerCompressionRaw =
+clamp(
+numberOr(
+marketDrivers?.dealerCompression,
+0
+)
+);
+
+/*
+
+    System Heat credit component is expected around
+    the neutral value 1.
+    */
+
+const systemHeatCredit =
+numberOr(
+systemHeat?.components?.credit,
+1
+);
+
+/*
+
+    Drivers Core may be on a directional scale.
+    Do NOT treat it as direct liquidity.
+    It is used only as a small environmental modifier.
+    */
+
+const driversLiquidity =
+numberOr(
+driversCore?.score,
+0
+);
+
+/* ==========================================================
+HISTORICAL METRICS
+========================================================== */
+
+const liquidityPersistence =
+clamp(
+numberOr(
+historyMetrics?.liquidityPersistence,
+50
+)
+);
+
+const averageLiquidity =
+clamp(
+numberOr(
+historyMetrics?.averageLiquidity,
+liquidity
+)
+);
+
+const institutionalPressure =
+clamp(
+numberOr(
+historyMetrics?.institutionalPressure,
+0
+)
+);
+
+/* ==========================================================
+HISTORY SNAPSHOTS
+========================================================== */
 
 const h5 =
 history.length >= 5
-? history[history.length - 5]
-: null
+? history[
+history.length - 5
+]
+: null;
 
 const h10 =
 history.length >= 10
-? history[history.length - 10]
-: null
+? history[
+history.length - 10
+]
+: null;
 
 const h20 =
 history.length >= 20
-? history[history.length - 20]
-: null
+? history[
+history.length - 20
+]
+: null;
 
-/* =====================================================
+/* ==========================================================
 LIQUIDITY TRENDS
-===================================================== */
+========================================================== */
+
+const liquidity10 =
+numberOr(
+h10?.marketLiquidityScore,
+liquidity
+);
+
+const liquidity20 =
+numberOr(
+h20?.marketLiquidityScore,
+liquidity10
+);
+
+const credit10 =
+numberOr(
+h10?.creditRatio,
+credit
+);
+
+const gamma10 =
+numberOr(
+h10?.gammaExposure,
+rawGamma
+);
+
+const breadth10 =
+numberOr(
+h10?.breadth50,
+breadth50
+);
 
 const liquidityTrend =
 liquidity -
-Number(
-h10?.marketLiquidityScore ??
-liquidity
-)
+liquidity10;
 
 const creditTrend =
 credit -
-Number(
-h10?.creditRatio ??
-credit
-)
+credit10;
 
 const gammaTrend =
 rawGamma -
-Number(
-h10?.gammaExposure ??
-rawGamma
-)
+gamma10;
 
 const breadthTrend =
 breadth50 -
-Number(
-h10?.breadth50 ??
-breadth50
-)
+breadth10;
 
+/*
+
+    Current 10-period change versus
+    previous 10-period change.
+    */
+
+const previousLiquidityTrend =
+liquidity10 -
+liquidity20;
 
 const liquidityAcceleration =
 liquidityTrend -
-Number(
-h20?.marketLiquidityScore
-? (
-Number(
-h10?.marketLiquidityScore ??
-liquidity
-) -
-Number(
-h20?.marketLiquidityScore ??
-liquidity
-)
-)
-: 0
-)
+previousLiquidityTrend;
 
-/* =====================================================
-STRUCTURAL FLAGS
-===================================================== */
+/* ==========================================================
+STRUCTURAL CONDITIONS
+========================================================== */
+
+/*
+
+    Credit:
+    ●
+    lower ratio = healthier
+    higher ratio = stress
+    */
 
 const stableCredit =
-credit <= 0.95
+credit <= 0.95;
 
 const stressedCredit =
-credit >= 1.10
+credit >= 1.10;
 
 const severeCreditStress =
-credit >= 1.20
+credit >= 1.20;
+
+/* ==========================================================
+VOL TERM STRUCTURE
+========================================================== */
 
 const healthyTermStructure =
-vixTerm > 1.00
+vixTerm >= 1.00;
 
 const fragileTermStructure =
-vixTerm < 0.95
+vixTerm < 0.95;
 
 const backwardation =
-vixTerm < 0.92
+vixTerm < 0.92;
+
+/* ==========================================================
+BREADTH
+========================================================== */
 
 const supportiveBreadth =
-breadth50 > 60 &&
-breadth200 > 55
+breadth50 >= 60 &&
+breadth200 >= 55;
 
 const weakBreadth =
 breadth50 < 45 ||
-breadth200 < 40
+breadth200 < 40;
 
-const narrowLeadership = (
+const breadthFailure =
+breadth50 < 45 &&
+breadth200 < 45;
+
+/* ==========================================================
+LEADERSHIP
+========================================================== */
+
+const narrowLeadership =
 rsGrowth > 1.03 &&
 rsSmall < 0.99 &&
-rsEqual < 0.99
-)
+rsEqual < 0.99;
 
-const megaCapOnlyTape = (
+const megaCapOnlyTape =
 rsGrowth > 1.05 &&
 rsSmall < 0.97 &&
-rsEqual < 0.97
-)
-
-const weakParticipation =
-participationScore < 50
-
-const breadthFailure = (
-breadth50 < 45 &&
-breadth200 < 45
-)
+rsEqual < 0.97;
 
 const equalWeightWeakness =
-rsEqual < 0.99
+rsEqual < 0.99;
 
 const smallCapWeakness =
-rsSmall < 0.99
+rsSmall < 0.99;
+
+/* ==========================================================
+PARTICIPATION
+========================================================== */
+
+const weakParticipation =
+participationScore < 50;
+
+const severeWeakParticipation =
+participationScore < 42;
+
+/* ==========================================================
+ROTATION
+========================================================== */
 
 const severeRotationDecay =
-rotationDecayScore >= 60
+rotationDecayScore >= 60;
 
-/* =====================================================
+/* ==========================================================
 STRUCTURAL GAMMA FLOOR
-===================================================== */
 
-let structuralGammaFloor = 0
+IMPORTANT:
+
+Quiet volatility and positive gamma can create
+apparent liquidity support.
+
+Therefore effective gamma is diagnostic and must
+never automatically be interpreted as healthy
+liquidity.
+========================================================== */
+
+let structuralGammaFloor = 0;
 
 if (
 vix < 20 &&
 vixTerm >= 0.95
 ) {
-structuralGammaFloor = 35
+
+structuralGammaFloor =
+  35;
+
 }
 
 if (
@@ -394,7 +709,13 @@ vix < 18 &&
 vixTerm >= 1 &&
 narrowLeadership
 ) {
-structuralGammaFloor = 45
+
+structuralGammaFloor =
+  Math.max(
+    structuralGammaFloor,
+    45
+  );
+
 }
 
 if (
@@ -402,582 +723,910 @@ vix < 17 &&
 breadth50 < 55 &&
 narrowLeadership
 ) {
-structuralGammaFloor = 55
+
+structuralGammaFloor =
+  Math.max(
+    structuralGammaFloor,
+    55
+  );
+
 }
 
 const effectiveGamma =
-Math.max(rawGamma, structuralGammaFloor)
+Math.max(
+rawGamma,
+structuralGammaFloor
+);
 
-/* =====================================================
-NEW CONDITIONS
-===================================================== */
+/* ==========================================================
+LIQUIDITY QUALITY CONDITIONS
+========================================================== */
 
-const passiveFragility = (
+/*
+
+    Passive fragility:
+    ●
+    Headline liquidity is high but participation
+    is structurally weak.
+    */
+
+const passiveFragility =
 liquidity >= 65 &&
 vix < 18 &&
 (
 weakParticipation ||
 narrowLeadership ||
 severeRotationDecay
-)
-)
+);
 
-const liquidityIllusion = (
+/*
+
+    Liquidity illusion:
+    ●
+    Very strong headline liquidity is masking
+    severe internal deterioration.
+    */
+
+const liquidityIllusion =
 liquidity >= 70 &&
-narrowLeadership &&
+(
+megaCapOnlyTape ||
+narrowLeadership
+) &&
 breadthFailure &&
-weakParticipation
-)
+weakParticipation;
 
-const dealerCompression = (
-effectiveGamma > 35 &&
+/*
+
+    Dealer compression:
+    ●
+    Strong dealer positioning + calm volatility +
+    weak internals can create unstable compression.
+    */
+
+const dealerCompression =
+effectiveGamma >= 35 &&
 vix < 18 &&
 correlation < 3 &&
-weakParticipation
-)
+weakParticipation;
 
-/* =====================================================
+/* ==========================================================
 MARKET QUALITY SCORE
-===================================================== */
 
-let marketQualityScore = 60
+HIGH = HEALTHY
+LOW  = STRUCTURALLY WEAK
+========================================================== */
 
-marketQualityScore +=
-Math.round(
-(participationScore - 50) * 0.24
-)
+let marketQualityScore = 60;
 
-marketQualityScore +=
-Math.round(
-(rotationScore - 50) * 0.18
-)
+/*
+
+    Participation.
+    */
 
 marketQualityScore +=
-Math.round(
-(driversLiquidity - 5) * 2
-)
+(participationScore - 50) * 0.25;
+
+/*
+
+    Rotation quality.
+    */
 
 marketQualityScore +=
-Math.round(
-(systemHeatCredit - 1) * 8
-)
+(rotationScore - 50) * 0.15;
+
+/*
+
+    Breadth.
+    */
+
+marketQualityScore +=
+(breadth50 - 50) * 0.15;
+
+/*
+
+    Liquidity environment.
+    */
+
+marketQualityScore +=
+(liquidity - 50) * 0.10;
+
+/*
+
+    Small environmental contribution.
+    */
+
+marketQualityScore +=
+clamp(
+driversLiquidity,
+-10,
+10
+) * 0.20;
+
+/*
+
+    Structural penalties.
+    */
 
 if (narrowLeadership) {
-marketQualityScore -= 10
+
+marketQualityScore -= 8;
+
 }
 
 if (megaCapOnlyTape) {
-marketQualityScore -= 12
+
+marketQualityScore -= 10;
+
+}
+
+if (equalWeightWeakness) {
+
+marketQualityScore -= 4;
+
+}
+
+if (smallCapWeakness) {
+
+marketQualityScore -= 4;
+
 }
 
 if (participationCollapse) {
-marketQualityScore -= 16
+
+marketQualityScore -= 14;
+
 }
 
 if (hiddenDistribution) {
-marketQualityScore -= 14
+
+marketQualityScore -= 12;
+
 }
 
 if (liquidityIllusion) {
-marketQualityScore -= 18
+
+marketQualityScore -= 15;
+
 }
 
 if (passiveFragility) {
-marketQualityScore -= 10
+
+marketQualityScore -= 8;
+
 }
 
 if (dealerCompression) {
-marketQualityScore -= 8
+
+marketQualityScore -= 6;
+
 }
 
-/* =====================================================
-TREND DETERIORATION
-===================================================== */
+/*
+
+    Trend deterioration.
+    */
 
 if (liquidityTrend < -8) {
-marketQualityScore -= 6
+
+marketQualityScore -= 5;
+
 }
 
 if (breadthTrend < -8) {
-marketQualityScore -= 6
+
+marketQualityScore -= 5;
+
 }
 
 if (
 gammaTrend < -15 &&
 breadthTrend < 0
 ) {
-marketQualityScore -= 4
+
+marketQualityScore -= 4;
+
 }
 
-if (
-liquidityPersistence < 40
-){
-marketQualityScore -=8
+/*
+
+    Historical deterioration.
+    */
+
+if (liquidityPersistence < 40) {
+
+marketQualityScore -= 6;
+
 }
 
-if(
-averageLiquidity <60
-){
-marketQualityScore -=5
+if (averageLiquidity < 60) {
+
+marketQualityScore -= 4;
+
 }
 
-if(
-institutionalPressure>55
-){
-marketQualityScore-=6
+if (institutionalPressure > 55) {
+
+marketQualityScore -= 5;
+
 }
 
-if(
-passiveFlowRisk>25
-){
-marketQualityScore-=8
+if (passiveFlowRisk > 25) {
+
+marketQualityScore -= 6;
+
 }
 
-
-marketQualityScore = clamp(
-Math.round(marketQualityScore)
+marketQualityScore =
+clamp(
+Math.round(
+marketQualityScore
 )
+);
 
-/* =====================================================
+/* ==========================================================
 MARKET QUALITY STATE
-===================================================== */
+========================================================== */
 
 let marketQuality:
 | "HEALTHY"
 | "FRAGILE"
 | "DETERIORATING"
-| "INTERNALLY_WEAK"
+| "INTERNALLY_WEAK";
+
+/*
+
+    Severe structural conditions always dominate.
+    */
 
 if (
-marketQualityScore >= 70 &&
-!weakParticipation
-) {
-marketQuality = "HEALTHY"
-}
-
-else if (
 liquidityIllusion ||
-participationCollapse
+participationCollapse ||
+(
+breadthFailure &&
+weakParticipation &&
+narrowLeadership
+)
 ) {
-marketQuality = "INTERNALLY_WEAK"
+
+marketQuality =
+  "INTERNALLY_WEAK";
+
 }
 
 else if (
 marketQualityScore < 45
 ) {
-marketQuality = "DETERIORATING"
+
+marketQuality =
+  "DETERIORATING";
+
+}
+
+else if (
+marketQualityScore >= 70 &&
+!weakParticipation &&
+!narrowLeadership
+) {
+
+marketQuality =
+  "HEALTHY";
+
 }
 
 else {
-marketQuality = "FRAGILE"
+
+marketQuality =
+  "FRAGILE";
+
 }
 
-/* =====================================================
-SCORE
-===================================================== */
+/* ==========================================================
+BASE LIQUIDITY SCORE
 
-let score = 55
+IMPORTANT:
 
-score +=
-Math.round(
-(liquidity - 50) * 0.45
-)
+This score measures actual liquidity conditions.
 
-score +=
-Math.round(
-(systemHeatCredit - 1) * 10
-)
+Structural quality problems can reduce the score,
+but must not repeatedly subtract the same weakness
+through multiple overlapping penalties.
+========================================================== */
 
-score +=
-Math.round(
-(driversLiquidity - 5)
-)
+let score = 50;
 
 /*
-Effective gamma replaces raw gamma
-*/
 
-if (effectiveGamma > 5) {
-score += 10
-}
+    Headline liquidity.
+    */
 
-if (effectiveGamma > 25) {
-score += 5
-}
+score +=
+(liquidity - 50) * 0.55;
 
-if (rawGamma < -5) {
-score -= 10
-}
+/*
+
+    Credit.
+    */
 
 if (stableCredit) {
-score += 12
+
+score += 10;
+
 }
 
-if (stressedCredit) {
-score -= 10
+else if (stressedCredit) {
+
+score -= 10;
+
 }
 
 if (severeCreditStress) {
-score -= 18
+
+score -= 8;
+
 }
 
+/*
+
+    Volatility term structure.
+    */
+
 if (healthyTermStructure) {
-score += 8
+
+score += 6;
+
 }
 
 if (fragileTermStructure) {
-score -= 10
+
+score -= 8;
+
 }
 
 if (backwardation) {
-score -= 16
+
+score -= 8;
+
 }
+
+/*
+
+    Gamma.
+    Raw negative gamma is directly negative.
+    Effective gamma gives only limited support,
+    because structural gamma floors can represent
+    compression rather than healthy liquidity.
+    */
+
+if (rawGamma < -5) {
+
+score -= 10;
+
+}
+
+else if (
+rawGamma > 5 &&
+!dealerCompression
+) {
+
+score += 5;
+
+}
+
+/*
+
+    Breadth deterioration.
+    */
 
 if (weakBreadth) {
-score -= 4
+
+score -= 5;
 
 }
 
-if (liquidityAcceleration < -8)
+/*
+
+    Liquidity trend.
+    */
+
+if (liquidityTrend < -8) {
+
+score -= 5;
+
+}
+
+if (liquidityTrend < -20) {
+
+score -= 5;
+
+}
+
+/*
+
+    Acceleration.
+    */
+
+if (liquidityAcceleration < -8) {
+
 score -= 4;
 
-if (liquidityAcceleration < -15)
-score -= 6;
+}
 
-if (creditTrend > 0.08)
+if (liquidityAcceleration < -15) {
+
 score -= 4;
 
-if (creditTrend > 0.15)
-score -= 6;
+}
 
-/* =====================================================
-NEW PENALTIES
-===================================================== */
+/*
+
+    Credit deterioration.
+    */
+
+if (creditTrend > 0.08) {
+
+score -= 4;
+
+}
+
+if (creditTrend > 0.15) {
+
+score -= 4;
+
+}
+
+/*
+
+    Combined internal weakness.
+    */
 
 if (
 narrowLeadership &&
 weakParticipation
 ) {
-score -= 20
-}
 
-if (liquidityIllusion) {
-score -= 18
-}
+score -= 10;
 
-if (passiveFragility) {
-score -= 12
-}
-
-if (dealerCompression) {
-score -= 10
-}
-
-if (
-equalWeightWeakness &&
-smallCapWeakness
-) {
-score -= 8
 }
 
 /*
-Structural gamma floor:
-quiet compression != healthy liquidity
-*/
+
+    Severe structural liquidity conditions.
+    ●
+    Only the strongest applicable condition
+    should dominate.
+    */
+
+if (liquidityIllusion) {
+
+score -= 18;
+
+}
+
+else if (passiveFragility) {
+
+score -= 10;
+
+}
+
+else if (dealerCompression) {
+
+score -= 8;
+
+}
+
+/*
+
+    Internal market quality overlay.
+    */
 
 if (
-structuralGammaFloor >= 35 &&
-weakParticipation
+marketQuality ===
+"INTERNALLY_WEAK"
 ) {
-score -= 8
+
+score -= 10;
+
+}
+
+else if (
+marketQuality ===
+"DETERIORATING"
+) {
+
+score -= 6;
+
+}
+
+/*
+
+    Historical deterioration.
+    */
+
+if (
+liquidityPersistence < 40
+) {
+
+score -= 4;
+
 }
 
 if (
-structuralGammaFloor >= 45 &&
-narrowLeadership
+averageLiquidity < 60
 ) {
-score -= 10
+
+score -= 3;
+
 }
 
 if (
-marketQuality === "DETERIORATING"
+institutionalPressure > 55
 ) {
-score -= 16
+
+score -= 4;
+
 }
+
+/*
+
+    Passive flow risk.
+    */
 
 if (
-marketQuality === "INTERNALLY_WEAK"
+passiveFlowRisk > 25
 ) {
-score -= 22
+
+score -= 5;
+
 }
 
-/* =====================================================
-HISTORICAL LIQUIDITY DECAY
-===================================================== */
+/*
 
-if (liquidityTrend < -10) {
-score -= 8
-}
-
-if (liquidityTrend < -20) {
-score -= 8
-}
+    External dealer compression diagnostic.
+    */
 
 if (
-breadthTrend < -10 &&
-liquidityTrend < 0
+dealerCompressionRaw > 40
 ) {
-score -= 6
+
+score -= 4;
+
 }
 
-if (
-gammaTrend < -20 &&
-breadthTrend < 0
-) {
-score -= 5
-}
-
-if(
-liquidityPersistence<40
-){
-score-=6
-}
-
-if(
-averageLiquidity<60
-){
-score-=4
-}
-
-if(
-institutionalPressure>55
-){
-score-=6
-}
-
-if(
-passiveFlowRisk>25
-){
-score-=8
-}
-
-if(
-dealerCompressionRaw>25
-){
-score-=6
-}
-
-
-score = clamp(
+score =
+clamp(
 Math.round(score)
-)
+);
 
-/* =====================================================
-STATE
-===================================================== */
+/* ==========================================================
+LIQUIDITY STATE
+
+ABSOLUTE LIQUIDITY CONDITIONS
+========================================================== */
 
 let state:
 | "ABUNDANT"
 | "SUPPORTIVE"
 | "NEUTRAL"
 | "TIGHTENING"
-| "LIQUIDITY_STRESS"
+| "LIQUIDITY_STRESS";
 
 if (score >= 80) {
-state = "ABUNDANT"
+
+state =
+  "ABUNDANT";
+
 }
 
 else if (score >= 65) {
-state = "SUPPORTIVE"
+
+state =
+  "SUPPORTIVE";
+
 }
 
 else if (score >= 48) {
-state = "NEUTRAL"
+
+state =
+  "NEUTRAL";
+
 }
 
 else if (score >= 30) {
-state = "TIGHTENING"
+
+state =
+  "TIGHTENING";
+
 }
 
 else {
-state = "LIQUIDITY_STRESS"
+
+state =
+  "LIQUIDITY_STRESS";
+
 }
 
-/* =====================================================
-LIQUIDITY STATE
-===================================================== */
+/* ==========================================================
+LIQUIDITY QUALITY STATE
+
+PRIORITY:
+
+ILLUSION
+FRAGILE
+NARROW
+BROAD
+PASSIVE
+========================================================== */
 
 let liquidityState:
 | "BROAD"
 | "PASSIVE"
 | "NARROW"
 | "FRAGILE"
-| "ILLUSION"
+| "ILLUSION";
 
-if (
-supportiveBreadth &&
-participationScore >= 60
-) {
-liquidityState = "BROAD"
+if (liquidityIllusion) {
+
+liquidityState =
+  "ILLUSION";
+
 }
 
-else if (liquidityIllusion) {
-liquidityState = "ILLUSION"
+else if (
+breadthFailure ||
+(
+weakParticipation &&
+score < 50
+)
+) {
+
+liquidityState =
+  "FRAGILE";
+
 }
 
 else if (
 narrowLeadership ||
-equalWeightWeakness
+(
+equalWeightWeakness &&
+smallCapWeakness
+)
 ) {
-liquidityState = "NARROW"
+
+liquidityState =
+  "NARROW";
+
 }
 
 else if (
-weakParticipation ||
-breadthFailure
+supportiveBreadth &&
+participationScore >= 60 &&
+score >= 60
 ) {
-liquidityState = "FRAGILE"
+
+liquidityState =
+  "BROAD";
+
 }
 
 else {
-liquidityState = "PASSIVE"
+
+liquidityState =
+  "PASSIVE";
+
 }
 
-/* =====================================================
+/* ==========================================================
 SUPPORT
-===================================================== */
+========================================================== */
 
 let support:
 | "STRONG"
 | "MODERATE"
 | "WEAK"
-| "NEGATIVE"
+| "NEGATIVE";
 
 if (score >= 75) {
-support = "STRONG"
+
+support =
+  "STRONG";
+
 }
 
 else if (score >= 58) {
-support = "MODERATE"
+
+support =
+  "MODERATE";
+
 }
 
 else if (score >= 40) {
-support = "WEAK"
+
+support =
+  "WEAK";
+
 }
 
 else {
-support = "NEGATIVE"
+
+support =
+  "NEGATIVE";
+
 }
 
-/* =====================================================
+/* ==========================================================
 FRAGILITY
-===================================================== */
+
+IMPORTANT:
+
+Fragility can be HIGH even when headline
+liquidity remains elevated.
+========================================================== */
 
 let fragility:
 | "LOW"
 | "ELEVATED"
-| "HIGH"
+| "HIGH";
 
 if (
 liquidityIllusion ||
 passiveFragility ||
-dealerCompression
+dealerCompression ||
+marketQuality ===
+"INTERNALLY_WEAK"
 ) {
-fragility = "HIGH"
+
+fragility =
+  "HIGH";
+
 }
 
 else if (
 score < 48 ||
-marketQuality === "FRAGILE"
+marketQuality ===
+"FRAGILE" ||
+narrowLeadership
 ) {
-fragility = "ELEVATED"
+
+fragility =
+  "ELEVATED";
+
 }
 
 else {
-fragility = "LOW"
+
+fragility =
+  "LOW";
+
 }
 
-/* =====================================================
+/* ==========================================================
 INSTITUTIONAL LIQUIDITY
-===================================================== */
 
-const institutionalLiquidity = (
+Requires BOTH:
+
+    supportive liquidity conditions
+    healthy internal participation
+    ========================================================== */
+
+const institutionalLiquidity =
+
+score >= 65 &&
 
 stableCredit &&
 
 healthyTermStructure &&
 
-systemHeatCredit>1 &&
+participationScore >= 55 &&
 
-driversLiquidity>=5 &&
+!weakBreadth &&
 
-liquidityPersistence>=45 &&
+!narrowLeadership &&
+
+liquidityPersistence >= 45 &&
 
 !liquidityIllusion &&
 
-!passiveFragility
+!passiveFragility;
 
-)
-
-/* =====================================================
+/* ==========================================================
 SUMMARY
-===================================================== */
+========================================================== */
 
 let summary =
-"Balanced liquidity backdrop"
+"Balanced liquidity backdrop";
 
 if (
-liquidityState === "BROAD"
+liquidityState ===
+"BROAD"
 ) {
+
 summary =
-"Broad institutional liquidity participation"
+  "Broad institutional liquidity participation";
+
+}
+
+else if (
+liquidityState ===
+"PASSIVE"
+) {
+
+summary =
+  "Passive liquidity support with mixed market internals";
+
+}
+
+else if (
+liquidityState ===
+"NARROW"
+) {
+
+summary =
+  "Liquidity concentrated in narrow market leadership";
+
+}
+
+else if (
+liquidityState ===
+"FRAGILE"
+) {
+
+summary =
+  "Liquidity backdrop is structurally fragile";
+
+}
+
+else if (
+liquidityState ===
+"ILLUSION"
+) {
+
+summary =
+  "Headline liquidity is masking severe internal weakness";
+
 }
 
 if (
-liquidityState === "PASSIVE"
+dealerCompression &&
+liquidityState !==
+"ILLUSION"
 ) {
-summary =
-"Passive liquidity support with moderate internals"
+
+summary +=
+  " | Dealer compression";
+
 }
 
 if (
-liquidityState === "NARROW"
+passiveFlowRisk >= 60
 ) {
-summary =
-"Liquidity concentrated in narrow leadership"
+
+summary +=
+  " | Passive flow risk elevated";
+
 }
 
-if (
-liquidityState === "FRAGILE"
-) {
-summary =
-"Liquidity backdrop structurally fragile"
-}
-
-if (
-liquidityState === "ILLUSION"
-) {
-summary =
-"Mega-cap liquidity masking severe internal weakness"
-}
-
-if (dealerCompression) {
-summary += " | Dealer compression"
-}
-
-/* =====================================================
+/* ==========================================================
 RETURN
-===================================================== */
+========================================================== */
 
 return {
+
 score,
 
 state,
 
 liquidityState,
 
+
+/*
+ * Positive = above neutral
+ * Negative = below neutral
+ */
+
 liquidityImpulse:
-score - 50,
+  score - 50,
+
 
 support,
 
@@ -989,66 +1638,117 @@ marketQuality,
 
 institutionalLiquidity,
 
+
 metrics: {
-liquidity,
 
-gamma: rawGamma,
-effectiveGamma,
-structuralGammaFloor,
+  /* =========================
+  RAW
+  ========================= */
 
-credit,
-vixTerm,
-volOfVol,
-breadth50,
-breadth200,
-correlation,
-vix,
+  liquidity,
 
-participation:
-participationScore,
+  gamma:
+    rawGamma,
 
-rotation:
-rotationScore,
+  effectiveGamma,
 
-decay:
-rotationDecayScore,
+  structuralGammaFloor,
 
-fragility:
-fragilityScore,
+  credit,
 
-marketQualityScore,
+  vixTerm,
 
-liquidityTrend,
-creditTrend,
-gammaTrend,
-breadthTrend,
+  volOfVol,
 
-liquidityAcceleration,
+  breadth50,
 
-averageLiquidity,
+  breadth200,
 
-liquidityPersistence,
+  correlation,
 
-institutionalPressure,
+  vix,
 
-passiveFlowRisk,
+  participation:
+    participationScore,
 
-dealerCompressionRaw,
+  rotation:
+    rotationScore,
 
-driversLiquidity,
+  decay:
+    rotationDecayScore,
 
-systemHeatCredit,
+  fragility:
+    fragilityScore,
 
 
-narrowLeadership,
-weakParticipation,
-breadthFailure,
-equalWeightWeakness,
-smallCapWeakness,
+  /* =========================
+  QUALITY
+  ========================= */
 
-passiveFragility,
-liquidityIllusion,
-dealerCompression
-}
-}
+  marketQualityScore,
+
+
+  /* =========================
+  TRENDS
+  ========================= */
+
+  liquidityTrend,
+
+  creditTrend,
+
+  gammaTrend,
+
+  breadthTrend,
+
+  liquidityAcceleration,
+
+
+  /* =========================
+  HISTORY
+  ========================= */
+
+  averageLiquidity,
+
+  liquidityPersistence,
+
+  institutionalPressure,
+
+
+  /* =========================
+  DRIVERS
+  ========================= */
+
+  passiveFlowRisk,
+
+  dealerCompressionRaw,
+
+  driversLiquidity,
+
+  systemHeatCredit,
+
+
+  /* =========================
+  FLAGS
+  ========================= */
+
+  narrowLeadership,
+
+  weakParticipation,
+
+  breadthFailure,
+
+  equalWeightWeakness,
+
+  smallCapWeakness,
+
+  passiveFragility,
+
+  liquidityIllusion,
+
+  dealerCompression,
+
+},
+
+};
+
 }

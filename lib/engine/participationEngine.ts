@@ -1,325 +1,443 @@
 // /lib/engine/participationEngine.ts
 
-import { getMarketStructureFlags } from "./marketStructureFlags";
+import {
+getMarketStructureFlags
+} from "./marketStructureFlags";
+
+
+/* =====================================================
+INPUT
+===================================================== */
 
 export interface ParticipationEngineInput {
 
-history?: any[]
+history?: any[];
+historyMetrics?: any;
 
-historyMetrics?: any
+marketDrivers?: any;
+systemHeat?: any;
+driversCore?: any;
 
-marketDrivers?: any
+breadth20?: number;
+breadth50?: number;
+breadth200?: number;
 
-systemHeat?: any
+structure?: any;
 
-driversCore?: any
+highs?: number;
+lows?: number;
 
-breadth20?: number
-breadth50?: number
-breadth200?: number
+rsEqual?: number;
+rsSmall?: number;
+rsGrowth?: number;
 
-structure?: any
+rotation?: any;
 
-highs?: number
-lows?: number
+divergenceState?: string;
 
-rsEqual?: number
-rsSmall?: number
-rsGrowth?: number
+concentrationScore?: number;
 
-rotation?: any
+rotationScore?: number;
 
-divergenceState?: string
-concentrationScore?: number
-rotationScore?: number
+previousParticipationScore?: number;
+previousParticipation10d?: number;
+previousParticipation20d?: number;
 
-previousParticipationScore?: number
-previousParticipation10d?: number
-previousParticipation20d?: number
+previousLeadershipBreadth?: number;
+previousPassiveDependence?: number;
 
-previousLeadershipBreadth?: number
-previousPassiveDependence?: number
+previousRsEqual?: number;
+previousRsSmall?: number;
+previousGrowthBreadth?: number;
 
-previousRsEqual?: number
-previousRsSmall?: number
-previousGrowthBreadth?: number
+previousBreadth50?: number;
+previousBreadth50_10d?: number;
 
-previousBreadth50?: number
-previousBreadth50_10d?: number
-
-previousBreadth200?: number
-previousBreadth200_20d?: number
+previousBreadth200?: number;
+previousBreadth200_20d?: number;
 }
 
+
+/* =====================================================
+OUTPUT
+===================================================== */
+
 export interface ParticipationEngineOutput {
-score: number
+
+score: number;
 
 state:
 | "STRONG"
 | "HEALTHY"
 | "FRAGILE"
-| "WEAK"
+| "WEAK";
 
 quality:
 | "HIGH"
 | "MEDIUM"
-| "LOW"
+| "LOW";
 
-expansion: boolean
+expansion: boolean;
 
-participationVelocity: number
-participationDecayRate: number
+participationVelocity: number;
+participationDecayRate: number;
+participationSlope: number;
+participationAcceleration: number;
 
-participationSlope: number
-participationAcceleration: number
+breadth50Trend: number;
+breadth50Slope: number;
 
-breadth50Trend: number
-breadth50Slope: number
+breadth200Trend: number;
+breadth200Slope: number;
 
-breadth200Trend: number
-breadth200Slope: number
+breadthParticipationDecay: number;
 
-breadthParticipationDecay: number
+leadershipBreadthTrend: number;
+megaCapDependenceTrend: number;
 
-leadershipBreadthTrend: number
-megaCapDependenceTrend: number
+equalWeightTrend: number;
+smallCapTrend: number;
+growthBreadthTrend: number;
 
-equalWeightTrend: number
-smallCapTrend: number
-growthBreadthTrend: number
+decayPersistence: number;
 
-decayPersistence: number
+narrowLeadership: boolean;
+severeNarrowLeadership: boolean;
 
-narrowLeadership: boolean
-severeNarrowLeadership: boolean
+equalWeightWeakness: boolean;
+smallCapWeakness: boolean;
 
-equalWeightWeakness: boolean
-smallCapWeakness: boolean
-breadthFailure: boolean
+breadthFailure: boolean;
 
-institutionalParticipation: number
-passiveDependence: number
-leadershipBreadth: number
+institutionalParticipation: number;
 
-summary: string
+passiveDependence: number;
 
-metrics: any
+leadershipBreadth: number;
+
+summary: string;
+
+metrics: any;
 }
+
+
+/* =====================================================
+HELPERS
+===================================================== */
 
 function normalizePercent(
 value: number
 ): number {
 
 if (!Number.isFinite(value)) {
-return 50
+return 50;
 }
 
 return value <= 1
 ? value * 100
-: value
+: value;
 }
+
 
 function clamp(
 value: number,
 min = 0,
 max = 100
-) {
-return Math.max(min, Math.min(max, value))
+): number {
+
+return Math.max(
+min,
+Math.min(max, value)
+);
 }
+
+
+function safeNumber(
+value: any,
+fallback = 50
+): number {
+
+const numeric = Number(value);
+
+return Number.isFinite(numeric)
+? numeric
+: fallback;
+}
+
+
+/* =====================================================
+ENGINE
+===================================================== */
 
 export function participationEngine(
 input: ParticipationEngineInput
 ): ParticipationEngineOutput {
 
-/* =====================================================
+
+/* ===================================================
 INPUT
-===================================================== */
+==================================================== */
 
 const breadth20 =
+clamp(
 normalizePercent(
-Number(
+safeNumber(
 input.breadth20 ??
-input.structure?.breadth?.b20?.value ??
+input.structure?.breadth?.b20?.value,
 50
 )
 )
+);
+
 
 const breadth50 =
+clamp(
 normalizePercent(
-Number(
+safeNumber(
 input.breadth50 ??
-input.structure?.breadth?.b50?.value ??
+input.structure?.breadth?.b50?.value,
 50
 )
 )
+);
+
 
 const breadth200 =
+clamp(
 normalizePercent(
-Number(
+safeNumber(
 input.breadth200 ??
-input.structure?.breadth?.b200?.value ??
+input.structure?.breadth?.b200?.value,
 50
 )
 )
+);
+
 
 const highs =
-Number(
+safeNumber(
 input.highs ??
-input.structure?.highsLows?.highs ??
+input.structure?.highsLows?.highs,
 0
-)
+);
+
 
 const lows =
-Number(
+safeNumber(
 input.lows ??
-input.structure?.highsLows?.lows ??
+input.structure?.highsLows?.lows,
 0
-)
+);
+
 
 const rsEqual =
-Number(
+safeNumber(
 input.rsEqual ??
-input.rotation?.rsEqual ??
+input.rotation?.rsEqual,
 1
-)
+);
+
 
 const rsSmall =
-Number(
+safeNumber(
 input.rsSmall ??
-input.rotation?.rsSmall ??
+input.rotation?.rsSmall,
 1
-)
+);
+
 
 const rsGrowth =
-Number(
+safeNumber(
 input.rsGrowth ??
-input.rotation?.rsGrowth ??
+input.rotation?.rsGrowth,
 1
-)
+);
+
 
 const divergenceState =
 input.divergenceState ??
-"NONE"
+"NONE";
+
 
 const concentrationScore =
-Number(
+clamp(
+safeNumber(
 input.concentrationScore ??
-input.rotation?.concentrationScore ??
+input.rotation?.concentrationScore,
 50
 )
+);
+
 
 const rotationScore =
-Number(
+clamp(
+safeNumber(
 input.rotationScore ??
-input.rotation?.score ??
+input.rotation?.score,
 50
 )
+);
 
-/* =====================================================
+
+/* ===================================================
 HISTORY
-===================================================== */
+==================================================== */
 
 const history =
-input.history ?? []
+input.history ?? [];
+
 
 const h5 =
 history.length >= 5
 ? history[history.length - 5]
-: null
+: null;
+
 
 const h10 =
 history.length >= 10
 ? history[history.length - 10]
-: null
+: null;
+
 
 const h20 =
 history.length >= 20
 ? history[history.length - 20]
-: null
+: null;
+
 
 const historyMetrics =
-input.historyMetrics ?? {}
+input.historyMetrics ?? {};
+
 
 const marketDrivers =
-input.marketDrivers ?? {}
+input.marketDrivers ?? {};
+
 
 const systemHeat =
-input.systemHeat ?? {}
+input.systemHeat ?? {};
+
 
 const driversCore =
-input.driversCore ?? {}
+input.driversCore ?? {};
+
+
+/* ===================================================
+HISTORY METRICS
+==================================================== */
 
 const participationPersistence =
-Number(historyMetrics.participationPersistence ?? 50)
+clamp(
+safeNumber(
+historyMetrics.participationPersistence,
+50
+)
+);
+
 
 const averageParticipation =
-Number(historyMetrics.averageParticipation ?? 50)
+clamp(
+safeNumber(
+historyMetrics.averageParticipation,
+50
+)
+);
+
 
 const institutionalParticipationTrend =
-Number(historyMetrics.institutionalParticipation ?? 50)
+safeNumber(
+historyMetrics.institutionalParticipation,
+50
+);
+
 
 const participationAccelerationHistory =
-Number(historyMetrics.participationAcceleration ?? 0)
+safeNumber(
+historyMetrics.participationAcceleration,
+0
+);
+
 
 const passiveFlowRisk =
-Number(marketDrivers.passiveFlowRisk ?? 0)
+clamp(
+safeNumber(
+marketDrivers.passiveFlowRisk,
+0
+)
+);
+
 
 const systemHeatBreadth =
-Number(systemHeat.components?.breadth ?? 1)
+safeNumber(
+systemHeat.components?.breadth,
+1
+);
+
 
 const driversParticipation =
-Number(driversCore.score ?? 0)
+safeNumber(
+driversCore.score,
+0
+);
 
 
-/* =====================================================
+/* ===================================================
 RELATIVE BREADTH SYSTEM
-===================================================== */
+==================================================== */
 
 const previousBreadth50 =
-Number(
+safeNumber(
 input.previousBreadth50 ??
-h5?.breadth50 ??
+h5?.breadth50,
 breadth50
-)
+);
+
 
 const previousBreadth50_10d =
-Number(
+safeNumber(
 input.previousBreadth50_10d ??
-h10?.breadth50 ??
+h10?.breadth50,
 previousBreadth50
-)
+);
+
 
 const previousBreadth200 =
-Number(
+safeNumber(
 input.previousBreadth200 ??
-h10?.breadth200 ??
+h10?.breadth200,
 breadth200
-)
+);
+
 
 const previousBreadth200_20d =
-Number(
+safeNumber(
 input.previousBreadth200_20d ??
-h20?.breadth200 ??
+h20?.breadth200,
 previousBreadth200
-)
+);
+
 
 const breadth50Slope =
 Math.round(
-breadth50 - previousBreadth50
-)
+breadth50 -
+previousBreadth50
+);
+
 
 const breadth50Trend =
 Math.round(
 (
-(breadth50 - previousBreadth50) * 0.6 +
-(breadth50 - previousBreadth50_10d) * 0.4
+(breadth50 - previousBreadth50) * 0.60 +
+(breadth50 - previousBreadth50_10d) * 0.40
 )
-)
+);
+
 
 const breadth200Slope =
 Math.round(
-breadth200 - previousBreadth200
-)
+breadth200 -
+previousBreadth200
+);
+
 
 const breadth200Trend =
 Math.round(
@@ -327,14 +445,16 @@ Math.round(
 (breadth200 - previousBreadth200) * 0.55 +
 (breadth200 - previousBreadth200_20d) * 0.45
 )
-)
+);
 
-/* =====================================================
+
+/* ===================================================
 CENTRAL MARKET STRUCTURE FLAGS
-===================================================== */
+==================================================== */
 
 const structureFlags =
 getMarketStructureFlags({
+
 rsGrowth,
 rsSmall,
 rsEqual,
@@ -344,9 +464,12 @@ breadth200,
 
 highs,
 lows
+
 });
 
+
 const {
+
 equalWeightWeakness,
 smallCapWeakness,
 
@@ -354,135 +477,240 @@ narrowLeadership,
 severeNarrowLeadership,
 
 breadthFailure
+
 } = structureFlags;
 
-/* =====================================================
+
+/* ===================================================
 LEADERSHIP BREADTH
-===================================================== */
+==================================================== */
 
-let leadershipBreadth = 58
+let leadershipBreadth = 58;
 
-leadershipBreadth +=
-Math.round((breadth50 - 50) * 0.22)
 
 leadershipBreadth +=
-Math.round((breadth200 - 50) * 0.18)
+Math.round(
+(breadth50 - 50) * 0.22
+);
+
+
+leadershipBreadth +=
+Math.round(
+(breadth200 - 50) * 0.18
+);
+
 
 if (equalWeightWeakness) {
-leadershipBreadth -= 12
+leadershipBreadth -= 12;
 }
+
 
 if (smallCapWeakness) {
-leadershipBreadth -= 12
+leadershipBreadth -= 12;
 }
+
 
 if (narrowLeadership) {
-leadershipBreadth -= 14
+leadershipBreadth -= 14;
 }
 
-leadershipBreadth = clamp(leadershipBreadth)
 
-/* =====================================================
+leadershipBreadth =
+clamp(
+leadershipBreadth
+);
+
+
+/* ===================================================
 PASSIVE DEPENDENCE
-===================================================== */
+==================================================== */
 
-let passiveDependence = 18
+let passiveDependence = 18;
+
 
 if (narrowLeadership) {
-passiveDependence += 18
+passiveDependence += 18;
 }
+
 
 if (breadth50 < 50) {
-passiveDependence += 12
+passiveDependence += 12;
 }
+
 
 if (breadth200 < 45) {
-passiveDependence += 10
+passiveDependence += 10;
 }
+
 
 if (concentrationScore >= 70) {
-passiveDependence += 14
+passiveDependence += 14;
 }
+
 
 if (equalWeightWeakness) {
-passiveDependence += 8
+passiveDependence += 8;
 }
 
-passiveDependence = clamp(passiveDependence)
 
-/* =====================================================
+if (smallCapWeakness) {
+passiveDependence += 6;
+}
+
+
+if (severeNarrowLeadership) {
+passiveDependence += 10;
+}
+
+
+passiveDependence =
+clamp(
+passiveDependence
+);
+
+
+/* ===================================================
 INSTITUTIONAL PARTICIPATION
-===================================================== */
+==================================================== */
 
-let institutionalParticipation = 55
+let institutionalParticipation = 55;
 
-institutionalParticipation +=
-Math.round((breadth20 - 50) * 0.10)
 
 institutionalParticipation +=
-Math.round((breadth50 - 50) * 0.22)
+Math.round(
+(breadth20 - 50) * 0.10
+);
+
 
 institutionalParticipation +=
-Math.round((breadth200 - 50) * 0.18)
+Math.round(
+(breadth50 - 50) * 0.22
+);
+
+
+institutionalParticipation +=
+Math.round(
+(breadth200 - 50) * 0.18
+);
+
 
 if (highs > lows) {
-institutionalParticipation += 6
+institutionalParticipation += 6;
 }
+
 
 if (narrowLeadership) {
-institutionalParticipation -= 14
+institutionalParticipation -= 14;
 }
+
+
+if (severeNarrowLeadership) {
+institutionalParticipation -= 8;
+}
+
 
 if (passiveDependence >= 65) {
-institutionalParticipation -= 12
+institutionalParticipation -= 12;
 }
 
+
+if (breadthFailure) {
+institutionalParticipation -= 10;
+}
+
+
 institutionalParticipation =
-clamp(institutionalParticipation)
+clamp(
+institutionalParticipation
+);
 
-/* =====================================================
+
+/* ===================================================
 BASE SCORE
-===================================================== */
+==================================================== */
 
-let score = 60
+let score = 60;
 
-score += Math.round((driversParticipation - 5))
 
-score += Math.round((systemHeatBreadth - 1) * 8)
+/*
+* Drivers Core is only an environmental modifier.
+* It must never dominate participation itself.
+*/
+
+score +=
+Math.round(
+clamp(
+driversParticipation,
+-10,
+10
+) * 0.40
+);
+
+
+/*
+* System heat is centered around 1.
+*/
+
+score +=
+Math.round(
+(systemHeatBreadth - 1) * 8
+);
+
+
+/* ===================================================
+BREADTH
+==================================================== */
 
 score +=
 Math.round(
 (breadth20 - 50) * 0.08
-)
+);
+
 
 score +=
 Math.round(
 (breadth50 - 50) * 0.18
-)
+);
+
 
 score +=
 Math.round(
 (breadth200 - 50) * 0.16
-)
+);
 
-/* =====================================================
+
+/* ===================================================
 RELATIVE BREADTH PENALTIES
-===================================================== */
+==================================================== */
 
 if (breadth50Trend < -4) {
-score -= 6
+score -= 6;
 }
+
+
+if (breadth50Trend < -8) {
+score -= 4;
+}
+
 
 if (breadth200Trend < -3) {
-score -= 6
+score -= 6;
 }
 
-/* =====================================================
-INTERNALS
-===================================================== */
+
+if (breadth200Trend < -7) {
+score -= 4;
+}
+
+
+/* ===================================================
+HIGHS / LOWS
+==================================================== */
 
 if (highs > lows) {
-score += 6
+
+score += 6;
+
 }
 
 else if (lows > highs) {
@@ -491,123 +719,162 @@ const hlDelta =
 Math.min(
 8,
 Math.abs(lows - highs)
-)
+);
 
 score -=
-Math.round(hlDelta * 0.5)
+Math.round(
+hlDelta * 0.50
+);
+
 }
 
-/* =====================================================
+
+/* ===================================================
 LEADERSHIP QUALITY
-===================================================== */
+==================================================== */
 
 if (equalWeightWeakness) {
-score -= 6
+score -= 6;
 }
+
 
 if (smallCapWeakness) {
-score -= 6
+score -= 6;
 }
+
 
 if (narrowLeadership) {
-score -= 10
+score -= 10;
 }
+
 
 if (severeNarrowLeadership) {
-score -= 10
+score -= 8;
 }
 
-/* =====================================================
+
+/* ===================================================
 PASSIVE MARKET PENALTY
-===================================================== */
+==================================================== */
 
 if (
 narrowLeadership &&
 rsEqual < 0.97
 ) {
-score -= 15
+
+score -= 12;
+
 }
 
-if (
-passiveDependence >= 70
-) {
-score -= 10
+
+if (passiveDependence >= 70) {
+
+score -= 10;
+
 }
 
-/* =====================================================
+
+if (passiveDependence >= 85) {
+
+score -= 6;
+
+}
+
+
+/* ===================================================
 ROTATION
-===================================================== */
+==================================================== */
 
 score +=
 Math.round(
 (rotationScore - 50) * 0.10
-)
+);
 
-/* =====================================================
+
+/* ===================================================
 BREADTH FAILURE
-===================================================== */
+==================================================== */
 
 if (breadthFailure) {
-score -= 12
+
+score -= 12;
+
 }
 
-/* =====================================================
+
+/* ===================================================
 DIVERGENCE
-===================================================== */
+==================================================== */
 
 if (
 divergenceState ===
 "BEARISH_DIVERGENCE"
 ) {
-score -= 6
+
+score -= 6;
+
 }
 
-/* =====================================================
+
+/* ===================================================
 STRUCTURAL BONUS
-===================================================== */
+==================================================== */
 
 if (
+
 breadth50 > 72 &&
 breadth200 > 62 &&
+
 !narrowLeadership
+
 ) {
-score += 8
+
+score += 8;
+
 }
 
-/* =====================================================
+
+/* ===================================================
 VELOCITY / DECAY
-===================================================== */
+==================================================== */
 
 const previousParticipationScore =
-Number(
+safeNumber(
 input.previousParticipationScore ??
-h5?.participationScore ??
+h5?.participationScore,
 score
-)
+);
+
 
 const previousParticipation10d =
-Number(
+safeNumber(
 input.previousParticipation10d ??
-h10?.participationScore ??
+h10?.participationScore,
 previousParticipationScore
-)
+);
+
 
 const previousParticipation20d =
-Number(
+safeNumber(
 input.previousParticipation20d ??
-h20?.participationScore ??
+h20?.participationScore,
 previousParticipation10d
-)
+);
+
 
 const participationVelocity =
 Math.round(
-score - previousParticipationScore
-)
+score -
+previousParticipationScore
+);
+
 
 const participationDecayRate =
 Math.round(
-score - previousParticipation10d
-)
+score -
+previousParticipation10d
+);
+
 
 const participationSlope =
 Math.round(
@@ -615,234 +882,361 @@ Math.round(
 score -
 previousParticipation20d
 ) / 2
-)
+);
+
+
+/*
+* Short-term movement relative to
+* medium-term movement.
+*/
 
 const participationAcceleration =
 Math.round(
 participationVelocity -
-participationDecayRate
+(
+participationDecayRate / 2
 )
+);
+
 
 if (
 participationDecayRate <= -15
 ) {
-score -= 8
+
+score -= 8;
+
 }
 
-/* =====================================================
+
+if (
+participationDecayRate <= -25
+) {
+
+score -= 6;
+
+}
+
+
+/* ===================================================
 RELATIVE TRENDS
-===================================================== */
+==================================================== */
 
 const previousLeadershipBreadth =
-Number(
-input.previousLeadershipBreadth ??
+safeNumber(
+input.previousLeadershipBreadth,
 leadershipBreadth
-)
+);
+
 
 const previousPassiveDependence =
-Number(
-input.previousPassiveDependence ??
+safeNumber(
+input.previousPassiveDependence,
 passiveDependence
-)
+);
+
 
 const leadershipBreadthTrend =
 Math.round(
 leadershipBreadth -
 previousLeadershipBreadth
-)
+);
+
 
 const megaCapDependenceTrend =
 Math.round(
 passiveDependence -
 previousPassiveDependence
-)
+);
+
 
 const previousRsEqual =
-Number(
-input.previousRsEqual ??
+safeNumber(
+input.previousRsEqual,
 rsEqual
-)
+);
+
 
 const previousRsSmall =
-Number(
-input.previousRsSmall ??
+safeNumber(
+input.previousRsSmall,
 rsSmall
-)
+);
+
 
 const previousGrowthBreadth =
-Number(
-input.previousGrowthBreadth ??
+safeNumber(
+input.previousGrowthBreadth,
 rsGrowth
-)
+);
+
 
 const equalWeightTrend =
 Number(
 (
 (rsEqual - previousRsEqual) * 100
 ).toFixed(2)
-)
+);
+
 
 const smallCapTrend =
 Number(
 (
 (rsSmall - previousRsSmall) * 100
 ).toFixed(2)
-)
+);
+
 
 const growthBreadthTrend =
 Number(
 (
 (rsGrowth - previousGrowthBreadth) * 100
 ).toFixed(2)
-)
+);
 
-/* =====================================================
+
+/* ===================================================
 BREADTH PARTICIPATION DECAY
-===================================================== */
+==================================================== */
 
-let breadthParticipationDecay = 0
+let breadthParticipationDecay = 0;
+
 
 if (breadth50Slope < 0) {
-breadthParticipationDecay += 4
+breadthParticipationDecay += 4;
 }
 
+
 if (breadth50Trend < 0) {
-breadthParticipationDecay += 5
+breadthParticipationDecay += 5;
 }
+
 
 if (breadth200Slope < 0) {
-breadthParticipationDecay += 3
+breadthParticipationDecay += 3;
 }
+
 
 if (breadth200Trend < 0) {
-breadthParticipationDecay += 4
+breadthParticipationDecay += 4;
 }
+
 
 if (participationVelocity < 0) {
-breadthParticipationDecay += 4
+breadthParticipationDecay += 4;
 }
 
+
 if (participationDecayRate < 0) {
-breadthParticipationDecay += 5
+breadthParticipationDecay += 5;
 }
+
 
 breadthParticipationDecay =
-Math.min(30, breadthParticipationDecay)
+Math.min(
+30,
+breadthParticipationDecay
+);
 
-/* =====================================================
+
+/* ===================================================
 DECAY PERSISTENCE
-===================================================== */
+==================================================== */
 
-let decayPersistence = 0
+let decayPersistence = 0;
+
 
 if (participationVelocity < 0) {
-decayPersistence += 3
+decayPersistence += 3;
 }
+
 
 if (participationDecayRate < 0) {
-decayPersistence += 4
+decayPersistence += 4;
 }
+
 
 if (participationSlope < 0) {
-decayPersistence += 5
+decayPersistence += 5;
 }
+
 
 if (leadershipBreadthTrend < 0) {
-decayPersistence += 3
+decayPersistence += 3;
 }
+
 
 if (equalWeightTrend < 0) {
-decayPersistence += 2
+decayPersistence += 2;
 }
+
 
 if (smallCapTrend < 0) {
-decayPersistence += 2
+decayPersistence += 2;
 }
+
 
 if (breadth50Trend < 0) {
-decayPersistence += 3
+decayPersistence += 3;
 }
+
 
 if (breadth200Trend < 0) {
-decayPersistence += 3
+decayPersistence += 3;
 }
 
+
+if (megaCapDependenceTrend > 0) {
+decayPersistence += 3;
+}
+
+
 decayPersistence =
-Math.min(20, decayPersistence)
+Math.min(
+20,
+decayPersistence
+);
 
-if (participationPersistence < 40)
-score -= 6
 
-if (averageParticipation < 55)
-score -= 4
+/* ===================================================
+HISTORICAL OVERLAYS
+==================================================== */
 
-if (institutionalParticipationTrend < 45)
-score -= 5
+if (
+participationPersistence < 40
+) {
 
-if (participationAccelerationHistory < -10)
-score -= 5
+score -= 6;
 
-if (passiveFlowRisk > 25)
-score -= 6
+}
 
-/* =====================================================
+
+if (
+averageParticipation < 55
+) {
+
+score -= 4;
+
+}
+
+
+if (
+institutionalParticipationTrend < 45
+) {
+
+score -= 5;
+
+}
+
+
+if (
+participationAccelerationHistory < -10
+) {
+
+score -= 5;
+
+}
+
+
+if (
+passiveFlowRisk > 25
+) {
+
+score -= 6;
+
+}
+
+
+if (
+passiveFlowRisk > 50
+) {
+
+score -= 4;
+
+}
+
+
+/* ===================================================
 FINAL SCORE
-===================================================== */
+==================================================== */
 
-score = clamp(
+score =
+clamp(
 Math.round(score)
-)
+);
 
-/* =====================================================
+
+/* ===================================================
 STATE
-===================================================== */
+==================================================== */
 
 let state:
 | "STRONG"
 | "HEALTHY"
 | "FRAGILE"
-| "WEAK"
+| "WEAK";
+
 
 if (score >= 70) {
-state = "STRONG"
+
+state = "STRONG";
+
 }
 
-else if (score > 50) {
-state = "HEALTHY"
+else if (score >= 52) {
+
+state = "HEALTHY";
+
 }
 
-else if (score > 45) {
-state = "FRAGILE"
+else if (score >= 42) {
+
+state = "FRAGILE";
+
 }
 
 else {
-state = "WEAK"
+
+state = "WEAK";
+
 }
 
-/* =====================================================
+
+/* ===================================================
 QUALITY
-===================================================== */
+==================================================== */
 
 let quality:
 | "HIGH"
 | "MEDIUM"
-| "LOW"
+| "LOW";
 
-if (score >= 72) {
-quality = "HIGH"
+
+if (
+score >= 72 &&
+!narrowLeadership &&
+passiveDependence < 45
+) {
+
+quality = "HIGH";
+
 }
 
 else if (score >= 48) {
-quality = "MEDIUM"
+
+quality = "MEDIUM";
+
 }
 
 else {
-quality = "LOW"
+
+quality = "LOW";
+
 }
 
-/* =====================================================
+
+/* ===================================================
 EXPANSION
-===================================================== */
+==================================================== */
 
 const expansion =
 
@@ -856,73 +1250,113 @@ rsEqual >= 1 &&
 rsSmall >= 1 &&
 
 !narrowLeadership &&
-participationPersistence >= 55 &&
-driversParticipation >= 5
 
-/* =====================================================
+participationPersistence >= 55 &&
+
+driversParticipation >= 5;
+
+
+/* ===================================================
 SUMMARY
-===================================================== */
+==================================================== */
 
 let summary =
-"Average market participation"
+"Average market participation";
+
 
 if (state === "STRONG") {
+
 summary =
-"Broad institutional participation"
+"Broad institutional participation";
+
 }
 
+
 if (state === "HEALTHY") {
+
 summary =
-"Healthy institutional participation"
+"Healthy institutional participation";
+
 }
+
 
 if (state === "FRAGILE") {
 
 if (
 passiveDependence >= 60
 ) {
+
 summary =
-"Participation fragile – passive liquidity masking weakening internals"
+"Participation fragile | passive liquidity masking weakening internals";
+
 }
 
 else if (
 narrowLeadership
 ) {
+
 summary =
-"Participation fragile – concentrated in mega caps"
+"Participation fragile | concentrated in narrow leadership";
+
 }
 
 else {
+
 summary =
-"Participation becoming fragile"
+"Participation becoming structurally fragile";
+
 }
+
 }
+
 
 if (state === "WEAK") {
+
 summary =
-"Participation breakdown active"
+"Participation breakdown active";
+
 }
 
-/* =====================================================
+
+if (
+severeNarrowLeadership
+) {
+
+summary +=
+" | Severe leadership concentration";
+
+}
+
+
+if (
+decayPersistence >= 14
+) {
+
+summary +=
+" | Persistent deterioration";
+
+}
+
+
+/* ===================================================
 RETURN
-===================================================== */
+==================================================== */
 
 return {
+
 score,
 
 state,
-
 quality,
 
 expansion,
 
+
 participationVelocity,
-
 participationDecayRate,
-
 participationSlope,
-
 participationAcceleration,
+
 
 breadth50Trend,
 breadth50Slope,
@@ -930,19 +1364,93 @@ breadth50Slope,
 breadth200Trend,
 breadth200Slope,
 
+
 breadthParticipationDecay,
 
-leadershipBreadthTrend,
 
+leadershipBreadthTrend,
 megaCapDependenceTrend,
 
 equalWeightTrend,
-
 smallCapTrend,
-
 growthBreadthTrend,
 
+
 decayPersistence,
+
+
+narrowLeadership,
+severeNarrowLeadership,
+
+equalWeightWeakness,
+smallCapWeakness,
+
+breadthFailure,
+
+
+institutionalParticipation,
+
+passiveDependence,
+
+leadershipBreadth,
+
+
+summary,
+
+
+metrics: {
+
+breadth20,
+breadth50,
+breadth200,
+
+
+breadth50Trend,
+breadth50Slope,
+
+breadth200Trend,
+breadth200Slope,
+
+
+breadthParticipationDecay,
+
+
+highs,
+lows,
+
+
+rsEqual,
+rsSmall,
+rsGrowth,
+
+
+concentrationScore,
+
+rotationScore,
+
+
+institutionalParticipation,
+
+passiveDependence,
+
+leadershipBreadth,
+
+
+participationPersistence,
+
+averageParticipation,
+
+institutionalParticipationTrend,
+
+participationAccelerationHistory,
+
+
+driversParticipation,
+
+systemHeatBreadth,
+
+passiveFlowRisk,
+
 
 narrowLeadership,
 
@@ -952,55 +1460,10 @@ equalWeightWeakness,
 
 smallCapWeakness,
 
-breadthFailure,
+breadthFailure
 
-institutionalParticipation,
-
-passiveDependence,
-
-leadershipBreadth,
-
-summary,
-
-metrics: {
-breadth20,
-breadth50,
-breadth200,
-
-breadth50Trend,
-breadth50Slope,
-
-breadth200Trend,
-breadth200Slope,
-
-breadthParticipationDecay,
-
-highs,
-lows,
-
-rsEqual,
-rsSmall,
-rsGrowth,
-
-concentrationScore,
-rotationScore,
-
-institutionalParticipation,
-passiveDependence,
-leadershipBreadth,
-participationPersistence,
-
-averageParticipation,
-
-institutionalParticipationTrend,
-
-participationAccelerationHistory,
-
-driversParticipation,
-
-systemHeatBreadth,
-
-passiveFlowRisk
 }
-}
+
+};
+
 }
