@@ -60,6 +60,7 @@ import FragilityPanel from "@/components/FragilityPanel";
 import ParticipationPanel from "@/components/ParticipationPanel";
 import BreadthThrustPanel from "@/components/BreadthThrustPanel";
 import SqueezeRiskPanel from "@/components/SqueezeRiskPanel";
+import GammaPanel from "@/components/GammaPanel";
 
 /* =====================================================
 ROTATION
@@ -881,7 +882,7 @@ dangerZone={engine.dangerZone}
     />
 
 
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
 
 
       <LiquidityPanel
@@ -903,6 +904,9 @@ dangerZone={engine.dangerZone}
         data={engine}
       />
 
+	<GammaPanel
+	data={engine}
+	/>
 
       <SqueezeRiskPanel
         data={engine}
