@@ -83,9 +83,11 @@ scenario
 REAL ENGINE EXECUTION
 =================================================== */
 
-const engine =
-marketEngine(
-input as any
+const engine = marketEngine(
+input as any,
+{
+skipHistoricalReplay: true
+}
 );
 
 
