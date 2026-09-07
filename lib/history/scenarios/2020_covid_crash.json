@@ -1,0 +1,93 @@
+{
+"id": "2020_COVID_CRASH",
+"date": "2020-03-16",
+"year": 2020,
+"title": "COVID Liquidity Crash",
+"description": "Extreme volatility, collapsing breadth and panic conditions during the COVID market crash.",
+
+"expected": {
+"phase": "PHASE_6_ACCELERATION",
+"mode": "CRASH",
+"signal": "PUT",
+"minRisk": 75,
+"maxRisk": 100
+},
+
+"market": {
+"vix": 82,
+"breadth50": 8,
+"breadth200": 12,
+"vixTermRatio": 0.72
+},
+
+"rotation": {
+"score": 8,
+"rsSmall": 0.85,
+"rsEqual": 0.88,
+"rsGrowth": 0.92
+},
+
+"participation": {
+"score": 8
+},
+
+"breadthThrust": {
+"score": 5
+},
+
+"liquidity": {
+"score": 18
+},
+
+"fragility": {
+"score": 96
+},
+
+"rotationDecay": {
+"score": 95
+},
+
+"internalDivergence": {
+"score": 95
+},
+
+"regimeSync": {
+"score": 5
+},
+
+"concentrationScore": 45,
+
+"crash": {
+"score": 96,
+"probability": 94
+},
+
+"phaseConfirmation": {
+"confidence": 98,
+"confirmed": true
+},
+
+"putTiming": {
+"score": 12
+},
+
+"historyMetrics": {
+"breadthTrend": -20,
+"breadthAcceleration": -12,
+"participationDecay": 45,
+"leadershipDecay": -15,
+"crashTrend": 30,
+"relativeBreadthWeakness": 35,
+"institutionalPressure": 98,
+"phasePersistence": 90,
+"daysInPhase": 20,
+"averageBreadth": 25,
+"averageParticipation": 22,
+"averageRotation": 20,
+"averageLiquidity": 30,
+"averageFragility": 92,
+"acceleratingWeakness": true,
+"persistentDistribution": true,
+"prolongedBearRegime": true
+}
+}

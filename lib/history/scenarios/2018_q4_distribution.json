@@ -1,0 +1,88 @@
+{
+"id": "2018_Q4_DISTRIBUTION",
+"date": "2018-10-10",
+"year": 2018,
+"title": "Q4 Distribution Before Selloff",
+"description": "Breadth deterioration and rising structural fragility before the major Q4 selloff.",
+
+"expected": {
+"phase": "PHASE_3_DISTRIBUTION",
+"mode": "NEUTRAL",
+"signal": "NEUTRAL",
+"minRisk": 40,
+"maxRisk": 70
+},
+
+"market": {
+"vix": 22,
+"breadth50": 52,
+"breadth200": 58,
+"vixTermRatio": 1.0
+},
+
+"rotation": {
+"score": 48,
+"rsSmall": 0.98,
+"rsEqual": 0.99,
+"rsGrowth": 1.03
+},
+
+"participation": {
+"score": 49
+},
+
+"breadthThrust": {
+"score": 42
+},
+
+"liquidity": {
+"score": 58
+},
+
+"fragility": {
+"score": 62
+},
+
+"rotationDecay": {
+"score": 52
+},
+
+"internalDivergence": {
+"score": 55
+},
+
+"regimeSync": {
+"score": 42
+},
+
+"concentrationScore": 58,
+
+"crash": {
+"score": 30,
+"probability": 28
+},
+
+"phaseConfirmation": {
+"confidence": 75,
+"confirmed": true
+},
+
+"historyMetrics": {
+"breadthTrend": -4,
+"breadthAcceleration": -2,
+"participationDecay": 12,
+"leadershipDecay": -3,
+"crashTrend": 3,
+"relativeBreadthWeakness": 9,
+"institutionalPressure": 68,
+"phasePersistence": 72,
+"daysInPhase": 18,
+"averageBreadth": 60,
+"averageParticipation": 58,
+"averageRotation": 55,
+"averageLiquidity": 62,
+"averageFragility": 48,
+"acceleratingWeakness": true,
+"persistentDistribution": true
+}
+}

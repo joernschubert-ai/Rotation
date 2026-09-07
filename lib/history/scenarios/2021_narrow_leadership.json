@@ -1,0 +1,80 @@
+{
+"id": "2021_narrow_leadership",
+"date": "2021-11-19",
+"year": 2021,
+"title": "2021 Narrow Leadership and Internal Divergence",
+"description": "Headline indices remain strong while leadership increasingly concentrates in growth and mega-cap stocks. Equal-weight and small-cap participation deteriorate.",
+"expected": {
+"phase": "PHASE_3_DISTRIBUTION",
+"mode": "NEUTRAL",
+"signal": "NEUTRAL",
+"minRisk": 36,
+"maxRisk": 64
+},
+"market": {
+"vix": 17.6,
+"breadth50": 58,
+"breadth200": 62,
+"vixTermRatio": 0.96
+},
+"rotation": {
+"score": 48,
+"rsSmall": 0.978,
+"rsEqual": 0.982,
+"rsGrowth": 1.055
+},
+"participation": {
+"score": 51
+},
+"breadthThrust": {
+"score": 48
+},
+"liquidity": {
+"score": 68
+},
+"fragility": {
+"score": 54
+},
+"rotationDecay": {
+"score": 48
+},
+"internalDivergence": {
+"score": 62
+},
+"regimeSync": {
+"score": 43
+},
+"concentrationScore": 76,
+"crash": {
+"score": 28,
+"probability": 18
+},
+"phaseConfirmation": {
+"confidence": 72,
+"confirmed": true
+},
+"putTiming": {
+"score": 4
+},
+"historyMetrics": {
+"phasePersistence": 48,
+"daysInPhase": 36,
+"participationDecay": 12,
+"breadthTrend": -3,
+"breadthAcceleration": -1,
+"leadershipDecay": -7,
+"crashTrend": 2,
+"relativeBreadthWeakness": 11,
+"institutionalPressure": 58,
+"marketCharacter": "DISTRIBUTION",
+"averageBreadth": 63,
+"averageParticipation": 61,
+"averageRotation": 55,
+"averageLiquidity": 68,
+"averageFragility": 48,
+"acceleratingWeakness": false,
+"regimePersistence": 58,
+"persistentDistribution": true,
+"prolongedBearRegime": false
+}
+}

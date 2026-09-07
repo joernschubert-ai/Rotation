@@ -1,0 +1,80 @@
+{
+"id": "2021_broad_expansion",
+"date": "2021-04-16",
+"year": 2021,
+"title": "2021 Broad Economic Expansion",
+"description": "Broad post-pandemic expansion with strong participation, healthy breadth, improving small-cap participation and constructive market internals.",
+"expected": {
+"phase": "PHASE_1_EXPANSION",
+"mode": "LONG",
+"signal": "CALL",
+"minRisk": 0,
+"maxRisk": 35
+},
+"market": {
+"vix": 17.3,
+"breadth50": 76,
+"breadth200": 69,
+"vixTermRatio": 0.92
+},
+"rotation": {
+"score": 74,
+"rsSmall": 1.035,
+"rsEqual": 1.022,
+"rsGrowth": 1.008
+},
+"participation": {
+"score": 78
+},
+"breadthThrust": {
+"score": 82
+},
+"liquidity": {
+"score": 74
+},
+"fragility": {
+"score": 22
+},
+"rotationDecay": {
+"score": 12
+},
+"internalDivergence": {
+"score": 14
+},
+"regimeSync": {
+"score": 78
+},
+"concentrationScore": 28,
+"crash": {
+"score": 12,
+"probability": 8
+},
+"phaseConfirmation": {
+"confidence": 88,
+"confirmed": true
+},
+"putTiming": {
+"score": 1
+},
+"historyMetrics": {
+"phasePersistence": 24,
+"daysInPhase": 18,
+"participationDecay": 2,
+"breadthTrend": 6,
+"breadthAcceleration": 2,
+"leadershipDecay": 1,
+"crashTrend": -1,
+"relativeBreadthWeakness": 2,
+"institutionalPressure": 18,
+"marketCharacter": "EXPANSION",
+"averageBreadth": 74,
+"averageParticipation": 76,
+"averageRotation": 72,
+"averageLiquidity": 70,
+"averageFragility": 24,
+"acceleratingWeakness": false,
+"regimePersistence": 18,
+"persistentDistribution": false,
+"prolongedBearRegime": false
+}
+}

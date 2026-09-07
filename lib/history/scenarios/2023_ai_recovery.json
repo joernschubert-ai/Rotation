@@ -1,0 +1,80 @@
+{
+"id": "2023_ai_recovery",
+"date": "2023-06-30",
+"year": 2023,
+"title": "2023 AI-Led Market Recovery",
+"description": "Strong technology and AI-led recovery following the 2022 bear market. Growth leadership is dominant, but participation and breadth recover sufficiently to support a constructive regime.",
+"expected": {
+"phase": "PHASE_1_EXPANSION",
+"mode": "LONG",
+"signal": "CALL",
+"minRisk": 15,
+"maxRisk": 45
+},
+"market": {
+"vix": 13.6,
+"breadth50": 65,
+"breadth200": 59,
+"vixTermRatio": 0.90
+},
+"rotation": {
+"score": 63,
+"rsSmall": 1.005,
+"rsEqual": 0.998,
+"rsGrowth": 1.062
+},
+"participation": {
+"score": 62
+},
+"breadthThrust": {
+"score": 68
+},
+"liquidity": {
+"score": 72
+},
+"fragility": {
+"score": 36
+},
+"rotationDecay": {
+"score": 24
+},
+"internalDivergence": {
+"score": 32
+},
+"regimeSync": {
+"score": 66
+},
+"concentrationScore": 64,
+"crash": {
+"score": 18,
+"probability": 12
+},
+"phaseConfirmation": {
+"confidence": 79,
+"confirmed": true
+},
+"putTiming": {
+"score": 2
+},
+"historyMetrics": {
+"phasePersistence": 42,
+"daysInPhase": 36,
+"participationDecay": 5,
+"breadthTrend": 9,
+"breadthAcceleration": 4,
+"leadershipDecay": -2,
+"crashTrend": -4,
+"relativeBreadthWeakness": 6,
+"institutionalPressure": 34,
+"marketCharacter": "EXPANSION",
+"averageBreadth": 61,
+"averageParticipation": 59,
+"averageRotation": 58,
+"averageLiquidity": 67,
+"averageFragility": 42,
+"acceleratingWeakness": false,
+"regimePersistence": 32,
+"persistentDistribution": false,
+"prolongedBearRegime": false
+}
+}

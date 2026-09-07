@@ -1,0 +1,80 @@
+{
+"id": "2023_banking_stress",
+"date": "2023-03-13",
+"year": 2023,
+"title": "2023 Regional Banking Stress",
+"description": "Regional banking crisis creates sudden liquidity stress and systemic uncertainty while broader market conditions remain mixed rather than fully capitulatory.",
+"expected": {
+"phase": "PHASE_4_RISK",
+"mode": "RISK",
+"signal": "PUT",
+"minRisk": 60,
+"maxRisk": 85
+},
+"market": {
+"vix": 26.5,
+"breadth50": 44,
+"breadth200": 51,
+"vixTermRatio": 1.08
+},
+"rotation": {
+"score": 42,
+"rsSmall": 0.958,
+"rsEqual": 0.971,
+"rsGrowth": 1.018
+},
+"participation": {
+"score": 45
+},
+"breadthThrust": {
+"score": 39
+},
+"liquidity": {
+"score": 32
+},
+"fragility": {
+"score": 82
+},
+"rotationDecay": {
+"score": 68
+},
+"internalDivergence": {
+"score": 70
+},
+"regimeSync": {
+"score": 34
+},
+"concentrationScore": 62,
+"crash": {
+"score": 63,
+"probability": 52
+},
+"phaseConfirmation": {
+"confidence": 84,
+"confirmed": true
+},
+"putTiming": {
+"score": 8
+},
+"historyMetrics": {
+"phasePersistence": 70,
+"daysInPhase": 16,
+"participationDecay": 19,
+"breadthTrend": -8,
+"breadthAcceleration": -4,
+"leadershipDecay": -5,
+"crashTrend": 9,
+"relativeBreadthWeakness": 17,
+"institutionalPressure": 86,
+"marketCharacter": "RISK",
+"averageBreadth": 48,
+"averageParticipation": 47,
+"averageRotation": 44,
+"averageLiquidity": 39,
+"averageFragility": 74,
+"acceleratingWeakness": true,
+"regimePersistence": 68,
+"persistentDistribution": false,
+"prolongedBearRegime": false
+}
+}

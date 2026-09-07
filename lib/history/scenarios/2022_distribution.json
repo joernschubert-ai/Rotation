@@ -1,0 +1,80 @@
+{
+"id": "2022_distribution",
+"date": "2022-01-24",
+"year": 2022,
+"title": "2022 Structural Distribution",
+"description": "Broad market deterioration emerges as participation weakens, rotation breaks down and fragility rises before the full bear market becomes obvious.",
+"expected": {
+"phase": "PHASE_3_DISTRIBUTION",
+"mode": "NEUTRAL",
+"signal": "NEUTRAL",
+"minRisk": 45,
+"maxRisk": 64
+},
+"market": {
+"vix": 29.9,
+"breadth50": 43,
+"breadth200": 55,
+"vixTermRatio": 1.04
+},
+"rotation": {
+"score": 39,
+"rsSmall": 0.965,
+"rsEqual": 0.972,
+"rsGrowth": 1.025
+},
+"participation": {
+"score": 43
+},
+"breadthThrust": {
+"score": 38
+},
+"liquidity": {
+"score": 54
+},
+"fragility": {
+"score": 67
+},
+"rotationDecay": {
+"score": 62
+},
+"internalDivergence": {
+"score": 72
+},
+"regimeSync": {
+"score": 38
+},
+"concentrationScore": 68,
+"crash": {
+"score": 42,
+"probability": 32
+},
+"phaseConfirmation": {
+"confidence": 78,
+"confirmed": true
+},
+"putTiming": {
+"score": 6
+},
+"historyMetrics": {
+"phasePersistence": 62,
+"daysInPhase": 28,
+"participationDecay": 20,
+"breadthTrend": -7,
+"breadthAcceleration": -3,
+"leadershipDecay": -10,
+"crashTrend": 5,
+"relativeBreadthWeakness": 16,
+"institutionalPressure": 76,
+"marketCharacter": "DISTRIBUTION",
+"averageBreadth": 52,
+"averageParticipation": 49,
+"averageRotation": 43,
+"averageLiquidity": 56,
+"averageFragility": 62,
+"acceleratingWeakness": true,
+"regimePersistence": 72,
+"persistentDistribution": true,
+"prolongedBearRegime": false
+}
+}
