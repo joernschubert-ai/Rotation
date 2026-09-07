@@ -1,0 +1,118 @@
+[
+{
+"id": "2017-early-expansion",
+"date": "2017-03-15",
+"year": 2017,
+"title": "2017 Broad Expansion",
+"description": "Broad equity expansion with healthy participation and stable volatility.",
+
+"expectedRegime": "EXPANSION",
+"expectedPhase": "PHASE_1_EXPANSION",
+"expectedMode": "LONG",
+"expectedSignal": "CALL",
+
+"market": {
+"vix": 12,
+"vixTermRatio": 1.08,
+
+"breadth50": 72,
+"breadth200": 68,
+
+"participationScore": 74,
+"breadthThrustScore": 70,
+
+"liquidityScore": 68,
+"fragilityScore": 28,
+
+"rotationScore": 68,
+"rotationDecayScore": 12,
+
+"regimeSyncScore": 74,
+"concentrationScore": 42,
+
+"crashProbability": 8
+},
+
+"leadership": {
+"rsGrowth": 1.01,
+"rsEqual": 1.01,
+"rsSmall": 1.00
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": false,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"EXPANSION",
+"BROAD_PARTICIPATION",
+"LOW_VOL_HEALTHY"
+]
+},
+
+
+{
+"id": "2017-late-expansion",
+"date": "2017-10-01",
+"year": 2017,
+"title": "2017 Late Low Volatility Expansion",
+"description": "Extremely low volatility but still broadly supported market structure.",
+
+"expectedRegime": "LATE_EXPANSION",
+"expectedPhase": "PHASE_2_WARNING",
+"expectedMode": "LONG",
+"expectedSignal": "CALL",
+
+"market": {
+"vix": 10,
+"vixTermRatio": 1.10,
+
+"breadth50": 70,
+"breadth200": 72,
+
+"participationScore": 68,
+"breadthThrustScore": 66,
+
+"liquidityScore": 72,
+"fragilityScore": 38,
+
+"rotationScore": 64,
+"rotationDecayScore": 20,
+
+"regimeSyncScore": 70,
+"concentrationScore": 50,
+
+"crashProbability": 12
+},
+
+"leadership": {
+"rsGrowth": 1.02,
+"rsEqual": 1.00,
+"rsSmall": 0.99
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": false,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"LATE_EXPANSION",
+"LOW_VOL",
+"HEALTHY_INTERNALS"
+]
+}
+]

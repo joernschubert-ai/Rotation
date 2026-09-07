@@ -1,94 +1,209 @@
 [
 {
-"date": "2021-01-15",
-"breadth50": 84,
-"breadth200": 77,
-"marketLiquidityScore": 88,
-"creditRatio": 1.08,
-"gammaExposure": 1.6,
-"vixTermRatio": 1.14,
-"volOfVolRatio": 0.94,
-"correlationScore": 0.7,
-"moveIndex": 49,
-"concentrationScore": 58,
-"crashProbability": 8,
-"marketData": {
-"^VIX": { "current": 22.4 }
-},
-"rotation": {
-"rsSmall": 1.09,
-"rsGrowth": 1.04,
-"rsEqual": 1.07,
-"score": 84
-}
-},
-{
-"date": "2021-03-10",
-"breadth50": 79,
-"breadth200": 73,
-"marketLiquidityScore": 82,
-"creditRatio": 1.05,
-"gammaExposure": 1.1,
-"vixTermRatio": 1.10,
-"volOfVolRatio": 0.97,
-"correlationScore": 0.9,
-"moveIndex": 57,
-"concentrationScore": 51,
-"crashProbability": 11,
-"marketData": {
-"^VIX": { "current": 23.2 }
-},
-"rotation": {
-"rsSmall": 1.11,
-"rsGrowth": 0.98,
-"rsEqual": 1.08,
-"score": 82
-}
-},
-{
-"date": "2021-09-20",
-"breadth50": 48,
-"breadth200": 55,
-"marketLiquidityScore": 61,
-"creditRatio": 0.98,
-"gammaExposure": -0.4,
-"vixTermRatio": 0.97,
-"volOfVolRatio": 1.14,
-"correlationScore": 1.7,
-"moveIndex": 86,
-"concentrationScore": 63,
-"crashProbability": 38,
-"marketData": {
-"^VIX": { "current": 28.8 }
-},
-"rotation": {
-"rsSmall": 0.96,
-"rsGrowth": 1.05,
-"rsEqual": 0.97,
-"score": 44
-}
-},
-{
-"date": "2021-11-22",
+"id": "2021-broad-expansion",
+"date": "2021-03-15",
+"year": 2021,
+"title": "Broad Post Pandemic Expansion",
+"description": "Broad economic reopening expansion with strong participation, healthy breadth and strong cyclicals.",
+
+"expectedRegime": "EXPANSION",
+"expectedPhase": "PHASE_1_EXPANSION",
+"expectedMode": "LONG",
+"expectedSignal": "CALL",
+
+"market": {
+"vix": 21,
+"vixTermRatio": 1.04,
 "breadth50": 76,
-"breadth200": 71,
-"marketLiquidityScore": 85,
-"creditRatio": 1.04,
-"gammaExposure": 1.2,
-"vixTermRatio": 1.11,
-"volOfVolRatio": 0.99,
-"correlationScore": 0.8,
-"moveIndex": 52,
-"concentrationScore": 74,
-"crashProbability": 10,
-"marketData": {
-"^VIX": { "current": 17.2 }
+"breadth200": 68,
+"participationScore": 74,
+"breadthThrustScore": 75,
+"liquidityScore": 76,
+"fragilityScore": 28,
+"rotationScore": 72,
+"rotationDecayScore": 12,
+"regimeSyncScore": 75,
+"concentrationScore": 45,
+"crashProbability": 8
 },
-"rotation": {
-"rsSmall": 0.98,
-"rsGrowth": 1.11,
-"rsEqual": 0.99,
-"score": 71
-}
+
+"leadership": {
+"rsGrowth": 1.01,
+"rsEqual": 1.02,
+"rsSmall": 1.03
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": false,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"EXPANSION",
+"BROAD_PARTICIPATION",
+"REOPENING"
+]
+},
+
+{
+"id": "2021-speculative-excess",
+"date": "2021-06-15",
+"year": 2021,
+"title": "Speculative Market Excess",
+"description": "Strong liquidity environment with elevated speculation but still broadly constructive market internals.",
+
+"expectedRegime": "LATE_EXPANSION",
+"expectedPhase": "PHASE_2_WARNING",
+"expectedMode": "LONG",
+"expectedSignal": "CALL",
+
+"market": {
+"vix": 17,
+"vixTermRatio": 1.07,
+"breadth50": 71,
+"breadth200": 69,
+"participationScore": 68,
+"breadthThrustScore": 64,
+"liquidityScore": 82,
+"fragilityScore": 42,
+"rotationScore": 65,
+"rotationDecayScore": 25,
+"regimeSyncScore": 67,
+"concentrationScore": 58,
+"crashProbability": 14
+},
+
+"leadership": {
+"rsGrowth": 1.03,
+"rsEqual": 1.00,
+"rsSmall": 1.00
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": false,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": true
+},
+
+"tags": [
+"LATE_EXPANSION",
+"SPECULATION",
+"HIGH_LIQUIDITY"
+]
+},
+
+{
+"id": "2021-internal-divergence",
+"date": "2021-09-15",
+"year": 2021,
+"title": "Emerging Internal Divergence",
+"description": "Indices remain resilient while participation and smaller companies begin losing relative strength.",
+
+"expectedRegime": "TRANSITION",
+"expectedPhase": "PHASE_3_DISTRIBUTION",
+"expectedMode": "NEUTRAL",
+"expectedSignal": "NEUTRAL",
+
+"market": {
+"vix": 21,
+"vixTermRatio": 1.00,
+"breadth50": 56,
+"breadth200": 64,
+"participationScore": 52,
+"breadthThrustScore": 45,
+"liquidityScore": 68,
+"fragilityScore": 55,
+"rotationScore": 48,
+"rotationDecayScore": 52,
+"regimeSyncScore": 48,
+"concentrationScore": 67,
+"crashProbability": 22
+},
+
+"leadership": {
+"rsGrowth": 1.04,
+"rsEqual": 0.98,
+"rsSmall": 0.96
+},
+
+"flags": {
+"narrowLeadership": true,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": true
+},
+
+"tags": [
+"INTERNAL_DIVERGENCE",
+"DISTRIBUTION",
+"NARROW_LEADERSHIP"
+]
+},
+
+{
+"id": "2021-mega-cap-distortion",
+"date": "2021-12-15",
+"year": 2021,
+"title": "Mega Cap Leadership Distortion",
+"description": "Major indices remain elevated while internal participation deteriorates and leadership becomes increasingly concentrated.",
+
+"expectedRegime": "DISTRIBUTION",
+"expectedPhase": "PHASE_3_DISTRIBUTION",
+"expectedMode": "NEUTRAL",
+"expectedSignal": "NEUTRAL",
+
+"market": {
+"vix": 20,
+"vixTermRatio": 1.01,
+"breadth50": 48,
+"breadth200": 60,
+"participationScore": 46,
+"breadthThrustScore": 38,
+"liquidityScore": 65,
+"fragilityScore": 64,
+"rotationScore": 42,
+"rotationDecayScore": 66,
+"regimeSyncScore": 40,
+"concentrationScore": 78,
+"crashProbability": 30
+},
+
+"leadership": {
+"rsGrowth": 1.06,
+"rsEqual": 0.96,
+"rsSmall": 0.94
+},
+
+"flags": {
+"narrowLeadership": true,
+"weakParticipation": true,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": true
+},
+
+"tags": [
+"DISTRIBUTION",
+"MEGA_CAP_CONCENTRATION",
+"INTERNAL_WEAKNESS"
+]
 }
 ]

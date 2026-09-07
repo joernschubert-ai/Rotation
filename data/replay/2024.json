@@ -1,71 +1,209 @@
 [
 {
-"date": "2024-02-12",
-"breadth50": 68,
-"breadth200": 66,
-"marketLiquidityScore": 82,
-"creditRatio": 1.06,
-"gammaExposure": 1.4,
-"vixTermRatio": 1.14,
-"volOfVolRatio": 0.89,
-"correlationScore": 0.7,
-"moveIndex": 47,
-"concentrationScore": 91,
-"crashProbability": 7,
-"marketData": {
-"^VIX": { "current": 13.2 }
-},
-"rotation": {
-"rsSmall": 0.95,
-"rsGrowth": 1.17,
-"rsEqual": 0.97,
-"score": 73
-}
-},
-{
-"date": "2024-04-19",
-"breadth50": 39,
-"breadth200": 54,
-"marketLiquidityScore": 59,
-"creditRatio": 0.98,
-"gammaExposure": -0.5,
-"vixTermRatio": 0.94,
-"volOfVolRatio": 1.19,
-"correlationScore": 1.9,
-"moveIndex": 92,
-"concentrationScore": 89,
-"crashProbability": 41,
-"marketData": {
-"^VIX": { "current": 24.5 }
-},
-"rotation": {
-"rsSmall": 0.89,
-"rsGrowth": 1.11,
-"rsEqual": 0.91,
-"score": 46
-}
-},
-{
-"date": "2024-07-10",
+"id": "2024-broad-start",
+"date": "2024-02-15",
+"year": 2024,
+"title": "Early 2024 Broad Expansion",
+"description": "Strong market environment with improving breadth and constructive participation.",
+
+"expectedRegime": "EXPANSION",
+"expectedPhase": "PHASE_1_EXPANSION",
+"expectedMode": "LONG",
+"expectedSignal": "CALL",
+
+"market": {
+"vix": 14,
+"vixTermRatio": 1.08,
 "breadth50": 74,
-"breadth200": 71,
-"marketLiquidityScore": 86,
-"creditRatio": 1.07,
-"gammaExposure": 1.7,
-"vixTermRatio": 1.16,
-"volOfVolRatio": 0.87,
-"correlationScore": 0.6,
-"moveIndex": 44,
-"concentrationScore": 93,
-"crashProbability": 5,
-"marketData": {
-"^VIX": { "current": 12.4 }
+"breadth200": 68,
+"participationScore": 70,
+"breadthThrustScore": 72,
+"liquidityScore": 72,
+"fragilityScore": 26,
+"rotationScore": 70,
+"rotationDecayScore": 14,
+"regimeSyncScore": 74,
+"concentrationScore": 55,
+"crashProbability": 7
 },
-"rotation": {
-"rsSmall": 0.97,
-"rsGrowth": 1.19,
-"rsEqual": 0.98,
-"score": 81
-}
+
+"leadership": {
+"rsGrowth": 1.02,
+"rsEqual": 1.01,
+"rsSmall": 1.01
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": false,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"EXPANSION",
+"BROAD_MARKET",
+"HEALTHY_INTERNALS"
+]
+},
+
+{
+"id": "2024-mega-cap-concentration",
+"date": "2024-05-31",
+"year": 2024,
+"title": "Mega Cap Concentration Regime",
+"description": "Index strength increasingly depends on a small group of technology leaders while equal weight and smaller companies lag.",
+
+"expectedRegime": "CONCENTRATION_RISK",
+"expectedPhase": "PHASE_3_DISTRIBUTION",
+"expectedMode": "NEUTRAL",
+"expectedSignal": "NEUTRAL",
+
+"market": {
+"vix": 13,
+"vixTermRatio": 1.09,
+"breadth50": 55,
+"breadth200": 62,
+"participationScore": 52,
+"breadthThrustScore": 48,
+"liquidityScore": 75,
+"fragilityScore": 64,
+"rotationScore": 52,
+"rotationDecayScore": 58,
+"regimeSyncScore": 45,
+"concentrationScore": 86,
+"crashProbability": 22
+},
+
+"leadership": {
+"rsGrowth": 1.07,
+"rsEqual": 0.96,
+"rsSmall": 0.95
+},
+
+"flags": {
+"narrowLeadership": true,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": true
+},
+
+"tags": [
+"MEGA_CAP_CONCENTRATION",
+"PASSIVE_FLOW",
+"STRUCTURAL_DIVERGENCE"
+]
+},
+
+{
+"id": "2024-volatility-shock",
+"date": "2024-08-05",
+"year": 2024,
+"title": "Volatility Shock",
+"description": "Rapid volatility spike and broad deleveraging create a temporary breakdown in otherwise constructive markets.",
+
+"expectedRegime": "RISK",
+"expectedPhase": "PHASE_4_RISK",
+"expectedMode": "RISK",
+"expectedSignal": "PUT",
+
+"market": {
+"vix": 38,
+"vixTermRatio": 0.88,
+"breadth50": 38,
+"breadth200": 55,
+"participationScore": 42,
+"breadthThrustScore": 25,
+"liquidityScore": 40,
+"fragilityScore": 82,
+"rotationScore": 35,
+"rotationDecayScore": 78,
+"regimeSyncScore": 32,
+"concentrationScore": 72,
+"crashProbability": 55
+},
+
+"leadership": {
+"rsGrowth": 0.98,
+"rsEqual": 0.94,
+"rsSmall": 0.90
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": true,
+"liquidityStress": true,
+"structuralFragility": true,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"VOLATILITY_SHOCK",
+"RISK_OFF",
+"DELEVERAGING"
+]
+},
+
+{
+"id": "2024-post-shock-recovery",
+"date": "2024-11-15",
+"year": 2024,
+"title": "Post Volatility Shock Recovery",
+"description": "Market recovers with improving participation and declining fragility after the August volatility event.",
+
+"expectedRegime": "EXPANSION",
+"expectedPhase": "PHASE_1_EXPANSION",
+"expectedMode": "LONG",
+"expectedSignal": "CALL",
+
+"market": {
+"vix": 15,
+"vixTermRatio": 1.07,
+"breadth50": 72,
+"breadth200": 68,
+"participationScore": 70,
+"breadthThrustScore": 74,
+"liquidityScore": 73,
+"fragilityScore": 30,
+"rotationScore": 69,
+"rotationDecayScore": 16,
+"regimeSyncScore": 74,
+"concentrationScore": 64,
+"crashProbability": 9
+},
+
+"leadership": {
+"rsGrowth": 1.03,
+"rsEqual": 1.00,
+"rsSmall": 1.01
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": false,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"RECOVERY",
+"EXPANSION",
+"BROAD_PARTICIPATION"
+]
 }
 ]

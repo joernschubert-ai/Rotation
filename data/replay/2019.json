@@ -1,0 +1,177 @@
+[
+{
+"id": "2019-post-capitulation-recovery",
+"date": "2019-01-15",
+"year": 2019,
+"title": "Post 2018 Capitulation Recovery",
+"description": "Strong recovery following the December 2018 capitulation. Breadth and participation begin improving while volatility declines.",
+
+"expectedRegime": "RECOVERY",
+"expectedPhase": "PHASE_2_WARNING",
+"expectedMode": "NEUTRAL",
+"expectedSignal": "NEUTRAL",
+
+"market": {
+"vix": 19,
+"vixTermRatio": 1.01,
+
+"breadth50": 58,
+"breadth200": 42,
+
+"participationScore": 55,
+"breadthThrustScore": 62,
+
+"liquidityScore": 55,
+"fragilityScore": 58,
+
+"rotationScore": 54,
+"rotationDecayScore": 42,
+
+"regimeSyncScore": 52,
+"concentrationScore": 48,
+
+"crashProbability": 28
+},
+
+"leadership": {
+"rsGrowth": 1.01,
+"rsEqual": 1.00,
+"rsSmall": 1.01
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"RECOVERY",
+"POST_CAPITULATION",
+"BREADTH_IMPROVEMENT"
+]
+},
+
+
+{
+"id": "2019-fed-pivot-recovery",
+"date": "2019-06-15",
+"year": 2019,
+"title": "Fed Pivot Recovery",
+"description": "Monetary policy expectations become increasingly supportive and market breadth improves after the 2018 decline.",
+
+"expectedRegime": "EXPANSION",
+"expectedPhase": "PHASE_1_EXPANSION",
+"expectedMode": "LONG",
+"expectedSignal": "CALL",
+
+"market": {
+"vix": 15,
+"vixTermRatio": 1.06,
+
+"breadth50": 68,
+"breadth200": 61,
+
+"participationScore": 67,
+"breadthThrustScore": 65,
+
+"liquidityScore": 67,
+"fragilityScore": 32,
+
+"rotationScore": 64,
+"rotationDecayScore": 18,
+
+"regimeSyncScore": 70,
+"concentrationScore": 46,
+
+"crashProbability": 10
+},
+
+"leadership": {
+"rsGrowth": 1.01,
+"rsEqual": 1.01,
+"rsSmall": 1.00
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": false,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"FED_PIVOT",
+"EXPANSION",
+"BROAD_RECOVERY"
+]
+},
+
+
+{
+"id": "2019-q4-expansion",
+"date": "2019-11-15",
+"year": 2019,
+"title": "Late 2019 Broad Expansion",
+"description": "Strong equity environment with healthy participation, stable liquidity and contained volatility.",
+
+"expectedRegime": "EXPANSION",
+"expectedPhase": "PHASE_1_EXPANSION",
+"expectedMode": "LONG",
+"expectedSignal": "CALL",
+
+"market": {
+"vix": 13,
+"vixTermRatio": 1.08,
+
+"breadth50": 74,
+"breadth200": 69,
+
+"participationScore": 73,
+"breadthThrustScore": 72,
+
+"liquidityScore": 70,
+"fragilityScore": 25,
+
+"rotationScore": 70,
+"rotationDecayScore": 10,
+
+"regimeSyncScore": 76,
+"concentrationScore": 45,
+
+"crashProbability": 6
+},
+
+"leadership": {
+"rsGrowth": 1.01,
+"rsEqual": 1.01,
+"rsSmall": 1.02
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": false,
+"hiddenDistribution": false,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"EXPANSION",
+"BROAD_PARTICIPATION",
+"LOW_VOL"
+]
+}
+]

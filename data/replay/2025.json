@@ -1,71 +1,261 @@
 [
 {
-"date": "2025-01-22",
-"breadth50": 72,
-"breadth200": 69,
-"marketLiquidityScore": 84,
-"creditRatio": 1.05,
-"gammaExposure": 1.5,
-"vixTermRatio": 1.15,
-"volOfVolRatio": 0.88,
-"correlationScore": 0.7,
-"moveIndex": 46,
-"concentrationScore": 94,
-"crashProbability": 6,
-"marketData": {
-"^VIX": { "current": 12.8 }
-},
-"rotation": {
-"rsSmall": 0.96,
-"rsGrowth": 1.18,
-"rsEqual": 0.97,
-"score": 79
-}
-},
-{
-"date": "2025-03-14",
+"id": "2025-concentrated-expansion",
+"date": "2025-02-15",
+"year": 2025,
+"title": "Concentrated Index Expansion",
+"description": "Major indices remain strong while leadership concentration increases and internal breadth begins weakening.",
+
+"expectedRegime": "LATE_EXPANSION",
+"expectedPhase": "PHASE_2_WARNING",
+"expectedMode": "LONG",
+"expectedSignal": "CALL",
+
+"market": {
+"vix": 16,
+"vixTermRatio": 1.06,
 "breadth50": 58,
-"breadth200": 63,
-"marketLiquidityScore": 73,
-"creditRatio": 1.02,
-"gammaExposure": 0.8,
-"vixTermRatio": 1.07,
-"volOfVolRatio": 1.02,
-"correlationScore": 1.0,
-"moveIndex": 63,
-"concentrationScore": 92,
-"crashProbability": 18,
-"marketData": {
-"^VIX": { "current": 17.6 }
+"breadth200": 66,
+"participationScore": 56,
+"breadthThrustScore": 52,
+"liquidityScore": 72,
+"fragilityScore": 55,
+"rotationScore": 55,
+"rotationDecayScore": 50,
+"regimeSyncScore": 50,
+"concentrationScore": 82,
+"crashProbability": 20
 },
-"rotation": {
-"rsSmall": 0.94,
-"rsGrowth": 1.12,
-"rsEqual": 0.95,
-"score": 63
-}
+
+"leadership": {
+"rsGrowth": 1.06,
+"rsEqual": 0.97,
+"rsSmall": 0.96
 },
+
+"flags": {
+"narrowLeadership": true,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": true
+},
+
+"tags": [
+"LATE_EXPANSION",
+"CONCENTRATION",
+"PASSIVE_FLOW"
+]
+},
+
 {
-"date": "2025-06-18",
-"breadth50": 46,
-"breadth200": 57,
-"marketLiquidityScore": 62,
-"creditRatio": 0.98,
-"gammaExposure": -0.2,
-"vixTermRatio": 0.97,
-"volOfVolRatio": 1.12,
-"correlationScore": 1.7,
-"moveIndex": 82,
-"concentrationScore": 91,
-"crashProbability": 36,
-"marketData": {
-"^VIX": { "current": 22.1 }
+"id": "2025-internal-distribution",
+"date": "2025-04-15",
+"year": 2025,
+"title": "Internal Distribution",
+"description": "Market indices remain relatively stable while participation and rotation deteriorate beneath the surface.",
+
+"expectedRegime": "DISTRIBUTION",
+"expectedPhase": "PHASE_3_DISTRIBUTION",
+"expectedMode": "NEUTRAL",
+"expectedSignal": "NEUTRAL",
+
+"market": {
+"vix": 21,
+"vixTermRatio": 0.99,
+"breadth50": 48,
+"breadth200": 60,
+"participationScore": 46,
+"breadthThrustScore": 40,
+"liquidityScore": 60,
+"fragilityScore": 72,
+"rotationScore": 43,
+"rotationDecayScore": 72,
+"regimeSyncScore": 38,
+"concentrationScore": 84,
+"crashProbability": 35
 },
-"rotation": {
-"rsSmall": 0.90,
-"rsGrowth": 1.08,
-"rsEqual": 0.92,
-"score": 47
-}
+
+"leadership": {
+"rsGrowth": 1.06,
+"rsEqual": 0.95,
+"rsSmall": 0.94
+},
+
+"flags": {
+"narrowLeadership": true,
+"weakParticipation": true,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": true
+},
+
+"tags": [
+"DISTRIBUTION",
+"ROTATION_DECAY",
+"INTERNAL_WEAKNESS"
+]
+},
+
+{
+"id": "2025-risk-escalation",
+"date": "2025-06-15",
+"year": 2025,
+"title": "Structural Risk Escalation",
+"description": "Weakening breadth and participation combine with elevated fragility and increasing institutional pressure.",
+
+"expectedRegime": "RISK",
+"expectedPhase": "PHASE_4_RISK",
+"expectedMode": "RISK",
+"expectedSignal": "PUT",
+
+"market": {
+"vix": 26,
+"vixTermRatio": 0.95,
+"breadth50": 42,
+"breadth200": 56,
+"participationScore": 42,
+"breadthThrustScore": 32,
+"liquidityScore": 50,
+"fragilityScore": 82,
+"rotationScore": 38,
+"rotationDecayScore": 82,
+"regimeSyncScore": 32,
+"concentrationScore": 78,
+"crashProbability": 48
+},
+
+"leadership": {
+"rsGrowth": 1.04,
+"rsEqual": 0.95,
+"rsSmall": 0.92
+},
+
+"flags": {
+"narrowLeadership": true,
+"weakParticipation": true,
+"liquidityStress": true,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": true
+},
+
+"tags": [
+"RISK",
+"STRUCTURAL_FRAGILITY",
+"BREADTH_FAILURE"
+]
+},
+
+{
+"id": "2025-recovery-attempt",
+"date": "2025-09-15",
+"year": 2025,
+"title": "Recovery Attempt",
+"description": "Market rebound improves headline conditions but underlying structural metrics remain mixed.",
+
+"expectedRegime": "TRANSITION",
+"expectedPhase": "PHASE_3_DISTRIBUTION",
+"expectedMode": "NEUTRAL",
+"expectedSignal": "NEUTRAL",
+
+"market": {
+"vix": 18,
+"vixTermRatio": 1.03,
+"breadth50": 56,
+"breadth200": 62,
+"participationScore": 52,
+"breadthThrustScore": 58,
+"liquidityScore": 62,
+"fragilityScore": 62,
+"rotationScore": 50,
+"rotationDecayScore": 58,
+"regimeSyncScore": 48,
+"concentrationScore": 74,
+"crashProbability": 28
+},
+
+"leadership": {
+"rsGrowth": 1.04,
+"rsEqual": 0.98,
+"rsSmall": 0.97
+},
+
+"flags": {
+"narrowLeadership": true,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": true,
+"passiveFlowRegime": true
+},
+
+"tags": [
+"RECOVERY_ATTEMPT",
+"FALSE_RECOVERY_RISK",
+"TRANSITION"
+]
+},
+
+{
+"id": "2025-year-end-mixed-regime",
+"date": "2025-12-15",
+"year": 2025,
+"title": "Mixed Late Cycle Market",
+"description": "Mixed market environment with improving headline performance but persistent structural concentration and fragility.",
+
+"expectedRegime": "TRANSITION",
+"expectedPhase": "PHASE_3_DISTRIBUTION",
+"expectedMode": "NEUTRAL",
+"expectedSignal": "NEUTRAL",
+
+"market": {
+"vix": 19,
+"vixTermRatio": 1.01,
+"breadth50": 54,
+"breadth200": 64,
+"participationScore": 50,
+"breadthThrustScore": 50,
+"liquidityScore": 58,
+"fragilityScore": 68,
+"rotationScore": 48,
+"rotationDecayScore": 66,
+"regimeSyncScore": 44,
+"concentrationScore": 80,
+"crashProbability": 34
+},
+
+"leadership": {
+"rsGrowth": 1.05,
+"rsEqual": 0.97,
+"rsSmall": 0.95
+},
+
+"flags": {
+"narrowLeadership": true,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": true
+},
+
+"tags": [
+"TRANSITION",
+"LATE_CYCLE",
+"STRUCTURAL_DIVERGENCE"
+]
 }
 ]

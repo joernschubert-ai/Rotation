@@ -1,0 +1,178 @@
+[
+{
+id 2018-volatility-shock,
+date 2018-02-06,
+year 2018,
+title February 2018 Volatility Shock,
+description Rapid volatility shock after an extended low-volatility regime, without full structural market breakdown.,
+
+expectedRegime RISK,
+expectedPhase PHASE_4_RISK,
+expectedMode RISK,
+expectedSignal NEUTRAL,
+
+market {
+vix 32,
+vixTermRatio 0.92,
+
+breadth50 48,
+breadth200 60,
+
+participationScore 55,
+breadthThrustScore 42,
+
+liquidityScore 58,
+fragilityScore 62,
+
+rotationScore 48,
+rotationDecayScore 38,
+
+regimeSyncScore 45,
+concentrationScore 48,
+
+crashProbability 28
+},
+
+leadership {
+rsGrowth 1.01,
+rsEqual 0.99,
+rsSmall 0.98
+},
+
+flags {
+narrowLeadership false,
+weakParticipation false,
+liquidityStress true,
+structuralFragility true,
+hiddenDistribution false,
+participationCollapse false,
+falseRecovery false,
+passiveFlowRegime false
+},
+
+tags [
+VOLATILITY_SHOCK,
+SHORT_VOL_UNWIND,
+NOT_FULL_BEAR_MARKET
+]
+},
+
+
+{
+id 2018-q4-distribution,
+date 2018-11-20,
+year 2018,
+title Q4 2018 Structural Distribution,
+description Fed tightening concerns, weakening global growth and broad structural market deterioration.,
+
+expectedRegime BREAKDOWN,
+expectedPhase PHASE_5_BREAKDOWN,
+expectedMode CRASH,
+expectedSignal PUT,
+
+market {
+vix 25,
+vixTermRatio 0.96,
+
+breadth50 32,
+breadth200 45,
+
+participationScore 38,
+breadthThrustScore 30,
+
+liquidityScore 42,
+fragilityScore 78,
+
+rotationScore 32,
+rotationDecayScore 72,
+
+regimeSyncScore 28,
+concentrationScore 55,
+
+crashProbability 55
+},
+
+leadership {
+rsGrowth 0.98,
+rsEqual 0.96,
+rsSmall 0.94
+},
+
+flags {
+narrowLeadership false,
+weakParticipation true,
+liquidityStress true,
+structuralFragility true,
+hiddenDistribution true,
+participationCollapse true,
+falseRecovery false,
+passiveFlowRegime false
+},
+
+tags [
+DISTRIBUTION,
+FED_TIGHTENING,
+LIQUIDITY_STRESS,
+BREAKDOWN
+]
+},
+
+
+{
+id 2018-christmas-capitulation,
+date 2018-12-24,
+year 2018,
+title Christmas Eve Capitulation,
+description Extreme year-end selling and panic conditions after prolonged structural deterioration.,
+
+expectedRegime CAPITULATION,
+expectedPhase PHASE_7_CAPITULATION,
+expectedMode CRASH,
+expectedSignal PUT,
+
+market {
+vix 36,
+vixTermRatio 0.88,
+
+breadth50 18,
+breadth200 28,
+
+participationScore 25,
+breadthThrustScore 15,
+
+liquidityScore 28,
+fragilityScore 92,
+
+rotationScore 20,
+rotationDecayScore 88,
+
+regimeSyncScore 15,
+concentrationScore 58,
+
+crashProbability 82
+},
+
+leadership {
+rsGrowth 0.94,
+rsEqual 0.92,
+rsSmall 0.88
+},
+
+flags {
+narrowLeadership false,
+weakParticipation true,
+liquidityStress true,
+structuralFragility true,
+hiddenDistribution false,
+participationCollapse true,
+falseRecovery false,
+passiveFlowRegime false
+},
+
+tags [
+CAPITULATION,
+PANIC,
+EXTREME_BREADTH_WEAKNESS
+]
+}
+]

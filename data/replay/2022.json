@@ -1,94 +1,209 @@
 [
 {
-"date": "2022-01-10",
-"breadth50": 72,
-"breadth200": 66,
-"marketLiquidityScore": 69,
-"creditRatio": 1.00,
-"gammaExposure": 0.1,
-"vixTermRatio": 1.02,
-"volOfVolRatio": 1.05,
-"correlationScore": 1.1,
-"moveIndex": 64,
-"concentrationScore": 69,
-"crashProbability": 18,
-"marketData": {
-"^VIX": { "current": 19.3 }
+"id": "2022-growth-breakdown",
+"date": "2022-01-20",
+"year": 2022,
+"title": "Growth Market Breakdown Begins",
+"description": "High valuation growth stocks break down while broader indices initially remain relatively resilient.",
+
+"expectedRegime": "RISK",
+"expectedPhase": "PHASE_4_RISK",
+"expectedMode": "RISK",
+"expectedSignal": "PUT",
+
+"market": {
+"vix": 26,
+"vixTermRatio": 0.97,
+"breadth50": 42,
+"breadth200": 58,
+"participationScore": 44,
+"breadthThrustScore": 32,
+"liquidityScore": 55,
+"fragilityScore": 72,
+"rotationScore": 38,
+"rotationDecayScore": 70,
+"regimeSyncScore": 38,
+"concentrationScore": 70,
+"crashProbability": 38
 },
-"rotation": {
-"rsSmall": 0.99,
-"rsGrowth": 1.06,
-"rsEqual": 0.98,
-"score": 61
-}
-},
-{
-"date": "2022-04-26",
-"breadth50": 38,
-"breadth200": 41,
-"marketLiquidityScore": 46,
-"creditRatio": 0.94,
-"gammaExposure": -0.9,
-"vixTermRatio": 0.91,
-"volOfVolRatio": 1.28,
-"correlationScore": 2.1,
-"moveIndex": 96,
-"concentrationScore": 73,
-"crashProbability": 58,
-"marketData": {
-"^VIX": { "current": 33.5 }
-},
-"rotation": {
-"rsSmall": 0.92,
+
+"leadership": {
 "rsGrowth": 0.96,
-"rsEqual": 0.91,
-"score": 29
-}
+"rsEqual": 0.98,
+"rsSmall": 0.94
 },
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": true,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"EARLY_BEAR_MARKET",
+"GROWTH_BREAKDOWN",
+"RISK_ESCALATION"
+]
+},
+
 {
-"date": "2022-06-16",
-"breadth50": 16,
-"breadth200": 21,
-"marketLiquidityScore": 24,
-"creditRatio": 0.86,
-"gammaExposure": -1.9,
-"vixTermRatio": 0.79,
-"volOfVolRatio": 1.61,
-"correlationScore": 3.0,
-"moveIndex": 131,
-"concentrationScore": 77,
-"crashProbability": 86,
-"marketData": {
-"^VIX": { "current": 37.8 }
+"id": "2022-spring-breakdown",
+"date": "2022-05-15",
+"year": 2022,
+"title": "Broad Bear Market Breakdown",
+"description": "Market weakness expands across sectors as inflation, rising yields and tightening financial conditions accelerate.",
+
+"expectedRegime": "BREAKDOWN",
+"expectedPhase": "PHASE_5_BREAKDOWN",
+"expectedMode": "CRASH",
+"expectedSignal": "PUT",
+
+"market": {
+"vix": 32,
+"vixTermRatio": 0.90,
+"breadth50": 28,
+"breadth200": 38,
+"participationScore": 30,
+"breadthThrustScore": 20,
+"liquidityScore": 38,
+"fragilityScore": 88,
+"rotationScore": 25,
+"rotationDecayScore": 86,
+"regimeSyncScore": 25,
+"concentrationScore": 58,
+"crashProbability": 65
 },
-"rotation": {
-"rsSmall": 0.84,
-"rsGrowth": 0.89,
-"rsEqual": 0.86,
-"score": 12
-}
-},
-{
-"date": "2022-10-14",
-"breadth50": 44,
-"breadth200": 28,
-"marketLiquidityScore": 38,
-"creditRatio": 0.91,
-"gammaExposure": -0.5,
-"vixTermRatio": 0.89,
-"volOfVolRatio": 1.22,
-"correlationScore": 2.0,
-"moveIndex": 108,
-"concentrationScore": 66,
-"crashProbability": 61,
-"marketData": {
-"^VIX": { "current": 31.2 }
-},
-"rotation": {
-"rsSmall": 0.96,
-"rsGrowth": 0.92,
+
+"leadership": {
+"rsGrowth": 0.94,
 "rsEqual": 0.95,
-"score": 37
-}
+"rsSmall": 0.90
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": true,
+"liquidityStress": true,
+"structuralFragility": true,
+"hiddenDistribution": false,
+"participationCollapse": true,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"BREAKDOWN",
+"BEAR_MARKET",
+"BROAD_WEAKNESS"
+]
+},
+
+{
+"id": "2022-summer-bear-rally",
+"date": "2022-08-15",
+"year": 2022,
+"title": "Summer Bear Market Rally",
+"description": "Sharp recovery rally occurs inside a structurally weak bear market. Important false recovery test.",
+
+"expectedRegime": "FALSE_RECOVERY",
+"expectedPhase": "PHASE_3_DISTRIBUTION",
+"expectedMode": "NEUTRAL",
+"expectedSignal": "NEUTRAL",
+
+"market": {
+"vix": 22,
+"vixTermRatio": 1.01,
+"breadth50": 58,
+"breadth200": 42,
+"participationScore": 50,
+"breadthThrustScore": 62,
+"liquidityScore": 52,
+"fragilityScore": 66,
+"rotationScore": 52,
+"rotationDecayScore": 58,
+"regimeSyncScore": 45,
+"concentrationScore": 55,
+"crashProbability": 34
+},
+
+"leadership": {
+"rsGrowth": 1.02,
+"rsEqual": 0.99,
+"rsSmall": 0.96
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": false,
+"liquidityStress": false,
+"structuralFragility": true,
+"hiddenDistribution": true,
+"participationCollapse": false,
+"falseRecovery": true,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"FALSE_RECOVERY",
+"BEAR_MARKET_RALLY",
+"DISTRIBUTION"
+]
+},
+
+{
+"id": "2022-october-capitulation",
+"date": "2022-10-13",
+"year": 2022,
+"title": "2022 Bear Market Capitulation",
+"description": "Severe selling pressure and extreme pessimism create late-stage bear market conditions.",
+
+"expectedRegime": "CAPITULATION",
+"expectedPhase": "PHASE_7_CAPITULATION",
+"expectedMode": "CRASH",
+"expectedSignal": "PUT",
+
+"market": {
+"vix": 34,
+"vixTermRatio": 0.92,
+"breadth50": 18,
+"breadth200": 28,
+"participationScore": 22,
+"breadthThrustScore": 12,
+"liquidityScore": 35,
+"fragilityScore": 94,
+"rotationScore": 20,
+"rotationDecayScore": 94,
+"regimeSyncScore": 18,
+"concentrationScore": 48,
+"crashProbability": 82
+},
+
+"leadership": {
+"rsGrowth": 0.93,
+"rsEqual": 0.93,
+"rsSmall": 0.88
+},
+
+"flags": {
+"narrowLeadership": false,
+"weakParticipation": true,
+"liquidityStress": true,
+"structuralFragility": true,
+"hiddenDistribution": false,
+"participationCollapse": true,
+"falseRecovery": false,
+"passiveFlowRegime": false
+},
+
+"tags": [
+"CAPITULATION",
+"BEAR_MARKET_LOW",
+"EXTREME_FRAGILITY"
+]
 }
 ]
