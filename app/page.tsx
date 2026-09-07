@@ -1,20 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { useRouter } from "next/navigation";
 
 import { marketEngine } from "@/lib/engine/marketEngine";
 import { mapBackendToEngine } from "@/lib/adapters/mapBackendToEngine";
 import { validateEngineData } from "@/lib/engine/validateEngineData";
 
-import {
-historyEngine
-} from "@/lib/history/historyEngine";
-
-import {
-createMarketSnapshot
-} from "@/lib/history/snapshotEngine";
+import { historyEngine } from "@/lib/history/historyEngine";
+import { createMarketSnapshot } from "@/lib/history/snapshotEngine";
 
 /* =====================================================
 COMPONENTS
@@ -26,29 +20,20 @@ import CrashPanel from "@/components/CrashPanel";
 import PutTimingPanel from "@/components/PutTimingPanel";
 import RussellPanel from "@/components/RussellPanel";
 import NasdaqPanel from "@/components/NasdaqPanel";
-
 import MasterPanel from "@/components/MasterPanel";
 import PositionSizingPanel from "@/components/PositionSizingPanel";
-
 import PhaseBar from "@/components/PhaseBar";
 import IndicesPanel from "@/components/IndicesPanel";
-
 import SystemHeatPanel from "@/components/SystemHeatPanel";
 import SystemDotsPanel from "@/components/SystemDotsPanel";
-
 import EarlyWarningPanel from "@/components/EarlyWarningPanel";
 import PositioningPanel from "@/components/PositioningPanel";
 import ExitPanel from "@/components/ExitPanel";
-
 import TradeStackPanel from "@/components/TradeStackPanel";
-
 import SignalPanel from "@/components/SignalPanel";
 import SignalHistoryPanel from "@/components/SignalHistoryPanel";
-
 import SystemDiagnosticsPanel from "@/components/SystemDiagnosticsPanel";
-
 import RegimeRibbonPanel from "@/components/RegimeRibbonPanel";
-
 import SuperSignalPanel from "@/components/SuperSignalPanel";
 
 /* =====================================================
@@ -67,7 +52,6 @@ ROTATION
 ===================================================== */
 
 import RotationCompositePanel from "@/components/RotationCompositePanel";
-
 import RotationInternalsPanel from "@/components/RotationInternalsPanel";
 
 /* =====================================================
@@ -84,11 +68,11 @@ export default function Home() {
 
 const router = useRouter();
 
-const [engine, setEngine] =
-useState<any>(null);
+const [engine, setEngine] = useState<any>(null);
 
 const [checkedAuth, setCheckedAuth] =
 useState(false);
+
 
 /* =====================================================
 LOAD
@@ -97,15 +81,16 @@ LOAD
 useEffect(() => {
 
 const auth =
-  localStorage.getItem("auth");
+localStorage.getItem("auth");
 
 if (
-  auth !== "true"
+auth !== "true"
 ) {
 
-  router.replace("/login");
+router.replace("/login");
 
-  return;
+return;
+
 }
 
 setCheckedAuth(true);
@@ -113,6 +98,7 @@ setCheckedAuth(true);
 load();
 
 }, [router]);
+
 
 /* =====================================================
 MARKET LOAD
@@ -122,231 +108,286 @@ async function load() {
 
 try {
 
-  /* ================= MARKET ================= */
+/* ===================================================
+MARKET
+=================================================== */
 
-  const res =
-    await fetch("/api/market");
+const res =
+await fetch("/api/market");
 
-  const json =
-    await res.json();
+const json =
+await res.json();
 
 
-  /* ================= MAP ================= */
+/* ===================================================
+MAP
+=================================================== */
 
-  const mapped =
-    mapBackendToEngine(json);
+const mapped =
+mapBackendToEngine(json);
 
-  if (!mapped) {
+if (!mapped) {
 
-    console.error(
-      "MAP FAILED",
-      json
-    );
+console.error(
+"MAP FAILED",
+json
+);
 
-    return;
-  }
+return;
 
+}
 
-  /* ================= VALIDATION ================= */
 
-  if (
-    !validateEngineData(mapped)
-  ) {
+/* ===================================================
+VALIDATION
+=================================================== */
 
-    console.error(
-      "ENGINE DATA INVALID",
-      mapped
-    );
+if (
+!validateEngineData(mapped)
+) {
 
-    return;
-  }
+console.error(
+"ENGINE DATA INVALID",
+mapped
+);
 
+return;
 
-  /* ================= HISTORY ================= */
+}
 
-  const historyRes =
-    await fetch("/api/history");
 
-  const history =
-    await historyRes.json();
+/* ===================================================
+HISTORY
+=================================================== */
 
+const historyRes =
+await fetch("/api/history");
 
-  const historyMetrics =
-    historyEngine(history);
+const history =
+await historyRes.json();
 
 
-  /* ================= ENGINE INPUT ================= */
+/* ===================================================
+HISTORY METRICS
+=================================================== */
 
-  const mappedWithHistory = {
+const historyMetrics =
+historyEngine(history);
 
-    ...mapped,
 
-    historyMetrics
+/*
+* The historical metrics are the central
+* historical input for the Market Engine.
+*
+* This includes the structural history used by:
+*
+* - Rotation Decay
+* - Regime Persistence
+* - Price Momentum
+* - Market Phase
+* - Historical Replay context
+*/
 
-  };
+console.log(
+"HISTORY METRICS",
+historyMetrics
+);
 
 
-  console.log(
-    "HISTORY METRICS",
-    historyMetrics
-  );
+/* ===================================================
+ENGINE INPUT
+=================================================== */
 
+const mappedWithHistory = {
 
-  /* ================= MARKET ENGINE ================= */
+...mapped,
 
-  const e =
-    marketEngine(
-      mappedWithHistory
-    );
+historyMetrics
 
+};
 
-  /* ================= SNAPSHOT ================= */
 
-  const snapshot =
-    createMarketSnapshot({
+/* ===================================================
+MARKET ENGINE
+=================================================== */
 
-      map:
-        mappedWithHistory,
+const e =
+marketEngine(
+mappedWithHistory
+);
 
-      engine:
-        e
 
-    });
+/*
+* Diagnostics for the newly integrated
+* historical engines.
+*/
 
+console.log(
+"HISTORICAL ENGINE CHECK",
+{
 
-  console.log(
-    "SNAPSHOT CREATED",
-    snapshot.timestamp
-  );
+hasHistoryMetrics:
+!!e?.historyMetrics,
 
+hasRegimePersistence:
+!!e?.regimePersistence,
 
-  console.log(
-    "SNAPSHOT CHECK",
-    {
+hasRegimePersistencePre:
+!!e?.regimePersistencePre,
 
-      phase:
-        snapshot.phase,
+hasPriceMomentum:
+!!e?.priceMomentum,
 
-      hasRotationDecay:
-        !!snapshot.rotationDecay,
+hasReplay:
+!!e?.replay
 
-      hasRegimeSync:
-        !!snapshot.regimeSync,
+}
+);
 
-      hasTradeStack:
-        !!snapshot.tradeStack,
 
-      hasExecutionState:
-        !!snapshot.executionState,
+/* ===================================================
+SNAPSHOT
+=================================================== */
 
-      hasLiquidity:
-        !!snapshot.liquidity,
+const snapshot =
+createMarketSnapshot({
+map: mappedWithHistory,
+engine: e
+});
 
-      hasFragility:
-        !!snapshot.fragility
 
-    }
-  );
+console.log(
+"SNAPSHOT CREATED",
+snapshot.timestamp
+);
 
 
-  /* ================= SAVE HISTORY ================= */
+console.log(
+"SNAPSHOT CHECK",
+{
 
-  await fetch(
-    "/api/history",
-    {
+phase:
+snapshot.phase,
 
-      method:
-        "POST",
+hasRotationDecay:
+!!snapshot.rotationDecay,
 
-      headers: {
+hasRegimeSync:
+!!snapshot.regimeSync,
 
-        "Content-Type":
-          "application/json"
+hasTradeStack:
+!!snapshot.tradeStack,
 
-      },
+hasExecutionState:
+!!snapshot.executionState,
 
-      body:
-        JSON.stringify({
+hasLiquidity:
+!!snapshot.liquidity,
 
-          snapshot
+hasFragility:
+!!snapshot.fragility
 
-        })
+}
+);
 
-    }
-  );
 
+/* ===================================================
+SAVE HISTORY
+=================================================== */
 
-  /* ================= UPDATE UI ================= */
+await fetch(
+"/api/history",
+{
 
-  setEngine(e);
+method: "POST",
 
+headers: {
+"Content-Type":
+"application/json"
+},
 
-  /* ================= AUTO SAVE SIGNAL ================= */
+body:
+JSON.stringify({
+snapshot
+})
 
-  if (
-    e?.signal?.active
-  ) {
+}
+);
 
-    fetch(
-      "/api/signal",
-      {
 
-        method:
-          "POST",
+/* ===================================================
+UPDATE UI
+=================================================== */
 
-        headers: {
+setEngine(e);
 
-          "Content-Type":
-            "application/json"
 
-        },
+/* ===================================================
+AUTO SAVE SIGNAL
+=================================================== */
 
-        body:
-          JSON.stringify({
+if (
+e?.signal?.active
+) {
 
-            signal: {
+fetch(
+"/api/signal",
+{
 
-              timestamp:
-                Date.now(),
+method: "POST",
 
-              phase:
-                e.phase,
+headers: {
+"Content-Type":
+"application/json"
+},
 
-              type:
-                e.signal.type,
+body:
+JSON.stringify({
 
-              strength:
-                e.signal.strength,
+signal: {
 
-              message:
-                e.signal.message,
+timestamp:
+Date.now(),
 
-              priority:
-                e.signal.priority ??
-                "MEDIUM"
+phase:
+e.phase,
 
-            }
+type:
+e.signal.type,
 
-          })
+strength:
+e.signal.strength,
 
-      }
-    )
-    .catch(() => {});
+message:
+e.signal.message,
 
-  }
+priority:
+e.signal.priority ??
+"MEDIUM"
+
+}
+
+})
+
+}
+)
+.catch(() => {});
+
+}
 
 }
 
 catch (err) {
 
-  console.error(
-    "LOAD ERROR:",
-    err
-  );
+console.error(
+"LOAD ERROR:",
+err
+);
 
 }
 
 }
+
 
 /* =====================================================
 SNAPSHOT COPY
@@ -354,47 +395,50 @@ SNAPSHOT COPY
 
 function copySnapshot() {
 
-if (!engine) return;
+if (!engine) {
+
+return;
+
+}
 
 
 const snapshot =
-  createMarketSnapshot({
+createMarketSnapshot({
 
-    map: {
+map: {
 
-      indices:
-        engine.indices,
+indices:
+engine.indices,
 
-      futures:
-        engine.futures,
+futures:
+engine.futures,
 
-      historyMetrics:
-        engine.historyMetrics
+historyMetrics:
+engine.historyMetrics
 
-    },
+},
 
-    engine
+engine
 
-  });
+});
 
 
 navigator.clipboard.writeText(
-
-  JSON.stringify(
-    snapshot,
-    null,
-    2
-  )
-
+JSON.stringify(
+snapshot,
+null,
+2
+)
 );
 
 
 console.log(
-  "📸 SNAPSHOT COPIED",
-  snapshot
+"📸 SNAPSHOT COPIED",
+snapshot
 );
 
 }
+
 
 /* =====================================================
 LOADING
@@ -406,19 +450,21 @@ return null;
 
 }
 
+
 if (!engine) {
 
 return (
 
-  <div className="flex min-h-screen items-center justify-center bg-black p-10 text-white">
+<div className="flex min-h-screen items-center justify-center bg-black p-10 text-white">
 
-    Loading Market Engine...
+Loading Market Engine...
 
-  </div>
+</div>
 
 );
 
 }
+
 
 /* =====================================================
 PANEL STYLE
@@ -427,15 +473,16 @@ PANEL STYLE
 const panel = {
 
 background:
-  "#111",
+"#111",
 
 border:
-  "1px solid #222",
+"1px solid #222",
 
 padding:
-  "16px"
+"16px"
 
 };
+
 
 /* =====================================================
 SECTION HEADER
@@ -451,29 +498,30 @@ subtitle?: string;
 
 return (
 
-  <div className="mb-3 border-b border-[#222] pb-2">
+<div className="mb-3 border-b border-[#222] pb-2">
 
-    <h2 className="text-sm font-bold tracking-[0.12em] text-[#888] md:text-base">
+<h2 className="text-sm font-bold tracking-[0.12em] text-[#888] md:text-base">
 
-      {title}
+{title}
 
-    </h2>
+</h2>
 
-    {subtitle && (
+{subtitle && (
 
-      <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#555]">
+<div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#555]">
 
-        {subtitle}
+{subtitle}
 
-      </div>
+</div>
 
-    )}
+)}
 
-  </div>
+</div>
 
 );
 
 }
+
 
 /* =====================================================
 RENDER
@@ -484,479 +532,559 @@ return (
 <main className="min-h-screen bg-black p-3 font-mono text-white sm:p-4 md:p-6 lg:p-8">
 
 
-  {/* =====================================================
-  HEADER
-  ===================================================== */}
+{/* =====================================================
+HEADER
+===================================================== */}
 
-  <header className="mb-6 flex flex-col gap-4 border-b border-[#222] pb-4 sm:flex-row sm:items-center sm:justify-between">
+<header className="mb-6 flex flex-col gap-4 border-b border-[#222] pb-4 sm:flex-row sm:items-center sm:justify-between">
 
-    <div>
+<div>
 
-      <h1 className="text-xl font-bold tracking-wide md:text-2xl">
+<h1 className="text-xl font-bold tracking-wide md:text-2xl">
 
-        MARKET DASHBOARD
+MARKET DASHBOARD
 
-      </h1>
+</h1>
 
-      <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#555]">
+<div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#555]">
 
-        Institutional Market Structure Engine
+Institutional Market Structure Engine
 
-      </div>
+</div>
 
-    </div>
+</div>
 
 
-    {/* ACTIONS */}
+{/* ACTIONS */}
 
-    <div className="flex gap-2">
+<div className="flex gap-2">
 
-      <button
-        onClick={load}
-        className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333]"
-      >
-        ↻
-      </button>
+<button
+onClick={load}
+className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333]}"
+>
 
+↻
 
-      <button
-        onClick={copySnapshot}
-        className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333]"
-      >
-        📸
-      </button>
+</button>
 
 
-      <button
-        onClick={() => {
+<button
+onClick={copySnapshot}
+className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333]}"
+>
 
-          localStorage.removeItem(
-            "auth"
-          );
+📸
 
-          router.push(
-            "/login"
-          );
+</button>
 
-        }}
-        className="border border-[#444] bg-[#8b0000] px-3 py-2 text-sm transition hover:bg-[#a00000]"
-      >
-        🔒
-      </button>
 
-    </div>
+<button
+onClick={() => {
 
-  </header>
+localStorage.removeItem(
+"auth"
+);
 
+router.push(
+"/login"
+);
 
-  {/* =====================================================
-  1. MARKET REGIME
-  ===================================================== */}
+}}
+className="border border-[#444] bg-[#8b0000] px-3 py-2 text-sm transition hover:bg-[#a00000]}"
+>
 
-  <section className="mb-8">
+🔒
 
-    <SectionHeader
-      title="MARKET REGIME"
-      subtitle="Current institutional market posture"
-    />
+</button>
 
+</div>
 
-    <RegimeRibbonPanel
-      executionState={engine.executionState}
-      regimeSync={engine.regimeSync}
-      dangerZone={engine.dangerZone}
-      phase={engine.phase}
-    />
+</header>
 
-  </section>
 
+{/* =====================================================
+1. MARKET REGIME
+===================================================== */}
 
-  {/* =====================================================
-  2. TRADE COMMAND CENTER
-  ===================================================== */}
+<section className="mb-8">
 
-  <section className="mb-8">
-
-    <SectionHeader
-      title="TRADE COMMAND CENTER"
-      subtitle="Master score, execution and directional positioning"
-    />
-
-
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
-
-
-      <MasterPanel
-        master={engine.master}
-        decision={engine.decision}
-        signal={engine.signal}
-        nasdaq={engine.nasdaqCall}
-        marketPhase={engine.phase}
-        rotationConfirm={engine.rotationConfirm}
-      />
-
-
-      <TradeStackPanel
-        tradeStack={engine.tradeStack}
-        sizing={engine.sizing}
-        rotationConfirm={engine.rotationConfirm}
-      />
-
-
-      <PutTimingPanel
-        putTiming={engine.putTiming}
-        exit={engine.exit?.short}
-      />
-
-
-      <RussellPanel
-        russell={engine.russell}
-        exit={engine.exit?.long}
-      />
-
-
-      <NasdaqPanel
-        nasdaq={engine.nasdaqCall}
-        exit={engine.exit}
-      />
-
-
-      <PositionSizingPanel
-        sizing={engine.sizing}
-        decision={engine.decision}
-      />
-
-
-      <CrashPanel
-        crash={engine.crash}
-      />
-
-    </div>
-
-  </section>
-
-
-  {/* =====================================================
-  3. SIGNALS
-  ===================================================== */}
-
-  <section className="mb-8">
-
-    <SectionHeader
-      title="SIGNALS & POSITIONING"
-      subtitle="Signal generation, early warning and exits"
-    />
-
-
-    <div className="mb-4">
-
-      <SuperSignalPanel
-        superSignal={engine.superSignal}
-      />
-
-    </div>
-
-
-    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-
-      <SignalHistoryPanel />
-
-
-      <SignalPanel
-        signal={engine.signal}
-      />
-
-    </div>
-
-
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-
-      <EarlyWarningPanel
-        earlyWarning={engine.earlyWarning}
-      />
-
-
-      <PositioningPanel
-        positioning={engine.positioning}
-      />
-
-
-      <ExitPanel
-        exit={engine.exit}
-      />
-
-    </div>
-
-  </section>
-
-
-  {/* =====================================================
-  4. SYSTEM STRUCTURE
-  ===================================================== */}
-
-  <section className="mb-8">
-
-    <SectionHeader
-      title="SYSTEM STRUCTURE"
-      subtitle="Market phase, system temperature and index environment"
-    />
-
-
-    <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-
-
-      {/* MARKET PHASE */}
-
-      <div style={panel}>
-
-        <h3 className="mb-4 text-sm text-[#888]">
-
-          MARKET PHASE
-
-        </h3>
-
-
-        <PhaseBar
-          phase={engine.phase}
-          regime={engine.regime}
-        />
-
-      </div>
-
-
-      {/* SYSTEM HEAT */}
-
-      <div style={panel}>
-
-        <h3 className="mb-4 text-sm text-[#888]">
-
-          SYSTEM HEAT
-
-        </h3>
-
-
-        <SystemHeatPanel
-          heat={engine.systemHeat}
-        />
-
-
-        <div className="mt-4">
-
-          <SystemDotsPanel
-            drivers={engine.marketDrivers}
-            structure={engine.structure}
-            crash={engine.crash}
-          />
-
-        </div>
-
-      </div>
-
-    </div>
-
-
-    {/* INDEX MARKETS */}
-
-    <div style={panel}>
-
-      <h3 className="mb-4 text-sm text-[#888]">
-
-        INDEX MARKETS
-
-      </h3>
-
-
-      <IndicesPanel
-        indices={engine.indices}
-        futures={engine.futures}
-      />
-
-    </div>
-
-  </section>
-
-
-  {/* =====================================================
-  5. ROTATION & INTERNALS
-  ===================================================== */}
-
-  <section className="mb-8">
-
-    <SectionHeader
-      title="ROTATION & INTERNAL MARKET STRUCTURE"
-      subtitle="Capital rotation, leadership concentration and internal deterioration"
-    />
-
-
-    {/* ROTATION COMPOSITE */}
-
-    <div className="mb-4">
-
-      <RotationCompositePanel
-        rotation={engine.rotation}
-        rotationConfirm={engine.rotationConfirm}
-
-        rotationDecay={engine.rotationDecay}
-
-        fragility={engine.fragility}
-
-        liquidity={engine.liquidity}
-
-        squeeze={engine.squeeze}
-
-        participation={engine.participation}
-
-        executionState={engine.executionState}
-
-        regimeSync={engine.regimeSync}
-
-        superSignal={engine.superSignal}
-      />
-
-    </div>
-
-
-    {/* ROTATION INTERNALS + STRUCTURE */}
-
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-
-
-      <RotationInternalsPanel
-        rotation={engine.rotation}
-
-        rotationConfirm={
-          engine.rotationConfirm
-        }
-
-        rotationDecay={
-          engine.rotationDecay
-        }
-
-        structureFlags={
-          engine.structureFlags
-        }
-      />
-
-
-      <StructurePanel
-        structure={engine.structure}
-
-        regimeSync={
-          engine.regimeSync
-        }
-
-        executionState={
-          engine.executionState
-        }
-      />
-
-    </div>
-
-
-    {/* MARKET DRIVERS */}
-
-    <div className="mt-4">
-
-      <MarketDrivers
-drivers={engine.marketDrivers}
-earlyWarning={engine.earlyWarning}
-regimeSync={engine.regimeSync}
-executionState={engine.executionState}
-dangerZone={engine.dangerZone}
+<SectionHeader
+title="MARKET REGIME"
+subtitle="Current institutional market posture"
 />
 
-    </div>
+<RegimeRibbonPanel
+executionState={
+engine.executionState
+}
+regimeSync={
+engine.regimeSync
+}
+dangerZone={
+engine.dangerZone
+}
+phase={
+engine.phase
+}
+/>
 
-  </section>
-
-
-  {/* =====================================================
-  6. INSTITUTIONAL RISK ENGINES
-  ===================================================== */}
-
-  <section className="mb-8">
-
-    <SectionHeader
-      title="INSTITUTIONAL MARKET RISK"
-      subtitle="Liquidity, fragility, participation and breadth"
-    />
-
-
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+</section>
 
 
-      <LiquidityPanel
-        data={engine}
-      />
+{/* =====================================================
+2. TRADE COMMAND CENTER
+===================================================== */}
+
+<section className="mb-8">
+
+<SectionHeader
+title="TRADE COMMAND CENTER"
+subtitle="Master score, execution and directional positioning"
+/>
 
 
-      <FragilityPanel
-        data={engine}
-      />
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
+
+<MasterPanel
+master={engine.master}
+decision={engine.decision}
+signal={engine.signal}
+nasdaq={engine.nasdaqCall}
+marketPhase={engine.phase}
+rotationConfirm={
+engine.rotationConfirm
+}
+/>
 
 
-      <ParticipationPanel
-        data={engine}
-      />
+<TradeStackPanel
+tradeStack={
+engine.tradeStack
+}
+sizing={
+engine.sizing
+}
+rotationConfirm={
+engine.rotationConfirm
+}
+/>
 
 
-      <BreadthThrustPanel
-        data={engine}
-      />
-
-	<GammaPanel
-	data={engine}
-	/>
-
-      <SqueezeRiskPanel
-        data={engine}
-      />
-
-    </div>
-
-  </section>
+<PutTimingPanel
+putTiming={
+engine.putTiming
+}
+exit={
+engine.exit?.short
+}
+/>
 
 
-  {/* =====================================================
-  7. HISTORY
-  ===================================================== */}
-
-  <section className="mb-8">
-
-    <SectionHeader
-      title="MARKET HISTORY & REPLAY"
-      subtitle="Historical structural development"
-    />
+<RussellPanel
+russell={
+engine.russell
+}
+exit={
+engine.exit?.long
+}
+/>
 
 
-    <HistoricalReplayPanel
-      replay={engine.replay}
-    />
-
-  </section>
-
-
-  {/* =====================================================
-  8. DIAGNOSTICS
-  ===================================================== */}
-
-  <section className="mb-8">
-
-    <SectionHeader
-      title="SYSTEM DIAGNOSTICS"
-      subtitle="Engine validation and technical diagnostics"
-    />
+<NasdaqPanel
+nasdaq={
+engine.nasdaqCall
+}
+exit={
+engine.exit
+}
+/>
 
 
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+<PositionSizingPanel
+sizing={
+engine.sizing
+}
+decision={
+engine.decision
+}
+/>
 
-      <SystemDiagnosticsPanel
-        engine={engine}
-      />
 
-    </div>
+<CrashPanel
+crash={
+engine.crash
+}
+/>
 
-  </section>
+</div>
+
+</section>
+
+
+{/* =====================================================
+3. SIGNALS
+===================================================== */}
+
+<section className="mb-8">
+
+<SectionHeader
+title="SIGNALS & POSITIONING"
+subtitle="Signal generation, early warning and exits"
+/>
+
+
+<div className="mb-4">
+
+<SuperSignalPanel
+superSignal={
+engine.superSignal
+}
+/>
+
+</div>
+
+
+<div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+<SignalHistoryPanel />
+
+<SignalPanel
+signal={
+engine.signal
+}
+/>
+
+</div>
+
+
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+
+<EarlyWarningPanel
+earlyWarning={
+engine.earlyWarning
+}
+/>
+
+
+<PositioningPanel
+positioning={
+engine.positioning
+}
+/>
+
+
+<ExitPanel
+exit={
+engine.exit
+}
+/>
+
+</div>
+
+</section>
+
+
+{/* =====================================================
+4. SYSTEM STRUCTURE
+===================================================== */}
+
+<section className="mb-8">
+
+<SectionHeader
+title="SYSTEM STRUCTURE"
+subtitle="Market phase, system temperature and index environment"
+/>
+
+
+<div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+
+
+{/* MARKET PHASE */}
+
+<div style={panel}>
+
+<h3 className="mb-4 text-sm text-[#888]">
+
+MARKET PHASE
+
+</h3>
+
+<PhaseBar
+phase={
+engine.phase
+}
+regime={
+engine.regime
+}
+/>
+
+</div>
+
+
+{/* SYSTEM HEAT */}
+
+<div style={panel}>
+
+<h3 className="mb-4 text-sm text-[#888]">
+
+SYSTEM HEAT
+
+</h3>
+
+<SystemHeatPanel
+heat={
+engine.systemHeat
+}
+/>
+
+
+<div className="mt-4">
+
+<SystemDotsPanel
+drivers={
+engine.marketDrivers
+}
+structure={
+engine.structure
+}
+crash={
+engine.crash
+}
+/>
+
+</div>
+
+</div>
+
+</div>
+
+
+{/* INDEX MARKETS */}
+
+<div style={panel}>
+
+<h3 className="mb-4 text-sm text-[#888]">
+
+INDEX MARKETS
+
+</h3>
+
+<IndicesPanel
+indices={
+engine.indices
+}
+futures={
+engine.futures
+}
+/>
+
+</div>
+
+</section>
+
+
+{/* =====================================================
+5. ROTATION & INTERNALS
+===================================================== */}
+
+<section className="mb-8">
+
+<SectionHeader
+title="ROTATION & INTERNAL MARKET STRUCTURE"
+subtitle="Capital rotation, leadership concentration and internal deterioration"
+/>
+
+
+{/* ROTATION COMPOSITE */}
+
+<div className="mb-4">
+
+<RotationCompositePanel
+rotation={
+engine.rotation
+}
+rotationConfirm={
+engine.rotationConfirm
+}
+rotationDecay={
+engine.rotationDecay
+}
+fragility={
+engine.fragility
+}
+liquidity={
+engine.liquidity
+}
+squeeze={
+engine.squeeze
+}
+participation={
+engine.participation
+}
+executionState={
+engine.executionState
+}
+regimeSync={
+engine.regimeSync
+}
+superSignal={
+engine.superSignal
+}
+/>
+
+</div>
+
+
+{/* ROTATION INTERNALS + STRUCTURE */}
+
+<div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+
+<RotationInternalsPanel
+rotation={
+engine.rotation
+}
+rotationConfirm={
+engine.rotationConfirm
+}
+rotationDecay={
+engine.rotationDecay
+}
+structureFlags={
+engine.structureFlags
+}
+/>
+
+
+<StructurePanel
+structure={
+engine.structure
+}
+regimeSync={
+engine.regimeSync
+}
+executionState={
+engine.executionState
+}
+/>
+
+</div>
+
+
+{/* MARKET DRIVERS */}
+
+<div className="mt-4">
+
+<MarketDrivers
+drivers={
+engine.marketDrivers
+}
+earlyWarning={
+engine.earlyWarning
+}
+regimeSync={
+engine.regimeSync
+}
+executionState={
+engine.executionState
+}
+dangerZone={
+engine.dangerZone
+}
+/>
+
+</div>
+
+</section>
+
+
+{/* =====================================================
+6. INSTITUTIONAL RISK ENGINES
+===================================================== */}
+
+<section className="mb-8">
+
+<SectionHeader
+title="INSTITUTIONAL MARKET RISK"
+subtitle="Liquidity, fragility, participation and breadth"
+/>
+
+
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+
+<LiquidityPanel
+data={engine}
+/>
+
+<FragilityPanel
+data={engine}
+/>
+
+<ParticipationPanel
+data={engine}
+/>
+
+<BreadthThrustPanel
+data={engine}
+/>
+
+<GammaPanel
+data={engine}
+/>
+
+<SqueezeRiskPanel
+data={engine}
+/>
+
+</div>
+
+</section>
+
+
+{/* =====================================================
+7. HISTORY & HISTORICAL REPLAY
+===================================================== */}
+
+<section className="mb-8">
+
+<SectionHeader
+title="MARKET HISTORY & REPLAY"
+subtitle="Historical structural development and regime validation"
+/>
+
+
+<HistoricalReplayPanel
+replay={
+engine.replay
+}
+/>
+
+</section>
+
+
+{/* =====================================================
+8. DIAGNOSTICS
+===================================================== */}
+
+<section className="mb-8">
+
+<SectionHeader
+title="SYSTEM DIAGNOSTICS"
+subtitle="Engine validation and technical diagnostics"
+/>
+
+
+<div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+
+<SystemDiagnosticsPanel
+engine={
+engine
+}
+/>
+
+</div>
+
+</section>
 
 
 </main>
