@@ -1,8 +1,6 @@
 // /lib/history/historicalScenarioRunner.ts
 
-import {
-marketEngine
-} from "@/lib/engine/marketEngine";
+import { marketEngine } from "@/lib/engine/marketEngine";
 
 import {
 historicalScenarioAdapter,
@@ -16,32 +14,41 @@ RESULT
 
 export interface HistoricalScenarioResult {
 
-scenario: HistoricalScenario;
+scenario:
+HistoricalScenario;
 
-engine: any;
+engine:
+any;
 
 actual: {
 
-phase: string;
+phase:
+string;
 
-mode: string;
+mode:
+string;
 
-signal: string;
+signal:
+string;
 
-riskScore: number;
+riskScore:
+number;
 
 };
 
-
 evaluation: {
 
-phaseMatch: boolean;
+phaseMatch:
+boolean;
 
-modeMatch: boolean;
+modeMatch:
+boolean;
 
-signalMatch: boolean;
+signalMatch:
+boolean;
 
-riskMatch: boolean;
+riskMatch:
+boolean;
 
 result:
 | "PASS"
@@ -60,6 +67,7 @@ RUNNER
 export function historicalScenarioRunner(
 scenario: HistoricalScenario
 ): HistoricalScenarioResult {
+
 
 /* ===================================================
 ADAPT
@@ -96,15 +104,45 @@ engine?.executionState?.executionMode ??
 "UNKNOWN";
 
 
+/*
+* MASTER SCORE is the primary
+* source of truth for:
+*
+* CALL
+* NEUTRAL
+* PUT
+*
+* The legacy signal object can have
+* two different shapes:
+*
+* active signal:
+* {
+* active: true,
+* type: "..."
+* }
+*
+* inactive signal:
+* {
+* active: false
+* }
+*
+* Therefore signal.type may only be
+* accessed when active === true.
+*/
+
 const actualSignal =
 engine?.master?.signal ??
-engine?.signal?.type ??
-"UNKNOWN";
+(
+engine?.signal?.active === true
+? engine.signal.type
+: "UNKNOWN"
+);
 
 
 const actualRiskScore =
 Number(
-engine?.master?.score ?? 50
+engine?.master?.score ??
+50
 );
 
 
@@ -121,7 +159,8 @@ PHASE MATCH
 =================================================== */
 
 const phaseMatch =
-actualPhase === expected.phase;
+actualPhase ===
+expected.phase;
 
 
 /* ===================================================
@@ -129,7 +168,8 @@ MODE MATCH
 =================================================== */
 
 const modeMatch =
-actualMode === expected.mode;
+actualMode ===
+expected.mode;
 
 
 /* ===================================================
@@ -137,14 +177,16 @@ SIGNAL MATCH
 =================================================== */
 
 const signalMatch =
-actualSignal === expected.signal;
+actualSignal ===
+expected.signal;
 
 
 /* ===================================================
 RISK MATCH
 =================================================== */
 
-let riskMatch = true;
+let riskMatch =
+true;
 
 
 if (
@@ -152,7 +194,8 @@ typeof expected.minRisk === "number" &&
 actualRiskScore < expected.minRisk
 ) {
 
-riskMatch = false;
+riskMatch =
+false;
 
 }
 
@@ -162,7 +205,8 @@ typeof expected.maxRisk === "number" &&
 actualRiskScore > expected.maxRisk
 ) {
 
-riskMatch = false;
+riskMatch =
+false;
 
 }
 
@@ -171,17 +215,15 @@ riskMatch = false;
 FINAL RESULT
 =================================================== */
 
-const matches = [
-
+const matches =
+[
 phaseMatch,
-
 modeMatch,
-
 signalMatch,
-
 riskMatch
-
-].filter(Boolean).length;
+]
+.filter(Boolean)
+.length;
 
 
 let result:
@@ -190,21 +232,28 @@ let result:
 | "FAIL";
 
 
-if (matches === 4) {
+if (
+matches === 4
+) {
 
-result = "PASS";
+result =
+"PASS";
 
 }
 
-else if (matches >= 2) {
+else if (
+matches >= 2
+) {
 
-result = "PARTIAL";
+result =
+"PARTIAL";
 
 }
 
 else {
 
-result = "FAIL";
+result =
+"FAIL";
 
 }
 
