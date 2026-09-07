@@ -3,10 +3,18 @@
 "use client";
 
 
+/* =====================================================
+PROPS
+===================================================== */
+
 interface Props {
 replay: any;
 }
 
+
+/* =====================================================
+COMPONENT
+===================================================== */
 
 export default function HistoricalReplayPanel({
 replay,
@@ -18,7 +26,9 @@ SAFETY
 ===================================================== */
 
 if (!replay) {
+
 return null;
+
 }
 
 
@@ -37,11 +47,15 @@ value: number
 ) {
 
 if (value >= 80) {
+
 return "text-emerald-400";
+
 }
 
 if (value >= 60) {
+
 return "text-yellow-400";
+
 }
 
 return "text-red-400";
@@ -54,14 +68,82 @@ value: number
 ) {
 
 if (value === 0) {
+
 return "text-emerald-400";
+
 }
 
 if (value <= 2) {
+
 return "text-yellow-400";
+
 }
 
 return "text-red-400";
+
+}
+
+
+function resultColor(
+result: string
+) {
+
+if (result === "PASS") {
+
+return "text-emerald-400";
+
+}
+
+if (result === "PARTIAL") {
+
+return "text-yellow-400";
+
+}
+
+return "text-red-400";
+
+}
+
+
+function resultBackground(
+result: string
+) {
+
+if (result === "PASS") {
+
+return "bg-emerald-500/10 border-emerald-500/20";
+
+}
+
+if (result === "PARTIAL") {
+
+return "bg-yellow-500/10 border-yellow-500/20";
+
+}
+
+return "bg-red-500/10 border-red-500/20";
+
+}
+
+
+function booleanIndicator(
+value: boolean
+) {
+
+return value
+? "✓"
+: "✕";
+
+}
+
+
+function booleanColor(
+value: boolean
+) {
+
+return value
+? "text-emerald-400"
+: "text-red-400";
 
 }
 
@@ -98,7 +180,9 @@ text-white
 sm:text-2xl
 "
 >
+
 Historical Replay Framework
+
 </h2>
 
 
@@ -109,9 +193,12 @@ text-sm
 text-zinc-400
 "
 >
-Historical validation of institutional market
-classification across expansion, transition,
-breakdown and crash regimes.
+
+Historical validation of market phase,
+trading mode, directional signal and
+risk classification across institutional
+market regimes.
+
 </p>
 
 </div>
@@ -153,22 +240,22 @@ replay.phaseAccuracy ?? 0
 
 
 <MetricCard
-label="Transition Accuracy"
-value={`${replay.transitionAccuracy ?? 0}%`}
+label="Mode Accuracy"
+value={`${replay.modeAccuracy ?? 0}%`}
 color={scoreColor(
 Number(
-replay.transitionAccuracy ?? 0
+replay.modeAccuracy ?? 0
 )
 )}
 />
 
 
 <MetricCard
-label="Crash Accuracy"
-value={`${replay.crashAccuracy ?? 0}%`}
+label="Signal Accuracy"
+value={`${replay.signalAccuracy ?? 0}%`}
 color={scoreColor(
 Number(
-replay.crashAccuracy ?? 0
+replay.signalAccuracy ?? 0
 )
 )}
 />
@@ -191,62 +278,51 @@ lg:grid-cols-4
 >
 
 <MetricCard
-label="Expansion Persistence"
-value={`${replay.expansionPersistence ?? 0}%`}
+label="Risk Accuracy"
+value={`${replay.riskAccuracy ?? 0}%`}
 color={scoreColor(
 Number(
-replay.expansionPersistence ?? 0
+replay.riskAccuracy ?? 0
 )
 )}
 />
 
 
 <MetricCard
-label="False Defensive"
+label="PASS"
 value={String(
-replay.falseDefensiveStates ?? 0
+replay.passCount ?? 0
 )}
-color={warningColor(
-Number(
-replay.falseDefensiveStates ?? 0
-)
-)}
+color="text-emerald-400"
 />
 
 
 <MetricCard
-label="Missed Crashes"
+label="PARTIAL"
 value={String(
-replay.missedCrashes ?? 0
+replay.partialCount ?? 0
 )}
-color={warningColor(
-Number(
-replay.missedCrashes ?? 0
-)
-)}
+color="text-yellow-400"
 />
 
 
 <MetricCard
-label="Late Exits"
+label="FAIL"
 value={String(
-replay.lateExits ?? 0
+replay.failCount ?? 0
 )}
-color={warningColor(
-Number(
-replay.lateExits ?? 0
-)
-)}
+color="text-red-400"
 />
 
 </div>
 
 
 {/* =================================================
-STRUCTURAL WARNINGS
+CRITICAL RISK DETECTION
 ================================================= */}
 
 <div className="mt-6">
+
 
 <div
 className="
@@ -258,7 +334,9 @@ tracking-wider
 text-zinc-500
 "
 >
-Structural Warning Detection
+
+Critical Risk Detection
+
 </div>
 
 
@@ -267,31 +345,136 @@ className="
 grid
 grid-cols-1
 gap-3
-sm:grid-cols-3
+sm:grid-cols-2
+xl:grid-cols-4
 "
 >
 
 <WarningCard
-label="False Stability"
+label="False Defensive"
 value={
-replay.falseStabilityWarnings ?? 0
+Number(
+replay.falseDefensiveStates ?? 0
+)
 }
+description="
+Expected LONG but system became
+unnecessarily defensive.
+"
 />
 
 
 <WarningCard
-label="Liquidity Illusion"
+label="Missed Crashes"
 value={
-replay.liquidityIllusionWarnings ?? 0
+Number(
+replay.missedCrashes ?? 0
+)
 }
+description="
+Expected CRASH but defensive
+classification was missed.
+"
 />
 
 
 <WarningCard
-label="Passive Flow Regimes"
+label="Late Exits"
 value={
-replay.passiveFlowWarnings ?? 0
+Number(
+replay.lateExits ?? 0
+)
 }
+description="
+Expected RISK while the system
+remained bullish.
+"
+/>
+
+
+<WarningCard
+label="Critical Failures"
+value={
+Number(
+replay.criticalFailures ?? 0
+)
+}
+description="
+Risk or crash regime incorrectly
+produced a CALL signal.
+"
+/>
+
+</div>
+
+</div>
+
+
+{/* =================================================
+SCENARIO OVERVIEW
+================================================= */}
+
+<div className="mt-6">
+
+
+<div
+className="
+mb-3
+text-xs
+font-semibold
+uppercase
+tracking-wider
+text-zinc-500
+"
+>
+
+Scenario Overview
+
+</div>
+
+
+<div
+className="
+grid
+grid-cols-2
+gap-3
+sm:grid-cols-4
+"
+>
+
+<SmallMetricCard
+label="Total Scenarios"
+value={String(
+replay.totalScenarios ??
+tests.length
+)}
+/>
+
+
+<SmallMetricCard
+label="Passed"
+value={String(
+replay.passCount ?? 0
+)}
+color="text-emerald-400"
+/>
+
+
+<SmallMetricCard
+label="Partial"
+value={String(
+replay.partialCount ?? 0
+)}
+color="text-yellow-400"
+/>
+
+
+<SmallMetricCard
+label="Failed"
+value={String(
+replay.failCount ?? 0
+)}
+color="text-red-400"
 />
 
 </div>
@@ -304,6 +487,7 @@ TABLE
 ================================================= */}
 
 <div className="mt-6">
+
 
 <div
 className="
@@ -323,7 +507,9 @@ tracking-wider
 text-zinc-500
 "
 >
+
 Replay Tests
+
 </div>
 
 
@@ -333,7 +519,9 @@ text-xs
 text-zinc-600
 "
 >
-{tests.length} snapshots
+
+{tests.length} scenarios
+
 </div>
 
 </div>
@@ -350,11 +538,16 @@ border-zinc-800
 
 <table
 className="
-min-w-[850px]
+min-w-[1450px]
 w-full
 text-sm
 "
 >
+
+
+{/* =============================================
+TABLE HEADER
+============================================== */}
 
 <thead>
 
@@ -372,27 +565,79 @@ text-zinc-500
 >
 
 <th className="px-4 py-3">
-Year
+
+Date
+
 </th>
 
-<th className="px-4 py-3">
-Regime
-</th>
 
 <th className="px-4 py-3">
-Classification
+
+Scenario
+
 </th>
 
+
 <th className="px-4 py-3">
+
+Expected Phase
+
+</th>
+
+
+<th className="px-4 py-3">
+
+Actual Phase
+
+</th>
+
+
+<th className="px-4 py-3">
+
+Expected Mode
+
+</th>
+
+
+<th className="px-4 py-3">
+
+Actual Mode
+
+</th>
+
+
+<th className="px-4 py-3">
+
+Expected Signal
+
+</th>
+
+
+<th className="px-4 py-3">
+
+Actual Signal
+
+</th>
+
+
+<th className="px-4 py-3">
+
+Risk
+
+</th>
+
+
+<th className="px-4 py-3">
+
+Matches
+
+</th>
+
+
+<th className="px-4 py-3">
+
 Result
-</th>
 
-<th className="px-4 py-3">
-Edge
-</th>
-
-<th className="px-4 py-3">
-Notes
 </th>
 
 </tr>
@@ -400,14 +645,23 @@ Notes
 </thead>
 
 
+{/* =============================================
+TABLE BODY
+============================================== */}
+
 <tbody>
+
+
+{/* =============================================
+EMPTY
+============================================== */}
 
 {tests.length === 0 && (
 
 <tr>
 
 <td
-colSpan={6}
+colSpan={11}
 className="
 px-4
 py-8
@@ -415,13 +669,19 @@ text-center
 text-zinc-500
 "
 >
+
 No historical replay data available.
+
 </td>
 
 </tr>
 
 )}
 
+
+{/* =============================================
+TESTS
+============================================== */}
 
 {tests.map(
 (test: any) => (
@@ -437,39 +697,175 @@ last:border-b-0
 "
 >
 
+
+{/* DATE */}
+
+<td
+className="
+whitespace-nowrap
+px-4
+py-3
+text-zinc-300
+"
+>
+
+<div
+className="
+font-medium
+text-white
+"
+>
+
+{test.year}
+
+</div>
+
+
+<div
+className="
+text-xs
+text-zinc-600
+"
+>
+
+{test.date ?? "—"}
+
+</div>
+
+</td>
+
+
+{/* SCENARIO */}
+
+<td
+className="
+max-w-[240px]
+px-4
+py-3
+"
+>
+
+<div
+className="
+font-medium
+text-zinc-200
+"
+>
+
+{test.title ?? test.id}
+
+</div>
+
+
+<div
+className="
+mt-1
+max-w-[240px]
+truncate
+text-xs
+text-zinc-600
+"
+>
+
+{test.description ?? "—"}
+
+</div>
+
+</td>
+
+
+{/* EXPECTED PHASE */}
+
+<td
+className="
+px-4
+py-3
+text-zinc-400
+"
+>
+
+{test.expectedPhase ?? "—"}
+
+</td>
+
+
+{/* ACTUAL PHASE */}
+
+<td
+className="
+px-4
+py-3
+text-zinc-200
+"
+>
+
+{test.actualPhase ?? "—"}
+
+</td>
+
+
+{/* EXPECTED MODE */}
+
+<td
+className="
+px-4
+py-3
+text-zinc-400
+"
+>
+
+{test.expectedMode ?? "—"}
+
+</td>
+
+
+{/* ACTUAL MODE */}
+
+<td
+className="
+px-4
+py-3
+text-zinc-200
+"
+>
+
+{test.actualMode ?? "—"}
+
+</td>
+
+
+{/* EXPECTED SIGNAL */}
+
+<td
+className="
+px-4
+py-3
+text-zinc-400
+"
+>
+
+{test.expectedSignal ?? "—"}
+
+</td>
+
+
+{/* ACTUAL SIGNAL */}
+
 <td
 className="
 px-4
 py-3
 font-medium
-text-white
+text-zinc-200
 "
 >
-{test.year}
+
+{test.actualSignal ?? "—"}
+
 </td>
 
 
-<td
-className="
-px-4
-py-3
-text-zinc-300
-"
->
-{test.regime}
-</td>
-
-
-<td
-className="
-px-4
-py-3
-text-zinc-300
-"
->
-{test.classification}
-</td>
-
+{/* RISK */}
 
 <td
 className="
@@ -480,40 +876,141 @@ py-3
 
 <span
 className={
-test.result === "PASS"
-
+Number(
+test.riskScore ?? 50
+) >= 65
+? "font-semibold text-red-400"
+: Number(
+test.riskScore ?? 50
+) <= 35
 ? "font-semibold text-emerald-400"
-
-: "font-semibold text-red-400"
+: "font-semibold text-yellow-400"
 }
 >
-{test.result}
+
+{test.riskScore ?? "—"}
+
 </span>
 
 </td>
 
 
+{/* MATCHES */}
+
 <td
 className="
 px-4
 py-3
-font-medium
-text-zinc-200
 "
 >
-{test.edgePersistence}%
+
+<div
+className="
+flex
+gap-2
+text-sm
+"
+>
+
+<span
+className={
+booleanColor(
+Boolean(
+test.phaseMatch
+)
+)
+}
+title="Phase Match"
+>
+
+P
+
+</span>
+
+
+<span
+className={
+booleanColor(
+Boolean(
+test.modeMatch
+)
+)
+}
+title="Mode Match"
+>
+
+M
+
+</span>
+
+
+<span
+className={
+booleanColor(
+Boolean(
+test.signalMatch
+)
+)
+}
+title="Signal Match"
+>
+
+S
+
+</span>
+
+
+<span
+className={
+booleanColor(
+Boolean(
+test.riskMatch
+)
+)
+}
+title="Risk Match"
+>
+
+R
+
+</span>
+
+</div>
+
 </td>
 
 
+{/* RESULT */}
+
 <td
 className="
-max-w-[320px]
 px-4
 py-3
-text-zinc-500
 "
 >
-{test.notes || "—"}
+
+<span
+className={`
+inline-flex
+rounded-lg
+border
+px-2
+py-1
+text-xs
+font-bold
+${resultColor(
+test.result
+)}
+${resultBackground(
+test.result
+)}
+`}
+>
+
+{test.result ?? "UNKNOWN"}
+
+</span>
+
 </td>
 
 </tr>
@@ -526,6 +1023,57 @@ text-zinc-500
 </table>
 
 </div>
+
+
+{/* =================================================
+MATCH LEGEND
+================================================= */}
+
+{tests.length > 0 && (
+
+<div
+className="
+mt-3
+flex
+flex-wrap
+gap-4
+text-[10px]
+uppercase
+tracking-wider
+text-zinc-600
+"
+>
+
+<span>
+
+P = Phase Match
+
+</span>
+
+
+<span>
+
+M = Mode Match
+
+</span>
+
+
+<span>
+
+S = Signal Match
+
+</span>
+
+
+<span>
+
+R = Risk Match
+
+</span>
+
+</div>
+
+)}
 
 </div>
 
@@ -573,7 +1121,9 @@ text-zinc-500
 sm:text-xs
 "
 >
+
 {label}
+
 </div>
 
 
@@ -585,7 +1135,69 @@ sm:text-3xl
 ${color}
 `}
 >
+
 {value}
+
+</div>
+
+</div>
+
+);
+
+}
+
+
+/* =====================================================
+SMALL METRIC CARD
+===================================================== */
+
+function SmallMetricCard({
+label,
+value,
+color = "text-white",
+}: {
+label: string;
+value: string;
+color?: string;
+}) {
+
+return (
+
+<div
+className="
+rounded-xl
+border
+border-zinc-800
+bg-zinc-950
+p-3
+"
+>
+
+<div
+className="
+text-[10px]
+uppercase
+tracking-wider
+text-zinc-600
+"
+>
+
+{label}
+
+</div>
+
+
+<div
+className={`
+mt-1
+text-xl
+font-bold
+${color}
+`}
+>
+
+{value}
+
 </div>
 
 </div>
@@ -602,21 +1214,19 @@ WARNING CARD
 function WarningCard({
 label,
 value,
+description,
 }: {
 label: string;
 value: number;
+description?: string;
 }) {
 
+
 const color =
-
 value === 0
-
 ? "text-emerald-400"
-
 : value <= 2
-
 ? "text-yellow-400"
-
 : "text-red-400";
 
 
@@ -635,10 +1245,13 @@ p-4
 <div
 className="
 text-xs
-text-zinc-500
+font-medium
+text-zinc-400
 "
 >
+
 {label}
+
 </div>
 
 
@@ -650,8 +1263,28 @@ font-bold
 ${color}
 `}
 >
+
 {value}
+
 </div>
+
+
+{description && (
+
+<div
+className="
+mt-2
+text-[10px]
+leading-relaxed
+text-zinc-600
+"
+>
+
+{description}
+
+</div>
+
+)}
 
 </div>
 
