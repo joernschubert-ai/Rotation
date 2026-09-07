@@ -54,7 +54,12 @@ HISTORICAL REPLAY
 import { historicalReplay } from "../history/historicalReplay";
 
 
-export function marketEngine(data: any) {
+export function marketEngine(
+data: any,
+options: {
+skipHistoricalReplay?: boolean;
+} = {}
+) {
 
 /* =====================================================
 DRIVERS
@@ -2404,7 +2409,9 @@ HISTORICAL REPLAY
 */
 
 const replay =
-historicalReplay();
+options.skipHistoricalReplay
+? null
+: historicalReplay();
 
 
 /* =====================================================
