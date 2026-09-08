@@ -35,6 +35,10 @@ HISTORY ENGINES
 
 import { regimePersistenceEngine } from "../history/regimePersistenceEngine";
 
+/* =====================================================
+STRUCTURAL ENGINES
+===================================================== */
+
 import { executionStateEngine } from "./executionStateEngine";
 import { regimeSyncEngine } from "./regimeSyncEngine";
 import { dangerZoneEngine } from "./dangerZoneEngine";
@@ -61,11 +65,13 @@ skipHistoricalReplay?: boolean;
 } = {}
 ) {
 
+
 /* =====================================================
 DRIVERS
 ===================================================== */
 
-const driversCore = driversEngine(data);
+const driversCore =
+driversEngine(data);
 
 const marketDrivers =
 marketDriversEngine(data);
@@ -150,7 +156,8 @@ for (const path of paths) {
 const parts =
 path.split(".");
 
-let value = snapshot;
+let value =
+snapshot;
 
 for (const part of parts) {
 
@@ -165,7 +172,8 @@ break;
 
 }
 
-value = value[part];
+value =
+value[part];
 
 }
 
@@ -238,9 +246,7 @@ HISTORICAL BREADTH VALUES
 
 const breadth20_5dAgo =
 getHistorySeriesValue(
-[
-"breadth20History"
-],
+["breadth20History"],
 5,
 [
 "breadth20",
@@ -253,9 +259,7 @@ breadth20
 
 const breadth50_5dAgo =
 getHistorySeriesValue(
-[
-"breadth50History"
-],
+["breadth50History"],
 5,
 [
 "breadth50",
@@ -268,9 +272,7 @@ breadth50
 
 const breadth50_10dAgo =
 getHistorySeriesValue(
-[
-"breadth50History"
-],
+["breadth50History"],
 10,
 [
 "breadth50",
@@ -283,9 +285,7 @@ breadth50
 
 const breadth200_10dAgo =
 getHistorySeriesValue(
-[
-"breadth200History"
-],
+["breadth200History"],
 10,
 [
 "breadth200",
@@ -298,9 +298,7 @@ breadth200
 
 const breadth200_20dAgo =
 getHistorySeriesValue(
-[
-"breadth200History"
-],
+["breadth200History"],
 20,
 [
 "breadth200",
@@ -361,9 +359,12 @@ PRICE MOMENTUM
 
 const priceMomentum =
 priceMomentumEngine({
+
 historyMetrics,
+
 indices:
 data.indices ?? {}
+
 });
 
 
@@ -371,7 +372,8 @@ data.indices ?? {}
 DIVERGENCE — LEGACY
 ===================================================== */
 
-const divergence = (() => {
+const divergence =
+(() => {
 
 const breadth =
 Number(
@@ -408,10 +410,13 @@ return {
 score,
 
 state:
+
 score > 1
 ? "BULLISH_DIVERGENCE"
+
 : score < -1
 ? "BEARISH_DIVERGENCE"
+
 : "NONE"
 
 };
@@ -469,11 +474,26 @@ historyMetrics
 
 
 /* =====================================================
-FRAGILITY
+FRAGILITY — PRELIMINARY
 ===================================================== */
 
-const fragility =
+/*
+* IMPORTANT:
+*
+* The preliminary fragility object exists because
+* early engines already require fragility.
+*
+* At this stage Participation, Breadth Thrust,
+* Final Rotation and Market Quality do not yet exist.
+*
+* Therefore this object is NOT the final system
+* fragility used by Master Score and execution logic.
+*/
+
+const fragilityPre =
 fragilityEngine({
+
+history,
 
 historyMetrics,
 
@@ -487,8 +507,6 @@ data.crashProbability ?? 0
 breadth50,
 
 breadth200,
-
-liquidity,
 
 gammaExposure:
 Number(
@@ -506,6 +524,13 @@ volOfVolRatio:
 Number(
 data.volOfVolRatio ?? 1
 ),
+
+vixTermRatio:
+Number(
+data.vixTermRatio ?? 1
+),
+
+liquidity,
 
 structure
 
@@ -560,7 +585,8 @@ data.marketData ?? {},
 
 liquidity,
 
-fragility,
+fragility:
+fragilityPre,
 
 squeeze,
 
@@ -846,7 +872,8 @@ data.marketData ?? {},
 
 liquidity,
 
-fragility,
+fragility:
+fragilityPre,
 
 squeeze,
 
@@ -1136,7 +1163,8 @@ breadth50,
 
 breadth200,
 
-fragility,
+fragility:
+fragilityPre,
 
 participation,
 
@@ -1272,7 +1300,7 @@ rotationDecayScore:
 
 fragilityScore:
 Number(
-fragility?.score ?? 50
+fragilityPre?.score ?? 50
 ),
 
 participationScore:
@@ -1286,7 +1314,8 @@ squeeze?.risk ?? 0
 ),
 
 divergenceState:
-divergence?.state ?? "NONE",
+divergence?.state ??
+"NONE",
 
 internalDivergence,
 
@@ -1327,7 +1356,8 @@ earlyWarning,
 
 liquidity,
 
-fragility,
+fragility:
+fragilityPre,
 
 squeeze,
 
@@ -1407,7 +1437,9 @@ positioning:
 {},
 
 volatility:
-{ vix },
+{
+vix
+},
 
 executionState:
 executionStatePre,
@@ -1417,7 +1449,8 @@ regimeSyncPre,
 
 liquidity,
 
-fragility,
+fragility:
+fragilityPre,
 
 squeeze,
 
@@ -1498,7 +1531,8 @@ breadthThrust,
 
 liquidity,
 
-fragility,
+fragility:
+fragilityPre,
 
 rotationDecay,
 
@@ -1510,6 +1544,18 @@ historyMetrics
 /* =====================================================
 MARKET QUALITY
 ===================================================== */
+
+/*
+* Market Quality intentionally receives fragilityPre.
+*
+* This prevents a circular dependency:
+*
+* Market Quality -> Fragility Final
+* Fragility Final -> Market Quality
+*
+* The final fragility calculation below then combines
+* the completed Market Quality with all structural data.
+*/
 
 const marketQuality =
 marketQualityEngine({
@@ -1526,7 +1572,8 @@ rotationDecay,
 
 liquidity,
 
-fragility,
+fragility:
+fragilityPre,
 
 phaseConfirmation,
 
@@ -1539,6 +1586,79 @@ concentrationScore:
 Number(
 data.concentrationScore ?? 50
 )
+
+});
+
+
+/* =====================================================
+FRAGILITY — FINAL
+===================================================== */
+
+/*
+* FINAL FRAGILITY ENGINE
+*
+* This is the canonical fragility object used by all
+* downstream institutional decision engines.
+*
+* It now has access to:
+*
+* - Final Rotation
+* - Participation
+* - Breadth Thrust
+* - Market Quality
+* - Full Liquidity
+* - Full history
+*
+* The preliminary fragility object remains only for
+* resolving early pipeline dependencies.
+*/
+
+const fragility =
+fragilityEngine({
+
+history,
+
+historyMetrics,
+
+crash,
+
+breadth50,
+
+breadth200,
+
+gammaExposure:
+Number(
+data.gammaExposure ?? 0
+),
+
+correlationScore:
+Number(
+data.correlationScore ?? 0
+),
+
+vix,
+
+volOfVolRatio:
+Number(
+data.volOfVolRatio ?? 1
+),
+
+vixTermRatio:
+Number(
+data.vixTermRatio ?? 1
+),
+
+liquidity,
+
+structure,
+
+participation,
+
+breadthThrust,
+
+rotation,
+
+marketQuality
 
 });
 
@@ -1781,7 +1901,8 @@ squeeze?.risk ?? 0
 ),
 
 divergenceState:
-divergence?.state ?? "NONE",
+divergence?.state ??
+"NONE",
 
 internalDivergence,
 
@@ -2108,7 +2229,8 @@ EXIT
 const exit =
 exitEngine({
 
-position: {
+position:
+{
 size:
 currentPositionSize
 },
@@ -2276,10 +2398,11 @@ regimePersistence
 
 const signal = {
 
-...(signalResult?.signal ?? {
-active:
-false
-}),
+...(
+signalResult?.signal ?? {
+active: false
+}
+),
 
 phase
 
@@ -2468,7 +2591,18 @@ liquidity,
 
 breadthThrust,
 
+/*
+* FINAL canonical fragility.
+*/
+
 fragility,
+
+/*
+* Preliminary fragility is exposed only for
+* diagnostics and pipeline debugging.
+*/
+
+fragilityPre,
 
 squeeze,
 
