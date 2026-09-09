@@ -50,6 +50,7 @@ import { fragilityEngine } from "./fragilityEngine";
 import { squeezeEngine } from "./squeezeEngine";
 import { participationEngine } from "./participationEngine";
 import { priceMomentumEngine } from "./priceMomentumEngine";
+import { gammaEngine } from "./gammaEngine";
 
 /* =====================================================
 HISTORICAL REPLAY
@@ -57,14 +58,12 @@ HISTORICAL REPLAY
 
 import { historicalReplay } from "../history/historicalReplay";
 
-
 export function marketEngine(
 data: any,
 options: {
 skipHistoricalReplay?: boolean;
 } = {}
 ) {
-
 
 /* =====================================================
 DRIVERS
@@ -76,14 +75,12 @@ driversEngine(data);
 const marketDrivers =
 marketDriversEngine(data);
 
-
 /* =====================================================
 STRUCTURE
 ===================================================== */
 
 const structure =
 structureEngine(data);
-
 
 /* =====================================================
 CLEAN INPUT
@@ -112,7 +109,6 @@ data.marketData?.["^VIX"]?.current ?? 20
 const historyMetrics =
 data.historyMetrics ?? {};
 
-
 /* =====================================================
 HISTORY ACCESS
 ===================================================== */
@@ -123,7 +119,6 @@ Array.isArray(data.history)
 : Array.isArray(historyMetrics?.history)
 ? historyMetrics.history
 : [];
-
 
 function getHistoryValue(
 offset: number,
@@ -194,7 +189,6 @@ return fallback;
 
 }
 
-
 function getHistorySeriesValue(
 seriesNames: string[],
 offset: number,
@@ -239,7 +233,6 @@ fallback
 
 }
 
-
 /* =====================================================
 HISTORICAL BREADTH VALUES
 ===================================================== */
@@ -256,7 +249,6 @@ getHistorySeriesValue(
 breadth20
 );
 
-
 const breadth50_5dAgo =
 getHistorySeriesValue(
 ["breadth50History"],
@@ -268,7 +260,6 @@ getHistorySeriesValue(
 ],
 breadth50
 );
-
 
 const breadth50_10dAgo =
 getHistorySeriesValue(
@@ -282,7 +273,6 @@ getHistorySeriesValue(
 breadth50
 );
 
-
 const breadth200_10dAgo =
 getHistorySeriesValue(
 ["breadth200History"],
@@ -295,7 +285,6 @@ getHistorySeriesValue(
 breadth200
 );
 
-
 const breadth200_20dAgo =
 getHistorySeriesValue(
 ["breadth200History"],
@@ -307,7 +296,6 @@ getHistorySeriesValue(
 ],
 breadth200
 );
-
 
 const advanceDecline_5dAgo =
 getHistorySeriesValue(
@@ -326,14 +314,12 @@ structure?.advanceDecline?.value ?? 0
 )
 );
 
-
 const spxCurrent =
 Number(
 data.indices?.spx ??
 data.indices?.SPX ??
 0
 );
-
 
 const spx5dAgo =
 getHistorySeriesValue(
@@ -352,7 +338,6 @@ getHistorySeriesValue(
 spxCurrent
 );
 
-
 /* =====================================================
 PRICE MOMENTUM
 ===================================================== */
@@ -366,7 +351,6 @@ indices:
 data.indices ?? {}
 
 });
-
 
 /* =====================================================
 DIVERGENCE — LEGACY
@@ -423,7 +407,6 @@ score > 1
 
 })();
 
-
 /* =====================================================
 LIQUIDITY
 ===================================================== */
@@ -471,7 +454,6 @@ data.correlationScore ?? 0
 historyMetrics
 
 });
-
 
 /* =====================================================
 FRAGILITY — PRELIMINARY
@@ -536,7 +518,6 @@ structure
 
 });
 
-
 /* =====================================================
 SQUEEZE
 ===================================================== */
@@ -559,7 +540,6 @@ data.moveIndex ?? 80
 breadth50
 
 });
-
 
 /* =====================================================
 ROTATION BASE
@@ -608,7 +588,6 @@ historyMetrics?.relativeBreadthWeakness ?? 0,
 structure
 
 });
-
 
 /* =====================================================
 PARTICIPATION
@@ -661,7 +640,6 @@ rotationBase?.score ?? 50
 
 });
 
-
 /* =====================================================
 BREADTH THRUST
 ===================================================== */
@@ -704,7 +682,6 @@ divergence.state
 
 });
 
-
 /* =====================================================
 BREADTH VELOCITY
 ===================================================== */
@@ -743,7 +720,6 @@ spxCurrent,
 spx5dAgo
 
 });
-
 
 /* =====================================================
 INTERNAL DIVERGENCE
@@ -837,6 +813,78 @@ data.gammaExposure ?? 0
 
 });
 
+/* =====================================================
+GAMMA
+===================================================== */
+
+/*
+* IMPORTANT:
+*
+* Gamma is a dedicated structural engine.
+*
+* The Gamma Engine requires:
+*
+* - actual gamma exposure
+* - VIX
+* - breadth
+* - liquidity
+* - VIX term structure
+* - Russell / Growth / Equal relative strength
+* - participation
+*
+* Therefore Gamma is intentionally calculated AFTER
+* Rotation Base and Participation exist.
+*
+* `effectiveGamma` remains the ACTUAL gamma exposure.
+*
+* `structuralGammaFloor` is only a structural
+* compression diagnostic and must never replace
+* `effectiveGamma`.
+*/
+
+const gamma =
+gammaEngine({
+
+gammaExposure:
+Number(
+data.gammaExposure ?? 0
+),
+
+vix,
+
+breadth50,
+
+liquidityScore:
+Number(
+liquidity?.score ?? 50
+),
+
+vixTermRatio:
+Number(
+data.vixTermRatio ?? 1
+),
+
+rsSmall:
+Number(
+rotationBase?.rsSmall ?? 1
+),
+
+rsEqual:
+Number(
+rotationBase?.rsEqual ?? 1
+),
+
+rsGrowth:
+Number(
+rotationBase?.rsGrowth ?? 1
+),
+
+participationScore:
+Number(
+participation?.score ?? 50
+)
+
+});
 
 /* =====================================================
 REGIME PERSISTENCE — PRE PHASE
@@ -846,7 +894,6 @@ const regimePersistencePre =
 regimePersistenceEngine(
 historyMetrics
 );
-
 
 /* =====================================================
 FINAL ROTATION
@@ -900,7 +947,6 @@ structure
 
 });
 
-
 /* =====================================================
 CRASH
 ===================================================== */
@@ -946,7 +992,6 @@ driversCore
 
 });
 
-
 /* =====================================================
 EARLY WARNING
 ===================================================== */
@@ -959,7 +1004,6 @@ earlyWarningEngine({
 historyMetrics
 
 });
-
 
 /* =====================================================
 TEMP PUT
@@ -982,7 +1026,6 @@ historyMetrics,
 priceMomentum
 
 });
-
 
 /* =====================================================
 TEMP RUSSELL
@@ -1017,7 +1060,6 @@ historyMetrics
 
 });
 
-
 /* =====================================================
 PHASE
 ===================================================== */
@@ -1048,10 +1090,8 @@ regimePersistencePre
 
 });
 
-
 const phase =
 phaseData.phase;
-
 
 const regime = {
 
@@ -1062,7 +1102,6 @@ score:
 crash.score
 
 };
-
 
 /* =====================================================
 PHASE STAGE
@@ -1075,7 +1114,6 @@ phase,
 phaseData
 
 };
-
 
 /* =====================================================
 CONFIDENCE
@@ -1093,7 +1131,6 @@ rotation,
 phase
 
 });
-
 
 /* =====================================================
 SYSTEM HEAT
@@ -1123,7 +1160,6 @@ gammaExposure:
 data.gammaExposure
 
 });
-
 
 /* =====================================================
 REGIME SYNC — PRE
@@ -1171,7 +1207,6 @@ participation,
 breadthThrust
 
 });
-
 
 /* =====================================================
 DANGER ZONE
@@ -1225,7 +1260,6 @@ history:
 historyMetrics
 
 });
-
 
 /* =====================================================
 EXECUTION STATE — PRE
@@ -1336,7 +1370,6 @@ data.masterScore ?? 50
 
 });
 
-
 /* =====================================================
 ROTATION DECAY
 ===================================================== */
@@ -1412,8 +1445,15 @@ historyMetrics?.leadershipDecay,
 relativeBreadthWeakness:
 historyMetrics?.relativeBreadthWeakness
 
-});
+/*
+* Gamma is supplied as a structural diagnostic.
+* Existing gammaExposure remains available as the
+* raw actual gamma input.
+*/
 
+
+
+});
 
 /* =====================================================
 ROTATION CONFIRM
@@ -1460,10 +1500,11 @@ breadthThrust,
 
 rotationDecay,
 
-historyMetrics
+historyMetrics,
+
+gamma
 
 });
-
 
 /* =====================================================
 FINAL RUSSELL
@@ -1503,10 +1544,11 @@ participation,
 
 internalDivergence,
 
-priceMomentum
+priceMomentum,
+
+gamma
 
 });
-
 
 /* =====================================================
 PHASE CONFIRMATION
@@ -1539,7 +1581,6 @@ rotationDecay,
 historyMetrics
 
 });
-
 
 /* =====================================================
 MARKET QUALITY
@@ -1588,7 +1629,6 @@ data.concentrationScore ?? 50
 )
 
 });
-
 
 /* =====================================================
 FRAGILITY — FINAL
@@ -1662,7 +1702,6 @@ marketQuality
 
 });
 
-
 /* =====================================================
 REGIME SYNC — FINAL
 ===================================================== */
@@ -1711,7 +1750,6 @@ marketQuality
 
 });
 
-
 /* =====================================================
 REGIME PERSISTENCE — FINAL
 ===================================================== */
@@ -1720,7 +1758,6 @@ const regimePersistence =
 regimePersistenceEngine(
 historyMetrics
 );
-
 
 /* =====================================================
 FINAL PUT TIMING
@@ -1761,10 +1798,11 @@ marketQuality,
 
 rotationDecay,
 
-regimePersistence
+regimePersistence,
+
+gamma
 
 });
-
 
 /* =====================================================
 MASTER
@@ -1807,10 +1845,11 @@ historyMetrics,
 
 priceMomentum,
 
-regimePersistence
+regimePersistence,
+
+gamma
 
 });
-
 
 /* =====================================================
 EXECUTION STATE — FINAL
@@ -1922,7 +1961,6 @@ master?.score ?? 50
 
 });
 
-
 /* =====================================================
 EDGE
 ===================================================== */
@@ -1961,10 +1999,11 @@ regimeSync,
 dangerZone,
 
 marketData:
-data.marketData ?? {}
+data.marketData ?? {},
+
+gamma
 
 });
-
 
 /* =====================================================
 NASDAQ CALL
@@ -2003,10 +2042,11 @@ regimeSync,
 
 executionState,
 
-master
+master,
+
+gamma
 
 });
-
 
 /* =====================================================
 POSITIONING
@@ -2023,7 +2063,6 @@ bias:
 ? "BEARISH"
 : "NEUTRAL",
 
-
 crowding:
 
 structure?.breadth?.b50?.value > 85
@@ -2033,7 +2072,6 @@ structure?.breadth?.b50?.value > 85
 ? "CROWDED_SHORT"
 : "BALANCED",
 
-
 state:
 
 earlyWarning?.active
@@ -2042,7 +2080,6 @@ earlyWarning?.active
 : crash?.probability > 40
 ? "RISK"
 : "STABLE",
-
 
 score:
 
@@ -2073,7 +2110,6 @@ crash?.probability ?? 0
 )
 
 };
-
 
 /* =====================================================
 TRADE STACK
@@ -2110,10 +2146,11 @@ regimeSync,
 
 historyMetrics,
 
-regimePersistence
+regimePersistence,
+
+gamma
 
 });
-
 
 /* =====================================================
 POSITION STATE — PRE
@@ -2122,12 +2159,10 @@ POSITION STATE — PRE
 const statePre =
 data.positionState ?? null;
 
-
 const currentPositionSize =
 Number(
 statePre?.size ?? 0
 );
-
 
 const sizingState =
 statePre ?? {
@@ -2153,7 +2188,6 @@ isRunner:
 false
 
 };
-
 
 /* =====================================================
 SIZING
@@ -2217,10 +2251,11 @@ historyMetrics,
 
 priceMomentum,
 
-regimePersistence
+regimePersistence,
+
+gamma
 
 });
-
 
 /* =====================================================
 EXIT
@@ -2262,10 +2297,11 @@ fragility,
 
 liquidity,
 
-participation
+participation,
+
+gamma
 
 });
-
 
 /* =====================================================
 POSITION STATE — FINAL
@@ -2288,7 +2324,6 @@ data.pnl ?? 0
 
 });
 
-
 /* =====================================================
 POSITION
 ===================================================== */
@@ -2308,7 +2343,6 @@ crash,
 rotation
 
 });
-
 
 /* =====================================================
 DECISION
@@ -2336,7 +2370,6 @@ positioning,
 edgeState
 
 });
-
 
 /* =====================================================
 SIGNAL
@@ -2391,10 +2424,11 @@ marketQuality,
 
 priceMomentum,
 
-regimePersistence
+regimePersistence,
+
+gamma
 
 });
-
 
 const signal = {
 
@@ -2407,7 +2441,6 @@ active: false
 phase
 
 };
-
 
 /* =====================================================
 SUPER SIGNAL
@@ -2458,7 +2491,6 @@ regimePersistence
 
 });
 
-
 /* =====================================================
 EXECUTION
 ===================================================== */
@@ -2496,10 +2528,11 @@ fragility,
 
 squeeze,
 
-participation
+participation,
+
+gamma
 
 });
-
 
 /* =====================================================
 RISK
@@ -2515,7 +2548,6 @@ exit,
 state
 
 });
-
 
 /* =====================================================
 HISTORICAL REPLAY
@@ -2535,7 +2567,6 @@ const replay =
 options.skipHistoricalReplay
 ? null
 : historicalReplay();
-
 
 /* =====================================================
 RETURN
@@ -2560,6 +2591,15 @@ rotation,
 rotationConfirm,
 
 rotationDecay,
+
+/*
+* Dedicated Gamma Engine output.
+*
+* This is the canonical gamma object for
+* downstream panels and diagnostics.
+*/
+
+gamma,
 
 breadthVelocity,
 
