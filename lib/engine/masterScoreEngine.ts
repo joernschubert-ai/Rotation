@@ -15,18 +15,13 @@ MASTER SCORE SEMANTICS
 * 50 = neutral / transition
 * 100 = strong defensive / PUT environment
 *
-* Therefore:
-*
 * LOW SCORE -> GREEN -> CALL
 * HIGH SCORE -> RED -> PUT
 *
-* ALL component scores use exactly the same semantic:
+* ALL component scores use the same semantic:
 *
 * LOW = constructive / CALL
 * HIGH = risk / PUT
-*
-* There is NO mixed constructive/risk interpretation
-* inside the returned Master Score object.
 */
 
 
@@ -70,24 +65,17 @@ Number(rotation?.score ?? 50);
 
 
 /*
-* Russell handling is intentionally defensive.
+* BLOCKED / NO_TRADE Russell does NOT mean
+* maximum risk.
 *
-* A BLOCKED Russell signal does NOT mean:
-*
-* "maximum Russell risk"
-*
-* It means:
-*
-* "Russell provides no usable directional information."
-*
-* Therefore BLOCKED is mapped to neutral risk = 50.
+* It means that Russell provides no usable
+* directional information.
 */
 
 const russellBlocked =
 russell?.state === "BLOCKED" ||
 russell?.decision === "NO_TRADE" ||
 russell?.action === "NO_TRADE";
-
 
 const russellScore =
 russellBlocked
@@ -251,9 +239,13 @@ institutionalPressure = 0,
 marketCharacter = "EXPANSION",
 
 averageBreadth = 50,
+
 averageParticipation = 50,
+
 averageRotation = 50,
+
 averageLiquidity = 50,
+
 averageFragility = 50,
 
 acceleratingWeakness = false,
@@ -308,8 +300,6 @@ value
 
 /*
 * Convert a constructive score into risk space.
-*
-* Example:
 *
 * constructive 100 -> risk 0
 * constructive 50 -> risk 50
@@ -378,32 +368,34 @@ TIMING NORMALIZATION
 ===================================================== */
 
 /*
-* putTiming historically uses a 0..12 scale.
+* PutTiming uses a 0..24 scale.
 *
 * 0 = no PUT timing pressure
-* 12 = maximum PUT timing pressure
+* 24 = maximum PUT timing pressure
 *
-* Therefore it is directly normalized into
-* the common 0..100 RISK scale.
+* The score is normalized into the common
+* 0..100 RISK scale.
 */
 
 const timingRisk =
 clamp(
-(timingRaw / 12) * 100
+(timingRaw / 24) * 100
 );
+
+const timingRiskScore =
+timingRisk;
 
 
 /* =====================================================
 RISK COMPONENTS
 ===================================================== */
 
+
 /*
 * CRASH
 *
-* crash.score:
-* high = more risk
+* Already risk-oriented:
 *
-* crash.probability:
 * high = more risk
 */
 
@@ -424,10 +416,9 @@ weight: 0.50
 * ROTATION
 *
 * rotation.score:
+*
 * high = constructive
 * low = risk
-*
-* Convert into risk space.
 */
 
 const rotationRisk =
@@ -437,25 +428,12 @@ rotationScore
 
 
 /*
-* PUT TIMING
-*
-* Already risk-oriented after normalization.
-*/
-
-const timingRiskScore =
-timingRisk;
-
-
-/*
 * RUSSELL
 *
-* A BLOCKED / NO_TRADE Russell signal is NEUTRAL.
+* high confidence = constructive
+* low confidence = weak
 *
-* It must NOT become 100 risk merely because the
-* confidence value is zero.
-*
-* If Russell provides a real directional score,
-* normal constructive -> risk inversion applies.
+* BLOCKED remains neutral.
 */
 
 const russellRisk =
@@ -495,12 +473,19 @@ thrustScore
 /*
 * BREADTH VELOCITY
 *
-* high = healthy/stable
-* low = deterioration
+* IMPORTANT:
+*
+* breadthVelocityEngine semantics:
+*
+* HIGH = deterioration
+* LOW = healthy / stable
+*
+* Therefore this value is already
+* risk-oriented and must NOT be inverted.
 */
 
 const breadthVelocityRisk =
-riskFromConstructive(
+clamp(
 breadthVelocityScore
 );
 
@@ -522,8 +507,6 @@ liquidityScore
 * FRAGILITY
 *
 * Already risk-oriented.
-*
-* high = dangerous
 */
 
 const fragilityRisk =
@@ -536,8 +519,6 @@ fragilityScore
 * ROTATION DECAY
 *
 * Already risk-oriented.
-*
-* high = deteriorating rotation
 */
 
 const rotationDecayRisk =
@@ -627,14 +608,6 @@ Number(averageFragility)
 );
 
 
-/*
-* Historical values are mostly constructive
-* measurements.
-*
-* Convert every constructive measurement into
-* the common risk space first.
-*/
-
 const historicalBreadthRisk =
 riskFromConstructive(
 historicalBreadth
@@ -657,7 +630,7 @@ historicalLiquidity
 
 
 /*
-* Historical fragility is already a risk measurement.
+* Historical fragility is already risk-oriented.
 */
 
 const historicalFragilityRisk =
@@ -665,7 +638,10 @@ historicalFragility;
 
 
 /*
-* Historical risk.
+* Historical risk remains deliberately small.
+*
+* History should provide context and persistence,
+* not overwhelm current market conditions.
 */
 
 const historicalRisk =
@@ -697,12 +673,6 @@ weight: 0.25
 STRUCTURAL RISK
 ===================================================== */
 
-/*
-* All inputs below are already in RISK space.
-*
-* Therefore they can be combined directly.
-*/
-
 const structuralRisk =
 weightedAverage([
 {
@@ -733,9 +703,13 @@ CURRENT MARKET RISK
 ===================================================== */
 
 /*
-* All components are now directly risk-oriented.
+* Current market conditions are the primary source
+* of the Master Score.
 *
-* No second inversion is necessary.
+* PutTiming receives only a small weight here.
+*
+* It should refine timing pressure, not dominate
+* the structural market assessment.
 */
 
 const currentMarketRisk =
@@ -770,7 +744,7 @@ weight: 0.08
 },
 {
 value: marketQualityRisk,
-weight: 0.16
+weight: 0.13
 },
 {
 value: priceMomentumRisk,
@@ -783,6 +757,10 @@ weight: 0.04
 {
 value: dangerRisk,
 weight: 0.03
+},
+{
+value: timingRiskScore,
+weight: 0.03
 }
 ]);
 
@@ -792,33 +770,36 @@ BASE MASTER RISK
 ===================================================== */
 
 /*
-* Master Score = RISK SCORE.
+* IMPORTANT:
 *
-* Current market conditions have the largest weight.
-* Structural quality provides the second layer.
-* Historical conditions prevent short-term noise from
-* dominating the score.
-* Crash risk is deliberately kept as an additional
-* independent risk input.
+* The base score is deliberately dominant.
+*
+* Current market = 70%
+* Structural = 20%
+* Historical = 5%
+* Crash = 5%
+*
+* This prevents the same historical deterioration
+* from being counted repeatedly through large overlays.
 */
 
 let score =
 weightedAverage([
 {
 value: currentMarketRisk,
-weight: 0.55
+weight: 0.70
 },
 {
 value: structuralRisk,
-weight: 0.25
+weight: 0.20
 },
 {
 value: historicalRisk,
-weight: 0.10
+weight: 0.05
 },
 {
 value: crashRisk,
-weight: 0.10
+weight: 0.05
 }
 ]);
 
@@ -828,16 +809,10 @@ PHASE ADJUSTMENT
 ===================================================== */
 
 /*
-* Phase is a bounded RISK overlay.
+* Phase is a bounded confirmation overlay.
 *
-* Earlier phases:
-* lower risk
-*
-* Later phases:
-* higher risk
-*
-* PHASE_7_CAPITULATION receives a reduced adjustment
-* because capitulation can represent exhaustion.
+* It must confirm the risk regime without
+* saturating the Master Score.
 */
 
 let phaseAdjustment = 0;
@@ -846,43 +821,43 @@ switch (phase) {
 
 case "PHASE_1_EXPANSION":
 
-phaseAdjustment = -5;
+phaseAdjustment = -4;
 
 break;
 
 case "PHASE_2_WARNING":
 
-phaseAdjustment = +3;
+phaseAdjustment = +2;
 
 break;
 
 case "PHASE_3_DISTRIBUTION":
 
-phaseAdjustment = +7;
+phaseAdjustment = +4;
 
 break;
 
 case "PHASE_4_RISK":
 
-phaseAdjustment = +10;
+phaseAdjustment = +5;
 
 break;
 
 case "PHASE_5_BREAKDOWN":
 
-phaseAdjustment = +15;
+phaseAdjustment = +8;
 
 break;
 
 case "PHASE_6_ACCELERATION":
 
-phaseAdjustment = +20;
+phaseAdjustment = +10;
 
 break;
 
 case "PHASE_7_CAPITULATION":
 
-phaseAdjustment = +10;
+phaseAdjustment = +5;
 
 break;
 
@@ -894,7 +869,8 @@ phaseAdjustment = 0;
 
 
 /*
-* Confirmed phases receive slightly more weight.
+* Confirmed high-confidence phases receive
+* a modest additional confirmation.
 */
 
 if (
@@ -911,12 +887,6 @@ else if (
 phaseConfidence < 40
 ) {
 
-/*
-* Low phase confidence pulls the score toward neutral.
-*
-* It does not directly create a bullish or bearish signal.
-*/
-
 score =
 50 +
 (score - 50) * 0.75;
@@ -932,10 +902,13 @@ REGIME PERSISTENCE OVERLAY
 ===================================================== */
 
 /*
-* Persistence is deliberately treated as an OVERLAY.
+* Persistence confirms structural weakness.
 *
-* It should confirm structural weakness but must never
-* completely replace the underlying market score.
+* It is deliberately bounded much more tightly
+* than in the previous implementation.
+*
+* Persistence is NOT allowed to turn an already
+* defensive market score into an automatic 100.
 */
 
 let persistenceAdjustment = 0;
@@ -948,7 +921,7 @@ let persistenceAdjustment = 0;
 persistenceAdjustment +=
 clamp(
 distributionRisk
-) * 0.10;
+) * 0.04;
 
 
 /*
@@ -958,7 +931,7 @@ distributionRisk
 persistenceAdjustment +=
 clamp(
 falseRecoveryRisk
-) * 0.08;
+) * 0.03;
 
 
 /*
@@ -968,7 +941,7 @@ falseRecoveryRisk
 persistenceAdjustment +=
 clamp(
 marketFatigue
-) * 0.05;
+) * 0.02;
 
 
 /*
@@ -979,7 +952,7 @@ if (
 bearishPersistence
 ) {
 
-persistenceAdjustment += 6;
+persistenceAdjustment += 1;
 
 }
 
@@ -992,7 +965,7 @@ if (
 historyPersistentDistribution
 ) {
 
-persistenceAdjustment += 4;
+persistenceAdjustment += 1;
 
 }
 
@@ -1005,13 +978,13 @@ if (
 prolongedBearRegime
 ) {
 
-persistenceAdjustment += 4;
+persistenceAdjustment += 1;
 
 }
 
 
 /*
-* Improving persistence can reduce risk slightly.
+* Improving persistence reduces risk slightly.
 */
 
 if (
@@ -1019,20 +992,21 @@ bullishPersistence &&
 persistenceTrend === "IMPROVING"
 ) {
 
-persistenceAdjustment -= 5;
+persistenceAdjustment -= 3;
 
 }
 
 
 /*
-* Bound persistence overlay.
+* Persistence can never exceed +8
+* or fall below -5.
 */
 
 persistenceAdjustment =
 clamp(
 persistenceAdjustment,
--10,
-20
+-5,
+8
 );
 
 score +=
@@ -1044,10 +1018,10 @@ STRUCTURAL WARNING ADJUSTMENTS
 ===================================================== */
 
 /*
-* Warning signals are deliberately bounded overlays.
+* Warning signals are confirmation signals.
 *
-* They confirm risk but do not create an independent
-* Master Score.
+* They must not duplicate the entire structural
+* deterioration already contained in the base score.
 */
 
 let warningAdjustment = 0;
@@ -1102,14 +1076,17 @@ Boolean(prolongedBearRegime);
 
 
 /*
-* Apply bounded risk adjustments.
+* Warning stack.
+*
+* Each individual warning receives only a small
+* confirmation contribution.
 */
 
 if (
 deterioratingBreadth
 ) {
 
-warningAdjustment += 2;
+warningAdjustment += 1;
 
 }
 
@@ -1117,7 +1094,7 @@ if (
 acceleratingBreadthDecay
 ) {
 
-warningAdjustment += 3;
+warningAdjustment += 1;
 
 }
 
@@ -1125,7 +1102,7 @@ if (
 leadershipConcentration
 ) {
 
-warningAdjustment += 2;
+warningAdjustment += 1;
 
 }
 
@@ -1133,7 +1110,7 @@ if (
 risingCrashRisk
 ) {
 
-warningAdjustment += 2;
+warningAdjustment += 1;
 
 }
 
@@ -1141,7 +1118,7 @@ if (
 broadParticipationFailure
 ) {
 
-warningAdjustment += 3;
+warningAdjustment += 1;
 
 }
 
@@ -1150,7 +1127,7 @@ prolongedBearHistory &&
 Number(institutionalPressure) > 70
 ) {
 
-warningAdjustment += 3;
+warningAdjustment += 1;
 
 }
 
@@ -1158,7 +1135,7 @@ if (
 Number(phasePersistence) >= 85
 ) {
 
-warningAdjustment += 2;
+warningAdjustment += 1;
 
 }
 
@@ -1166,7 +1143,7 @@ if (
 historyPersistentDistribution
 ) {
 
-warningAdjustment += 2;
+warningAdjustment += 1;
 
 }
 
@@ -1174,20 +1151,20 @@ if (
 Boolean(acceleratingWeakness)
 ) {
 
-warningAdjustment += 2;
+warningAdjustment += 1;
 
 }
 
 
 /*
-* Warning stack can never dominate the underlying score.
+* Maximum confirmation overlay.
 */
 
 warningAdjustment =
 clamp(
 warningAdjustment,
 0,
-20
+6
 );
 
 score +=
@@ -1199,7 +1176,13 @@ EXECUTION ADJUSTMENT
 ===================================================== */
 
 /*
-* Execution state is a small risk overlay.
+* Execution state is a small overlay.
+*
+* CRISIS alone does not automatically add risk because
+* executionState is an action layer.
+*
+* Only explicit defensive execution states influence
+* the Master Score.
 */
 
 let executionAdjustment = 0;
@@ -1208,7 +1191,7 @@ if (
 marketMode === "RISK_OFF"
 ) {
 
-executionAdjustment += 4;
+executionAdjustment += 2;
 
 }
 
@@ -1216,7 +1199,7 @@ if (
 riskState === "BREAKDOWN"
 ) {
 
-executionAdjustment += 5;
+executionAdjustment += 3;
 
 }
 
@@ -1224,7 +1207,7 @@ if (
 executionMode === "REDUCE_RISK"
 ) {
 
-executionAdjustment += 3;
+executionAdjustment += 2;
 
 }
 
@@ -1232,7 +1215,7 @@ executionAdjustment =
 clamp(
 executionAdjustment,
 0,
-12
+6
 );
 
 score +=
@@ -1258,13 +1241,11 @@ MASTER SIGNAL
 ===================================================== */
 
 /*
-* SINGLE SOURCE OF TRUTH FOR PANEL INTERPRETATION:
+* SINGLE SOURCE OF TRUTH:
 *
 * 0..35 = CALL / GREEN
 * 36..64 = NEUTRAL / YELLOW
 * 65..100 = PUT / RED
-*
-* The panel should NOT invert these values again.
 */
 
 let signal:
@@ -1276,6 +1257,7 @@ let color:
 | "GREEN"
 | "YELLOW"
 | "RED";
+
 
 if (
 score <= 35
@@ -1306,11 +1288,6 @@ color = "YELLOW";
 /* =====================================================
 SIGNAL STRENGTH
 ===================================================== */
-
-/*
-* Strength describes how far the score has moved
-* into the corresponding directional zone.
-*/
 
 let signalStrength = 0;
 
@@ -1362,7 +1339,7 @@ const weakInternals = (
 
 participationScore < 50 ||
 
-breadthVelocityScore < 45 ||
+breadthVelocityScore > 55 ||
 
 marketQualityScore < 45 ||
 
@@ -1416,79 +1393,31 @@ Number(rotation?.rsEqual ?? 1) < 0.995
 DEFENSIVE STRUCTURAL CONFIRMATION
 ===================================================== */
 
-/*
-* IMPORTANT:
-*
-* PHASE_3_DISTRIBUTION is no longer an automatic
-* NEUTRAL mode.
-*
-* The Master Score has priority.
-*
-* A defensive mode is confirmed when:
-*
-* 1. Score is already in PUT territory
-*
-* AND
-*
-* 2. Structural evidence confirms that the high score
-* is not merely a temporary isolated spike.
-*
-* This prevents:
-*
-* PHASE_3 = NEUTRAL
-*
-* from overriding a clearly defensive structure.
-*/
-
-
-/*
-* Rotation breakdown confirmation.
-*/
-
 const rotationBreakdown =
 rotation?.signal === "RISK_OFF_ROTATION" ||
 rotation?.state === "BREAKDOWN" ||
 rotationScore <= 35;
 
 
-/*
-* Fragility breakdown confirmation.
-*/
-
 const fragilityBreakdown =
 fragilityScore >= 75;
 
-
-/*
-* Market quality breakdown confirmation.
-*/
 
 const marketQualityBreakdown =
 marketQuality?.state === "STRUCTURAL_BREAKDOWN" ||
 marketQualityScore <= 35;
 
 
-/*
-* Weak participation confirmation.
-*/
-
 const weakParticipation =
 participation?.state === "WEAK" ||
 participationScore < 45;
 
 
-/*
-* Defensive timing confirmation.
-*/
-
 const defensiveTiming =
 putTiming?.decision === "DEFENSIVE_BUILD" ||
+putTiming?.decision === "STRUCTURAL_BUILD" ||
 timingRiskScore >= 65;
 
-
-/*
-* Structural evidence count.
-*/
 
 const defensiveEvidenceCount = [
 rotationBreakdown,
@@ -1503,27 +1432,9 @@ acceleratingWeakness
 .length;
 
 
-/*
-* Distribution is itself a meaningful structural phase,
-* but it should be combined with actual risk evidence.
-*/
-
 const distributionPhase =
 phase === "PHASE_3_DISTRIBUTION";
 
-
-/*
-* Defensive structural confirmation.
-*
-* Score >= 65 establishes the risk regime.
-*
-* At least two independent structural confirmations
-* are required to promote the trading mode to RISK.
-*
-* A confirmed PHASE_3 distribution requires only two
-* confirmations because distribution is already a
-* meaningful regime transition.
-*/
 
 const defensiveStructuralConfirmation =
 score >= 65 &&
@@ -1539,12 +1450,6 @@ defensiveEvidenceCount >= 3
 );
 
 
-/*
-* Stronger structural confirmation.
-*
-* This is useful for diagnostics and future engines.
-*/
-
 const strongDefensiveStructure =
 score >= 75 &&
 defensiveEvidenceCount >= 3;
@@ -1553,33 +1458,6 @@ defensiveEvidenceCount >= 3;
 /* =====================================================
 MODE
 ===================================================== */
-
-/*
-* IMPORTANT:
-*
-* Mode is NOT simply the phase.
-*
-* Master Score = risk intensity
-* Mode = trading posture
-*
-* The Score has priority.
-*
-* Therefore:
-*
-* PHASE_3 + SCORE 89 + structural breakdown
-*
-* => RISK
-*
-* instead of:
-*
-* PHASE_3
-* => NEUTRAL
-*/
-
-
-/*
-* Default posture.
-*/
 
 let mode:
 | "LONG"
@@ -1591,11 +1469,7 @@ mode = "LONG";
 
 
 /*
-* Base phase posture.
-*
-* Distribution starts at NEUTRAL, but this is only
-* the baseline. It can be promoted by the score and
-* structural confirmation below.
+* Distribution baseline.
 */
 
 if (
@@ -1608,7 +1482,7 @@ mode = "NEUTRAL";
 
 
 /*
-* Risk phases.
+* Risk phase.
 */
 
 if (
@@ -1636,12 +1510,7 @@ mode = "CRASH";
 
 
 /*
-* SCORE-FIRST DEFENSIVE PROMOTION.
-*
-* This is the key correction.
-*
-* A high Master Score is allowed to override the
-* neutral baseline of PHASE_3.
+* Score-first defensive promotion.
 */
 
 if (
@@ -1655,8 +1524,7 @@ mode = "RISK";
 
 
 /*
-* Strong defensive structure can promote a lower phase
-* even when the phase engine has not yet transitioned.
+* Strong defensive structure.
 */
 
 if (
@@ -1672,11 +1540,7 @@ mode = "RISK";
 
 
 /*
-* Explicit prolonged bear regime.
-*
-* This is independent confirmation and should not be
-* ignored simply because the current phase is only
-* PHASE_3.
+* Prolonged bear confirmation.
 */
 
 if (
@@ -1692,7 +1556,7 @@ mode = "RISK";
 
 
 /*
-* Accelerating weakness plus PUT territory.
+* Accelerating weakness.
 */
 
 if (
@@ -1707,7 +1571,7 @@ mode = "RISK";
 
 
 /*
-* Execution layer may force defensive posture.
+* Explicit execution override.
 */
 
 const executionOverride = (
@@ -1732,9 +1596,6 @@ mode = "RISK";
 
 
 /*
-* Do NOT downgrade RISK/CRASH because of
-* narrow leadership.
-*
 * Narrow leadership is diagnostic only.
 */
 
@@ -1826,17 +1687,6 @@ regime = "CRASH";
 }
 
 
-/*
-* IMPORTANT:
-*
-* PHASE_3 does NOT force TRANSITION anymore.
-*
-* If the score and structural evidence have already
-* promoted the trading mode to RISK, the regime must
-* also become RISK.
-*/
-
-
 /* =====================================================
 SUMMARY
 ===================================================== */
@@ -1874,10 +1724,6 @@ summary =
 
 }
 
-
-/*
-* Explicit mode information.
-*/
 
 if (
 mode === "RISK" &&
@@ -1939,19 +1785,11 @@ return {
 
 score,
 
-/*
-* SINGLE SOURCE OF TRUTH FOR USER INTERFACE
-*/
-
 signal,
 
 color,
 
 signalStrength,
-
-/*
-* Trading posture.
-*/
 
 mode,
 
@@ -1967,10 +1805,6 @@ META
 =================================================== */
 
 meta: {
-
-/*
-* Master semantics
-*/
 
 scoreType:
 "RISK",
@@ -2083,7 +1917,7 @@ persistenceTrend,
 
 
 /*
-* Defensive structural confirmation
+* Defensive confirmation
 */
 
 defensiveEvidenceCount,
@@ -2092,7 +1926,6 @@ fragilityBreakdown,
 marketQualityBreakdown,
 weakParticipation,
 defensiveTiming,
-
 distributionPhase,
 defensiveStructuralConfirmation,
 strongDefensiveStructure,
@@ -2148,17 +1981,6 @@ russellRisk
 /* ===================================================
 RISK-ORIENTED COMPONENTS
 =================================================== */
-
-/*
-* ALL components use exactly the same semantics:
-*
-* HIGH = RISK / PUT
-* LOW = CONSTRUCTIVE / CALL
-*
-* The panel must display these values directly.
-*
-* DO NOT invert them in the UI.
-*/
 
 components: {
 
@@ -2232,10 +2054,9 @@ Math.round(
 dangerRisk
 ),
 
+
 /*
 * Persistence components.
-*
-* These are also risk-oriented.
 */
 
 regimePersistence:
