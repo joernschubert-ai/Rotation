@@ -849,9 +849,56 @@ REGIME PERSISTENCE — PRE PHASE
 =================================================== */
 
 const regimePersistencePre =
-regimePersistenceEngine(
-historyMetrics
-);
+regimePersistenceEngine({
+breadth50,
+
+breadth200,
+
+participationScore: 50,
+
+rotationDecayScore: 0,
+
+dangerScore: 0,
+
+fragilityScore:
+Number(
+fragilityPre?.score ?? 50
+),
+
+internalDivergenceScore:
+Number(
+internalDivergence?.score ?? 0
+),
+
+breadth50History:
+Array.isArray(
+historyMetrics?.breadth50History
+)
+? historyMetrics.breadth50History
+: [],
+
+breadth200History:
+Array.isArray(
+historyMetrics?.breadth200History
+)
+? historyMetrics.breadth200History
+: [],
+
+participationHistory:
+Array.isArray(
+historyMetrics?.participationHistory
+)
+? historyMetrics.participationHistory
+: [],
+
+rotationDecayHistory:
+Array.isArray(
+historyMetrics?.rotationDecayHistory
+)
+? historyMetrics.rotationDecayHistory
+: []
+});
+
 
 
 /* ===================================================
