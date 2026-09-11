@@ -58,6 +58,7 @@ HISTORICAL REPLAY
 
 import { historicalReplay } from "../history/historicalReplay";
 
+
 export function marketEngine(
 data: any,
 options: {
@@ -65,9 +66,9 @@ skipHistoricalReplay?: boolean;
 } = {}
 ) {
 
-/* =====================================================
+/* ===================================================
 DRIVERS
-===================================================== */
+=================================================== */
 
 const driversCore =
 driversEngine(data);
@@ -75,16 +76,18 @@ driversEngine(data);
 const marketDrivers =
 marketDriversEngine(data);
 
-/* =====================================================
+
+/* ===================================================
 STRUCTURE
-===================================================== */
+=================================================== */
 
 const structure =
 structureEngine(data);
 
-/* =====================================================
+
+/* ===================================================
 CLEAN INPUT
-===================================================== */
+=================================================== */
 
 const breadth20 =
 Number(
@@ -109,9 +112,10 @@ data.marketData?.["^VIX"]?.current ?? 20
 const historyMetrics =
 data.historyMetrics ?? {};
 
-/* =====================================================
+
+/* ===================================================
 HISTORY ACCESS
-===================================================== */
+=================================================== */
 
 const history =
 Array.isArray(data.history)
@@ -119,6 +123,7 @@ Array.isArray(data.history)
 : Array.isArray(historyMetrics?.history)
 ? historyMetrics.history
 : [];
+
 
 function getHistoryValue(
 offset: number,
@@ -162,7 +167,6 @@ value === undefined
 ) {
 
 value = undefined;
-
 break;
 
 }
@@ -188,6 +192,7 @@ return numeric;
 return fallback;
 
 }
+
 
 function getHistorySeriesValue(
 seriesNames: string[],
@@ -233,9 +238,10 @@ fallback
 
 }
 
-/* =====================================================
+
+/* ===================================================
 HISTORICAL BREADTH VALUES
-===================================================== */
+=================================================== */
 
 const breadth20_5dAgo =
 getHistorySeriesValue(
@@ -338,23 +344,22 @@ getHistorySeriesValue(
 spxCurrent
 );
 
-/* =====================================================
+
+/* ===================================================
 PRICE MOMENTUM
-===================================================== */
+=================================================== */
 
 const priceMomentum =
 priceMomentumEngine({
-
 historyMetrics,
-
 indices:
 data.indices ?? {}
-
 });
 
-/* =====================================================
+
+/* ===================================================
 DIVERGENCE — LEGACY
-===================================================== */
+=================================================== */
 
 const divergence =
 (() => {
@@ -369,7 +374,8 @@ Number(
 structure?.advanceDecline?.value ?? 0
 );
 
-let score = 0;
+let score =
+0;
 
 if (
 breadth > 80 &&
@@ -394,22 +400,20 @@ return {
 score,
 
 state:
-
 score > 1
 ? "BULLISH_DIVERGENCE"
-
 : score < -1
 ? "BEARISH_DIVERGENCE"
-
 : "NONE"
 
 };
 
 })();
 
-/* =====================================================
+
+/* ===================================================
 LIQUIDITY
-===================================================== */
+=================================================== */
 
 const liquidity =
 liquidityEngine({
@@ -443,7 +447,6 @@ marketData:
 data.marketData ?? {},
 
 breadth50,
-
 breadth200,
 
 correlationScore:
@@ -455,28 +458,15 @@ historyMetrics
 
 });
 
-/* =====================================================
-FRAGILITY — PRELIMINARY
-===================================================== */
 
-/*
-* IMPORTANT:
-*
-* The preliminary fragility object exists because
-* early engines already require fragility.
-*
-* At this stage Participation, Breadth Thrust,
-* Final Rotation and Market Quality do not yet exist.
-*
-* Therefore this object is NOT the final system
-* fragility used by Master Score and execution logic.
-*/
+/* ===================================================
+FRAGILITY — PRELIMINARY
+=================================================== */
 
 const fragilityPre =
 fragilityEngine({
 
 history,
-
 historyMetrics,
 
 crash: {
@@ -487,7 +477,6 @@ data.crashProbability ?? 0
 },
 
 breadth50,
-
 breadth200,
 
 gammaExposure:
@@ -513,14 +502,14 @@ data.vixTermRatio ?? 1
 ),
 
 liquidity,
-
 structure
 
 });
 
-/* =====================================================
+
+/* ===================================================
 SQUEEZE
-===================================================== */
+=================================================== */
 
 const squeeze =
 squeezeEngine({
@@ -541,9 +530,10 @@ breadth50
 
 });
 
-/* =====================================================
+
+/* ===================================================
 ROTATION BASE
-===================================================== */
+=================================================== */
 
 const rotationBase =
 rotationEngine({
@@ -564,7 +554,6 @@ marketData:
 data.marketData ?? {},
 
 liquidity,
-
 fragility:
 fragilityPre,
 
@@ -589,9 +578,10 @@ structure
 
 });
 
-/* =====================================================
+
+/* ===================================================
 PARTICIPATION
-===================================================== */
+=================================================== */
 
 const participation =
 participationEngine({
@@ -599,9 +589,7 @@ participationEngine({
 historyMetrics,
 
 breadth20,
-
 breadth50,
-
 breadth200,
 
 structure,
@@ -640,17 +628,16 @@ rotationBase?.score ?? 50
 
 });
 
-/* =====================================================
+
+/* ===================================================
 BREADTH THRUST
-===================================================== */
+=================================================== */
 
 const breadthThrust =
 breadthThrustEngine({
 
 breadth20,
-
 breadth50,
-
 breadth200,
 
 structure,
@@ -682,9 +669,10 @@ divergence.state
 
 });
 
-/* =====================================================
+
+/* ===================================================
 BREADTH VELOCITY
-===================================================== */
+=================================================== */
 
 const breadthVelocity =
 breadthVelocityEngine({
@@ -692,19 +680,14 @@ breadthVelocityEngine({
 structure,
 
 breadth20,
-
 breadth20_5dAgo,
 
 breadth50,
-
 breadth50_5dAgo,
-
 breadth50_10dAgo,
 
 breadth200,
-
 breadth200_10dAgo,
-
 breadth200_20dAgo,
 
 advanceDecline:
@@ -721,9 +704,10 @@ spx5dAgo
 
 });
 
-/* =====================================================
+
+/* ===================================================
 INTERNAL DIVERGENCE
-===================================================== */
+=================================================== */
 
 const internalDivergence =
 internalDivergenceEngine({
@@ -739,9 +723,7 @@ priceMomentum?.score ?? 0
 ),
 
 breadth20,
-
 breadth50,
-
 breadth200,
 
 breadth20Slope5d:
@@ -813,34 +795,10 @@ data.gammaExposure ?? 0
 
 });
 
-/* =====================================================
-GAMMA
-===================================================== */
 
-/*
-* IMPORTANT:
-*
-* Gamma is a dedicated structural engine.
-*
-* The Gamma Engine requires:
-*
-* - actual gamma exposure
-* - VIX
-* - breadth
-* - liquidity
-* - VIX term structure
-* - Russell / Growth / Equal relative strength
-* - participation
-*
-* Therefore Gamma is intentionally calculated AFTER
-* Rotation Base and Participation exist.
-*
-* `effectiveGamma` remains the ACTUAL gamma exposure.
-*
-* `structuralGammaFloor` is only a structural
-* compression diagnostic and must never replace
-* `effectiveGamma`.
-*/
+/* ===================================================
+GAMMA
+=================================================== */
 
 const gamma =
 gammaEngine({
@@ -851,7 +809,6 @@ data.gammaExposure ?? 0
 ),
 
 vix,
-
 breadth50,
 
 liquidityScore:
@@ -886,18 +843,20 @@ participation?.score ?? 50
 
 });
 
-/* =====================================================
+
+/* ===================================================
 REGIME PERSISTENCE — PRE PHASE
-===================================================== */
+=================================================== */
 
 const regimePersistencePre =
 regimePersistenceEngine(
 historyMetrics
 );
 
-/* =====================================================
+
+/* ===================================================
 FINAL ROTATION
-===================================================== */
+=================================================== */
 
 const rotation =
 rotationEngine({
@@ -918,14 +877,11 @@ marketData:
 data.marketData ?? {},
 
 liquidity,
-
 fragility:
 fragilityPre,
 
 squeeze,
-
 participation,
-
 breadthThrust,
 
 breadthTrend:
@@ -947,9 +903,10 @@ structure
 
 });
 
-/* =====================================================
+
+/* ===================================================
 CRASH
-===================================================== */
+=================================================== */
 
 const crash =
 crashEngine({
@@ -992,22 +949,21 @@ driversCore
 
 });
 
-/* =====================================================
+
+/* ===================================================
 EARLY WARNING
-===================================================== */
+=================================================== */
 
 const earlyWarning =
 earlyWarningEngine({
-
 ...data,
-
 historyMetrics
-
 });
 
-/* =====================================================
+
+/* ===================================================
 TEMP PUT
-===================================================== */
+=================================================== */
 
 const putTimingTemp =
 putTimingEngine({
@@ -1016,20 +972,17 @@ phase:
 "TEMP",
 
 rotation,
-
 crash,
-
 earlyWarning,
-
 historyMetrics,
-
 priceMomentum
 
 });
 
-/* =====================================================
+
+/* ===================================================
 TEMP RUSSELL
-===================================================== */
+=================================================== */
 
 const russellTemp =
 russellEngine({
@@ -1041,7 +994,6 @@ rsGrowth:
 rotation.rsGrowth,
 
 breadth50,
-
 breadth200,
 
 concentrationScore:
@@ -1053,88 +1005,73 @@ phase:
 "TEMP",
 
 crash,
-
 vix,
-
 historyMetrics
 
 });
 
-/* =====================================================
+
+/* ===================================================
 PHASE
-===================================================== */
+=================================================== */
 
 const phaseData =
 marketPhaseEngine({
 
 crash,
-
 rotation,
-
 putTiming:
 putTimingTemp,
-
 earlyWarning,
-
 structure,
-
 russell:
 russellTemp,
-
 historyMetrics,
-
 priceMomentum,
-
 regimePersistence:
 regimePersistencePre
 
 });
 
+
 const phase =
 phaseData.phase;
 
 const regime = {
-
 label:
 phase,
 
 score:
 crash.score
-
 };
 
-/* =====================================================
+
+/* ===================================================
 PHASE STAGE
-===================================================== */
+=================================================== */
 
 const phaseStage = {
-
 phase,
-
 phaseData
-
 };
 
-/* =====================================================
+
+/* ===================================================
 CONFIDENCE
-===================================================== */
+=================================================== */
 
 const confidence =
 confidenceEngine({
-
 ...data,
-
 crash,
-
 rotation,
-
 phase
-
 });
 
-/* =====================================================
+
+/* ===================================================
 SYSTEM HEAT
-===================================================== */
+=================================================== */
 
 const systemHeat =
 systemHeatEngine({
@@ -1142,7 +1079,6 @@ systemHeatEngine({
 crash,
 
 breadth20,
-
 breadth50,
 
 vix,
@@ -1161,21 +1097,18 @@ data.gammaExposure
 
 });
 
-/* =====================================================
+
+/* ===================================================
 REGIME SYNC — PRE
-===================================================== */
+=================================================== */
 
 const regimeSyncPre =
 regimeSyncEngine({
 
 phase,
-
 crash,
-
 rotation,
-
 structure,
-
 earlyWarning,
 
 vix,
@@ -1196,21 +1129,20 @@ data.creditRatio ?? 1
 ),
 
 breadth50,
-
 breadth200,
 
 fragility:
 fragilityPre,
 
 participation,
-
 breadthThrust
 
 });
 
-/* =====================================================
+
+/* ===================================================
 DANGER ZONE
-===================================================== */
+=================================================== */
 
 const dangerZone =
 dangerZoneEngine({
@@ -1226,7 +1158,6 @@ crash?.momentum ?? 0
 ),
 
 breadth50,
-
 breadth200,
 
 liquidityVacuumScore:
@@ -1261,9 +1192,10 @@ historyMetrics
 
 });
 
-/* =====================================================
+
+/* ===================================================
 EXECUTION STATE — PRE
-===================================================== */
+=================================================== */
 
 const executionStatePre =
 executionStateEngine({
@@ -1289,7 +1221,8 @@ systemHeat?.value ?? 0
 ) * 10,
 
 rotationSignal:
-rotation?.signal ?? "neutral",
+rotation?.signal ??
+"neutral",
 
 rotationStrength:
 Number(
@@ -1297,7 +1230,6 @@ rotation?.score ?? 0
 ),
 
 breadth200,
-
 breadth50,
 
 gammaExposure:
@@ -1370,42 +1302,31 @@ data.masterScore ?? 50
 
 });
 
-/* =====================================================
+
+/* ===================================================
 ROTATION DECAY
-===================================================== */
+=================================================== */
 
 const rotationDecay =
 rotationDecayEngine({
 
 historyMetrics,
-
 rotation,
-
 structure,
-
 crash,
-
 earlyWarning,
-
 liquidity,
-
 fragility:
 fragilityPre,
-
 squeeze,
-
 participation,
-
 breadthThrust,
-
 regimeSync:
 regimeSyncPre,
-
 executionState:
 executionStatePre,
 
 breadth50,
-
 breadth200,
 
 vix,
@@ -1445,29 +1366,19 @@ historyMetrics?.leadershipDecay,
 relativeBreadthWeakness:
 historyMetrics?.relativeBreadthWeakness
 
-/*
-* Gamma is supplied as a structural diagnostic.
-* Existing gammaExposure remains available as the
-* raw actual gamma input.
-*/
-
-
-
 });
 
-/* =====================================================
+
+/* ===================================================
 ROTATION CONFIRM
-===================================================== */
+=================================================== */
 
 const rotationConfirm =
 rotationConfirmEngine({
 
 rotation,
-
 structure,
-
 crash,
-
 earlyWarning,
 
 drivers:
@@ -1477,9 +1388,7 @@ positioning:
 {},
 
 volatility:
-{
-vix
-},
+{ vix },
 
 executionState:
 executionStatePre,
@@ -1488,27 +1397,22 @@ regimeSync:
 regimeSyncPre,
 
 liquidity,
-
 fragility:
 fragilityPre,
 
 squeeze,
-
 participation,
-
 breadthThrust,
-
 rotationDecay,
-
 historyMetrics,
-
 gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
 FINAL RUSSELL
-===================================================== */
+=================================================== */
 
 const russell =
 russellEngine({
@@ -1520,7 +1424,6 @@ rsGrowth:
 rotation.rsGrowth,
 
 breadth50,
-
 breadth200,
 
 concentrationScore:
@@ -1531,95 +1434,63 @@ data.concentrationScore ?? 0
 phase,
 
 crash,
-
 vix,
-
 historyMetrics,
 
 rotationDecay,
-
 rotationConfirm,
-
 participation,
-
 internalDivergence,
-
 priceMomentum,
-
 gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
 PHASE CONFIRMATION
-===================================================== */
+=================================================== */
 
 const phaseConfirmation =
 phaseConfirmationEngine({
 
 phase,
-
 phaseData,
-
 rotation,
-
 crash,
-
 earlyWarning,
-
 participation,
-
 breadthThrust,
-
 liquidity,
 
 fragility:
 fragilityPre,
 
 rotationDecay,
-
 historyMetrics
 
 });
 
-/* =====================================================
-MARKET QUALITY
-===================================================== */
 
-/*
-* Market Quality intentionally receives fragilityPre.
-*
-* This prevents a circular dependency:
-*
-* Market Quality -> Fragility Final
-* Fragility Final -> Market Quality
-*
-* The final fragility calculation below then combines
-* the completed Market Quality with all structural data.
-*/
+/* ===================================================
+MARKET QUALITY
+=================================================== */
 
 const marketQuality =
 marketQualityEngine({
 
 structure,
-
 participation,
-
 rotation,
-
 breadthThrust,
-
 rotationDecay,
-
 liquidity,
 
 fragility:
 fragilityPre,
 
 phaseConfirmation,
-
 internalDivergence,
-
 regimeSync:
 regimeSyncPre,
 
@@ -1630,40 +1501,19 @@ data.concentrationScore ?? 50
 
 });
 
-/* =====================================================
-FRAGILITY — FINAL
-===================================================== */
 
-/*
-* FINAL FRAGILITY ENGINE
-*
-* This is the canonical fragility object used by all
-* downstream institutional decision engines.
-*
-* It now has access to:
-*
-* - Final Rotation
-* - Participation
-* - Breadth Thrust
-* - Market Quality
-* - Full Liquidity
-* - Full history
-*
-* The preliminary fragility object remains only for
-* resolving early pipeline dependencies.
-*/
+/* ===================================================
+FRAGILITY — FINAL
+=================================================== */
 
 const fragility =
 fragilityEngine({
 
 history,
-
 historyMetrics,
-
 crash,
 
 breadth50,
-
 breadth200,
 
 gammaExposure:
@@ -1689,34 +1539,26 @@ data.vixTermRatio ?? 1
 ),
 
 liquidity,
-
 structure,
-
 participation,
-
 breadthThrust,
-
 rotation,
-
 marketQuality
 
 });
 
-/* =====================================================
+
+/* ===================================================
 REGIME SYNC — FINAL
-===================================================== */
+=================================================== */
 
 const regimeSync =
 regimeSyncEngine({
 
 phase,
-
 crash,
-
 rotation,
-
 structure,
-
 earlyWarning,
 
 vix,
@@ -1737,123 +1579,236 @@ data.creditRatio ?? 1
 ),
 
 breadth50,
-
 breadth200,
 
 fragility,
-
 participation,
-
 breadthThrust,
-
 marketQuality
 
 });
 
-/* =====================================================
+
+/* ===================================================
 REGIME PERSISTENCE — FINAL
-===================================================== */
+=================================================== */
 
 const regimePersistence =
 regimePersistenceEngine(
 historyMetrics
 );
 
-/* =====================================================
+
+/* ===================================================
 FINAL PUT TIMING
-===================================================== */
+=================================================== */
 
 const putTiming =
 putTimingEngine({
 
 phase,
-
 phaseData,
-
 rotation,
-
 rotationConfirm,
-
 crash,
-
 earlyWarning,
-
 historyMetrics,
-
 priceMomentum,
-
 participation,
-
 liquidity,
-
 dangerZone,
-
 marketDrivers,
-
 regimeSync,
-
 breadthThrust,
-
 marketQuality,
-
 rotationDecay,
-
 regimePersistence,
-
 gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
 MASTER
-===================================================== */
+=================================================== */
+
+/*
+* TEMPORARY DIAGNOSTIC:
+*
+* We do NOT modify any values here.
+*
+* We only inspect the exact score sources that
+* masterScoreEngine receives.
+*
+* The diagnostic is emitted only when at least
+* one relevant value is non-finite.
+*/
+
+const masterDiagnostics = {
+
+crash:
+crash?.score,
+
+crashProbability:
+crash?.probability,
+
+rotation:
+rotation?.score,
+
+putTiming:
+putTiming?.score,
+
+russell:
+russell?.confidence ??
+russell?.score?.value ??
+russell?.score,
+
+participation:
+participation?.score,
+
+breadthThrust:
+breadthThrust?.score,
+
+liquidity:
+liquidity?.score,
+
+fragility:
+fragility?.score,
+
+marketQuality:
+marketQuality?.score,
+
+rotationDecay:
+rotationDecay?.score,
+
+phaseConfirmation:
+phaseConfirmation?.confidence,
+
+regimeSync:
+regimeSync?.score,
+
+priceMomentum:
+priceMomentum?.score,
+
+regimePersistence:
+regimePersistence?.score
+
+};
+
+const nonFiniteMasterInputs =
+Object.entries(
+masterDiagnostics
+)
+.filter(
+([, value]) =>
+!Number.isFinite(
+Number(value)
+)
+)
+.map(
+([name, value]) => ({
+name,
+value
+})
+);
+
+if (
+nonFiniteMasterInputs.length > 0
+) {
+
+console.error(
+"[MASTER SCORE DIAGNOSTIC] Non-finite input detected",
+{
+timestamp:
+new Date().toISOString(),
+
+skipHistoricalReplay:
+options.skipHistoricalReplay === true,
+
+masterInputs:
+masterDiagnostics,
+
+nonFinite:
+nonFiniteMasterInputs
+
+}
+);
+
+}
+
 
 const master =
 masterScoreEngine({
 
 crash,
-
 rotation,
-
 putTiming,
-
 russell,
-
 phaseData,
-
 structure,
-
 participation,
-
 breadthThrust,
-
 liquidity,
-
 fragility,
-
 marketQuality,
-
 rotationDecay,
-
 phaseConfirmation,
-
 regimeSync,
-
 phaseStage,
-
 historyMetrics,
-
 priceMomentum,
-
 regimePersistence,
-
 gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
+MASTER RESULT DIAGNOSTIC
+=================================================== */
+
+if (
+!Number.isFinite(
+Number(
+master?.score
+)
+)
+) {
+
+console.error(
+"[MASTER SCORE DIAGNOSTIC] Master score is non-finite",
+{
+timestamp:
+new Date().toISOString(),
+
+masterScore:
+master?.score,
+
+masterInputs:
+masterDiagnostics,
+
+nonFinite:
+nonFiniteMasterInputs,
+
+phase,
+rotationState:
+rotation?.state,
+
+rotationSignal:
+rotation?.signal,
+
+regimePersistence:
+regimePersistence?.score
+
+}
+);
+
+}
+
+
+/* ===================================================
 EXECUTION STATE — FINAL
-===================================================== */
+=================================================== */
 
 const executionState =
 executionStateEngine({
@@ -1879,7 +1834,8 @@ systemHeat?.value ?? 0
 ) * 10,
 
 rotationSignal:
-rotation?.signal ?? "neutral",
+rotation?.signal ??
+"neutral",
 
 rotationStrength:
 Number(
@@ -1887,7 +1843,6 @@ rotation?.score ?? 0
 ),
 
 breadth200,
-
 breadth50,
 
 gammaExposure:
@@ -1961,41 +1916,28 @@ master?.score ?? 50
 
 });
 
-/* =====================================================
+
+/* ===================================================
 EDGE
-===================================================== */
+=================================================== */
 
 const edgeState =
 edgeStateEngine({
 
 rotation,
-
 russell,
-
 structure,
-
 earlyWarning,
-
 crash,
-
 master,
-
 marketQuality,
-
 rotationDecay,
-
 rotationConfirm,
-
 participation,
-
 divergence,
-
 priceMomentum,
-
 executionState,
-
 regimeSync,
-
 dangerZone,
 
 marketData:
@@ -2005,9 +1947,10 @@ gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
 NASDAQ CALL
-===================================================== */
+=================================================== */
 
 const nasdaqCall =
 nasdaqEngine({
@@ -2015,146 +1958,104 @@ nasdaqEngine({
 ...data,
 
 phase,
-
 phaseData,
-
 crash,
-
 rotation,
-
 putTiming,
-
 earlyWarning,
-
 historyMetrics,
-
 priceMomentum,
-
 marketQuality,
-
 participation,
-
 breadthThrust,
-
 liquidity,
-
 regimeSync,
-
 executionState,
-
 master,
-
 gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
 POSITIONING
-===================================================== */
+=================================================== */
 
 const positioning = {
 
 bias:
-
 (rotation.score ?? 0) > 60
 ? "BULLISH"
-
 : (rotation.score ?? 0) < 40
 ? "BEARISH"
 : "NEUTRAL",
 
 crowding:
-
 structure?.breadth?.b50?.value > 85
 ? "CROWDED_LONG"
-
 : structure?.breadth?.b50?.value < 30
 ? "CROWDED_SHORT"
 : "BALANCED",
 
 state:
-
 earlyWarning?.active
 ? "FRAGILE"
-
 : crash?.probability > 40
 ? "RISK"
 : "STABLE",
 
 score:
-
 Math.round(
-
 (
 Number(
 rotation?.score ?? 50
 ) * 0.5
-)
-
-+
-
+) +
 (
 Number(
 structure?.health?.value ?? 0
 ) * 0.3
-)
-
--
-
+) -
 (
 Number(
 crash?.probability ?? 0
 ) * 0.2
 )
-
 )
 
 };
 
-/* =====================================================
+
+/* ===================================================
 TRADE STACK
-===================================================== */
+=================================================== */
 
 const tradeStack =
 tradeStackEngine({
 
 phase,
-
 putTiming,
-
 nasdaqCall,
-
 russell,
-
 priceMomentum,
-
 edgeState,
-
 master,
-
 marketQuality,
-
 phaseConfirmation,
-
 rotationConfirm,
-
 rotationDecay,
-
 executionState,
-
 regimeSync,
-
 historyMetrics,
-
 regimePersistence,
-
 gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
 POSITION STATE — PRE
-===================================================== */
+=================================================== */
 
 const statePre =
 data.positionState ?? null;
@@ -2167,113 +2068,79 @@ statePre?.size ?? 0
 const sizingState =
 statePre ?? {
 
-size:
-0,
-
-entryPrice:
-0,
+size: 0,
+entryPrice: 0,
 
 pnl:
 Number(
 data.pnl ?? 0
 ),
 
-realized:
-0,
+realized: 0,
 
-hasReduced:
-false,
+hasReduced: false,
 
-isRunner:
-false
+isRunner: false
 
 };
 
-/* =====================================================
+
+/* ===================================================
 SIZING
-===================================================== */
+=================================================== */
 
 const sizing =
 positionSizingV2({
 
 master,
-
 crash,
-
 putTiming,
-
 russell,
-
 positioning,
-
 state:
 sizingState,
 
 systemHeat,
-
 earlyWarning,
-
 rotation,
-
 structure,
-
 edgeState,
-
 tradeStack,
-
 divergence,
-
 regimeSync,
-
 dangerZone,
-
 executionState,
-
 rotationConfirm,
-
 rotationDecay,
-
 liquidity,
-
 breadthThrust,
-
 fragility,
-
 marketQuality,
-
 squeeze,
-
 participation,
-
 phase,
-
 historyMetrics,
-
 priceMomentum,
-
 regimePersistence,
-
 gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
 EXIT
-===================================================== */
+=================================================== */
 
 const exit =
 exitEngine({
 
-position:
-{
+position: {
 size:
 currentPositionSize
 },
 
 crash,
-
 vix,
-
 breadth50,
 
 pnl:
@@ -2282,30 +2149,22 @@ data.pnl ?? 0
 ),
 
 phase,
-
 rotation,
-
 rotationConfirm,
-
 rotationDecay,
-
 russell,
-
 systemHeat,
-
 fragility,
-
 liquidity,
-
 participation,
-
 gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
 POSITION STATE — FINAL
-===================================================== */
+=================================================== */
 
 const state =
 positionStateEngine({
@@ -2314,7 +2173,6 @@ prevState:
 statePre,
 
 sizing,
-
 exit,
 
 pnl:
@@ -2324,9 +2182,10 @@ data.pnl ?? 0
 
 });
 
-/* =====================================================
+
+/* ===================================================
 POSITION
-===================================================== */
+=================================================== */
 
 const position =
 positionEngine({
@@ -2337,103 +2196,73 @@ data.pnl ?? 0
 ),
 
 phase,
-
 crash,
-
 rotation
 
 });
 
-/* =====================================================
+
+/* ===================================================
 DECISION
-===================================================== */
+=================================================== */
 
 const decision =
 rotationDecisionEngine({
 
 phase,
-
 crash,
-
 putTiming,
-
 russell,
-
 confidence,
-
 earlyWarning,
-
 master,
-
 positioning,
-
 edgeState
 
 });
 
-/* =====================================================
+
+/* ===================================================
 SIGNAL
-===================================================== */
+=================================================== */
 
 const signalResult =
 signalEngine({
 
 phase,
-
 phaseConfirmation,
-
 crash,
-
 putTiming,
-
 rotation,
-
 earlyWarning,
-
 exit,
-
 decision,
-
 tradeStack,
-
 divergence,
-
 sizing,
-
 regimeSync,
-
 dangerZone,
-
 executionState,
-
 rotationConfirm,
-
 rotationDecay,
-
 liquidity,
-
 breadthThrust,
-
 fragility,
-
 squeeze,
-
 participation,
-
 marketQuality,
-
 priceMomentum,
-
 regimePersistence,
-
 gamma
 
 });
 
+
 const signal = {
 
 ...(
-signalResult?.signal ?? {
+signalResult?.signal ??
+{
 active: false
 }
 ),
@@ -2442,116 +2271,83 @@ phase
 
 };
 
-/* =====================================================
+
+/* ===================================================
 SUPER SIGNAL
-===================================================== */
+=================================================== */
 
 const superSignal =
 superSignalEngine({
 
 signal,
-
 phaseConfirmation,
-
 rotationConfirm,
-
 rotationDecay,
-
 tradeStack,
-
 regimeSync,
-
 dangerZone,
-
 executionState,
-
 structure,
-
 marketDrivers,
-
 crash,
-
 rotation,
-
 divergence,
-
 liquidity,
-
 breadthThrust,
-
 fragility,
-
 squeeze,
-
 participation,
-
 marketQuality,
-
 regimePersistence
 
 });
 
-/* =====================================================
+
+/* ===================================================
 EXECUTION
-===================================================== */
+=================================================== */
 
 const execution =
 executionEngine({
 
 superSignal,
-
 marketQuality,
-
 vix,
-
 breadth20,
-
 breadth50,
-
 crash,
-
 phase,
-
 executionState,
-
 dangerZone,
-
 regimeSync,
-
 rotationConfirm,
-
 liquidity,
-
 breadthThrust,
-
 fragility,
-
 squeeze,
-
 participation,
-
 gamma
 
 });
 
-/* =====================================================
+
+/* ===================================================
 RISK
-===================================================== */
+=================================================== */
 
 const risk =
 riskLoopEngine({
 
 sizing,
-
 exit,
-
 state
 
 });
 
-/* =====================================================
+
+/* ===================================================
 HISTORICAL REPLAY
-===================================================== */
+=================================================== */
 
 /*
 * Die neue Historical Replay Engine verwaltet
@@ -2559,8 +2355,9 @@ HISTORICAL REPLAY
 *
 * historicalScenarioLibrary.ts
 *
-* Deshalb werden hier KEINE JSON-Dateien mehr geladen
-* und KEINE Snapshots als Argument übergeben.
+* Deshalb werden hier KEINE JSON-Dateien mehr
+* geladen und KEINE Snapshots als Argument
+* übergeben.
 */
 
 const replay =
@@ -2568,16 +2365,16 @@ options.skipHistoricalReplay
 ? null
 : historicalReplay();
 
-/* =====================================================
+
+/* ===================================================
 RETURN
-===================================================== */
+=================================================== */
 
 return {
 
 crash,
 
 phase,
-
 phaseData,
 
 priceMomentum,
