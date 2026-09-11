@@ -33,7 +33,7 @@ import { rotationDecayEngine } from "./rotationDecayEngine";
 HISTORY ENGINES
 ===================================================== */
 
-import { regimePersistenceEngine } from "../history/regimePersistenceEngine";
+import { regimePersistenceEngine } from "./regimePersistenceEngine";
 
 /* =====================================================
 STRUCTURAL ENGINES
