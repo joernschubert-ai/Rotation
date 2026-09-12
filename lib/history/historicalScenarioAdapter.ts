@@ -211,6 +211,125 @@ historyMetrics?: Record<string, any>;
 
 
 /* =====================================================
+HISTORICAL SCENARIO INPUT
+===================================================== */
+
+/*
+* This structure is deliberately explicit.
+*
+* Historical scenarios are calibration fixtures.
+*
+* Their supplied structural values must remain available
+* to the phase engine even if marketEngine normally
+* recalculates the corresponding live engines.
+*/
+
+export interface HistoricalScenarioInput {
+
+historicalScenario: true;
+
+scenarioId: string;
+
+scenarioDate: string;
+
+market: {
+
+vix: number;
+
+breadth50: number;
+
+breadth200: number;
+
+vixTermRatio: number;
+
+};
+
+rotation: {
+
+score: number;
+
+rsSmall: number;
+
+rsEqual: number;
+
+rsGrowth: number;
+
+};
+
+participation: {
+
+score: number;
+
+};
+
+breadthThrust: {
+
+score: number;
+
+};
+
+liquidity: {
+
+score: number;
+
+};
+
+fragility: {
+
+score: number;
+
+};
+
+rotationDecay: {
+
+score: number;
+
+};
+
+internalDivergence: {
+
+score: number;
+
+severity: number;
+
+};
+
+regimeSync: {
+
+score: number;
+
+};
+
+concentrationScore: number;
+
+crash: {
+
+score: number;
+
+probability: number;
+
+};
+
+phaseConfirmation: {
+
+confidence: number;
+
+confirmed: boolean;
+
+};
+
+putTiming: {
+
+score: number;
+
+};
+
+historyMetrics: Record<string, any>;
+
+}
+
+
+/* =====================================================
 ADAPTER
 ===================================================== */
 
@@ -218,10 +337,22 @@ ADAPTER
 * Converts a permanent historical scenario into an
 * engine-compatible market input.
 *
-* The goal is NOT to fake a live API response.
+* IMPORTANT:
 *
-* The goal is to provide the actual marketEngine with
-* the same structural inputs that its sub-engines use.
+* The adapter does not pretend that historical data is
+* live market data.
+*
+* Instead it explicitly marks the input as a historical
+* calibration scenario and preserves the fixture values
+* in historicalScenarioInput.
+*
+* marketEngine can therefore distinguish:
+*
+* LIVE:
+* calculate from raw market inputs
+*
+* HISTORICAL:
+* preserve supplied calibration values for replay
 */
 
 export function historicalScenarioAdapter(
@@ -232,7 +363,284 @@ const historyMetrics =
 scenario.historyMetrics ?? {};
 
 
+const internalDivergenceScore =
+Number(
+scenario.internalDivergence?.score ?? 0
+);
+
+
+const regimeSyncScore =
+Number(
+scenario.regimeSync?.score ?? 50
+);
+
+
+const phaseConfirmation = {
+
+confidence:
+Number(
+scenario.phaseConfirmation?.confidence ?? 70
+),
+
+confirmed:
+Boolean(
+scenario.phaseConfirmation?.confirmed ?? true
+)
+
+};
+
+
+const historicalScenarioInput:
+HistoricalScenarioInput = {
+
+historicalScenario: true,
+
+scenarioId:
+scenario.id,
+
+scenarioDate:
+scenario.date,
+
+
+/* =================================================
+MARKET
+================================================= */
+
+market: {
+
+vix:
+Number(
+scenario.market.vix
+),
+
+breadth50:
+Number(
+scenario.market.breadth50
+),
+
+breadth200:
+Number(
+scenario.market.breadth200
+),
+
+vixTermRatio:
+Number(
+scenario.market.vixTermRatio ?? 1
+)
+
+},
+
+
+/* =================================================
+ROTATION
+================================================= */
+
+rotation: {
+
+score:
+Number(
+scenario.rotation.score
+),
+
+rsSmall:
+Number(
+scenario.rotation.rsSmall
+),
+
+rsEqual:
+Number(
+scenario.rotation.rsEqual
+),
+
+rsGrowth:
+Number(
+scenario.rotation.rsGrowth
+)
+
+},
+
+
+/* =================================================
+PARTICIPATION
+================================================= */
+
+participation: {
+
+score:
+Number(
+scenario.participation.score
+)
+
+},
+
+
+/* =================================================
+BREADTH THRUST
+================================================= */
+
+breadthThrust: {
+
+score:
+Number(
+scenario.breadthThrust.score
+)
+
+},
+
+
+/* =================================================
+LIQUIDITY
+================================================= */
+
+liquidity: {
+
+score:
+Number(
+scenario.liquidity.score
+)
+
+},
+
+
+/* =================================================
+FRAGILITY
+================================================= */
+
+fragility: {
+
+score:
+Number(
+scenario.fragility.score
+)
+
+},
+
+
+/* =================================================
+ROTATION DECAY
+================================================= */
+
+rotationDecay: {
+
+score:
+Number(
+scenario.rotationDecay.score
+)
+
+},
+
+
+/* =================================================
+INTERNAL DIVERGENCE
+================================================= */
+
+/*
+* IMPORTANT:
+*
+* The phase engine uses severity as the structural
+* divergence measure.
+*
+* Historical fixtures use score.
+*
+* Therefore both are explicitly supplied.
+*/
+
+internalDivergence: {
+
+score:
+internalDivergenceScore,
+
+severity:
+internalDivergenceScore
+
+},
+
+
+/* =================================================
+REGIME SYNC
+================================================= */
+
+regimeSync: {
+
+score:
+regimeSyncScore
+
+},
+
+
+/* =================================================
+CONCENTRATION
+================================================= */
+
+concentrationScore:
+Number(
+scenario.concentrationScore ?? 50
+),
+
+
+/* =================================================
+CRASH
+================================================= */
+
+crash: {
+
+score:
+Number(
+scenario.crash.score
+),
+
+probability:
+Number(
+scenario.crash.probability
+)
+
+},
+
+
+/* =================================================
+PHASE CONFIRMATION
+================================================= */
+
+phaseConfirmation,
+
+
+/* =================================================
+PUT TIMING
+================================================= */
+
+putTiming: {
+
+score:
+Number(
+scenario.putTiming?.score ?? 0
+)
+
+},
+
+
+/* =================================================
+HISTORY
+================================================= */
+
+historyMetrics
+
+};
+
+
 return {
+
+/* ===================================================
+HISTORICAL MODE MARKER
+=================================================== */
+
+historicalScenario: true,
+
+scenarioId:
+scenario.id,
+
+scenarioDate:
+scenario.date,
+
 
 /* ===================================================
 MARKET DATA
@@ -396,10 +804,18 @@ scenario.rotationDecay.score
 INTERNAL DIVERGENCE
 =================================================== */
 
+/*
+* Both score and severity are provided so the
+* historical fixture survives differing consumers.
+*/
+
 internalDivergence: {
 
 score:
-scenario.internalDivergence?.score ?? 0
+internalDivergenceScore,
+
+severity:
+internalDivergenceScore
 
 },
 
@@ -411,7 +827,7 @@ REGIME SYNC
 regimeSync: {
 
 score:
-scenario.regimeSync?.score ?? 50
+regimeSyncScore
 
 },
 
@@ -443,15 +859,7 @@ scenario.crash.probability
 PHASE CONFIRMATION
 =================================================== */
 
-phaseConfirmation: {
-
-confidence:
-scenario.phaseConfirmation?.confidence ?? 70,
-
-confirmed:
-scenario.phaseConfirmation?.confirmed ?? true
-
-},
+phaseConfirmation,
 
 
 /* ===================================================
@@ -467,10 +875,17 @@ scenario.putTiming?.score ?? 0
 
 
 /* ===================================================
-HISTORY METRICS
+HISTORY
 =================================================== */
 
-historyMetrics
+historyMetrics,
+
+
+/* ===================================================
+CANONICAL HISTORICAL FIXTURE
+=================================================== */
+
+historicalScenarioInput
 
 };
 
