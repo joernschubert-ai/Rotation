@@ -53,6 +53,17 @@ institutionalPressure = 0,
 marketCharacter = "EXPANSION",
 prolongedBearRegime = false,
 acceleratingWeakness = false,
+
+/*
+* IMPORTANT:
+*
+* Historical replay scenarios may explicitly mark
+* persistent distribution.
+*
+* This must be consumed by the phase engine.
+*/
+persistentDistribution: historicalPersistentDistribution = false,
+
 averageBreadth = 0,
 averageParticipation = 0,
 averageRotation = 0,
@@ -102,6 +113,10 @@ earlyWarning?.score ??
 0
 );
 
+const meaningfulEarlyWarning =
+early &&
+earlyScore >= 35;
+
 
 /* =====================================================
 STRUCTURE
@@ -146,17 +161,6 @@ structure?.highsLows?.lows ?? 0
 /* =====================================================
 BREADTH VELOCITY
 ===================================================== */
-
-/*
-* IMPORTANT:
-*
-* breadthVelocity.score is RISK-oriented:
-*
-* 0 = little deterioration
-* 100 = severe deterioration
-*
-* Therefore HIGH values are dangerous.
-*/
 
 const breadthVelocityScore =
 Number(
@@ -354,6 +358,60 @@ relativeBreadthWeakness > 20;
 
 
 /* =====================================================
+HISTORICAL DISTRIBUTION
+===================================================== */
+
+/*
+* Historical replay scenarios can explicitly describe
+* a persistent distribution regime.
+*
+* This is NOT allowed to force P4 by itself.
+*
+* It becomes meaningful when supported by at least one
+* structural deterioration characteristic.
+*/
+
+const historicalDistributionSupport =
+historicalPersistentDistribution &&
+(
+Number(averageFragility) >= 50 ||
+Number(averageParticipation) < 60 ||
+Number(averageBreadth) < 65 ||
+Number(averageRotation) < 55 ||
+Number(institutionalPressure) >= 60 ||
+Number(relativeBreadthWeakness) > 5 ||
+Number(participationDecay) >= 10 ||
+Boolean(acceleratingWeakness) ||
+Boolean(prolongedBearRegime) ||
+Boolean(narrowLeadershipDivergence) ||
+Number(divergenceSeverity) >= 30 ||
+Number(rotationScore) < 50 ||
+Number(breadth50) < 60
+);
+
+
+/*
+* Accelerating historical weakness is also useful
+* when the market is still relatively strong on the
+* surface.
+*
+* This remains a P3-level detector.
+*/
+
+const acceleratingHistoricalDistribution =
+acceleratingWeakness &&
+(
+Number(averageFragility) >= 50 ||
+Number(averageParticipation) < 60 ||
+Number(averageBreadth) < 65 ||
+Number(averageRotation) < 55 ||
+Number(institutionalPressure) >= 60 ||
+Number(divergenceSeverity) >= 30 ||
+Boolean(narrowLeadershipDivergence)
+);
+
+
+/* =====================================================
 STRUCTURAL DETERIORATION
 ===================================================== */
 
@@ -379,14 +437,6 @@ deterioratingBreadth
 /* =====================================================
 BREADTH FLAGS
 ===================================================== */
-
-/*
-* Expansion should not require perfect breadth.
-*
-* strongBreadth = clearly constructive
-* mediumBreadth = constructive but not perfect
-* weakBreadth = structurally weak
-*/
 
 const strongBreadth =
 breadth50 >= 75 &&
@@ -474,17 +524,9 @@ velocity20 < -4 &&
 velocity50 < -3;
 
 
-/*
-* CORRECTED SEMANTICS
-*
-* breadthVelocity.score:
-* HIGH = deterioration
-*
-* Therefore:
-*
-* >55 = deterioration
-* >70 = severe deterioration
-*/
+/* =====================================================
+BREADTH VELOCITY SEMANTICS
+===================================================== */
 
 const breadthImpulseBreak =
 breadthVelocityScore > 55;
@@ -546,13 +588,6 @@ aggressiveBreadthMomentumLoss
 COMBINED STRUCTURAL RISK
 ===================================================== */
 
-/*
-* Count independent deterioration signals.
-*
-* This prevents a single noisy metric from
-* automatically forcing PHASE_4_RISK.
-*/
-
 let structuralRiskCount = 0;
 
 if (
@@ -611,19 +646,140 @@ structuralRiskCount++;
 
 
 /*
-* Strong structural deterioration.
+* Historical distribution is deliberately counted
+* only as ONE additional structural signal.
+*
+* This prevents historical metadata from dominating
+* live structural measurements.
 */
+
+if (
+historicalDistributionSupport
+) {
+structuralRiskCount++;
+}
+
+
+/* =====================================================
+STRUCTURAL LEVELS
+===================================================== */
 
 const strongStructuralDeterioration =
 structuralRiskCount >= 3;
 
-
-/*
-* Moderate structural deterioration.
-*/
-
 const moderateStructuralDeterioration =
 structuralRiskCount >= 2;
+
+
+/* =====================================================
+ADDITIONAL DISTRIBUTION QUALITY
+===================================================== */
+
+const meaningfulDistribution =
+(
+distributionRisk >= 50 &&
+(
+moderateStructuralDeterioration ||
+narrowLeadership ||
+weakBreadth ||
+weakInternals ||
+rotationalWeakness
+)
+) ||
+
+(
+distributionRisk >= 55 &&
+(
+breadthMomentumLoss ||
+hiddenInstitutionalDistribution ||
+narrowLeadershipDivergence
+)
+) ||
+
+(
+falseRecoveryRisk >= 60 &&
+(
+moderateStructuralDeterioration ||
+weakBreadth ||
+rotationalWeakness
+)
+) ||
+
+(
+marketFatigue >= 65 &&
+(
+moderateStructuralDeterioration ||
+persistentWeakness
+)
+) ||
+
+/*
+* Historical scenarios explicitly marked as
+* persistent distribution can establish P3 when
+* supported by structural evidence.
+*/
+(
+historicalDistributionSupport &&
+(
+Number(averageFragility) >= 55 ||
+Number(divergenceSeverity) >= 30 ||
+Number(institutionalPressure) >= 60 ||
+Number(averageParticipation) < 60 ||
+Number(averageBreadth) < 65 ||
+Number(averageRotation) < 55 ||
+Boolean(acceleratingWeakness)
+)
+);
+
+
+/* =====================================================
+EARLY STRUCTURAL DISTRIBUTION
+===================================================== */
+
+const earlyStructuralDistribution =
+(
+early &&
+(
+earlyDistributionDynamics ||
+hiddenInstitutionalDistribution ||
+narrowLeadershipDivergence ||
+(
+weakInternals &&
+(
+weakBreadth ||
+rotationalWeakness
+)
+)
+)
+) ||
+
+(
+breadthMomentumLoss &&
+(
+narrowLeadership ||
+rotationalWeakness ||
+weakInternals
+)
+) ||
+
+(
+narrowLeadershipDivergence &&
+divergenceSeverity >= 30
+) ||
+
+/*
+* Explicit historical accelerating weakness can
+* identify an early distribution regime even when
+* current breadth has not yet collapsed.
+*/
+(
+acceleratingHistoricalDistribution &&
+(
+Number(divergenceSeverity) >= 30 ||
+Number(institutionalPressure) >= 60 ||
+Number(averageFragility) >= 55
+)
+);
 
 
 /* =====================================================
@@ -732,18 +888,6 @@ confidence =
 /* =====================================================
 PHASE 4 — RISK
 ===================================================== */
-
-/*
-* PHASE_4 requires either:
-*
-* 1. genuinely severe deterioration
-* 2. several independent structural failures
-* 3. strong persistent structural weakness
-* 4. a major crash warning
-*
-* A single distribution/fatigue score is no longer
-* sufficient.
-*/
 
 else if (
 
@@ -878,7 +1022,9 @@ breadthImpulseBreak &&
 rotationScore < 50
 ) ||
 
-persistentDistribution
+persistentDistribution ||
+
+historicalDistributionSupport
 
 ) {
 
@@ -959,55 +1105,41 @@ confidence =
 PHASE 3 — DISTRIBUTION
 ===================================================== */
 
-/*
-* Distribution is now a transitional regime.
-*
-* It requires actual structural evidence.
-*
-* Persistence values alone are not enough.
-*/
-
 else if (
 
-(
-early &&
-(
-earlyDistributionDynamics ||
-hiddenInstitutionalDistribution ||
-(
-weakInternals &&
-(
-weakBreadth ||
-rotationalWeakness
-)
-)
-)
-) ||
+earlyStructuralDistribution ||
+
+meaningfulDistribution ||
 
 persistentDistribution ||
 
 hiddenInstitutionalDistribution ||
 
+/*
+* EXPLICIT HISTORICAL DISTRIBUTION
+*
+* This is the central correction.
+*
+* A scenario explicitly marked as persistent
+* distribution must not fall into P2 merely because
+* the headline breadth is still medium.
+*/
+historicalDistributionSupport ||
+
 (
-distributionRisk > 65 &&
+moderateStructuralDeterioration &&
 (
-moderateStructuralDeterioration ||
-narrowLeadership ||
-weakBreadth
+weakBreadth ||
+weakInternals ||
+rotationalWeakness ||
+narrowLeadership
 )
 ) ||
 
 (
-marketFatigue > 70 &&
+distributionRisk > 55 &&
 (
-moderateStructuralDeterioration ||
-persistentWeakness
-)
-) ||
-
-(
-breadthMomentumLoss &&
-(
+weakBreadth ||
 narrowLeadership ||
 rotationalWeakness ||
 weakInternals
@@ -1015,9 +1147,26 @@ weakInternals
 ) ||
 
 (
+falseRecoveryRisk > 60 &&
+(
+weakBreadth ||
+moderateStructuralDeterioration ||
+persistentWeakness
+)
+) ||
+
+(
+marketFatigue > 65 &&
+(
+moderateStructuralDeterioration ||
+persistentWeakness
+)
+) ||
+
+(
 narrowLeadershipDivergence &&
 (
-divergenceSeverity >= 35 ||
+divergenceSeverity >= 30 ||
 hiddenDistribution
 )
 )
@@ -1045,6 +1194,18 @@ confidence =
 }
 
 else if (
+severeHiddenDistribution
+) {
+
+subPhase =
+"EARLY_INSTITUTIONAL_DISTRIBUTION";
+
+confidence =
+84;
+
+}
+
+else if (
 breadthMomentumLoss &&
 narrowLeadership
 ) {
@@ -1054,6 +1215,42 @@ subPhase =
 
 confidence =
 80;
+
+}
+
+else if (
+hiddenInstitutionalDistribution
+) {
+
+subPhase =
+"HIDDEN_DISTRIBUTION";
+
+confidence =
+78;
+
+}
+
+else if (
+historicalDistributionSupport
+) {
+
+subPhase =
+"STRUCTURAL_DISTRIBUTION";
+
+confidence =
+76;
+
+}
+
+else if (
+meaningfulDistribution
+) {
+
+subPhase =
+"STRUCTURAL_DISTRIBUTION";
+
+confidence =
+76;
 
 }
 
@@ -1074,10 +1271,6 @@ confidence =
 PHASE 2 — WARNING
 ===================================================== */
 
-/*
-* Warning is allowed even when breadth is not perfect.
-*/
-
 else if (
 
 (
@@ -1086,7 +1279,8 @@ early &&
 mediumBreadth ||
 strongBreadth
 ) &&
-!moderateStructuralDeterioration
+!moderateStructuralDeterioration &&
+!meaningfulDistribution
 ) ||
 
 (
@@ -1095,7 +1289,8 @@ rotationScore >= 40 &&
 crashScore < 30 &&
 !persistentWeakness &&
 trendStability > 60 &&
-recoveryQuality > 55
+recoveryQuality > 55 &&
+!meaningfulDistribution
 ) ||
 
 (
@@ -1103,7 +1298,8 @@ mediumBreadth &&
 (
 breadthMomentumLoss ||
 narrowLeadership
-)
+) &&
+!meaningfulDistribution
 )
 
 ) {
@@ -1157,11 +1353,6 @@ confidence =
 PHASE 1 — CLEAN EXPANSION
 ===================================================== */
 
-/*
-* Expansion should represent a genuinely constructive
-* market, not necessarily a perfect one.
-*/
-
 else if (
 
 (
@@ -1172,8 +1363,6 @@ healthyInternals
 )
 ) &&
 
-!early &&
-
 crashScore < 30 &&
 
 !breadthMomentumLoss &&
@@ -1182,7 +1371,17 @@ crashScore < 30 &&
 
 !hiddenInstitutionalDistribution &&
 
-!moderateStructuralDeterioration
+!moderateStructuralDeterioration &&
+
+!structuralDeterioration &&
+
+!meaningfulDistribution &&
+
+!narrowLeadershipDivergence &&
+
+!historicalDistributionSupport &&
+
+!acceleratingHistoricalDistribution
 
 ) {
 
@@ -1222,6 +1421,18 @@ confidence =
 
 }
 
+else if (
+meaningfulEarlyWarning
+) {
+
+subPhase =
+"HEALTHY_EXPANSION";
+
+confidence =
+68;
+
+}
+
 else {
 
 subPhase =
@@ -1239,33 +1450,49 @@ confidence =
 FALLBACK
 ===================================================== */
 
-/*
-* Important:
-*
-* If the market is not clearly dangerous and no strong
-* distribution structure exists, default to WARNING,
-* not DISTRIBUTION.
-*/
-
 else {
 
 primaryPhase =
-persistentWeakness
+(
+persistentWeakness ||
+persistentDistribution ||
+historicalDistributionSupport ||
+meaningfulDistribution ||
+earlyStructuralDistribution
+)
 ? "PHASE_3_DISTRIBUTION"
 : "PHASE_2_WARNING";
 
 regimeState =
-persistentWeakness
+(
+persistentWeakness ||
+persistentDistribution ||
+historicalDistributionSupport ||
+meaningfulDistribution ||
+earlyStructuralDistribution
+)
 ? "TRANSITION"
 : "LATE_EXPANSION";
 
 subPhase =
-persistentWeakness
+(
+persistentWeakness ||
+persistentDistribution ||
+historicalDistributionSupport ||
+meaningfulDistribution ||
+earlyStructuralDistribution
+)
 ? "PERSISTENT_TRANSITION"
 : "TRANSITION";
 
 confidence =
-persistentWeakness
+(
+persistentWeakness ||
+persistentDistribution ||
+historicalDistributionSupport ||
+meaningfulDistribution ||
+earlyStructuralDistribution
+)
 ? 68
 : 50;
 
@@ -1281,7 +1508,8 @@ if (
 (
 persistentWeakness ||
 persistentDistribution ||
-structuralDeterioration
+structuralDeterioration ||
+historicalDistributionSupport
 ) &&
 
 primaryPhase ===
@@ -1340,6 +1568,8 @@ const downsidePressure =
 
 (persistentDistribution ? 15 : 0) +
 
+(historicalDistributionSupport ? 12 : 0) +
+
 (structuralDeterioration ? 15 : 0) +
 
 (aggressiveBreadthMomentumLoss ? 10 : 0) +
@@ -1360,12 +1590,6 @@ const upsidePressure =
 (bullishPersistence ? 20 : 0) +
 
 (broadParticipation ? 15 : 0) +
-
-/*
-* CORRECTED BREADTH VELOCITY SEMANTICS
-*
-* Low deterioration = constructive.
-*/
 
 (
 breadthVelocityScore < 35
@@ -1571,11 +1795,6 @@ PHASE PROGRESSION
 let progressionBase =
 50;
 
-
-/* -----------------------------------------------
-DOWNSIDE
------------------------------------------------ */
-
 if (
 phaseDirection ===
 "DETERIORATING"
@@ -1592,11 +1811,6 @@ pressureDelta
 );
 
 }
-
-
-/* -----------------------------------------------
-WEAKENING
------------------------------------------------ */
 
 else if (
 phaseDirection ===
@@ -1615,11 +1829,6 @@ pressureDelta
 
 }
 
-
-/* -----------------------------------------------
-RECOVERY
------------------------------------------------ */
-
 else if (
 phaseDirection ===
 "RECOVERING"
@@ -1633,11 +1842,6 @@ pressureDelta
 );
 
 }
-
-
-/* -----------------------------------------------
-STABLE
------------------------------------------------ */
 
 else {
 
@@ -1665,17 +1869,8 @@ PHASE OUTPUT
 
 return {
 
-/* =================================================
-COMPATIBILITY
-================================================= */
-
 phase:
 primaryPhase,
-
-
-/* =================================================
-PHASE STRUCTURE
-================================================= */
 
 primaryPhase,
 
@@ -1687,21 +1882,11 @@ phaseDirection,
 
 phaseProgression,
 
-
-/* =================================================
-REGIME
-================================================= */
-
 regimeState,
 
 subPhase,
 
 confidence,
-
-
-/* =================================================
-DRIVERS
-================================================= */
 
 drivers: {
 
@@ -1772,6 +1957,8 @@ early,
 
 earlyScore,
 
+meaningfulEarlyWarning,
+
 russellDecision,
 
 persistenceScore,
@@ -1801,6 +1988,18 @@ severePersistentWeakness,
 persistentDistribution,
 
 severePersistentDistribution,
+
+/*
+* Historical distribution diagnostics.
+*/
+
+historicalPersistentDistribution,
+
+historicalDistributionSupport,
+
+acceleratingWeakness,
+
+acceleratingHistoricalDistribution,
 
 equalWeightWeakness,
 
@@ -1868,21 +2067,15 @@ daysInPhase,
 
 institutionalPressure,
 
-marketCharacter,
+meaningfulDistribution,
 
-/*
-* NEW DIAGNOSTIC
-*/
+earlyStructuralDistribution,
 
 structuralRiskCount,
 
 moderateStructuralDeterioration,
 
 strongStructuralDeterioration,
-
-/*
-* PRESSURE
-*/
 
 downsidePressure,
 
