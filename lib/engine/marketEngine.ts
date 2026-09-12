@@ -29,11 +29,13 @@ import { tradeStackEngine } from "./tradeStackEngine";
 import { rotationConfirmEngine } from "./rotationConfirmEngine";
 import { rotationDecayEngine } from "./rotationDecayEngine";
 
+
 /* =====================================================
 HISTORY ENGINES
 ===================================================== */
 
 import { regimePersistenceEngine } from "./regimePersistenceEngine";
+
 
 /* =====================================================
 STRUCTURAL ENGINES
@@ -52,6 +54,7 @@ import { participationEngine } from "./participationEngine";
 import { priceMomentumEngine } from "./priceMomentumEngine";
 import { gammaEngine } from "./gammaEngine";
 
+
 /* =====================================================
 HISTORICAL REPLAY
 ===================================================== */
@@ -65,6 +68,29 @@ options: {
 skipHistoricalReplay?: boolean;
 } = {}
 ) {
+
+
+/* ===================================================
+HISTORICAL SCENARIO MODE
+=================================================== */
+
+const isHistoricalScenario =
+data?.historicalScenario === true &&
+data?.historicalScenarioInput?.historicalScenario === true;
+
+
+/*
+* Historical scenarios are calibration fixtures.
+*
+* Their explicitly supplied structural values must be
+* available to the phase engine.
+*/
+
+const historicalInput =
+isHistoricalScenario
+? data.historicalScenarioInput
+: null;
+
 
 /* ===================================================
 DRIVERS
@@ -850,15 +876,19 @@ REGIME PERSISTENCE — PRE PHASE
 
 const regimePersistencePre =
 regimePersistenceEngine({
+
 breadth50,
 
 breadth200,
 
-participationScore: 50,
+participationScore:
+50,
 
-rotationDecayScore: 0,
+rotationDecayScore:
+0,
 
-dangerScore: 0,
+dangerScore:
+0,
 
 fragilityScore:
 Number(
@@ -897,8 +927,8 @@ historyMetrics?.rotationDecayHistory
 )
 ? historyMetrics.rotationDecayHistory
 : []
-});
 
+});
 
 
 /* ===================================================
@@ -924,6 +954,7 @@ marketData:
 data.marketData ?? {},
 
 liquidity,
+
 fragility:
 fragilityPre,
 
@@ -1059,24 +1090,340 @@ historyMetrics
 
 
 /* ===================================================
+HISTORICAL PHASE INPUTS
+=================================================== */
+
+/*
+* LIVE:
+*
+* use calculated engine outputs.
+*
+* HISTORICAL:
+*
+* use the explicit fixture values.
+*
+* This prevents the replay calibration scenario from
+* being silently transformed by live recalculation.
+*/
+
+const phaseCrash =
+isHistoricalScenario
+? {
+...crash,
+
+score:
+Number(
+historicalInput.crash.score
+),
+
+probability:
+Number(
+historicalInput.crash.probability
+)
+
+}
+: crash;
+
+
+const phaseRotation =
+isHistoricalScenario
+? {
+...rotation,
+
+score:
+Number(
+historicalInput.rotation.score
+),
+
+rsSmall:
+Number(
+historicalInput.rotation.rsSmall
+),
+
+rsEqual:
+Number(
+historicalInput.rotation.rsEqual
+),
+
+rsGrowth:
+Number(
+historicalInput.rotation.rsGrowth
+)
+
+}
+: rotation;
+
+
+const phaseParticipation =
+isHistoricalScenario
+? {
+
+...participation,
+
+score:
+Number(
+historicalInput.participation.score
+)
+
+}
+: participation;
+
+
+const phaseBreadthThrust =
+isHistoricalScenario
+? {
+
+...breadthThrust,
+
+score:
+Number(
+historicalInput.breadthThrust.score
+)
+
+}
+: breadthThrust;
+
+
+const phaseLiquidity =
+isHistoricalScenario
+? {
+
+...liquidity,
+
+score:
+Number(
+historicalInput.liquidity.score
+)
+
+}
+: liquidity;
+
+
+const phaseFragility =
+isHistoricalScenario
+? {
+
+...fragilityPre,
+
+score:
+Number(
+historicalInput.fragility.score
+)
+
+}
+: fragilityPre;
+
+
+const phaseRotationDecay =
+isHistoricalScenario
+? {
+
+...rotationDecayEngine({
+
+historyMetrics,
+rotation,
+structure,
+crash,
+earlyWarning,
+liquidity,
+fragility:
+fragilityPre,
+squeeze,
+participation,
+breadthThrust,
+regimeSync:
+{},
+executionState:
+{},
+breadth50,
+breadth200,
+vix,
+concentrationScore:
+Number(
+data.concentrationScore ?? 0
+),
+gammaExposure:
+Number(
+data.gammaExposure ?? 0
+),
+creditRatio:
+Number(
+data.creditRatio ?? 1
+),
+marketLiquidityScore:
+Number(
+data.marketLiquidityScore ?? 50
+),
+breadthTrend:
+historyMetrics?.breadthTrend,
+breadthAcceleration:
+historyMetrics?.breadthAcceleration,
+participationDecay:
+historyMetrics?.participationDecay,
+leadershipDecay:
+historyMetrics?.leadershipDecay,
+relativeBreadthWeakness:
+historyMetrics?.relativeBreadthWeakness
+
+}),
+
+score:
+Number(
+historicalInput.rotationDecay.score
+)
+
+}
+: null;
+
+
+/*
+* For live operation rotationDecay is calculated below
+* in its normal pipeline position.
+*/
+
+const phaseInternalDivergence =
+isHistoricalScenario
+? {
+
+...internalDivergence,
+
+score:
+Number(
+historicalInput.internalDivergence.score
+),
+
+severity:
+Number(
+historicalInput.internalDivergence.severity
+)
+
+}
+: internalDivergence;
+
+
+const phaseRegimeSync =
+isHistoricalScenario
+? {
+
+score:
+Number(
+historicalInput.regimeSync.score
+),
+
+state:
+historicalInput.regimeSync.score <= 35
+? "BREAKDOWN"
+: historicalInput.regimeSync.score >= 65
+? "SYNCHRONIZED"
+: "TRANSITION"
+
+}
+: null;
+
+
+const phaseConfirmationInput =
+isHistoricalScenario
+? historicalInput.phaseConfirmation
+: null;
+
+
+const phasePutTiming =
+isHistoricalScenario
+? {
+
+...putTimingTemp,
+
+score:
+Number(
+historicalInput.putTiming.score
+)
+
+}
+: putTimingTemp;
+
+
+/*
+* The phase engine expects a rotationDecay object.
+*
+* In live mode this is not yet available at this point,
+* so we use a neutral placeholder exactly as before.
+*
+* In historical mode the fixture value is preserved.
+*/
+
+const phaseRotationDecayInput =
+isHistoricalScenario
+? phaseRotationDecay
+: {
+
+score: 0
+
+};
+
+
+/* ===================================================
 PHASE
 =================================================== */
 
 const phaseData =
 marketPhaseEngine({
 
-crash,
-rotation,
+crash:
+phaseCrash,
+
+rotation:
+phaseRotation,
+
 putTiming:
-putTimingTemp,
+phasePutTiming,
+
 earlyWarning,
+
 structure,
+
 russell:
 russellTemp,
+
 historyMetrics,
+
 priceMomentum,
+
 regimePersistence:
-regimePersistencePre
+regimePersistencePre,
+
+
+/*
+* Explicit structural inputs.
+*
+* These were previously missing from the call even
+* though the phase engine reads them.
+*/
+
+liquidity:
+phaseLiquidity,
+
+fragility:
+phaseFragility,
+
+internalDivergence:
+phaseInternalDivergence,
+
+regimeSync:
+phaseRegimeSync ??
+undefined,
+
+phaseConfirmation:
+phaseConfirmationInput ??
+undefined,
+
+participation:
+phaseParticipation,
+
+breadthThrust:
+phaseBreadthThrust,
+
+rotationDecay:
+phaseRotationDecayInput
 
 });
 
@@ -1084,12 +1431,15 @@ regimePersistencePre
 const phase =
 phaseData.phase;
 
+
 const regime = {
+
 label:
 phase,
 
 score:
-crash.score
+phaseCrash.score
+
 };
 
 
@@ -1098,8 +1448,11 @@ PHASE STAGE
 =================================================== */
 
 const phaseStage = {
+
 phase,
+
 phaseData
+
 };
 
 
@@ -1109,10 +1462,17 @@ CONFIDENCE
 
 const confidence =
 confidenceEngine({
+
 ...data,
-crash,
-rotation,
+
+crash:
+phaseCrash,
+
+rotation:
+phaseRotation,
+
 phase
+
 });
 
 
@@ -1153,8 +1513,10 @@ const regimeSyncPre =
 regimeSyncEngine({
 
 phase,
+
 crash,
 rotation,
+
 structure,
 earlyWarning,
 
@@ -1358,18 +1720,23 @@ const rotationDecay =
 rotationDecayEngine({
 
 historyMetrics,
+
 rotation,
 structure,
 crash,
 earlyWarning,
 liquidity,
+
 fragility:
 fragilityPre,
+
 squeeze,
 participation,
 breadthThrust,
+
 regimeSync:
 regimeSyncPre,
+
 executionState:
 executionStatePre,
 
@@ -1444,6 +1811,7 @@ regimeSync:
 regimeSyncPre,
 
 liquidity,
+
 fragility:
 fragilityPre,
 
@@ -1538,6 +1906,7 @@ fragilityPre,
 
 phaseConfirmation,
 internalDivergence,
+
 regimeSync:
 regimeSyncPre,
 
@@ -1679,18 +2048,6 @@ gamma
 MASTER
 =================================================== */
 
-/*
-* TEMPORARY DIAGNOSTIC:
-*
-* We do NOT modify any values here.
-*
-* We only inspect the exact score sources that
-* masterScoreEngine receives.
-*
-* The diagnostic is emitted only when at least
-* one relevant value is non-finite.
-*/
-
 const masterDiagnostics = {
 
 crash:
@@ -1742,6 +2099,7 @@ regimePersistence?.score
 
 };
 
+
 const nonFiniteMasterInputs =
 Object.entries(
 masterDiagnostics
@@ -1759,6 +2117,7 @@ value
 })
 );
 
+
 if (
 nonFiniteMasterInputs.length > 0
 ) {
@@ -1771,6 +2130,12 @@ new Date().toISOString(),
 
 skipHistoricalReplay:
 options.skipHistoricalReplay === true,
+
+historicalScenario:
+isHistoricalScenario,
+
+scenarioId:
+data?.scenarioId,
 
 masterInputs:
 masterDiagnostics,
@@ -1838,6 +2203,7 @@ nonFinite:
 nonFiniteMasterInputs,
 
 phase,
+
 rotationState:
 rotation?.state,
 
@@ -2116,6 +2482,7 @@ const sizingState =
 statePre ?? {
 
 size: 0,
+
 entryPrice: 0,
 
 pnl:
@@ -2182,8 +2549,10 @@ const exit =
 exitEngine({
 
 position: {
+
 size:
 currentPositionSize
+
 },
 
 crash,
@@ -2397,14 +2766,10 @@ HISTORICAL REPLAY
 =================================================== */
 
 /*
-* Die neue Historical Replay Engine verwaltet
-* ihre permanenten Szenarien selbst über:
+* The new Historical Replay Engine manages its
+* permanent scenarios itself.
 *
-* historicalScenarioLibrary.ts
-*
-* Deshalb werden hier KEINE JSON-Dateien mehr
-* geladen und KEINE Snapshots als Argument
-* übergeben.
+* Therefore no JSON files are loaded here.
 */
 
 const replay =
@@ -2435,13 +2800,6 @@ rotation,
 rotationConfirm,
 
 rotationDecay,
-
-/*
-* Dedicated Gamma Engine output.
-*
-* This is the canonical gamma object for
-* downstream panels and diagnostics.
-*/
 
 gamma,
 
@@ -2475,16 +2833,7 @@ liquidity,
 
 breadthThrust,
 
-/*
-* FINAL canonical fragility.
-*/
-
 fragility,
-
-/*
-* Preliminary fragility is exposed only for
-* diagnostics and pipeline debugging.
-*/
 
 fragilityPre,
 
@@ -2544,7 +2893,23 @@ indices:
 data.indices ?? {},
 
 futures:
-data.futures ?? {}
+data.futures ?? {},
+
+/*
+* Historical diagnostics.
+*
+* This makes it possible to verify from the snapshot
+* whether the replay was actually running in fixture
+* mode and which scenario supplied the values.
+*/
+
+historicalScenario:
+isHistoricalScenario,
+
+historicalScenarioId:
+isHistoricalScenario
+? data.scenarioId
+: undefined
 
 };
 
