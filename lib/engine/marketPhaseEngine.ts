@@ -33,6 +33,12 @@ engine.internalDivergence ?? {};
 const regimePersistence =
 engine.regimePersistence ?? {};
 
+const liquidity =
+engine.liquidity ?? {};
+
+const phaseConfirmation =
+engine.phaseConfirmation ?? {};
+
 
 /* =====================================================
 HISTORY METRICS
@@ -94,6 +100,64 @@ crash?.probability ?? 0
 const rotationScore =
 Number(
 rotation?.score ?? 0
+);
+
+
+/* =====================================================
+MARKET / LIQUIDITY STRESS INPUTS
+===================================================== */
+
+/*
+* These inputs are intentionally read directly by the
+* phase engine.
+*
+* The acute-system-stress detector below is designed
+* specifically for events such as:
+*
+* - regional banking stress
+* - sudden liquidity shocks
+* - systemic uncertainty
+* - rapid volatility expansion
+*
+* They must NOT be inferred only from breadth.
+*/
+
+const vix =
+Number(
+engine?.marketData?.vix ??
+engine?.market?.vix ??
+engine?.vix ??
+crash?.vix ??
+0
+);
+
+const liquidityScore =
+Number(
+liquidity?.score ?? 50
+);
+
+const fragilityScore =
+Number(
+engine?.fragility?.score ??
+50
+);
+
+const regimeSyncScore =
+Number(
+engine?.regimeSync?.score ??
+50
+);
+
+const phaseConfirmed =
+Boolean(
+phaseConfirmation?.confirmed ??
+false
+);
+
+const phaseConfidence =
+Number(
+phaseConfirmation?.confidence ??
+50
 );
 
 
@@ -672,6 +736,131 @@ structuralRiskCount >= 2;
 
 
 /* =====================================================
+ACUTE LIQUIDITY / SYSTEM STRESS
+===================================================== */
+
+/*
+* IMPORTANT:
+*
+* This detector is intentionally separate from the
+* slower distribution logic.
+*
+* It is designed for sudden systemic stress where:
+*
+* - liquidity deteriorates rapidly
+* - fragility is already elevated
+* - volatility expands
+* - crash risk rises
+* - internal market structure diverges
+*
+* A high VIX alone is NOT sufficient.
+*
+* Likewise low liquidity alone is NOT sufficient.
+*
+* We require a combination of independent stress
+* dimensions.
+*/
+
+
+/*
+* Primary liquidity stress.
+*
+* This identifies an environment where market liquidity
+* is materially impaired while structural fragility and
+* volatility are already elevated.
+*/
+
+const acuteLiquidityStress =
+liquidityScore <= 40 &&
+fragilityScore >= 75 &&
+vix >= 25;
+
+
+/*
+* Acute systemic stress.
+*
+* The first condition establishes the core liquidity
+* stress environment.
+*
+* The second condition requires confirmation from at
+* least one additional systemic-risk dimension.
+*/
+
+const acuteSystemStress =
+acuteLiquidityStress &&
+(
+crashProbability >= 45 ||
+risingCrashRisk ||
+regimeSyncScore <= 40
+) &&
+(
+divergenceSeverity >= 60 ||
+phaseConfirmed ||
+crashTrend >= 7
+);
+
+
+/*
+* Strongly confirmed acute systemic stress.
+*
+* This is used for confidence/subphase diagnostics,
+* not as an independent phase.
+*/
+
+const confirmedAcuteSystemStress =
+acuteSystemStress &&
+(
+phaseConfirmed ||
+(
+phaseConfidence >= 75 &&
+divergenceSeverity >= 60
+) ||
+(
+crashTrend >= 7 &&
+crashProbability >= 45
+)
+);
+
+
+/*
+* Acute stress severity.
+*
+* This diagnostic helps distinguish a simple liquidity
+* deterioration from a broad systemic stress event.
+*/
+
+let acuteStressLevel =
+"NONE";
+
+if (
+confirmedAcuteSystemStress
+) {
+
+acuteStressLevel =
+"CONFIRMED";
+
+}
+
+else if (
+acuteSystemStress
+) {
+
+acuteStressLevel =
+"ELEVATED";
+
+}
+
+else if (
+acuteLiquidityStress
+) {
+
+acuteStressLevel =
+"WATCH";
+
+}
+
+
+/* =====================================================
 ADDITIONAL DISTRIBUTION QUALITY
 ===================================================== */
 
@@ -891,6 +1080,10 @@ PHASE 4 — RISK
 
 else if (
 
+/*
+* EXISTING P4 CONDITIONS
+*/
+
 severePersistentDistribution ||
 
 (
@@ -948,7 +1141,19 @@ participationCollapse ||
 severeInternalWeakness ||
 severeParticipationFailure
 )
-)
+) ||
+
+/*
+* NEW:
+*
+* ACUTE SYSTEM STRESS
+*
+* This is intentionally a separate pathway.
+*
+* It captures sudden liquidity/systemic events
+* without lowering the general P4 thresholds.
+*/
+acuteSystemStress
 
 ) {
 
@@ -960,10 +1165,29 @@ regimeState =
 
 
 /* -----------------------------------------------
-PRE CRASH
+ACUTE LIQUIDITY / SYSTEM STRESS
 ----------------------------------------------- */
 
 if (
+acuteSystemStress
+) {
+
+subPhase =
+"ACUTE_LIQUIDITY_STRESS";
+
+confidence =
+confirmedAcuteSystemStress
+? 92
+: 86;
+
+}
+
+
+/* -----------------------------------------------
+PRE CRASH
+----------------------------------------------- */
+
+else if (
 
 severePersistentDistribution ||
 
@@ -1574,7 +1798,14 @@ const downsidePressure =
 
 (aggressiveBreadthMomentumLoss ? 10 : 0) +
 
-(participationCollapse ? 15 : 0);
+(participationCollapse ? 15 : 0) +
+
+/*
+* Acute system stress is a strong downward pressure
+* signal, but it does not independently determine
+* the phase.
+*/
+(acuteSystemStress ? 20 : 0);
 
 
 /* =====================================================
@@ -1919,6 +2150,30 @@ ad,
 highs,
 
 lows,
+
+/*
+* Acute stress diagnostics.
+*/
+
+vix,
+
+liquidityScore,
+
+fragilityScore,
+
+regimeSyncScore,
+
+phaseConfirmed,
+
+phaseConfidence,
+
+acuteLiquidityStress,
+
+acuteSystemStress,
+
+confirmedAcuteSystemStress,
+
+acuteStressLevel,
 
 rsSmall,
 
