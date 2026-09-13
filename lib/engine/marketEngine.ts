@@ -29,13 +29,11 @@ import { tradeStackEngine } from "./tradeStackEngine";
 import { rotationConfirmEngine } from "./rotationConfirmEngine";
 import { rotationDecayEngine } from "./rotationDecayEngine";
 
-
 /* =====================================================
 HISTORY ENGINES
 ===================================================== */
 
 import { regimePersistenceEngine } from "./regimePersistenceEngine";
-
 
 /* =====================================================
 STRUCTURAL ENGINES
@@ -54,7 +52,6 @@ import { participationEngine } from "./participationEngine";
 import { priceMomentumEngine } from "./priceMomentumEngine";
 import { gammaEngine } from "./gammaEngine";
 
-
 /* =====================================================
 HISTORICAL REPLAY
 ===================================================== */
@@ -69,7 +66,6 @@ skipHistoricalReplay?: boolean;
 } = {}
 ) {
 
-
 /* ===================================================
 HISTORICAL SCENARIO MODE
 =================================================== */
@@ -78,12 +74,11 @@ const isHistoricalScenario =
 data?.historicalScenario === true &&
 data?.historicalScenarioInput?.historicalScenario === true;
 
-
 /*
 * Historical scenarios are calibration fixtures.
 *
 * Their explicitly supplied structural values must be
-* available to the phase engine.
+* available to the phase engine AND the Master Score.
 */
 
 const historicalInput =
@@ -161,9 +156,7 @@ if (
 !Array.isArray(history) ||
 history.length <= offset
 ) {
-
 return fallback;
-
 }
 
 const snapshot =
@@ -172,9 +165,7 @@ history.length - 1 - offset
 ];
 
 if (!snapshot) {
-
 return fallback;
-
 }
 
 for (const path of paths) {
@@ -191,15 +182,12 @@ if (
 value === null ||
 value === undefined
 ) {
-
 value = undefined;
 break;
-
 }
 
 value =
 value[part];
-
 }
 
 const numeric =
@@ -208,15 +196,12 @@ Number(value);
 if (
 Number.isFinite(numeric)
 ) {
-
 return numeric;
-
 }
 
 }
 
 return fallback;
-
 }
 
 
@@ -247,9 +232,7 @@ series.length - 1 - offset
 if (
 Number.isFinite(value)
 ) {
-
 return value;
-
 }
 
 }
@@ -261,7 +244,6 @@ offset,
 paths,
 fallback
 );
-
 }
 
 
@@ -281,6 +263,7 @@ getHistorySeriesValue(
 breadth20
 );
 
+
 const breadth50_5dAgo =
 getHistorySeriesValue(
 ["breadth50History"],
@@ -292,6 +275,7 @@ getHistorySeriesValue(
 ],
 breadth50
 );
+
 
 const breadth50_10dAgo =
 getHistorySeriesValue(
@@ -305,6 +289,7 @@ getHistorySeriesValue(
 breadth50
 );
 
+
 const breadth200_10dAgo =
 getHistorySeriesValue(
 ["breadth200History"],
@@ -317,6 +302,7 @@ getHistorySeriesValue(
 breadth200
 );
 
+
 const breadth200_20dAgo =
 getHistorySeriesValue(
 ["breadth200History"],
@@ -328,6 +314,7 @@ getHistorySeriesValue(
 ],
 breadth200
 );
+
 
 const advanceDecline_5dAgo =
 getHistorySeriesValue(
@@ -346,12 +333,14 @@ structure?.advanceDecline?.value ?? 0
 )
 );
 
+
 const spxCurrent =
 Number(
 data.indices?.spx ??
 data.indices?.SPX ??
 0
 );
+
 
 const spx5dAgo =
 getHistorySeriesValue(
@@ -378,8 +367,7 @@ PRICE MOMENTUM
 const priceMomentum =
 priceMomentumEngine({
 historyMetrics,
-indices:
-data.indices ?? {}
+indices: data.indices ?? {}
 });
 
 
@@ -407,18 +395,14 @@ if (
 breadth > 80 &&
 ad < 0
 ) {
-
 score -= 2;
-
 }
 
 if (
 breadth < 40 &&
 ad > 0
 ) {
-
 score += 2;
-
 }
 
 return {
@@ -549,7 +533,9 @@ vix,
 
 moveIndex:
 Number(
-data.moveIndex ?? 80
+data.moveIndex ??
+data.marketDrivers?.raw?.move ??
+80
 ),
 
 breadth50
@@ -580,9 +566,7 @@ marketData:
 data.marketData ?? {},
 
 liquidity,
-fragility:
-fragilityPre,
-
+fragility: fragilityPre,
 squeeze,
 
 breadthTrend:
@@ -878,7 +862,6 @@ const regimePersistencePre =
 regimePersistenceEngine({
 
 breadth50,
-
 breadth200,
 
 participationScore:
@@ -954,10 +937,7 @@ marketData:
 data.marketData ?? {},
 
 liquidity,
-
-fragility:
-fragilityPre,
-
+fragility: fragilityPre,
 squeeze,
 participation,
 breadthThrust,
@@ -1046,13 +1026,14 @@ TEMP PUT
 const putTimingTemp =
 putTimingEngine({
 
-phase:
-"TEMP",
+phase: "TEMP",
 
 rotation,
 crash,
 earlyWarning,
+
 historyMetrics,
+
 priceMomentum
 
 });
@@ -1079,11 +1060,11 @@ Number(
 data.concentrationScore ?? 0
 ),
 
-phase:
-"TEMP",
+phase: "TEMP",
 
 crash,
 vix,
+
 historyMetrics
 
 });
@@ -1120,7 +1101,6 @@ probability:
 Number(
 historicalInput.crash.probability
 )
-
 }
 : crash;
 
@@ -1149,7 +1129,6 @@ rsGrowth:
 Number(
 historicalInput.rotation.rsGrowth
 )
-
 }
 : rotation;
 
@@ -1157,14 +1136,12 @@ historicalInput.rotation.rsGrowth
 const phaseParticipation =
 isHistoricalScenario
 ? {
-
 ...participation,
 
 score:
 Number(
 historicalInput.participation.score
 )
-
 }
 : participation;
 
@@ -1172,14 +1149,12 @@ historicalInput.participation.score
 const phaseBreadthThrust =
 isHistoricalScenario
 ? {
-
 ...breadthThrust,
 
 score:
 Number(
 historicalInput.breadthThrust.score
 )
-
 }
 : breadthThrust;
 
@@ -1187,14 +1162,12 @@ historicalInput.breadthThrust.score
 const phaseLiquidity =
 isHistoricalScenario
 ? {
-
 ...liquidity,
 
 score:
 Number(
 historicalInput.liquidity.score
 )
-
 }
 : liquidity;
 
@@ -1202,14 +1175,12 @@ historicalInput.liquidity.score
 const phaseFragility =
 isHistoricalScenario
 ? {
-
 ...fragilityPre,
 
 score:
 Number(
 historicalInput.fragility.score
 )
-
 }
 : fragilityPre;
 
@@ -1217,51 +1188,70 @@ historicalInput.fragility.score
 const phaseRotationDecay =
 isHistoricalScenario
 ? {
-
 ...rotationDecayEngine({
 
 historyMetrics,
+
 rotation,
+
 structure,
+
 crash,
+
 earlyWarning,
+
 liquidity,
+
 fragility:
 fragilityPre,
+
 squeeze,
+
 participation,
+
 breadthThrust,
-regimeSync:
-{},
-executionState:
-{},
+
+regimeSync: {},
+
+executionState: {},
+
 breadth50,
 breadth200,
+
 vix,
+
 concentrationScore:
 Number(
 data.concentrationScore ?? 0
 ),
+
 gammaExposure:
 Number(
 data.gammaExposure ?? 0
 ),
+
 creditRatio:
 Number(
 data.creditRatio ?? 1
 ),
+
 marketLiquidityScore:
 Number(
 data.marketLiquidityScore ?? 50
 ),
+
 breadthTrend:
 historyMetrics?.breadthTrend,
+
 breadthAcceleration:
 historyMetrics?.breadthAcceleration,
+
 participationDecay:
 historyMetrics?.participationDecay,
+
 leadershipDecay:
 historyMetrics?.leadershipDecay,
+
 relativeBreadthWeakness:
 historyMetrics?.relativeBreadthWeakness
 
@@ -1271,20 +1261,13 @@ score:
 Number(
 historicalInput.rotationDecay.score
 )
-
 }
 : null;
 
 
-/*
-* For live operation rotationDecay is calculated below
-* in its normal pipeline position.
-*/
-
 const phaseInternalDivergence =
 isHistoricalScenario
 ? {
-
 ...internalDivergence,
 
 score:
@@ -1296,7 +1279,6 @@ severity:
 Number(
 historicalInput.internalDivergence.severity
 )
-
 }
 : internalDivergence;
 
@@ -1330,14 +1312,12 @@ isHistoricalScenario
 const phasePutTiming =
 isHistoricalScenario
 ? {
-
 ...putTimingTemp,
 
 score:
 Number(
 historicalInput.putTiming.score
 )
-
 }
 : putTimingTemp;
 
@@ -1354,11 +1334,7 @@ historicalInput.putTiming.score
 const phaseRotationDecayInput =
 isHistoricalScenario
 ? phaseRotationDecay
-: {
-
-score: 0
-
-};
+: { score: 0 };
 
 
 /* ===================================================
@@ -1391,7 +1367,6 @@ priceMomentum,
 regimePersistence:
 regimePersistencePre,
 
-
 /*
 * Explicit structural inputs.
 *
@@ -1409,12 +1384,10 @@ internalDivergence:
 phaseInternalDivergence,
 
 regimeSync:
-phaseRegimeSync ??
-undefined,
+phaseRegimeSync ?? undefined,
 
 phaseConfirmation:
-phaseConfirmationInput ??
-undefined,
+phaseConfirmationInput ?? undefined,
 
 participation:
 phaseParticipation,
@@ -1433,13 +1406,11 @@ phaseData.phase;
 
 
 const regime = {
-
 label:
 phase,
 
 score:
 phaseCrash.score
-
 };
 
 
@@ -1448,11 +1419,8 @@ PHASE STAGE
 =================================================== */
 
 const phaseStage = {
-
 phase,
-
 phaseData
-
 };
 
 
@@ -1487,7 +1455,6 @@ crash,
 
 breadth20,
 breadth50,
-
 vix,
 
 marketLiquidityScore:
@@ -1516,7 +1483,6 @@ phase,
 
 crash,
 rotation,
-
 structure,
 earlyWarning,
 
@@ -1630,8 +1596,7 @@ systemHeat?.value ?? 0
 ) * 10,
 
 rotationSignal:
-rotation?.signal ??
-"neutral",
+rotation?.signal ?? "neutral",
 
 rotationStrength:
 Number(
@@ -1689,8 +1654,7 @@ squeeze?.risk ?? 0
 ),
 
 divergenceState:
-divergence?.state ??
-"NONE",
+divergence?.state ?? "NONE",
 
 internalDivergence,
 
@@ -1798,11 +1762,11 @@ earlyWarning,
 drivers:
 marketDrivers,
 
-positioning:
-{},
+positioning: {},
 
-volatility:
-{ vix },
+volatility: {
+vix
+},
 
 executionState:
 executionStatePre,
@@ -1818,8 +1782,11 @@ fragilityPre,
 squeeze,
 participation,
 breadthThrust,
+
 rotationDecay,
+
 historyMetrics,
+
 gamma
 
 });
@@ -1850,6 +1817,7 @@ phase,
 
 crash,
 vix,
+
 historyMetrics,
 
 rotationDecay,
@@ -1871,17 +1839,21 @@ phaseConfirmationEngine({
 
 phase,
 phaseData,
+
 rotation,
 crash,
 earlyWarning,
+
 participation,
 breadthThrust,
+
 liquidity,
 
 fragility:
 fragilityPre,
 
 rotationDecay,
+
 historyMetrics
 
 });
@@ -1898,13 +1870,16 @@ structure,
 participation,
 rotation,
 breadthThrust,
+
 rotationDecay,
+
 liquidity,
 
 fragility:
 fragilityPre,
 
 phaseConfirmation,
+
 internalDivergence,
 
 regimeSync:
@@ -1927,6 +1902,7 @@ fragilityEngine({
 
 history,
 historyMetrics,
+
 crash,
 
 breadth50,
@@ -1956,9 +1932,11 @@ data.vixTermRatio ?? 1
 
 liquidity,
 structure,
+
 participation,
 breadthThrust,
 rotation,
+
 marketQuality
 
 });
@@ -1972,6 +1950,7 @@ const regimeSync =
 regimeSyncEngine({
 
 phase,
+
 crash,
 rotation,
 structure,
@@ -1998,6 +1977,7 @@ breadth50,
 breadth200,
 
 fragility,
+
 participation,
 breadthThrust,
 marketQuality
@@ -2024,20 +2004,28 @@ putTimingEngine({
 
 phase,
 phaseData,
+
 rotation,
 rotationConfirm,
+
 crash,
 earlyWarning,
+
 historyMetrics,
+
 priceMomentum,
 participation,
 liquidity,
+
 dangerZone,
 marketDrivers,
+
 regimeSync,
 breadthThrust,
+
 marketQuality,
 rotationDecay,
+
 regimePersistence,
 gamma
 
@@ -2045,22 +2033,277 @@ gamma
 
 
 /* ===================================================
-MASTER
+MASTER INPUT NORMALIZATION
+=================================================== */
+
+/*
+* IMPORTANT:
+*
+* Historical replay must use one coherent data space.
+*
+* Previously the individual Historical fixture values
+* were overridden for the Master, but marketQuality was
+* still the live-derived value.
+*
+* This meant:
+*
+* Historical fixture
+* ↓
+* Historical phase
+* ↓
+* mixed fixture/live Master
+*
+* That is not a valid calibration path.
+*
+* We therefore create a dedicated Historical
+* marketQuality object from the same fixture values
+* already used by the phase engine.
+*
+* LIVE operation remains completely unchanged.
+*/
+
+
+const masterCrash =
+isHistoricalScenario
+? {
+...crash,
+
+score:
+Number(
+historicalInput.crash.score
+),
+
+probability:
+Number(
+historicalInput.crash.probability
+)
+}
+: crash;
+
+
+const masterRotation =
+isHistoricalScenario
+? {
+...rotation,
+
+score:
+Number(
+historicalInput.rotation.score
+),
+
+rsSmall:
+Number(
+historicalInput.rotation.rsSmall
+),
+
+rsEqual:
+Number(
+historicalInput.rotation.rsEqual
+),
+
+rsGrowth:
+Number(
+historicalInput.rotation.rsGrowth
+)
+}
+: rotation;
+
+
+const masterParticipation =
+isHistoricalScenario
+? {
+...participation,
+
+score:
+Number(
+historicalInput.participation.score
+)
+}
+: participation;
+
+
+const masterBreadthThrust =
+isHistoricalScenario
+? {
+...breadthThrust,
+
+score:
+Number(
+historicalInput.breadthThrust.score
+)
+}
+: breadthThrust;
+
+
+const masterLiquidity =
+isHistoricalScenario
+? {
+...liquidity,
+
+score:
+Number(
+historicalInput.liquidity.score
+)
+}
+: liquidity;
+
+
+const masterFragility =
+isHistoricalScenario
+? {
+...fragility,
+
+score:
+Number(
+historicalInput.fragility.score
+)
+}
+: fragility;
+
+
+const masterRotationDecay =
+isHistoricalScenario
+? {
+...rotationDecay,
+
+score:
+Number(
+historicalInput.rotationDecay.score
+)
+}
+: rotationDecay;
+
+
+const masterRegimeSync =
+isHistoricalScenario
+? {
+...regimeSync,
+
+score:
+Number(
+historicalInput.regimeSync.score
+)
+}
+: regimeSync;
+
+
+const masterPutTiming =
+isHistoricalScenario
+? {
+...putTiming,
+
+score:
+Number(
+historicalInput.putTiming.score
+)
+}
+: putTiming;
+
+
+/* ===================================================
+HISTORICAL MARKET QUALITY
+=================================================== */
+
+const masterMarketQuality =
+isHistoricalScenario
+? marketQualityEngine({
+
+/*
+* Preserve the actual structural geometry from
+* the scenario adapter.
+*
+* Breadth values are already fixture values.
+*/
+
+structure,
+
+participation:
+masterParticipation,
+
+rotation:
+masterRotation,
+
+breadthThrust:
+masterBreadthThrust,
+
+rotationDecay:
+masterRotationDecay,
+
+liquidity:
+masterLiquidity,
+
+fragility:
+masterFragility,
+
+/*
+* Historical phase confirmation is explicitly
+* supplied by the fixture.
+*/
+
+phaseConfirmation:
+historicalInput.phaseConfirmation,
+
+internalDivergence:
+phaseInternalDivergence,
+
+regimeSync:
+masterRegimeSync,
+
+concentrationScore:
+Number(
+historicalInput.concentrationScore
+)
+
+})
+: marketQuality;
+
+
+/*
+* Historical phase confirmation must also remain
+* coherent with the fixture.
+*
+* Live operation continues using the calculated
+* phaseConfirmation engine.
+*/
+
+const masterPhaseConfirmation =
+isHistoricalScenario
+? historicalInput.phaseConfirmation
+: phaseConfirmation;
+
+
+/*
+* Historical regime persistence already originates
+* directly from the supplied historyMetrics.
+*
+* Therefore it is safe to preserve that object.
+*/
+
+const masterRegimePersistence =
+isHistoricalScenario
+? regimePersistenceEngine(
+historicalInput.historyMetrics
+)
+: regimePersistence;
+
+
+/* ===================================================
+MASTER DIAGNOSTICS
 =================================================== */
 
 const masterDiagnostics = {
 
 crash:
-crash?.score,
+masterCrash?.score,
 
 crashProbability:
-crash?.probability,
+masterCrash?.probability,
 
 rotation:
-rotation?.score,
+masterRotation?.score,
 
 putTiming:
-putTiming?.score,
+masterPutTiming?.score,
 
 russell:
 russell?.confidence ??
@@ -2068,34 +2311,34 @@ russell?.score?.value ??
 russell?.score,
 
 participation:
-participation?.score,
+masterParticipation?.score,
 
 breadthThrust:
-breadthThrust?.score,
+masterBreadthThrust?.score,
 
 liquidity:
-liquidity?.score,
+masterLiquidity?.score,
 
 fragility:
-fragility?.score,
+masterFragility?.score,
 
 marketQuality:
-marketQuality?.score,
+masterMarketQuality?.score,
 
 rotationDecay:
-rotationDecay?.score,
+masterRotationDecay?.score,
 
 phaseConfirmation:
-phaseConfirmation?.confidence,
+masterPhaseConfirmation?.confidence,
 
 regimeSync:
-regimeSync?.score,
+masterRegimeSync?.score,
 
 priceMomentum:
 priceMomentum?.score,
 
 regimePersistence:
-regimePersistence?.score
+masterRegimePersistence?.score
 
 };
 
@@ -2125,6 +2368,7 @@ nonFiniteMasterInputs.length > 0
 console.error(
 "[MASTER SCORE DIAGNOSTIC] Non-finite input detected",
 {
+
 timestamp:
 new Date().toISOString(),
 
@@ -2149,97 +2393,64 @@ nonFiniteMasterInputs
 }
 
 
-const masterCrash = isHistoricalScenario
-? {
-...crash,
-score: Number(historicalInput.crash.score),
-probability: Number(historicalInput.crash.probability)
-}
-: crash;
+/* ===================================================
+MASTER
+=================================================== */
 
-const masterRotation = isHistoricalScenario
-? {
-...rotation,
-score: Number(historicalInput.rotation.score),
-rsSmall: Number(historicalInput.rotation.rsSmall),
-rsEqual: Number(historicalInput.rotation.rsEqual),
-rsGrowth: Number(historicalInput.rotation.rsGrowth)
-}
-: rotation;
+const master =
+masterScoreEngine({
 
-const masterParticipation = isHistoricalScenario
-? {
-...participation,
-score: Number(historicalInput.participation.score)
-}
-: participation;
+crash:
+masterCrash,
 
-const masterBreadthThrust = isHistoricalScenario
-? {
-...breadthThrust,
-score: Number(historicalInput.breadthThrust.score)
-}
-: breadthThrust;
+rotation:
+masterRotation,
 
-const masterLiquidity = isHistoricalScenario
-? {
-...liquidity,
-score: Number(historicalInput.liquidity.score)
-}
-: liquidity;
+putTiming:
+masterPutTiming,
 
-const masterFragility = isHistoricalScenario
-? {
-...fragility,
-score: Number(historicalInput.fragility.score)
-}
-: fragility;
-
-const masterRotationDecay = isHistoricalScenario
-? {
-...rotationDecay,
-score: Number(historicalInput.rotationDecay.score)
-}
-: rotationDecay;
-
-const masterRegimeSync = isHistoricalScenario
-? {
-...regimeSync,
-score: Number(historicalInput.regimeSync.score)
-}
-: regimeSync;
-
-const masterPutTiming = isHistoricalScenario
-? {
-...putTiming,
-score: Number(historicalInput.putTiming.score)
-}
-: putTiming;
-
-
-const master = masterScoreEngine({
-crash: masterCrash,
-rotation: masterRotation,
-putTiming: masterPutTiming,
 russell,
+
 phaseData,
+
 structure,
-participation: masterParticipation,
-breadthThrust: masterBreadthThrust,
-liquidity: masterLiquidity,
-fragility: masterFragility,
-marketQuality,
-rotationDecay: masterRotationDecay,
-phaseConfirmation,
-regimeSync: masterRegimeSync,
+
+participation:
+masterParticipation,
+
+breadthThrust:
+masterBreadthThrust,
+
+liquidity:
+masterLiquidity,
+
+fragility:
+masterFragility,
+
+marketQuality:
+masterMarketQuality,
+
+rotationDecay:
+masterRotationDecay,
+
+phaseConfirmation:
+masterPhaseConfirmation,
+
+regimeSync:
+masterRegimeSync,
+
 phaseStage,
+
 historyMetrics,
+
 priceMomentum,
-regimePersistence,
+
+regimePersistence:
+masterRegimePersistence,
+
 gamma
+
 });
-
-
 
 
 /* ===================================================
@@ -2257,6 +2468,7 @@ master?.score
 console.error(
 "[MASTER SCORE DIAGNOSTIC] Master score is non-finite",
 {
+
 timestamp:
 new Date().toISOString(),
 
@@ -2278,7 +2490,7 @@ rotationSignal:
 rotation?.signal,
 
 regimePersistence:
-regimePersistence?.score
+masterRegimePersistence?.score
 
 }
 );
@@ -2314,8 +2526,7 @@ systemHeat?.value ?? 0
 ) * 10,
 
 rotationSignal:
-rotation?.signal ??
-"neutral",
+rotation?.signal ?? "neutral",
 
 rotationStrength:
 Number(
@@ -2375,8 +2586,7 @@ squeeze?.risk ?? 0
 ),
 
 divergenceState:
-divergence?.state ??
-"NONE",
+divergence?.state ?? "NONE",
 
 internalDivergence,
 
@@ -2407,17 +2617,24 @@ edgeStateEngine({
 rotation,
 russell,
 structure,
+
 earlyWarning,
 crash,
+
 master,
 marketQuality,
+
 rotationDecay,
 rotationConfirm,
+
 participation,
 divergence,
+
 priceMomentum,
+
 executionState,
 regimeSync,
+
 dangerZone,
 
 marketData:
@@ -2439,18 +2656,28 @@ nasdaqEngine({
 
 phase,
 phaseData,
+
 crash,
 rotation,
+
 putTiming,
+
 earlyWarning,
+
 historyMetrics,
+
 priceMomentum,
+
 marketQuality,
+
 participation,
 breadthThrust,
+
 liquidity,
+
 regimeSync,
 executionState,
+
 master,
 gamma
 
@@ -2486,21 +2713,29 @@ earlyWarning?.active
 
 score:
 Math.round(
+
 (
 Number(
 rotation?.score ?? 50
 ) * 0.5
-) +
+)
+
++
+
 (
 Number(
 structure?.health?.value ?? 0
 ) * 0.3
-) -
+)
+
+-
+
 (
 Number(
 crash?.probability ?? 0
 ) * 0.2
 )
+
 )
 
 };
@@ -2514,20 +2749,32 @@ const tradeStack =
 tradeStackEngine({
 
 phase,
+
 putTiming,
+
 nasdaqCall,
+
 russell,
+
 priceMomentum,
+
 edgeState,
+
 master,
+
 marketQuality,
+
 phaseConfirmation,
+
 rotationConfirm,
 rotationDecay,
+
 executionState,
 regimeSync,
+
 historyMetrics,
 regimePersistence,
+
 gamma
 
 });
@@ -2549,7 +2796,6 @@ const sizingState =
 statePre ?? {
 
 size: 0,
-
 entryPrice: 0,
 
 pnl:
@@ -2560,7 +2806,6 @@ data.pnl ?? 0
 realized: 0,
 
 hasReduced: false,
-
 isRunner: false
 
 };
@@ -2574,35 +2819,53 @@ const sizing =
 positionSizingV2({
 
 master,
+
 crash,
 putTiming,
+
 russell,
+
 positioning,
+
 state:
 sizingState,
 
 systemHeat,
+
 earlyWarning,
+
 rotation,
 structure,
+
 edgeState,
+
 tradeStack,
+
 divergence,
+
 regimeSync,
 dangerZone,
+
 executionState,
+
 rotationConfirm,
 rotationDecay,
+
 liquidity,
 breadthThrust,
+
 fragility,
 marketQuality,
+
 squeeze,
 participation,
+
 phase,
 historyMetrics,
+
 priceMomentum,
 regimePersistence,
+
 gamma
 
 });
@@ -2616,10 +2879,8 @@ const exit =
 exitEngine({
 
 position: {
-
 size:
 currentPositionSize
-
 },
 
 crash,
@@ -2632,11 +2893,15 @@ data.pnl ?? 0
 ),
 
 phase,
+
 rotation,
 rotationConfirm,
 rotationDecay,
+
 russell,
+
 systemHeat,
+
 fragility,
 liquidity,
 participation,
@@ -2693,11 +2958,14 @@ const decision =
 rotationDecisionEngine({
 
 phase,
+
 crash,
 putTiming,
 russell,
+
 confidence,
 earlyWarning,
+
 master,
 positioning,
 edgeState
@@ -2714,28 +2982,39 @@ signalEngine({
 
 phase,
 phaseConfirmation,
+
 crash,
 putTiming,
 rotation,
+
 earlyWarning,
 exit,
 decision,
+
 tradeStack,
 divergence,
+
 sizing,
+
 regimeSync,
 dangerZone,
+
 executionState,
+
 rotationConfirm,
 rotationDecay,
+
 liquidity,
 breadthThrust,
 fragility,
 squeeze,
 participation,
+
 marketQuality,
+
 priceMomentum,
 regimePersistence,
+
 gamma
 
 });
@@ -2743,12 +3022,9 @@ gamma
 
 const signal = {
 
-...(
-signalResult?.signal ??
-{
+...(signalResult?.signal ?? {
 active: false
-}
-),
+}),
 
 phase
 
@@ -2763,24 +3039,34 @@ const superSignal =
 superSignalEngine({
 
 signal,
+
 phaseConfirmation,
+
 rotationConfirm,
 rotationDecay,
+
 tradeStack,
+
 regimeSync,
 dangerZone,
+
 executionState,
+
 structure,
 marketDrivers,
+
 crash,
 rotation,
 divergence,
+
 liquidity,
 breadthThrust,
 fragility,
 squeeze,
+
 participation,
 marketQuality,
+
 regimePersistence
 
 });
@@ -2794,20 +3080,28 @@ const execution =
 executionEngine({
 
 superSignal,
+
 marketQuality,
+
 vix,
+
 breadth20,
 breadth50,
+
 crash,
 phase,
+
 executionState,
 dangerZone,
+
 regimeSync,
 rotationConfirm,
+
 liquidity,
 breadthThrust,
 fragility,
 squeeze,
+
 participation,
 gamma
 
@@ -2820,11 +3114,9 @@ RISK
 
 const risk =
 riskLoopEngine({
-
 sizing,
 exit,
 state
-
 });
 
 
@@ -2865,33 +3157,26 @@ regime,
 rotation,
 
 rotationConfirm,
-
 rotationDecay,
 
 gamma,
 
 breadthVelocity,
-
 internalDivergence,
 
 regimePersistence,
-
 regimePersistencePre,
 
 signal,
-
 superSignal,
 
 decision,
-
 execution,
 
 executionState,
-
 executionStatePre,
 
 regimeSync,
-
 regimeSyncPre,
 
 dangerZone,
@@ -2901,7 +3186,6 @@ liquidity,
 breadthThrust,
 
 fragility,
-
 fragilityPre,
 
 squeeze,
@@ -2911,7 +3195,6 @@ participation,
 marketQuality,
 
 position,
-
 positioning,
 
 sizing,
@@ -2919,7 +3202,6 @@ sizing,
 exit,
 
 state,
-
 statePre,
 
 currentPositionSize,
@@ -2949,13 +3231,11 @@ edgeState,
 divergence,
 
 driversCore,
-
 marketDrivers,
 
 replay,
 
 historyMetrics,
-
 indices:
 data.indices ?? {},
 
