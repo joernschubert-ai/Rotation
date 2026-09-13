@@ -2149,30 +2149,97 @@ nonFiniteMasterInputs
 }
 
 
-const master =
-masterScoreEngine({
+const masterCrash = isHistoricalScenario
+? {
+...crash,
+score: Number(historicalInput.crash.score),
+probability: Number(historicalInput.crash.probability)
+}
+: crash;
 
-crash,
-rotation,
-putTiming,
+const masterRotation = isHistoricalScenario
+? {
+...rotation,
+score: Number(historicalInput.rotation.score),
+rsSmall: Number(historicalInput.rotation.rsSmall),
+rsEqual: Number(historicalInput.rotation.rsEqual),
+rsGrowth: Number(historicalInput.rotation.rsGrowth)
+}
+: rotation;
+
+const masterParticipation = isHistoricalScenario
+? {
+...participation,
+score: Number(historicalInput.participation.score)
+}
+: participation;
+
+const masterBreadthThrust = isHistoricalScenario
+? {
+...breadthThrust,
+score: Number(historicalInput.breadthThrust.score)
+}
+: breadthThrust;
+
+const masterLiquidity = isHistoricalScenario
+? {
+...liquidity,
+score: Number(historicalInput.liquidity.score)
+}
+: liquidity;
+
+const masterFragility = isHistoricalScenario
+? {
+...fragility,
+score: Number(historicalInput.fragility.score)
+}
+: fragility;
+
+const masterRotationDecay = isHistoricalScenario
+? {
+...rotationDecay,
+score: Number(historicalInput.rotationDecay.score)
+}
+: rotationDecay;
+
+const masterRegimeSync = isHistoricalScenario
+? {
+...regimeSync,
+score: Number(historicalInput.regimeSync.score)
+}
+: regimeSync;
+
+const masterPutTiming = isHistoricalScenario
+? {
+...putTiming,
+score: Number(historicalInput.putTiming.score)
+}
+: putTiming;
+
+
+const master = masterScoreEngine({
+crash: masterCrash,
+rotation: masterRotation,
+putTiming: masterPutTiming,
 russell,
 phaseData,
 structure,
-participation,
-breadthThrust,
-liquidity,
-fragility,
+participation: masterParticipation,
+breadthThrust: masterBreadthThrust,
+liquidity: masterLiquidity,
+fragility: masterFragility,
 marketQuality,
-rotationDecay,
+rotationDecay: masterRotationDecay,
 phaseConfirmation,
-regimeSync,
+regimeSync: masterRegimeSync,
 phaseStage,
 historyMetrics,
 priceMomentum,
 regimePersistence,
 gamma
-
 });
+
+
 
 
 /* ===================================================
