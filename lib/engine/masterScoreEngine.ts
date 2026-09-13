@@ -1441,7 +1441,7 @@ score >= 65 &&
 (
 (
 distributionPhase &&
-defensiveEvidenceCount >= 2
+defensiveEvidenceCount >= 3
 ) ||
 (
 !distributionPhase &&
