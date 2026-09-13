@@ -1455,6 +1455,35 @@ score >= 75 &&
 defensiveEvidenceCount >= 3;
 
 
+console.log(
+"[MASTER P3 DIAGNOSTIC]",
+{
+phase,
+score,
+
+defensiveEvidenceCount,
+
+defensiveStructuralConfirmation,
+strongDefensiveStructure,
+
+prolongedBearRegime,
+institutionalPressure,
+acceleratingWeakness,
+
+rotationBreakdown,
+fragilityBreakdown,
+marketQualityBreakdown,
+weakParticipation,
+defensiveTiming,
+
+marketMode,
+riskState,
+executionMode
+}
+);
+
+
+
 /* =====================================================
 MODE
 ===================================================== */
