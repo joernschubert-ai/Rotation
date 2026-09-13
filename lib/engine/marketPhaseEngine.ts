@@ -60,15 +60,8 @@ marketCharacter = "EXPANSION",
 prolongedBearRegime = false,
 acceleratingWeakness = false,
 
-/*
-* IMPORTANT:
-*
-* Historical replay scenarios may explicitly mark
-* persistent distribution.
-*
-* This must be consumed by the phase engine.
-*/
-persistentDistribution: historicalPersistentDistribution = false,
+persistentDistribution:
+historicalPersistentDistribution = false,
 
 averageBreadth = 0,
 averageParticipation = 0,
@@ -106,21 +99,6 @@ rotation?.score ?? 0
 /* =====================================================
 MARKET / LIQUIDITY STRESS INPUTS
 ===================================================== */
-
-/*
-* These inputs are intentionally read directly by the
-* phase engine.
-*
-* The acute-system-stress detector below is designed
-* specifically for events such as:
-*
-* - regional banking stress
-* - sudden liquidity shocks
-* - systemic uncertainty
-* - rapid volatility expansion
-*
-* They must NOT be inferred only from breadth.
-*/
 
 const vix =
 Number(
@@ -425,16 +403,6 @@ relativeBreadthWeakness > 20;
 HISTORICAL DISTRIBUTION
 ===================================================== */
 
-/*
-* Historical replay scenarios can explicitly describe
-* a persistent distribution regime.
-*
-* This is NOT allowed to force P4 by itself.
-*
-* It becomes meaningful when supported by at least one
-* structural deterioration characteristic.
-*/
-
 const historicalDistributionSupport =
 historicalPersistentDistribution &&
 (
@@ -453,14 +421,6 @@ Number(rotationScore) < 50 ||
 Number(breadth50) < 60
 );
 
-
-/*
-* Accelerating historical weakness is also useful
-* when the market is still relatively strong on the
-* surface.
-*
-* This remains a P3-level detector.
-*/
 
 const acceleratingHistoricalDistribution =
 acceleratingWeakness &&
@@ -708,15 +668,6 @@ broadParticipationFailure
 structuralRiskCount++;
 }
 
-
-/*
-* Historical distribution is deliberately counted
-* only as ONE additional structural signal.
-*
-* This prevents historical metadata from dominating
-* live structural measurements.
-*/
-
 if (
 historicalDistributionSupport
 ) {
@@ -739,52 +690,10 @@ structuralRiskCount >= 2;
 ACUTE LIQUIDITY / SYSTEM STRESS
 ===================================================== */
 
-/*
-* IMPORTANT:
-*
-* This detector is intentionally separate from the
-* slower distribution logic.
-*
-* It is designed for sudden systemic stress where:
-*
-* - liquidity deteriorates rapidly
-* - fragility is already elevated
-* - volatility expands
-* - crash risk rises
-* - internal market structure diverges
-*
-* A high VIX alone is NOT sufficient.
-*
-* Likewise low liquidity alone is NOT sufficient.
-*
-* We require a combination of independent stress
-* dimensions.
-*/
-
-
-/*
-* Primary liquidity stress.
-*
-* This identifies an environment where market liquidity
-* is materially impaired while structural fragility and
-* volatility are already elevated.
-*/
-
 const acuteLiquidityStress =
 liquidityScore <= 40 &&
 fragilityScore >= 75 &&
 vix >= 25;
-
-
-/*
-* Acute systemic stress.
-*
-* The first condition establishes the core liquidity
-* stress environment.
-*
-* The second condition requires confirmation from at
-* least one additional systemic-risk dimension.
-*/
 
 const acuteSystemStress =
 acuteLiquidityStress &&
@@ -799,14 +708,6 @@ phaseConfirmed ||
 crashTrend >= 7
 );
 
-
-/*
-* Strongly confirmed acute systemic stress.
-*
-* This is used for confidence/subphase diagnostics,
-* not as an independent phase.
-*/
-
 const confirmedAcuteSystemStress =
 acuteSystemStress &&
 (
@@ -820,14 +721,6 @@ crashTrend >= 7 &&
 crashProbability >= 45
 )
 );
-
-
-/*
-* Acute stress severity.
-*
-* This diagnostic helps distinguish a simple liquidity
-* deterioration from a broad systemic stress event.
-*/
 
 let acuteStressLevel =
 "NONE";
@@ -902,11 +795,6 @@ persistentWeakness
 )
 ) ||
 
-/*
-* Historical scenarios explicitly marked as
-* persistent distribution can establish P3 when
-* supported by structural evidence.
-*/
 (
 historicalDistributionSupport &&
 (
@@ -956,11 +844,6 @@ narrowLeadershipDivergence &&
 divergenceSeverity >= 30
 ) ||
 
-/*
-* Explicit historical accelerating weakness can
-* identify an early distribution regime even when
-* current breadth has not yet collapsed.
-*/
 (
 acceleratingHistoricalDistribution &&
 (
@@ -969,6 +852,50 @@ Number(institutionalPressure) >= 60 ||
 Number(averageFragility) >= 55
 )
 );
+
+
+/* =====================================================
+CLEAN EXPANSION CANDIDATE
+===================================================== */
+
+/*
+* IMPORTANT:
+*
+* P1 should represent the actual constructive regime.
+*
+* Narrow leadership alone does NOT invalidate P1.
+* What invalidates P1 is evidence of genuine
+* structural deterioration.
+*
+* This distinction is important for strong AI /
+* mega-cap led expansions where headline leadership
+* is narrow but the broader market remains healthy.
+*/
+
+const cleanExpansionCandidate =
+(
+strongBreadth ||
+(
+mediumBreadth &&
+healthyInternals
+)
+) &&
+
+crashScore < 30 &&
+
+!breadthMomentumLoss &&
+!persistentWeakness &&
+!hiddenInstitutionalDistribution &&
+!moderateStructuralDeterioration &&
+!structuralDeterioration &&
+!meaningfulDistribution &&
+!narrowLeadershipDivergence &&
+!historicalDistributionSupport &&
+!acceleratingHistoricalDistribution &&
+
+!severeBearRegime &&
+!severeParticipationFailure &&
+!severeInternalWeakness;
 
 
 /* =====================================================
@@ -1010,7 +937,7 @@ PHASE 7 — CAPITULATION
 ===================================================== */
 
 if (
-crashScore > 85
+crashScore > 90
 ) {
 
 primaryPhase =
@@ -1023,7 +950,7 @@ subPhase =
 "FORCED_LIQUIDATION";
 
 confidence =
-95;
+97;
 
 }
 
@@ -1033,7 +960,7 @@ PHASE 6 — ACCELERATION
 ===================================================== */
 
 else if (
-crashScore > 75
+crashScore > 78
 ) {
 
 primaryPhase =
@@ -1046,7 +973,7 @@ subPhase =
 "LIQUIDITY_BREAK";
 
 confidence =
-90;
+91;
 
 }
 
@@ -1056,7 +983,7 @@ PHASE 5 — BREAKDOWN
 ===================================================== */
 
 else if (
-crashScore > 65
+crashScore > 68
 ) {
 
 primaryPhase =
@@ -1069,7 +996,7 @@ subPhase =
 "STRUCTURAL_BREAKDOWN";
 
 confidence =
-85;
+86;
 
 }
 
@@ -1079,10 +1006,6 @@ PHASE 4 — RISK
 ===================================================== */
 
 else if (
-
-/*
-* EXISTING P4 CONDITIONS
-*/
 
 severePersistentDistribution ||
 
@@ -1143,16 +1066,6 @@ severeParticipationFailure
 )
 ) ||
 
-/*
-* NEW:
-*
-* ACUTE SYSTEM STRESS
-*
-* This is intentionally a separate pathway.
-*
-* It captures sudden liquidity/systemic events
-* without lowering the general P4 thresholds.
-*/
 acuteSystemStress
 
 ) {
@@ -1163,10 +1076,6 @@ primaryPhase =
 regimeState =
 "FRAGILE";
 
-
-/* -----------------------------------------------
-ACUTE LIQUIDITY / SYSTEM STRESS
------------------------------------------------ */
 
 if (
 acuteSystemStress
@@ -1181,11 +1090,6 @@ confirmedAcuteSystemStress
 : 86;
 
 }
-
-
-/* -----------------------------------------------
-PRE CRASH
------------------------------------------------ */
 
 else if (
 
@@ -1218,11 +1122,6 @@ confidence =
 90;
 
 }
-
-
-/* -----------------------------------------------
-INTERNAL DISTRIBUTION
------------------------------------------------ */
 
 else if (
 
@@ -1260,11 +1159,6 @@ confidence =
 
 }
 
-
-/* -----------------------------------------------
-LIQUIDITY TRAP
------------------------------------------------ */
-
 else if (
 
 narrowLeadership &&
@@ -1284,11 +1178,6 @@ confidence =
 
 }
 
-
-/* -----------------------------------------------
-ROTATION BREAKDOWN
------------------------------------------------ */
-
 else if (
 
 rotationScore < 45 &&
@@ -1306,11 +1195,6 @@ confidence =
 78;
 
 }
-
-
-/* -----------------------------------------------
-DEFAULT
------------------------------------------------ */
 
 else {
 
@@ -1339,15 +1223,6 @@ persistentDistribution ||
 
 hiddenInstitutionalDistribution ||
 
-/*
-* EXPLICIT HISTORICAL DISTRIBUTION
-*
-* This is the central correction.
-*
-* A scenario explicitly marked as persistent
-* distribution must not fall into P2 merely because
-* the headline breadth is still medium.
-*/
 historicalDistributionSupport ||
 
 (
@@ -1492,6 +1367,83 @@ confidence =
 
 
 /* =====================================================
+PHASE 1 — CLEAN EXPANSION
+===================================================== */
+
+/*
+* P1 is deliberately evaluated BEFORE P2.
+*
+* This prevents a healthy expansion from being classified
+* as WARNING merely because a rotation or narrow-leadership
+* condition happens to exist.
+*/
+
+else if (
+cleanExpansionCandidate
+) {
+
+primaryPhase =
+"PHASE_1_EXPANSION";
+
+regimeState =
+"RISK_ON";
+
+
+if (
+
+broadParticipation &&
+health > 75 &&
+breadthVelocityScore < 35 &&
+bullishPersistence
+
+) {
+
+subPhase =
+"INSTITUTIONAL_EXPANSION";
+
+confidence =
+90;
+
+}
+
+else if (
+narrowLeadership
+) {
+
+subPhase =
+"AI_MELTUP";
+
+confidence =
+76;
+
+}
+
+else if (
+meaningfulEarlyWarning
+) {
+
+subPhase =
+"HEALTHY_EXPANSION";
+
+confidence =
+72;
+
+}
+
+else {
+
+subPhase =
+"HEALTHY_EXPANSION";
+
+confidence =
+74;
+
+}
+
+}
+
+
+/* =====================================================
 PHASE 2 — WARNING
 ===================================================== */
 
@@ -1574,149 +1526,35 @@ confidence =
 
 
 /* =====================================================
-PHASE 1 — CLEAN EXPANSION
-===================================================== */
-
-else if (
-
-(
-strongBreadth ||
-(
-mediumBreadth &&
-healthyInternals
-)
-) &&
-
-crashScore < 30 &&
-
-!breadthMomentumLoss &&
-
-!persistentWeakness &&
-
-!hiddenInstitutionalDistribution &&
-
-!moderateStructuralDeterioration &&
-
-!structuralDeterioration &&
-
-!meaningfulDistribution &&
-
-!narrowLeadershipDivergence &&
-
-!historicalDistributionSupport &&
-
-!acceleratingHistoricalDistribution
-
-) {
-
-primaryPhase =
-"PHASE_1_EXPANSION";
-
-regimeState =
-"RISK_ON";
-
-
-if (
-
-broadParticipation &&
-health > 75 &&
-breadthVelocityScore < 35 &&
-bullishPersistence
-
-) {
-
-subPhase =
-"INSTITUTIONAL_EXPANSION";
-
-confidence =
-88;
-
-}
-
-else if (
-narrowLeadership
-) {
-
-subPhase =
-"AI_MELTUP";
-
-confidence =
-72;
-
-}
-
-else if (
-meaningfulEarlyWarning
-) {
-
-subPhase =
-"HEALTHY_EXPANSION";
-
-confidence =
-68;
-
-}
-
-else {
-
-subPhase =
-"HEALTHY_EXPANSION";
-
-confidence =
-70;
-
-}
-
-}
-
-
-/* =====================================================
 FALLBACK
 ===================================================== */
 
 else {
 
-primaryPhase =
-(
+const distributionFallback =
 persistentWeakness ||
 persistentDistribution ||
 historicalDistributionSupport ||
 meaningfulDistribution ||
-earlyStructuralDistribution
-)
+earlyStructuralDistribution;
+
+primaryPhase =
+distributionFallback
 ? "PHASE_3_DISTRIBUTION"
 : "PHASE_2_WARNING";
 
 regimeState =
-(
-persistentWeakness ||
-persistentDistribution ||
-historicalDistributionSupport ||
-meaningfulDistribution ||
-earlyStructuralDistribution
-)
+distributionFallback
 ? "TRANSITION"
 : "LATE_EXPANSION";
 
 subPhase =
-(
-persistentWeakness ||
-persistentDistribution ||
-historicalDistributionSupport ||
-meaningfulDistribution ||
-earlyStructuralDistribution
-)
+distributionFallback
 ? "PERSISTENT_TRANSITION"
 : "TRANSITION";
 
 confidence =
-(
-persistentWeakness ||
-persistentDistribution ||
-historicalDistributionSupport ||
-meaningfulDistribution ||
-earlyStructuralDistribution
-)
+distributionFallback
 ? 68
 : 50;
 
@@ -1800,11 +1638,6 @@ const downsidePressure =
 
 (participationCollapse ? 15 : 0) +
 
-/*
-* Acute system stress is a strong downward pressure
-* signal, but it does not independently determine
-* the phase.
-*/
 (acuteSystemStress ? 20 : 0);
 
 
@@ -2151,10 +1984,6 @@ highs,
 
 lows,
 
-/*
-* Acute stress diagnostics.
-*/
-
 vix,
 
 liquidityScore,
@@ -2244,10 +2073,6 @@ persistentDistribution,
 
 severePersistentDistribution,
 
-/*
-* Historical distribution diagnostics.
-*/
-
 historicalPersistentDistribution,
 
 historicalDistributionSupport,
@@ -2325,6 +2150,8 @@ institutionalPressure,
 meaningfulDistribution,
 
 earlyStructuralDistribution,
+
+cleanExpansionCandidate,
 
 structuralRiskCount,
 
