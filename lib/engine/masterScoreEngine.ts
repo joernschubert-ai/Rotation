@@ -86,7 +86,6 @@ russell?.score?.value ??
 50
 );
 
-
 const timingRaw =
 Number(
 putTiming?.score?.value ??
@@ -100,57 +99,68 @@ phaseData?.phase ??
 
 const phaseConfidence =
 Number(
-phaseConfirmation?.confidence ?? 50
+phaseConfirmation?.confidence ??
+50
 );
 
 const phaseConfirmed =
 Boolean(
-phaseConfirmation?.confirmed ?? false
+phaseConfirmation?.confirmed ??
+false
 );
 
 const participationScore =
 Number(
-participation?.score ?? 50
+participation?.score ??
+50
 );
 
 const thrustScore =
 Number(
-breadthThrust?.score ?? 50
+breadthThrust?.score ??
+50
 );
 
 const liquidityScore =
 Number(
-liquidity?.score ?? 50
+liquidity?.score ??
+50
 );
 
 const fragilityScore =
 Number(
-fragility?.score ?? 50
+fragility?.score ??
+50
 );
 
 const rotationDecayScore =
 Number(
-rotationDecay?.score ?? 0
+rotationDecay?.score ??
+0
 );
 
 const marketQualityScore =
 Number(
-marketQuality?.score ?? 50
+marketQuality?.score ??
+50
 );
 
 const breadthVelocityScore =
 Number(
-breadthVelocity?.score ?? 50
+breadthVelocity?.score ??
+50
 );
 
 const regimeSyncScore =
 Number(
-regimeSync?.score ?? 50
+regimeSync?.score ??
+50
 );
 
 const dangerScore =
 Number(
-dangerZone?.score ?? 0
+dangerZone?.score ??
+0
 );
 
 
@@ -160,32 +170,38 @@ REGIME PERSISTENCE
 
 const persistenceScore =
 Number(
-regimePersistence?.score ?? 0
+regimePersistence?.score ??
+0
 );
 
 const distributionRisk =
 Number(
-regimePersistence?.distributionRisk ?? 0
+regimePersistence?.distributionRisk ??
+0
 );
 
 const falseRecoveryRisk =
 Number(
-regimePersistence?.falseRecoveryRisk ?? 0
+regimePersistence?.falseRecoveryRisk ??
+0
 );
 
 const marketFatigue =
 Number(
-regimePersistence?.marketFatigue ?? 0
+regimePersistence?.marketFatigue ??
+0
 );
 
 const bearishPersistence =
 Boolean(
-regimePersistence?.bearishPersistence ?? false
+regimePersistence?.bearishPersistence ??
+false
 );
 
 const bullishPersistence =
 Boolean(
-regimePersistence?.bullishPersistence ?? false
+regimePersistence?.bullishPersistence ??
+false
 );
 
 const persistenceTrend =
@@ -199,7 +215,8 @@ PRICE MOMENTUM
 
 const priceMomentumScore =
 Number(
-priceMomentum?.score ?? 50
+priceMomentum?.score ??
+50
 );
 
 const priceMomentumTrend =
@@ -209,7 +226,8 @@ priceMomentum?.direction ??
 
 const priceMomentumAcceleration =
 Number(
-priceMomentum?.acceleration ?? 0
+priceMomentum?.acceleration ??
+0
 );
 
 
@@ -219,44 +237,25 @@ HISTORY
 
 const {
 phasePersistence = 0,
-
 daysInPhase = 0,
-
 participationDecay = 0,
-
 breadthTrend = 0,
-
 breadthAcceleration = 0,
-
 leadershipDecay = 0,
-
 crashTrend = 0,
-
 relativeBreadthWeakness = 0,
-
 institutionalPressure = 0,
-
 marketCharacter = "EXPANSION",
-
 averageBreadth = 50,
-
 averageParticipation = 50,
-
 averageRotation = 50,
-
 averageLiquidity = 50,
-
 averageFragility = 50,
-
 acceleratingWeakness = false,
-
 regimePersistence: regimePersistenceHistory = 0,
-
 persistentDistribution:
 historyPersistentDistribution = false,
-
 prolongedBearRegime = false
-
 } = historyMetrics;
 
 
@@ -389,7 +388,6 @@ timingRisk;
 /* =====================================================
 RISK COMPONENTS
 ===================================================== */
-
 
 /*
 * CRASH
@@ -606,7 +604,6 @@ const historicalFragility =
 clamp(
 Number(averageFragility)
 );
-
 
 const historicalBreadthRisk =
 riskFromConstructive(
@@ -1072,7 +1069,9 @@ Number(relativeBreadthWeakness) > 10;
 */
 
 const prolongedBearHistory =
-Boolean(prolongedBearRegime);
+Boolean(
+prolongedBearRegime
+);
 
 
 /*
@@ -1258,7 +1257,6 @@ let color:
 | "YELLOW"
 | "RED";
 
-
 if (
 score <= 35
 ) {
@@ -1319,7 +1317,9 @@ signalStrength =
 Math.round(
 100 -
 (
-Math.abs(score - 50) * 2
+Math.abs(
+score - 50
+) * 2
 )
 );
 
@@ -1380,11 +1380,17 @@ LEADERSHIP
 
 const narrowLeadership = (
 
-Number(rotation?.rsGrowth ?? 1) > 1.03 &&
+Number(
+rotation?.rsGrowth ?? 1
+) > 1.03 &&
 
-Number(rotation?.rsSmall ?? 1) < 0.995 &&
+Number(
+rotation?.rsSmall ?? 1
+) < 0.995 &&
 
-Number(rotation?.rsEqual ?? 1) < 0.995
+Number(
+rotation?.rsEqual ?? 1
+) < 0.995
 
 );
 
@@ -1398,26 +1404,21 @@ rotation?.signal === "RISK_OFF_ROTATION" ||
 rotation?.state === "BREAKDOWN" ||
 rotationScore <= 35;
 
-
 const fragilityBreakdown =
 fragilityScore >= 75;
-
 
 const marketQualityBreakdown =
 marketQuality?.state === "STRUCTURAL_BREAKDOWN" ||
 marketQualityScore <= 35;
 
-
 const weakParticipation =
 participation?.state === "WEAK" ||
 participationScore < 45;
-
 
 const defensiveTiming =
 putTiming?.decision === "DEFENSIVE_BUILD" ||
 putTiming?.decision === "STRUCTURAL_BUILD" ||
 timingRiskScore >= 65;
-
 
 const defensiveEvidenceCount = [
 rotationBreakdown,
@@ -1430,7 +1431,6 @@ acceleratingWeakness
 ]
 .filter(Boolean)
 .length;
-
 
 const distributionPhase =
 phase === "PHASE_3_DISTRIBUTION";
@@ -1455,33 +1455,31 @@ score >= 75 &&
 defensiveEvidenceCount >= 3;
 
 
+/* =====================================================
+DIAGNOSTIC
+===================================================== */
+
 console.log(
 "[MASTER P3 DIAGNOSTIC]",
 {
 phase,
 score,
-
 defensiveEvidenceCount,
-
 defensiveStructuralConfirmation,
 strongDefensiveStructure,
-
 prolongedBearRegime,
 institutionalPressure,
 acceleratingWeakness,
-
 rotationBreakdown,
 fragilityBreakdown,
 marketQualityBreakdown,
 weakParticipation,
 defensiveTiming,
-
 marketMode,
 riskState,
 executionMode
 }
 );
-
 
 
 /* =====================================================
@@ -1494,7 +1492,8 @@ let mode:
 | "RISK"
 | "CRASH";
 
-mode = "LONG";
+mode =
+"LONG";
 
 
 /*
@@ -1505,7 +1504,8 @@ if (
 phase === "PHASE_3_DISTRIBUTION"
 ) {
 
-mode = "NEUTRAL";
+mode =
+"NEUTRAL";
 
 }
 
@@ -1518,7 +1518,8 @@ if (
 phase === "PHASE_4_RISK"
 ) {
 
-mode = "RISK";
+mode =
+"RISK";
 
 }
 
@@ -1533,13 +1534,23 @@ phase === "PHASE_6_ACCELERATION" ||
 phase === "PHASE_7_CAPITULATION"
 ) {
 
-mode = "CRASH";
+mode =
+"CRASH";
 
 }
 
 
 /*
 * Score-first defensive promotion.
+*
+* IMPORTANT:
+*
+* P3 DISTRIBUTION is deliberately excluded.
+*
+* P3 represents structural distribution / transition.
+* Structural confirmation in P3 can produce a PUT signal
+* but must not automatically promote the trading mode
+* to RISK.
 */
 
 if (
@@ -1547,54 +1558,83 @@ defensiveStructuralConfirmation &&
 phase !== "PHASE_3_DISTRIBUTION"
 ) {
 
-mode = "RISK";
+mode =
+"RISK";
 
 }
 
 
 /*
 * Strong defensive structure.
+*
+* Crash phases remain CRASH.
+*
+* P3 remains NEUTRAL even when the structural
+* conditions are strong enough for confirmation.
 */
 
 if (
 strongDefensiveStructure &&
+phase !== "PHASE_3_DISTRIBUTION" &&
 phase !== "PHASE_5_BREAKDOWN" &&
 phase !== "PHASE_6_ACCELERATION" &&
 phase !== "PHASE_7_CAPITULATION"
 ) {
 
-mode = "RISK";
+mode =
+"RISK";
 
 }
 
 
 /*
 * Prolonged bear confirmation.
+*
+* IMPORTANT:
+*
+* P3 DISTRIBUTION must remain a transition state.
+*
+* A prolonged-bear history can strengthen the
+* Master Score and PUT signal, but must not by
+* itself promote P3 into RISK.
 */
 
 if (
 prolongedBearRegime &&
 institutionalPressure > 70 &&
 score >= 65 &&
-mode !== "CRASH"
+mode !== "CRASH" &&
+phase !== "PHASE_3_DISTRIBUTION"
 ) {
 
-mode = "RISK";
+mode =
+"RISK";
 
 }
 
 
 /*
 * Accelerating weakness.
+*
+* IMPORTANT:
+*
+* P3 DISTRIBUTION is deliberately excluded.
+*
+* Accelerating weakness contributes to the
+* Master Score and structural evidence, but
+* P3 remains NEUTRAL until the market actually
+* transitions into P4 or a later risk phase.
 */
 
 if (
 acceleratingWeakness &&
 score >= 65 &&
-mode !== "CRASH"
+mode !== "CRASH" &&
+phase !== "PHASE_3_DISTRIBUTION"
 ) {
 
-mode = "RISK";
+mode =
+"RISK";
 
 }
 
@@ -1619,7 +1659,8 @@ executionOverride &&
 mode === "LONG"
 ) {
 
-mode = "RISK";
+mode =
+"RISK";
 
 }
 
@@ -1635,7 +1676,8 @@ phase === "PHASE_1_EXPANSION" &&
 mode === "LONG"
 ) {
 
-mode = "NEUTRAL";
+mode =
+"NEUTRAL";
 
 }
 
@@ -1650,25 +1692,29 @@ switch (mode) {
 
 case "LONG":
 
-netExposure = 40;
+netExposure =
+40;
 
 break;
 
 case "NEUTRAL":
 
-netExposure = 0;
+netExposure =
+0;
 
 break;
 
 case "RISK":
 
-netExposure = -40;
+netExposure =
+-40;
 
 break;
 
 case "CRASH":
 
-netExposure = -85;
+netExposure =
+-85;
 
 break;
 
@@ -1685,7 +1731,8 @@ let regime:
 | "RISK"
 | "CRASH";
 
-regime = "LONG";
+regime =
+"LONG";
 
 
 if (
@@ -1693,7 +1740,8 @@ phase === "PHASE_3_DISTRIBUTION" &&
 mode === "NEUTRAL"
 ) {
 
-regime = "TRANSITION";
+regime =
+"TRANSITION";
 
 }
 
@@ -1702,7 +1750,8 @@ if (
 mode === "RISK"
 ) {
 
-regime = "RISK";
+regime =
+"RISK";
 
 }
 
@@ -1711,7 +1760,8 @@ if (
 mode === "CRASH"
 ) {
 
-regime = "CRASH";
+regime =
+"CRASH";
 
 }
 
@@ -1854,55 +1904,61 @@ putThreshold:
 65,
 
 signal,
+
 color,
+
 signalStrength,
 
 
-/*
-* Execution
-*/
+/* Execution */
 
 riskState,
+
 marketMode,
+
 executionMode,
 
 
-/*
-* Phase
-*/
+/* Phase */
 
 phaseConfirmed,
+
 phaseConfidence,
 
 
-/*
-* Momentum
-*/
+/* Momentum */
 
 priceMomentumScore,
+
 priceMomentumTrend,
+
 priceMomentumAcceleration,
 
 
-/*
-* Structural flags
-*/
+/* Structural flags */
 
 weakInternals,
+
 narrowLeadership,
 
 rotationDecayScore,
+
 marketQualityScore,
+
 participationScore,
+
 breadthVelocityScore,
 
 phasePersistence,
+
 participationDecay,
 
 breadthTrend,
+
 breadthAcceleration,
 
 leadershipDecay,
+
 crashTrend,
 
 relativeBreadthWeakness,
@@ -1914,57 +1970,71 @@ institutionalPressure,
 marketCharacter,
 
 averageBreadth,
+
 averageParticipation,
+
 averageRotation,
+
 averageLiquidity,
+
 averageFragility,
 
 regimePersistenceHistory,
 
 deterioratingBreadth,
+
 acceleratingBreadthDecay,
 
 leadershipConcentration,
+
 risingCrashRisk,
 
 broadParticipationFailure,
+
 prolongedBearRegime,
 
 
-/*
-* Regime persistence
-*/
+/* Regime persistence */
 
 persistenceScore,
+
 distributionRisk,
+
 falseRecoveryRisk,
+
 marketFatigue,
 
 bearishPersistence,
+
 bullishPersistence,
+
 persistenceTrend,
 
 
-/*
-* Defensive confirmation
-*/
+/* Defensive confirmation */
 
 defensiveEvidenceCount,
+
 rotationBreakdown,
+
 fragilityBreakdown,
+
 marketQualityBreakdown,
+
 weakParticipation,
+
 defensiveTiming,
+
 distributionPhase,
+
 defensiveStructuralConfirmation,
+
 strongDefensiveStructure,
 
 russellBlocked,
 
 
-/*
-* Diagnostics
-*/
+/* Diagnostics */
 
 phaseAdjustment,
 
@@ -2084,9 +2154,7 @@ dangerRisk
 ),
 
 
-/*
-* Persistence components.
-*/
+/* Persistence components */
 
 regimePersistence:
 Math.round(
