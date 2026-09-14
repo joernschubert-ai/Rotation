@@ -1544,7 +1544,7 @@ mode = "CRASH";
 
 if (
 defensiveStructuralConfirmation &&
-mode !== "CRASH"
+phase !== "PHASE_3_DISTRIBUTION"
 ) {
 
 mode = "RISK";
