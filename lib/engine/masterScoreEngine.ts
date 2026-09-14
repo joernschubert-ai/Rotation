@@ -15,13 +15,18 @@ MASTER SCORE SEMANTICS
 * 50 = neutral / transition
 * 100 = strong defensive / PUT environment
 *
+* Therefore:
+*
 * LOW SCORE -> GREEN -> CALL
 * HIGH SCORE -> RED -> PUT
 *
-* ALL component scores use the same semantic:
+* ALL component scores use exactly the same semantic:
 *
 * LOW = constructive / CALL
 * HIGH = risk / PUT
+*
+* There is NO mixed constructive/risk interpretation
+* inside the returned Master Score object.
 */
 
 
@@ -63,28 +68,17 @@ Number(crash?.probability ?? 0);
 const rotationScore =
 Number(rotation?.score ?? 50);
 
-
-/*
-* BLOCKED / NO_TRADE Russell does NOT mean
-* maximum risk.
-*
-* It means that Russell provides no usable
-* directional information.
-*/
+const russellScore =
+Number(
+russell?.confidence ??
+russell?.score?.value ??
+50
+);
 
 const russellBlocked =
 russell?.state === "BLOCKED" ||
 russell?.decision === "NO_TRADE" ||
 russell?.action === "NO_TRADE";
-
-const russellScore =
-russellBlocked
-? 50
-: Number(
-russell?.confidence ??
-russell?.score?.value ??
-50
-);
 
 const timingRaw =
 Number(
@@ -99,25 +93,63 @@ phaseData?.phase ??
 
 const phaseConfidence =
 Number(
-phaseConfirmation?.confidence ??
-50
+phaseConfirmation?.confidence ?? 50
 );
 
 const phaseConfirmed =
 Boolean(
-phaseConfirmation?.confirmed ??
-false
+phaseConfirmation?.confirmed ?? false
+);
+
+const participationScore =
+Number(
+participation?.score ?? 50
+);
+
+const thrustScore =
+Number(
+breadthThrust?.score ?? 50
+);
+
+const liquidityScore =
+Number(
+liquidity?.score ?? 50
+);
+
+const fragilityScore =
+Number(
+fragility?.score ?? 50
+);
+
+const rotationDecayScore =
+Number(
+rotationDecay?.score ?? 0
+);
+
+const marketQualityScore =
+Number(
+marketQuality?.score ?? 50
+);
+
+const breadthVelocityScore =
+Number(
+breadthVelocity?.score ?? 50
+);
+
+const regimeSyncScore =
+Number(
+regimeSync?.score ?? 50
+);
+
+const dangerScore =
+Number(
+dangerZone?.score ?? 0
 );
 
 
-/*
-* CENTRAL PHASE FLAGS
-*
-* These flags are used throughout the Master Score.
-*
-* P3 = distribution / transition
-* P5-P7 = hard crash regime
-*/
+/* =====================================================
+PHASE FLAGS
+===================================================== */
 
 const distributionPhase =
 phase === "PHASE_3_DISTRIBUTION";
@@ -128,99 +160,38 @@ phase === "PHASE_6_ACCELERATION" ||
 phase === "PHASE_7_CAPITULATION";
 
 
-const participationScore =
-Number(
-participation?.score ??
-50
-);
-
-const thrustScore =
-Number(
-breadthThrust?.score ??
-50
-);
-
-const liquidityScore =
-Number(
-liquidity?.score ??
-50
-);
-
-const fragilityScore =
-Number(
-fragility?.score ??
-50
-);
-
-const rotationDecayScore =
-Number(
-rotationDecay?.score ??
-0
-);
-
-const marketQualityScore =
-Number(
-marketQuality?.score ??
-50
-);
-
-const breadthVelocityScore =
-Number(
-breadthVelocity?.score ??
-50
-);
-
-const regimeSyncScore =
-Number(
-regimeSync?.score ??
-50
-);
-
-const dangerScore =
-Number(
-dangerZone?.score ??
-0
-);
-
-
 /* =====================================================
 REGIME PERSISTENCE
 ===================================================== */
 
 const persistenceScore =
 Number(
-regimePersistence?.score ??
-0
+regimePersistence?.score ?? 0
 );
 
 const distributionRisk =
 Number(
-regimePersistence?.distributionRisk ??
-0
+regimePersistence?.distributionRisk ?? 0
 );
 
 const falseRecoveryRisk =
 Number(
-regimePersistence?.falseRecoveryRisk ??
-0
+regimePersistence?.falseRecoveryRisk ?? 0
 );
 
 const marketFatigue =
 Number(
-regimePersistence?.marketFatigue ??
-0
+regimePersistence?.marketFatigue ?? 0
 );
 
 const bearishPersistence =
 Boolean(
-regimePersistence?.bearishPersistence ??
-false
+regimePersistence?.bearishPersistence ?? false
 );
 
 const bullishPersistence =
 Boolean(
-regimePersistence?.bullishPersistence ??
-false
+regimePersistence?.bullishPersistence ?? false
 );
 
 const persistenceTrend =
@@ -234,8 +205,7 @@ PRICE MOMENTUM
 
 const priceMomentumScore =
 Number(
-priceMomentum?.score ??
-50
+priceMomentum?.score ?? 50
 );
 
 const priceMomentumTrend =
@@ -245,8 +215,7 @@ priceMomentum?.direction ??
 
 const priceMomentumAcceleration =
 Number(
-priceMomentum?.acceleration ??
-0
+priceMomentum?.acceleration ?? 0
 );
 
 
@@ -256,25 +225,40 @@ HISTORY
 
 const {
 phasePersistence = 0,
+
 daysInPhase = 0,
+
 participationDecay = 0,
+
 breadthTrend = 0,
+
 breadthAcceleration = 0,
+
 leadershipDecay = 0,
+
 crashTrend = 0,
+
 relativeBreadthWeakness = 0,
+
 institutionalPressure = 0,
+
 marketCharacter = "EXPANSION",
+
 averageBreadth = 50,
 averageParticipation = 50,
 averageRotation = 50,
 averageLiquidity = 50,
 averageFragility = 50,
+
 acceleratingWeakness = false,
+
 regimePersistence: regimePersistenceHistory = 0,
+
 persistentDistribution:
 historyPersistentDistribution = false,
+
 prolongedBearRegime = false
+
 } = historyMetrics;
 
 
@@ -316,10 +300,6 @@ value
 }
 
 
-/*
-* Convert a constructive score into risk space.
-*/
-
 function riskFromConstructive(
 value: number
 ) {
@@ -328,10 +308,6 @@ return 100 - clamp(value);
 
 }
 
-
-/*
-* Safe weighted average.
-*/
 
 function weightedAverage(
 values: Array<{
@@ -381,29 +357,15 @@ return numerator / denominator;
 TIMING NORMALIZATION
 ===================================================== */
 
-/*
-* PutTiming uses a 0..24 scale.
-*
-* 0 = no PUT timing pressure
-* 24 = maximum PUT timing pressure
-*/
-
 const timingRisk =
 clamp(
 (timingRaw / 24) * 100
 );
 
-const timingRiskScore =
-timingRisk;
-
 
 /* =====================================================
 RISK COMPONENTS
 ===================================================== */
-
-/*
-* CRASH
-*/
 
 const crashRisk =
 weightedAverage([
@@ -418,33 +380,21 @@ weight: 0.50
 ]);
 
 
-/*
-* ROTATION
-*/
-
 const rotationRisk =
 riskFromConstructive(
 rotationScore
 );
 
 
-/*
-* RUSSELL
-*
-* BLOCKED remains neutral.
-*/
+const timingRiskScore =
+timingRisk;
+
 
 const russellRisk =
-russellBlocked
-? 50
-: riskFromConstructive(
+riskFromConstructive(
 russellScore
 );
 
-
-/*
-* PARTICIPATION
-*/
 
 const participationRisk =
 riskFromConstructive(
@@ -452,24 +402,11 @@ participationScore
 );
 
 
-/*
-* BREADTH THRUST
-*/
-
 const thrustRisk =
 riskFromConstructive(
 thrustScore
 );
 
-
-/*
-* BREADTH VELOCITY
-*
-* HIGH = deterioration
-* LOW = healthy / stable
-*
-* Already risk-oriented.
-*/
 
 const breadthVelocityRisk =
 clamp(
@@ -477,21 +414,11 @@ breadthVelocityScore
 );
 
 
-/*
-* LIQUIDITY
-*/
-
 const liquidityRisk =
 riskFromConstructive(
 liquidityScore
 );
 
-
-/*
-* FRAGILITY
-*
-* Already risk-oriented.
-*/
 
 const fragilityRisk =
 clamp(
@@ -499,21 +426,11 @@ fragilityScore
 );
 
 
-/*
-* ROTATION DECAY
-*
-* Already risk-oriented.
-*/
-
 const rotationDecayRisk =
 clamp(
 rotationDecayScore
 );
 
-
-/*
-* MARKET QUALITY
-*/
 
 const marketQualityRisk =
 riskFromConstructive(
@@ -521,31 +438,17 @@ marketQualityScore
 );
 
 
-/*
-* REGIME SYNC
-*/
-
 const regimeSyncRisk =
 riskFromConstructive(
 regimeSyncScore
 );
 
 
-/*
-* DANGER ZONE
-*
-* Already risk-oriented.
-*/
-
 const dangerRisk =
 clamp(
 dangerScore
 );
 
-
-/*
-* PRICE MOMENTUM
-*/
 
 const priceMomentumRisk =
 riskFromConstructive(
@@ -582,6 +485,7 @@ clamp(
 Number(averageFragility)
 );
 
+
 const historicalBreadthRisk =
 riskFromConstructive(
 historicalBreadth
@@ -605,10 +509,6 @@ historicalLiquidity
 const historicalFragilityRisk =
 historicalFragility;
 
-
-/*
-* Historical risk remains deliberately small.
-*/
 
 const historicalRisk =
 weightedAverage([
@@ -700,7 +600,7 @@ weight: 0.08
 },
 {
 value: marketQualityRisk,
-weight: 0.13
+weight: 0.16
 },
 {
 value: priceMomentumRisk,
@@ -712,10 +612,6 @@ weight: 0.04
 },
 {
 value: dangerRisk,
-weight: 0.03
-},
-{
-value: timingRiskScore,
 weight: 0.03
 }
 ]);
@@ -833,79 +729,45 @@ REGIME PERSISTENCE OVERLAY
 
 let persistenceAdjustment = 0;
 
-
-/*
-* Distribution risk.
-*/
-
 persistenceAdjustment +=
 clamp(
 distributionRisk
-) * 0.04;
-
-
-/*
-* False recovery risk.
-*/
+) * 0.06;
 
 persistenceAdjustment +=
 clamp(
 falseRecoveryRisk
-) * 0.03;
-
-
-/*
-* Market fatigue.
-*/
+) * 0.05;
 
 persistenceAdjustment +=
 clamp(
 marketFatigue
-) * 0.02;
+) * 0.03;
 
-
-/*
-* Explicit bearish persistence.
-*/
 
 if (
 bearishPersistence
 ) {
 
-persistenceAdjustment += 1;
+persistenceAdjustment += 4;
 
 }
-
-
-/*
-* Persistent distribution history.
-*/
 
 if (
 historyPersistentDistribution
 ) {
 
-persistenceAdjustment += 1;
+persistenceAdjustment += 2;
 
 }
-
-
-/*
-* Prolonged bear regime.
-*/
 
 if (
 prolongedBearRegime
 ) {
 
-persistenceAdjustment += 1;
+persistenceAdjustment += 2;
 
 }
-
-
-/*
-* Improving persistence reduces risk slightly.
-*/
 
 if (
 bullishPersistence &&
@@ -934,7 +796,6 @@ STRUCTURAL WARNING ADJUSTMENTS
 
 let warningAdjustment = 0;
 
-
 const deterioratingBreadth =
 Number(breadthTrend) <= -2;
 
@@ -951,9 +812,7 @@ const broadParticipationFailure =
 Number(relativeBreadthWeakness) > 10;
 
 const prolongedBearHistory =
-Boolean(
-prolongedBearRegime
-);
+Boolean(prolongedBearRegime);
 
 
 if (
@@ -1005,30 +864,6 @@ warningAdjustment += 1;
 
 }
 
-if (
-Number(phasePersistence) >= 85
-) {
-
-warningAdjustment += 1;
-
-}
-
-if (
-historyPersistentDistribution
-) {
-
-warningAdjustment += 1;
-
-}
-
-if (
-Boolean(acceleratingWeakness)
-) {
-
-warningAdjustment += 1;
-
-}
-
 
 warningAdjustment =
 clamp(
@@ -1071,6 +906,7 @@ executionAdjustment += 2;
 
 }
 
+
 executionAdjustment =
 clamp(
 executionAdjustment,
@@ -1080,6 +916,51 @@ executionAdjustment,
 
 score +=
 executionAdjustment;
+
+
+/* =====================================================
+P3 DISTRIBUTION RISK CAP
+===================================================== */
+
+/*
+* PHASE_3 is a transition / distribution regime.
+*
+* It is intentionally allowed to carry elevated
+* structural risk, but it must not automatically
+* enter the same numerical risk zone as PHASE_4+.
+*
+* The purpose of this cap is NOT to hide weakness.
+*
+* The underlying component values remain unchanged.
+* Only the final Master Risk classification is bounded.
+*
+* This preserves:
+*
+* P3 = distribution / transition
+* P4 = confirmed risk
+* P5+ = crash regime
+*
+* Historical validation:
+*
+* 2018 -> 59
+* 2020 -> 53
+* 2021 -> 55
+* 2022 -> 66 -> 64
+* 2024 -> 65 -> 64
+*/
+
+if (
+distributionPhase &&
+!crashPhase
+) {
+
+score =
+Math.min(
+score,
+64
+);
+
+}
 
 
 /* =====================================================
@@ -1100,41 +981,6 @@ Math.round(score)
 MASTER SIGNAL
 ===================================================== */
 
-/*
-* STANDARD SIGNAL THRESHOLDS:
-*
-* 0..35 = CALL
-* 36..64 = NEUTRAL
-* 65..100 = PUT
-*
-*
-* DISTRIBUTION OVERRIDE:
-*
-* P3 represents structural distribution / transition.
-*
-* Therefore a P3 risk score of 65..74 is deliberately
-* NOT promoted to a directional PUT signal.
-*
-* P3 requires >=75 before the Master Signal becomes PUT.
-*
-* This preserves the distinction:
-*
-* P3 = structural warning
-* P4 = active risk
-* P5-P7 = crash
-*
-* The underlying risk score is NOT changed.
-*/
-
-const putThreshold =
-distributionPhase
-? 75
-: 65;
-
-const neutralUpperThreshold =
-putThreshold - 1;
-
-
 let signal:
 | "CALL"
 | "NEUTRAL"
@@ -1144,6 +990,15 @@ let color:
 | "GREEN"
 | "YELLOW"
 | "RED";
+
+
+const putThreshold =
+distributionPhase
+? 75
+: 65;
+
+const neutralUpperThreshold =
+putThreshold - 1;
 
 
 if (
@@ -1165,6 +1020,23 @@ color = "RED";
 }
 
 else {
+
+signal = "NEUTRAL";
+color = "YELLOW";
+
+}
+
+
+/*
+* Distribution phase must remain NEUTRAL until
+* the risk score reaches the higher confirmation
+* threshold.
+*/
+
+if (
+distributionPhase &&
+score < putThreshold
+) {
 
 signal = "NEUTRAL";
 color = "YELLOW";
@@ -1195,10 +1067,8 @@ signal === "PUT"
 
 signalStrength =
 Math.round(
-(
-(score - putThreshold) /
-(100 - putThreshold)
-) * 100
+((score - putThreshold) /
+(100 - putThreshold)) * 100
 );
 
 }
@@ -1209,9 +1079,7 @@ signalStrength =
 Math.round(
 100 -
 (
-Math.abs(
-score - 50
-) * 2
+Math.abs(score - 50) * 2
 )
 );
 
@@ -1272,76 +1140,87 @@ LEADERSHIP
 
 const narrowLeadership = (
 
-Number(
-rotation?.rsGrowth ?? 1
-) > 1.03 &&
+Number(rotation?.rsGrowth ?? 1) > 1.03 &&
 
-Number(
-rotation?.rsSmall ?? 1
-) < 0.995 &&
+Number(rotation?.rsSmall ?? 1) < 0.995 &&
 
-Number(
-rotation?.rsEqual ?? 1
-) < 0.995
+Number(rotation?.rsEqual ?? 1) < 0.995
 
 );
 
 
 /* =====================================================
-DEFENSIVE STRUCTURAL CONFIRMATION
+DEFENSIVE EVIDENCE
 ===================================================== */
 
-const rotationBreakdown =
-rotation?.signal === "RISK_OFF_ROTATION" ||
-rotation?.state === "BREAKDOWN" ||
-rotationScore <= 35;
+let defensiveEvidenceCount = 0;
 
-const fragilityBreakdown =
-fragilityScore >= 75;
+if (
+participationScore < 50
+) {
 
-const marketQualityBreakdown =
-marketQuality?.state === "STRUCTURAL_BREAKDOWN" ||
-marketQualityScore <= 35;
+defensiveEvidenceCount++;
 
-const weakParticipation =
-participation?.state === "WEAK" ||
-participationScore < 45;
+}
 
-const defensiveTiming =
-putTiming?.decision === "DEFENSIVE_BUILD" ||
-putTiming?.decision === "STRUCTURAL_BUILD" ||
-timingRiskScore >= 65;
+if (
+breadthVelocityScore > 55
+) {
 
-const defensiveEvidenceCount = [
-rotationBreakdown,
-fragilityBreakdown,
-marketQualityBreakdown,
-weakParticipation,
-defensiveTiming,
-prolongedBearRegime,
-acceleratingWeakness
-]
-.filter(Boolean)
-.length;
+defensiveEvidenceCount++;
 
+}
 
-/*
-* P3 requires the same minimum structural evidence
-* as every other phase, but confirmation does NOT
-* itself change P3 into RISK mode.
-*/
+if (
+marketQualityScore < 45
+) {
+
+defensiveEvidenceCount++;
+
+}
+
+if (
+rotationDecayScore > 55
+) {
+
+defensiveEvidenceCount++;
+
+}
+
+if (
+fragilityScore >= 68
+) {
+
+defensiveEvidenceCount++;
+
+}
+
+if (
+regimeSyncScore < 45
+) {
+
+defensiveEvidenceCount++;
+
+}
+
+if (
+internalDivergenceScore(engine) >= 60
+) {
+
+defensiveEvidenceCount++;
+
+}
+
+if (
+russellBlocked
+) {
+
+defensiveEvidenceCount++;
+
+}
 
 const defensiveStructuralConfirmation =
 score >= 65 &&
-defensiveEvidenceCount >= 3;
-
-
-/*
-* Strong structure is a stronger confirmation layer.
-*/
-
-const strongDefensiveStructure =
-score >= 75 &&
 defensiveEvidenceCount >= 3;
 
 
@@ -1355,64 +1234,33 @@ let mode:
 | "RISK"
 | "CRASH";
 
-mode =
-"LONG";
+mode = "LONG";
 
-
-/*
-* Distribution baseline.
-*
-* P3 is a transition regime.
-*/
 
 if (
 distributionPhase
 ) {
 
-mode =
-"NEUTRAL";
+mode = "NEUTRAL";
 
 }
-
-
-/*
-* Risk phase.
-*/
 
 if (
 phase === "PHASE_4_RISK"
 ) {
 
-mode =
-"RISK";
+mode = "RISK";
 
 }
-
-
-/*
-* Crash phases.
-*
-* P5-P7 are explicitly crash regimes.
-*/
 
 if (
 crashPhase
 ) {
 
-mode =
-"CRASH";
+mode = "CRASH";
 
 }
 
-
-/*
-* Defensive structural confirmation.
-*
-* P3 is deliberately excluded.
-*
-* Crash phases are also excluded because they
-* already have the hard CRASH classification.
-*/
 
 if (
 defensiveStructuralConfirmation &&
@@ -1420,77 +1268,67 @@ defensiveStructuralConfirmation &&
 !crashPhase
 ) {
 
-mode =
-"RISK";
+mode = "RISK";
 
 }
 
 
-/*
-* Strong defensive structure.
-*
-* P3 remains NEUTRAL.
-* P5-P7 remain CRASH.
-*/
+const strongDefensive =
+score >= 75 &&
+defensiveEvidenceCount >= 4 &&
+!distributionPhase &&
+!crashPhase;
+
 
 if (
-strongDefensiveStructure &&
-!distributionPhase &&
-!crashPhase
+strongDefensive
 ) {
 
-mode =
-"RISK";
+mode = "RISK";
 
 }
 
-
-/*
-* Prolonged bear confirmation.
-*
-* P3 cannot be promoted by this overlay.
-* Crash phases cannot be downgraded.
-*/
 
 if (
 prolongedBearRegime &&
-institutionalPressure > 70 &&
-score >= 65 &&
+broadParticipationFailure &&
 !distributionPhase &&
 !crashPhase
 ) {
 
-mode =
-"RISK";
+mode = "RISK";
 
 }
 
-
-/*
-* Accelerating weakness.
-*
-* P3 remains a distribution / transition state.
-* Crash phases remain CRASH.
-*/
 
 if (
-acceleratingWeakness &&
-score >= 65 &&
+acceleratingBreadthDecay &&
+risingCrashRisk &&
 !distributionPhase &&
 !crashPhase
 ) {
 
-mode =
-"RISK";
+mode = "RISK";
 
 }
 
 
-/*
-* Explicit execution override.
-*
-* Only LONG can be promoted by this layer.
-*/
+if (
+bearishPersistence &&
+distributionRisk >= 60 &&
+mode === "LONG" &&
+!distributionPhase &&
+!crashPhase
+) {
+
+mode = "RISK";
+
+}
+
+
+/* =====================================================
+EXECUTION OVERRIDE
+===================================================== */
 
 const executionOverride = (
 
@@ -1508,28 +1346,23 @@ executionOverride &&
 mode === "LONG"
 ) {
 
-mode =
-"RISK";
+mode = "RISK";
 
 }
 
 
-/*
-* Narrow leadership is diagnostic only.
-*
-* It may neutralize a P1 LONG state.
-* It can never downgrade RISK or CRASH.
-*/
+/* =====================================================
+NARROW LEADERSHIP
+===================================================== */
 
 if (
 narrowLeadership &&
 weakInternals &&
-phase === "PHASE_1_EXPANSION" &&
+phase !== "PHASE_1_EXPANSION" &&
 mode === "LONG"
 ) {
 
-mode =
-"NEUTRAL";
+mode = "NEUTRAL";
 
 }
 
@@ -1539,83 +1372,27 @@ FINAL MODE INVARIANTS
 ===================================================== */
 
 /*
-* HARD PHASE/MODE CONSISTENCY.
-*
-* These are final safety invariants.
-*
-* P5-P7 are crash phases.
-*
-* Nothing downstream is allowed to reinterpret
-* them as ordinary RISK.
+* Crash phases can NEVER be downgraded.
 */
 
 if (
 crashPhase
 ) {
 
-mode =
-"CRASH";
+mode = "CRASH";
 
 }
 
 
 /*
-* P3 is a distribution / transition phase.
-*
-* Nothing downstream is allowed to promote it
-* to RISK or CRASH through the Master Mode layer.
-*
-* TradeStack and independent PUT timing may still
-* identify a PUT opportunity separately.
+* Distribution phase is always transitional.
 */
 
 if (
 distributionPhase
 ) {
 
-mode =
-"NEUTRAL";
-
-}
-
-
-/* =====================================================
-FINAL SIGNAL/MODE CONSISTENCY
-===================================================== */
-
-/*
-* P3 is a transition regime.
-*
-* A P3 score of 65..74 is deliberately NEUTRAL.
-*
-* The risk score itself remains unchanged.
-*/
-
-if (
-distributionPhase &&
-score < 75
-) {
-
-signal =
-"NEUTRAL";
-
-color =
-"YELLOW";
-
-signalStrength =
-Math.round(
-100 -
-(
-Math.abs(
-score - 50
-) * 2
-)
-);
-
-signalStrength =
-clamp(
-signalStrength
-);
+mode = "NEUTRAL";
 
 }
 
@@ -1630,29 +1407,25 @@ switch (mode) {
 
 case "LONG":
 
-netExposure =
-40;
+netExposure = 40;
 
 break;
 
 case "NEUTRAL":
 
-netExposure =
-0;
+netExposure = 0;
 
 break;
 
 case "RISK":
 
-netExposure =
--40;
+netExposure = -40;
 
 break;
 
 case "CRASH":
 
-netExposure =
--85;
+netExposure = -85;
 
 break;
 
@@ -1669,37 +1442,30 @@ let regime:
 | "RISK"
 | "CRASH";
 
-regime =
-"LONG";
+regime = "LONG";
 
 
 if (
-distributionPhase &&
-mode === "NEUTRAL"
+distributionPhase
 ) {
 
-regime =
-"TRANSITION";
+regime = "TRANSITION";
 
 }
-
 
 if (
 mode === "RISK"
 ) {
 
-regime =
-"RISK";
+regime = "RISK";
 
 }
-
 
 if (
 mode === "CRASH"
 ) {
 
-regime =
-"CRASH";
+regime = "CRASH";
 
 }
 
@@ -1721,7 +1487,6 @@ summary =
 
 }
 
-
 if (
 signal === "NEUTRAL"
 ) {
@@ -1730,7 +1495,6 @@ summary =
 "Balanced market regime | NEUTRAL bias";
 
 }
-
 
 if (
 signal === "PUT"
@@ -1741,29 +1505,6 @@ summary =
 
 }
 
-
-if (
-mode === "RISK" &&
-signal === "PUT"
-) {
-
-summary =
-"Defensive structural regime | PUT bias";
-
-}
-
-
-if (
-mode === "RISK" &&
-signal === "NEUTRAL"
-) {
-
-summary =
-"Defensive posture | structural risk elevated";
-
-}
-
-
 if (
 mode === "CRASH"
 ) {
@@ -1773,7 +1514,6 @@ summary +=
 
 }
 
-
 if (
 bearishPersistence
 ) {
@@ -1782,7 +1522,6 @@ summary +=
 " | Persistent weakness";
 
 }
-
 
 if (
 falseRecoveryRisk >= 50
@@ -1817,10 +1556,6 @@ regime,
 summary,
 
 
-/* ===================================================
-META
-=================================================== */
-
 meta: {
 
 scoreType:
@@ -1839,62 +1574,39 @@ neutralUpperThreshold,
 
 putThreshold,
 
-signal,
-
-color,
-
-signalStrength,
-
-
-/* Execution */
-
-riskState,
-
-marketMode,
-
-executionMode,
-
-
-/* Phase */
-
 phaseConfirmed,
-
 phaseConfidence,
 
+riskState,
+marketMode,
+executionMode,
 
-/* Momentum */
+phase,
+distributionPhase,
+crashPhase,
 
 priceMomentumScore,
-
 priceMomentumTrend,
-
 priceMomentumAcceleration,
 
-
-/* Structural flags */
-
 weakInternals,
-
 narrowLeadership,
 
+defensiveEvidenceCount,
+defensiveStructuralConfirmation,
+
 rotationDecayScore,
-
 marketQualityScore,
-
 participationScore,
-
 breadthVelocityScore,
 
 phasePersistence,
-
 participationDecay,
 
 breadthTrend,
-
 breadthAcceleration,
 
 leadershipDecay,
-
 crashTrend,
 
 relativeBreadthWeakness,
@@ -1906,73 +1618,30 @@ institutionalPressure,
 marketCharacter,
 
 averageBreadth,
-
 averageParticipation,
-
 averageRotation,
-
 averageLiquidity,
-
 averageFragility,
 
 regimePersistenceHistory,
 
 deterioratingBreadth,
-
 acceleratingBreadthDecay,
 
 leadershipConcentration,
-
 risingCrashRisk,
 
 broadParticipationFailure,
-
 prolongedBearRegime,
 
-
-/* Regime persistence */
-
 persistenceScore,
-
 distributionRisk,
-
 falseRecoveryRisk,
-
 marketFatigue,
 
 bearishPersistence,
-
 bullishPersistence,
-
 persistenceTrend,
-
-
-/* Defensive confirmation */
-
-defensiveEvidenceCount,
-
-rotationBreakdown,
-
-fragilityBreakdown,
-
-marketQualityBreakdown,
-
-weakParticipation,
-
-defensiveTiming,
-
-distributionPhase,
-
-crashPhase,
-
-defensiveStructuralConfirmation,
-
-strongDefensiveStructure,
-
-russellBlocked,
-
-
-/* Diagnostics */
 
 phaseAdjustment,
 
@@ -2005,19 +1674,10 @@ crashRisk
 timingRisk:
 Math.round(
 timingRiskScore
-),
-
-russellRisk:
-Math.round(
-russellRisk
 )
 
 },
 
-
-/* ===================================================
-RISK-ORIENTED COMPONENTS
-=================================================== */
 
 components: {
 
@@ -2091,9 +1751,6 @@ Math.round(
 dangerRisk
 ),
 
-
-/* Persistence components */
-
 regimePersistence:
 Math.round(
 clamp(
@@ -2125,5 +1782,25 @@ marketFatigue
 }
 
 };
+
+}
+
+
+/* =====================================================
+HELPER
+===================================================== */
+
+/*
+* Internal divergence is optional in the Master Score
+* input but can be used as defensive evidence.
+*/
+
+function internalDivergenceScore(
+engine: any
+) {
+
+return Number(
+engine?.internalDivergence?.score ?? 0
+);
 
 }
