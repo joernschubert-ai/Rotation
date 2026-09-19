@@ -114,6 +114,237 @@ return value;
 
 
 /* =====================================================
+MARKET DATA REFERENCES
+=====================================================
+
+IMPORTANT:
+
+mapBackendToEngine currently creates:
+
+INDICES
+dow
+ndx
+spx
+rut
+
+FUTURES
+ym
+nq
+es
+rty
+
+The persisted snapshot uses descriptive names:
+
+INDICES
+dow
+nasdaq
+sp500
+russell
+vix
+
+FUTURES
+dow
+nasdaq
+sp500
+russell
+
+We explicitly map the real backend/mapping names here.
+
+This prevents the historical snapshot from losing
+the market prices because of mismatched property names.
+===================================================== */
+
+const mapIndices =
+map?.indices ?? {};
+
+const mapFutures =
+map?.futures ?? {};
+
+const mapMarketData =
+map?.marketData ?? {};
+
+
+/* =====================================================
+INDICES
+=====================================================
+
+Four major indices:
+
+Dow Jones
+Nasdaq 100
+S&P 500
+Russell 2000
+
+Plus:
+
+VIX
+
+The VIX is stored as a market indicator and is NOT
+treated as an index for Master Score semantics.
+===================================================== */
+
+const persistedIndices = {
+
+/* -------------------------------------------------
+DOW JONES
+------------------------------------------------- */
+
+dow:
+mapIndices?.dow ??
+mapIndices?.DJI ??
+mapMarketData?.["^DJI"] ??
+null,
+
+
+/* -------------------------------------------------
+NASDAQ 100
+------------------------------------------------- */
+
+nasdaq:
+mapIndices?.ndx ??
+mapIndices?.nasdaq ??
+mapIndices?.NASDAQ ??
+mapMarketData?.["^NDX"] ??
+null,
+
+
+/* -------------------------------------------------
+S&P 500
+------------------------------------------------- */
+
+sp500:
+mapIndices?.spx ??
+mapIndices?.sp500 ??
+mapIndices?.SP500 ??
+mapMarketData?.["^GSPC"] ??
+null,
+
+
+/* -------------------------------------------------
+RUSSELL 2000
+------------------------------------------------- */
+
+russell:
+mapIndices?.rut ??
+mapIndices?.russell ??
+mapIndices?.RUSSELL ??
+mapMarketData?.["^RUT"] ??
+null,
+
+
+/* -------------------------------------------------
+VIX
+-------------------------------------------------
+
+VIX may not currently be part of map.indices.
+
+Therefore we also check the backend marketData object
+directly.
+
+Multiple common backend names are supported.
+------------------------------------------------- */
+
+vix:
+mapIndices?.vix ??
+mapIndices?.VIX ??
+mapMarketData?.["^VIX"] ??
+mapMarketData?.VIX ??
+mapMarketData?.["VIX"] ??
+null,
+
+
+/* -------------------------------------------------
+VIX TERM STRUCTURE
+------------------------------------------------- */
+
+vixTermRatio:
+mapIndices?.vixTermRatio ??
+mapIndices?.VIX_TERM_RATIO ??
+liquidity.vixTermRatio ??
+null,
+
+
+/* -------------------------------------------------
+VOLATILITY OF VOLATILITY
+------------------------------------------------- */
+
+volOfVolRatio:
+mapIndices?.volOfVolRatio ??
+mapIndices?.VOL_OF_VOL_RATIO ??
+liquidity.volOfVolRatio ??
+null,
+
+};
+
+
+/* =====================================================
+FUTURES
+=====================================================
+
+mapBackendToEngine creates:
+
+ym = Dow Jones Future
+nq = Nasdaq Future
+es = S&P 500 Future
+rty = Russell Future
+
+These are persisted using descriptive names.
+
+IMPORTANT:
+
+The futures are stored separately from the indices.
+They therefore do not replace the underlying index values.
+===================================================== */
+
+const persistedFutures = {
+
+/* -------------------------------------------------
+DOW JONES FUTURE
+------------------------------------------------- */
+
+dow:
+mapFutures?.ym ??
+mapFutures?.dow ??
+mapMarketData?.["YM=F"] ??
+null,
+
+
+/* -------------------------------------------------
+NASDAQ FUTURE
+------------------------------------------------- */
+
+nasdaq:
+mapFutures?.nq ??
+mapFutures?.nasdaq ??
+mapMarketData?.["NQ=F"] ??
+null,
+
+
+/* -------------------------------------------------
+S&P 500 FUTURE
+------------------------------------------------- */
+
+sp500:
+mapFutures?.es ??
+mapFutures?.sp500 ??
+mapMarketData?.["ES=F"] ??
+null,
+
+
+/* -------------------------------------------------
+RUSSELL FUTURE
+------------------------------------------------- */
+
+russell:
+mapFutures?.rty ??
+mapFutures?.russell ??
+mapMarketData?.["RTY=F"] ??
+null,
+
+};
+
+
+/* =====================================================
 RETURN SNAPSHOT
 ===================================================== */
 
@@ -1397,8 +1628,8 @@ superSignal.confidence,
 HISTORY
 
 Only values relevant for regime analysis are persisted
-here. The detailed current-state diagnostics above are
-stored separately.
+here. The detailed current-state diagnostics above
+are stored separately.
 ===================================================== */
 
 historyMetrics: {
@@ -1542,58 +1773,72 @@ engine.systemHeat?.state,
 
 /* =====================================================
 INDICES
+=====================================================
+
+Persist the actual mapped market instruments.
+
+Mapping source:
+
+mapBackendToEngine.ts
+
+dow → ^DJI
+ndx → ^NDX
+spx → ^GSPC
+rut → ^RUT
+
+VIX:
+
+^VIX / VIX
+
+All five are persisted explicitly.
+
+The fallback to map.marketData is intentional so that
+the snapshot remains robust if the mapping layer changes.
 ===================================================== */
 
 indices: {
 
+dow:
+persistedIndices.dow,
+
 nasdaq:
-map.indices?.nasdaq ??
-map.indices?.NASDAQ,
+persistedIndices.nasdaq,
 
 sp500:
-map.indices?.sp500 ??
-map.indices?.SP500,
+persistedIndices.sp500,
 
 russell:
-map.indices?.russell ??
-map.indices?.RUSSELL,
+persistedIndices.russell,
 
 vix:
-map.indices?.vix ??
-map.indices?.VIX,
+persistedIndices.vix,
 
 vixTermRatio:
-map.indices?.vixTermRatio ??
-map.indices?.VIX_TERM_RATIO ??
-liquidity.vixTermRatio,
+persistedIndices.vixTermRatio,
 
 volOfVolRatio:
-map.indices?.volOfVolRatio ??
-map.indices?.VOL_OF_VOL_RATIO ??
-liquidity.volOfVolRatio,
+persistedIndices.volOfVolRatio,
 
 },
 
 
 /* =====================================================
 FUTURES
+=====================================================
+
+Mapping source:
+
+mapBackendToEngine.ts
+
+ym → YM=F
+nq → NQ=F
+es → ES=F
+rty → RTY=F
+
+All four futures are persisted explicitly.
 ===================================================== */
 
-futures:
-map.futures
-? {
-
-nasdaq:
-map.futures?.nasdaq,
-
-sp500:
-map.futures?.sp500,
-
-russell:
-map.futures?.russell,
-
-}
-: undefined,
+futures: persistedFutures,
 
 };
 
