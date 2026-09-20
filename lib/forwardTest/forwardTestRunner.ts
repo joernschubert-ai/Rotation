@@ -3,6 +3,7 @@
 import {
 buildForwardExcursion,
 buildForwardReturn,
+calculateDirectionalReturn,
 } from "./forwardTestMetrics";
 
 import {
@@ -22,45 +23,36 @@ type ForwardTestSignal,
 
 
 /* =====================================================
-* INPUT
-* ===================================================== */
+INPUT
+===================================================== */
 
 export interface ForwardTestInput {
-
 engine: ForwardEngineSnapshot;
-
 market: ForwardMarketSnapshot;
-
 }
 
 
 /* =====================================================
-* INTERNAL SORTED SNAPSHOT
-* ===================================================== */
+INTERNAL SORTED SNAPSHOT
+===================================================== */
 
 interface SortedSnapshot {
-
 engine: ForwardEngineSnapshot;
-
 market: ForwardMarketSnapshot;
-
 timestampMs: number;
-
 }
 
 
 /* =====================================================
-* HELPERS
-* ===================================================== */
+HELPERS
+===================================================== */
 
 function parseTimestamp(
 timestamp: string
 ): number {
 
 const value =
-new Date(
-timestamp
-).getTime();
+new Date(timestamp).getTime();
 
 return Number.isFinite(value)
 ? value
@@ -74,8 +66,8 @@ snapshots: ForwardTestInput[]
 ): SortedSnapshot[] {
 
 return snapshots
-.map(
-snapshot => ({
+
+.map(snapshot => ({
 
 engine:
 snapshot.engine,
@@ -88,19 +80,17 @@ parseTimestamp(
 snapshot.market.timestamp
 ),
 
-})
-)
+}))
+
 .filter(
 snapshot =>
 Number.isFinite(
 snapshot.timestampMs
 )
 )
+
 .sort(
-(
-a,
-b
-) =>
+(a, b) =>
 a.timestampMs -
 b.timestampMs
 );
@@ -130,8 +120,7 @@ decimals
 return (
 Math.round(
 value * factor
-) /
-factor
+) / factor
 );
 
 }
@@ -150,12 +139,8 @@ return null;
 }
 
 const sorted =
-[...values]
-.sort(
-(
-a,
-b
-) =>
+[...values].sort(
+(a, b) =>
 a - b
 );
 
@@ -181,8 +166,8 @@ return sorted[middle];
 
 
 /* =====================================================
-* HORIZON SNAPSHOT
-* ===================================================== */
+HORIZON SNAPSHOT
+===================================================== */
 
 /**
 * Horizon means subsequent market observations,
@@ -192,6 +177,7 @@ return sorted[middle];
 * T+3 = third subsequent snapshot
 * etc.
 */
+
 function getFutureSnapshot(
 snapshots: SortedSnapshot[],
 entryIndex: number,
@@ -199,8 +185,7 @@ horizon: ForwardHorizon
 ): SortedSnapshot | null {
 
 const futureIndex =
-entryIndex +
-horizon;
+entryIndex + horizon;
 
 if (
 futureIndex >=
@@ -212,17 +197,16 @@ return null;
 }
 
 return (
-snapshots[
-futureIndex
-] ?? null
+snapshots[futureIndex] ??
+null
 );
 
 }
 
 
 /* =====================================================
-* EXCURSION WINDOW
-* ===================================================== */
+EXCURSION WINDOW
+===================================================== */
 
 function getFutureWindow(
 snapshots: SortedSnapshot[],
@@ -235,8 +219,7 @@ entryIndex + 1;
 
 const end =
 Math.min(
-entryIndex +
-horizon,
+entryIndex + horizon,
 snapshots.length - 1
 );
 
@@ -249,10 +232,12 @@ return [];
 }
 
 return snapshots
+
 .slice(
 start,
 end + 1
 )
+
 .map(
 snapshot =>
 snapshot.market
@@ -262,8 +247,8 @@ snapshot.market
 
 
 /* =====================================================
-* SIGNAL DIRECTION
-* ===================================================== */
+SIGNAL DIRECTION
+===================================================== */
 
 function signalDirection(
 signal: ForwardTestSignal
@@ -291,8 +276,8 @@ return null;
 
 
 /* =====================================================
-* BUILD OBSERVATION
-* ===================================================== */
+BUILD OBSERVATION
+===================================================== */
 
 function buildObservation(
 snapshots: SortedSnapshot[],
@@ -300,9 +285,7 @@ entryIndex: number
 ): ForwardTestObservation {
 
 const entry =
-snapshots[
-entryIndex
-];
+snapshots[entryIndex];
 
 const signal =
 entry.engine.masterSignal;
@@ -323,18 +306,14 @@ ForwardReturn[] = [];
 * excursions: ForwardExcursion[]
 *
 * Therefore null values are never stored.
-*
-* buildForwardExcursion() may return null when
-* insufficient price data exists. Those values are
-* simply skipped.
 */
 
 const excursions:
 ForwardExcursion[] = [];
 
 for (
-const horizon
-of FORWARD_HORIZONS
+const horizon of
+FORWARD_HORIZONS
 ) {
 
 const future =
@@ -370,7 +349,8 @@ forwardReturn
 }
 
 /*
-* Neutral signals have no directional MFE/MAE.
+* Neutral signals have no
+* directional MFE/MAE.
 */
 
 if (
@@ -430,52 +410,151 @@ excursions,
 
 
 /* =====================================================
-* PERFORMANCE
-* ===================================================== */
+PERFORMANCE
+===================================================== */
+
+/**
+* Calculates performance from the perspective
+* of the signal.
+*
+* CALL:
+* underlying +5% -> +5%
+* underlying -5% -> -5%
+*
+* PUT:
+* underlying -5% -> +5%
+* underlying +5% -> -5%
+*
+* NEUTRAL:
+* underlying return is used unchanged.
+*
+* This is the critical distinction between
+* underlying performance and directional
+* trade performance.
+*/
 
 function calculatePerformance(
-observations: ForwardTestObservation[],
-horizon: ForwardHorizon
+observations:
+ForwardTestObservation[],
+horizon:
+ForwardHorizon
 ): ForwardTestPerformance {
 
-const returns =
+const directionalReturns:
+number[] = [];
+
+/*
+* Build directional returns while preserving
+* the signal attached to each observation.
+*/
+
+for (
+const observation of
 observations
-.flatMap(
-observation =>
+) {
+
+const signal =
+signalDirection(
+observation.engine.masterSignal
+);
+
+const forwardReturn =
 observation.forwardReturns
-)
-.filter(
-forwardReturn =>
-forwardReturn.horizon ===
+.find(
+item =>
+item.horizon ===
 horizon
-)
-.map(
-forwardReturn =>
+);
+
+if (
+forwardReturn === undefined
+) {
+
+continue;
+
+}
+
+if (
+forwardReturn.percentageChange ===
+null
+) {
+
+continue;
+
+}
+
+if (
+!Number.isFinite(
 forwardReturn.percentageChange
 )
-.filter(
-(
-value
-): value is number =>
-value !== null &&
-Number.isFinite(value)
+) {
+
+continue;
+
+}
+
+let performance =
+forwardReturn.percentageChange;
+
+/*
+* Directional transformation.
+*
+* CALL -> unchanged
+* PUT -> inverted
+* NEUTRAL -> unchanged
+*/
+
+if (
+signal !== null
+) {
+
+performance =
+calculateDirectionalReturn(
+forwardReturn.percentageChange,
+signal
 );
+
+}
+
+if (
+Number.isFinite(
+performance
+)
+) {
+
+directionalReturns.push(
+performance
+);
+
+}
+
+}
+
+
+/* ===================================================
+EXCURSIONS
+=================================================== */
 
 const favorableExcursions =
 observations
+
 .flatMap(
 observation =>
 observation.excursions
 )
+
 .filter(
 excursion =>
 excursion.horizon ===
 horizon
 )
+
 .map(
 excursion =>
-excursion.maximumFavorableExcursion
+excursion
+.maximumFavorableExcursion
 )
+
 .filter(
 (
 value
@@ -483,22 +562,28 @@ value
 value !== null &&
 Number.isFinite(value)
 );
+
 
 const adverseExcursions =
 observations
+
 .flatMap(
 observation =>
 observation.excursions
 )
+
 .filter(
 excursion =>
 excursion.horizon ===
 horizon
 )
+
 .map(
 excursion =>
-excursion.maximumAdverseExcursion
+excursion
+.maximumAdverseExcursion
 )
+
 .filter(
 (
 value
@@ -507,26 +592,36 @@ value !== null &&
 Number.isFinite(value)
 );
 
+
+/* ===================================================
+COUNTS
+=================================================== */
+
 const positiveCount =
-returns.filter(
+directionalReturns.filter(
 value =>
 value > 0
 ).length;
 
 const negativeCount =
-returns.filter(
+directionalReturns.filter(
 value =>
 value < 0
 ).length;
 
 const flatCount =
-returns.filter(
+directionalReturns.filter(
 value =>
 value === 0
 ).length;
 
 const count =
-returns.length;
+directionalReturns.length;
+
+
+/* ===================================================
+RESULT
+=================================================== */
 
 return {
 
@@ -538,7 +633,7 @@ count,
 averageReturn:
 count > 0
 ? roundMetric(
-returns.reduce(
+directionalReturns.reduce(
 (
 sum,
 value
@@ -553,7 +648,7 @@ medianReturn:
 count > 0
 ? roundMetric(
 median(
-returns
+directionalReturns
 ) ?? 0
 )
 : null,
@@ -624,11 +719,12 @@ adverseExcursions.length
 
 
 /* =====================================================
-* SIGNAL PERFORMANCE
-* ===================================================== */
+SIGNAL PERFORMANCE
+===================================================== */
 
 function calculateSignalPerformance(
-observations: ForwardTestObservation[]
+observations:
+ForwardTestObservation[]
 ): ForwardSignalPerformance[] {
 
 const signals:
@@ -644,7 +740,9 @@ signal => {
 const filtered =
 observations.filter(
 observation =>
-observation.engine.masterSignal ===
+observation
+.engine
+.masterSignal ===
 signal
 );
 
@@ -673,21 +771,30 @@ horizon
 
 
 /* =====================================================
-* PHASE PERFORMANCE
-* ===================================================== */
+PHASE PERFORMANCE
+===================================================== */
 
 function calculatePhasePerformance(
-observations: ForwardTestObservation[]
+observations:
+ForwardTestObservation[]
 ): ForwardPhasePerformance[] {
 
 const phases = [
+
 "PHASE_1_EXPANSION",
+
 "PHASE_2_WARNING",
+
 "PHASE_3_DISTRIBUTION",
+
 "PHASE_4_RISK",
+
 "PHASE_5_BREAKDOWN",
+
 "PHASE_6_ACCELERATION",
+
 "PHASE_7_CAPITULATION",
+
 ] as const;
 
 return phases.map(
@@ -696,7 +803,9 @@ phase => {
 const filtered =
 observations.filter(
 observation =>
-observation.engine.phase ===
+observation
+.engine
+.phase ===
 phase
 );
 
@@ -725,11 +834,12 @@ horizon
 
 
 /* =====================================================
-* MAIN RUNNER
-* ===================================================== */
+MAIN RUNNER
+===================================================== */
 
 export function runForwardTest(
-input: ForwardTestInput[]
+input:
+ForwardTestInput[]
 ): ForwardTestResult {
 
 const snapshots =
@@ -755,22 +865,27 @@ now,
 endDate:
 now,
 
-observations: [],
+observations:
+[],
 
-signalPerformance: [],
+signalPerformance:
+[],
 
-phasePerformance: [],
+phasePerformance:
+[],
 
 };
 
 }
 
+
 const observations:
 ForwardTestObservation[] = [];
 
+
 /*
-* Only observations with at least one future
-* horizon are useful.
+* Only observations with at least one
+* future horizon are useful.
 */
 
 for (
@@ -782,8 +897,7 @@ index++
 const hasFuture =
 FORWARD_HORIZONS.some(
 horizon =>
-index +
-horizon <
+index + horizon <
 snapshots.length
 );
 
@@ -803,6 +917,7 @@ index
 );
 
 }
+
 
 return {
 
@@ -839,12 +954,14 @@ observations
 
 
 /* =====================================================
-* SINGLE OBSERVATION HELPER
-* ===================================================== */
+SINGLE OBSERVATION HELPER
+===================================================== */
 
 export function runForwardTestObservation(
-snapshots: ForwardTestInput[],
-index: number
+snapshots:
+ForwardTestInput[],
+index:
+number
 ): ForwardTestObservation | null {
 
 const sorted =
@@ -864,8 +981,7 @@ return null;
 const hasFuture =
 FORWARD_HORIZONS.some(
 horizon =>
-index +
-horizon <
+index + horizon <
 sorted.length
 );
 
