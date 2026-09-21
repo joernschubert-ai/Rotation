@@ -1,8 +1,0 @@
-{
-“crons”: [
-{
-“path”: “/api/cron/market-snapshot”,
-“schedule”: “10 20 * * 1-5”
-}
-]
-}
