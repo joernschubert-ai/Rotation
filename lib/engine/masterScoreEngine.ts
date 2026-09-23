@@ -925,28 +925,22 @@ P3 DISTRIBUTION RISK CAP
 /*
 * PHASE_3 is a transition / distribution regime.
 *
-* It is intentionally allowed to carry elevated
-* structural risk, but it must not automatically
-* enter the same numerical risk zone as PHASE_4+.
+* IMPORTANT:
 *
-* The purpose of this cap is NOT to hide weakness.
+* The historical P3 cap has been removed from the
+* LIVE Master Score.
+*
+* The previous cap:
+*
+* score = Math.min(score, 64)
+*
+* made the live score unable to show any movement
+* above 64 while PHASE_3_DISTRIBUTION was active.
+*
+* Historical replay classification must not hard-cap
+* the live Master Risk value.
 *
 * The underlying component values remain unchanged.
-* Only the final Master Risk classification is bounded.
-*
-* This preserves:
-*
-* P3 = distribution / transition
-* P4 = confirmed risk
-* P5+ = crash regime
-*
-* Historical validation:
-*
-* 2018 -> 59
-* 2020 -> 53
-* 2021 -> 55
-* 2022 -> 66 -> 64
-* 2024 -> 65 -> 64
 */
 
 if (
@@ -954,11 +948,13 @@ distributionPhase &&
 !crashPhase
 ) {
 
-score =
-Math.min(
-score,
-64
-);
+/*
+* Intentionally no score cap.
+*
+* P3 may now produce values below OR above 64.
+* The existing P3 PUT confirmation threshold of 75
+* remains unchanged.
+*/
 
 }
 
