@@ -1,16 +1,8 @@
-// /lib/aiResearch/aiResearchRunner.ts
+import { loadMarketHistory } from "@/lib/history/marketHistory";
 
-import {
-loadMarketHistory,
-} from "@/lib/history/marketHistory";
-
-import {
-buildAIResearchContext,
-} from "./aiResearchContext";
-
-import {
-runAIResearch,
-} from "./aiResearchEngine";
+import { buildAIResearchContext } from "./aiResearchContext";
+import { runAIResearch } from "./aiResearchEngine";
+import { fetchExternalResearchSources } from "./aiResearchExternalSources";
 
 import type {
 AIResearchResult,
@@ -18,9 +10,38 @@ AIResearchTask,
 } from "./aiResearchTypes";
 
 
+/*
+* =====================================================
+* AI RESEARCH RUNNER
+* =====================================================
+*
+* Gesamtpipeline:
+*
+* Market History
+* +
+* External Research Sources
+* ↓
+* AI Research Context
+* ↓
+* AI Research Engine
+* ↓
+* Research Report
+*
+* WICHTIG:
+*
+* Dieser Runner verändert keine bestehenden
+* Market-Engine-Werte.
+*
+* Er führt ausschließlich die Research-Schicht
+* zusammen.
+*
+* =====================================================
+*/
+
+
 /* =====================================================
-INPUT
-===================================================== */
+* INPUT
+* ===================================================== */
 
 export interface RunAIResearchFromHistoryInput {
 
@@ -32,27 +53,8 @@ question?: string;
 
 
 /* =====================================================
-RUN RESEARCH
-===================================================== */
-
-/**
-* Loads the persisted Rotation-App market history,
-* takes the newest snapshot as the current market state,
-* builds the AI research context and runs the research
-* engine.
-*
-* IMPORTANT:
-*
-* This function does NOT:
-*
-* - modify market history
-* - modify the Market Engine
-* - modify the Master Score
-* - create trades
-* - call an external AI service
-*
-* It is purely an analysis layer.
-*/
+* MAIN RUNNER
+* ===================================================== */
 
 export async function runAIResearchFromHistory(
 input: RunAIResearchFromHistoryInput
@@ -60,13 +62,36 @@ input: RunAIResearchFromHistoryInput
 
 try {
 
+/*
+* -------------------------------------------------
+* MARKET HISTORY + EXTERNAL SOURCES
+* -------------------------------------------------
+*
+* Beide Datenquellen sind voneinander unabhängig.
+*
+* Deshalb parallel laden.
+*/
+
+const [
+history,
+externalSources,
+] = await Promise.all([
+
+loadMarketHistory(),
+
+fetchExternalResearchSources({
+
+task:
+input.task,
+
+}),
+
+]);
+
+
 /* -------------------------------------------------
-LOAD HISTORY
-------------------------------------------------- */
-
-const history =
-await loadMarketHistory();
-
+* HISTORY VALIDATION
+* ------------------------------------------------- */
 
 if (
 !Array.isArray(history) ||
@@ -87,11 +112,13 @@ historyCount:
 0,
 
 sourceCount:
-0,
+externalSources.sources.length,
 
 warnings: [
 
 "No persisted market history available.",
+
+...externalSources.diagnostics.warnings,
 
 ],
 
@@ -103,15 +130,8 @@ warnings: [
 
 
 /* -------------------------------------------------
-CURRENT SNAPSHOT
-------------------------------------------------- */
-
-/*
-* marketHistory stores newest snapshots first.
-*
-* The adapter still receives the complete history
-* and independently limits the research window.
-*/
+* CURRENT SNAPSHOT
+* ------------------------------------------------- */
 
 const currentSnapshot =
 history[0];
@@ -136,11 +156,13 @@ historyCount:
 history.length,
 
 sourceCount:
-0,
+externalSources.sources.length,
 
 warnings: [
 
 "Latest market history entry is invalid.",
+
+...externalSources.diagnostics.warnings,
 
 ],
 
@@ -152,8 +174,8 @@ warnings: [
 
 
 /* -------------------------------------------------
-BUILD CONTEXT
-------------------------------------------------- */
+* BUILD AI RESEARCH CONTEXT
+* ------------------------------------------------- */
 
 const researchInput =
 buildAIResearchContext({
@@ -169,20 +191,80 @@ input.task,
 question:
 input.question,
 
+sources:
+externalSources.sources,
+
 });
 
 
 /* -------------------------------------------------
-RUN ENGINE
-------------------------------------------------- */
+* RUN RESEARCH ENGINE
+* ------------------------------------------------- */
 
-return runAIResearch(
+const result =
+runAIResearch(
 researchInput
 );
 
+
+/* -------------------------------------------------
+* MERGE DIAGNOSTICS
+* ------------------------------------------------- */
+
+if (
+result.diagnostics
+) {
+
+result.diagnostics = {
+
+...result.diagnostics,
+
+historyCount:
+history.length,
+
+sourceCount:
+externalSources.sources.length,
+
+warnings: [
+
+...(result.diagnostics.warnings ?? []),
+
+...externalSources.diagnostics.warnings,
+
+],
+
+};
+
 }
 
-catch (error) {
+else {
+
+result.diagnostics = {
+
+snapshotTimestamp:
+typeof currentSnapshot.timestamp === "string"
+? currentSnapshot.timestamp
+: undefined,
+
+historyCount:
+history.length,
+
+sourceCount:
+externalSources.sources.length,
+
+warnings:
+externalSources.diagnostics.warnings,
+
+};
+
+}
+
+
+return result;
+
+} catch (
+error
+) {
 
 return {
 
@@ -198,7 +280,7 @@ warnings: [
 
 error instanceof Error
 ? error.message
-: "Unknown AI research runner error",
+: "Unknown AI research error",
 
 ],
 
