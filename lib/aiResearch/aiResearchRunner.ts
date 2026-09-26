@@ -3,6 +3,7 @@ import { loadMarketHistory } from "@/lib/history/marketHistory";
 import { buildAIResearchContext } from "./aiResearchContext";
 import { runAIResearch } from "./aiResearchEngine";
 import { fetchExternalResearchSources } from "./aiResearchExternalSources";
+import { selectTopResearchSources } from "./aiResearchSourceRelevance";
 
 import type {
 AIResearchResult,
@@ -21,6 +22,8 @@ AIResearchTask,
 * +
 * External Research Sources
 * ↓
+* Source Relevance / Ranking
+* ↓
 * AI Research Context
 * ↓
 * AI Research Engine
@@ -35,6 +38,12 @@ AIResearchTask,
 * Er führt ausschließlich die Research-Schicht
 * zusammen.
 *
+* Die Relevanzbewertung bestimmt nur,
+* welche externen Quellen für die jeweilige
+* Research-Aufgabe priorisiert werden.
+*
+* Sie erzeugt kein Bull/Bear-Signal.
+*
 * =====================================================
 */
 
@@ -45,7 +54,8 @@ AIResearchTask,
 
 export interface RunAIResearchFromHistoryInput {
 
-task: AIResearchTask;
+task:
+AIResearchTask;
 
 question?: string;
 
@@ -174,6 +184,42 @@ warnings: [
 
 
 /* -------------------------------------------------
+* SOURCE RELEVANCE / RANKING
+* -------------------------------------------------
+*
+* Die externe Quellebeschaffung bleibt unverändert.
+*
+* Erst hier werden die Quellen für die konkrete
+* Research-Aufgabe bewertet und sortiert.
+*
+* WICHTIG:
+*
+* relevance bedeutet ausschließlich:
+*
+* "Wie relevant ist diese Quelle für diese
+* Research-Aufgabe?"
+*
+* Es bedeutet NICHT:
+*
+* - bullish
+* - bearish
+* - Call
+* - Put
+* - Crash-Signal
+*
+* Anschließend werden nur die relevantesten Quellen
+* in den Research-Context übernommen.
+*/
+
+const rankedSources =
+selectTopResearchSources(
+externalSources.sources,
+input.task,
+12
+);
+
+
+/* -------------------------------------------------
 * BUILD AI RESEARCH CONTEXT
 * ------------------------------------------------- */
 
@@ -192,7 +238,7 @@ question:
 input.question,
 
 sources:
-externalSources.sources,
+rankedSources,
 
 });
 
@@ -223,7 +269,7 @@ historyCount:
 history.length,
 
 sourceCount:
-externalSources.sources.length,
+rankedSources.length,
 
 warnings: [
 
@@ -250,7 +296,7 @@ historyCount:
 history.length,
 
 sourceCount:
-externalSources.sources.length,
+rankedSources.length,
 
 warnings:
 externalSources.diagnostics.warnings,
