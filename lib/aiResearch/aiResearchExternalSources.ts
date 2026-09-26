@@ -3,823 +3,660 @@ AIResearchSource,
 AIResearchTask,
 } from "./aiResearchTypes";
 
-import {
-buildResearchSources,
-type ExternalResearchSourceInput,
-} from "./aiResearchSources";
-
-
-/*
-* =====================================================
-* AI RESEARCH EXTERNAL SOURCES
-* =====================================================
-*
-* Beschaffung und Normalisierung externer Quellen.
-*
-* Aktuell:
-*
-* - öffentliche RSS/Atom-Feeds
-* - keine KI
-* - keine Bewertung
-* - keine Tradingentscheidung
-*
-* =====================================================
-*/
-
-
 /* =====================================================
-* TYPES
-* ===================================================== */
+TYPES
+===================================================== */
 
-export interface ExternalFeedDefinition {
+interface FeedDefinition {
 name: string;
 url: string;
-publisher: string;
-
-category:
-| "MARKET_NEWS"
-| "FED_ECB"
-| "MACRO"
-| "NASDAQ"
-| "RUSSELL"
-| "VOLATILITY"
-| "MARKET_COMMENTARY"
-| "OTHER";
+tasks: AIResearchTask[];
+defaultPublisher: string;
 }
 
-
-export interface FetchExternalResearchSourcesInput {
-task: AIResearchTask;
-maxItemsPerFeed?: number;
-timeoutMs?: number;
-}
-
-
-export interface FetchExternalResearchSourcesResult {
-sources: AIResearchSource[];
-
-diagnostics: {
+export interface ExternalResearchDiagnostics {
 feedCount: number;
 successfulFeeds: number;
 failedFeeds: number;
 parsedItems: number;
 sourceCount: number;
 warnings: string[];
-};
 }
 
+export interface ExternalResearchResult {
+sources: AIResearchSource[];
+diagnostics: ExternalResearchDiagnostics;
+}
 
 /* =====================================================
-* FEEDS
-* ===================================================== */
+FEED DEFINITIONS
+===================================================== */
 
-const EXTERNAL_FEEDS: ExternalFeedDefinition[] = [
+/*
+* IMPORTANT:
+*
+* This layer is intentionally limited to EXTERNAL RESEARCH.
+*
+* It does NOT:
+*
+* - change Master Score
+* - change Phase
+* - change Mode
+* - change Regime
+* - generate trading signals
+* - modify engine output
+*
+* It only collects external information that the
+* deterministic AI Research Engine can later interpret.
+*
+* COT is deliberately NOT included here.
+*
+* COT is structured positioning data and will be handled
+* separately so that:
+*
+* NEWS ≠ POSITIONING
+*
+* remains explicit in the architecture.
+*/
+
+
+/*
+* Official Federal Reserve feed.
+*
+* This remains important for:
+*
+* - FOMC
+* - monetary policy
+* - rates
+* - Powell
+* - macro policy
+*/
+
+const FEEDS: FeedDefinition[] = [
+{
+name: "Federal Reserve",
+url: "https://www.federalreserve.gov/feeds/press_all.xml",
+defaultPublisher: "Federal Reserve Board",
+tasks: [
+"DAILY_MARKET_REVIEW",
+"REGIME_REVIEW",
+"CRASH_RISK_REVIEW",
+"FORWARD_TEST_REVIEW",
+"ANOMALY_REVIEW",
+"TRADE_SETUP_REVIEW",
+"ROTATION_REVIEW",
+],
+},
+
+/*
+* ECB.
+*
+* Useful mainly for:
+*
+* - European monetary policy
+* - liquidity
+* - FX
+* - cross-market macro context
+*/
 
 {
-name:
-"Federal Reserve Board",
+name: "European Central Bank",
+url: "https://mid.ecb.europa.eu/rss/mid.xml",
+defaultPublisher: "European Central Bank",
+tasks: [
+"DAILY_MARKET_REVIEW",
+"REGIME_REVIEW",
+"CRASH_RISK_REVIEW",
+"FORWARD_TEST_REVIEW",
+"ANOMALY_REVIEW",
+],
+},
 
+/*
+* Nasdaq corporate/news RSS.
+*
+* This is not treated as an index-price feed.
+*
+* It is useful for:
+*
+* - Nasdaq ecosystem developments
+* - technology
+* - market infrastructure
+* - exchange developments
+*
+* The relevance layer determines whether an individual
+* item is actually useful for the current research task.
+*/
+
+{
+name: "Nasdaq",
+url: "https://ir.nasdaq.com/rss/news-releases.xml",
+defaultPublisher: "Nasdaq",
+tasks: [
+"DAILY_MARKET_REVIEW",
+"ROTATION_REVIEW",
+"TRADE_SETUP_REVIEW",
+"ANOMALY_REVIEW",
+],
+},
+
+/*
+* Targeted Google News RSS feeds.
+*
+* These are intentionally query-specific.
+*
+* They give the Research Agent access to current
+* market-news headlines around:
+*
+* - Nasdaq / Big Tech
+* - Russell 2000 / Small Caps
+* - semiconductors / AI
+* - VIX / volatility
+*
+* The final relevance ranking still decides which
+* individual articles survive.
+*
+* We do NOT treat Google News as the original publisher.
+* The article title/link remains the source reference.
+*/
+
+{
+name: "Nasdaq Market News",
 url:
-"https://www.federalreserve.gov/feeds/press_all.xml",
-
-publisher:
-"Federal Reserve Board",
-
-category:
-"FED_ECB",
+"https://news.google.com/rss/search?q=NASDAQ+Nasdaq+100+QQQ+technology+stocks+when%3A7d&hl=en-US&gl=US&ceid=US%3Aen",
+defaultPublisher: "Google News",
+tasks: [
+"DAILY_MARKET_REVIEW",
+"ROTATION_REVIEW",
+"TRADE_SETUP_REVIEW",
+"ANOMALY_REVIEW",
+"FORWARD_TEST_REVIEW",
+],
 },
 
 {
-name:
-"European Central Bank MID",
-
+name: "Russell 2000 Market News",
 url:
-"https://mid.ecb.europa.eu/rss/mid.xml",
-
-publisher:
-"European Central Bank",
-
-category:
-"FED_ECB",
+"https://news.google.com/rss/search?q=Russell+2000+RUT+IWM+small+cap+stocks+when%3A7d&hl=en-US&gl=US&ceid=US%3Aen",
+defaultPublisher: "Google News",
+tasks: [
+"DAILY_MARKET_REVIEW",
+"ROTATION_REVIEW",
+"TRADE_SETUP_REVIEW",
+"ANOMALY_REVIEW",
+"FORWARD_TEST_REVIEW",
+],
 },
 
+{
+name: "Semiconductor and AI Market News",
+url:
+"https://news.google.com/rss/search?q=semiconductors+AI+Nvidia+chip+stocks+when%3A7d&hl=en-US&gl=US&ceid=US%3Aen",
+defaultPublisher: "Google News",
+tasks: [
+"DAILY_MARKET_REVIEW",
+"ROTATION_REVIEW",
+"CRASH_RISK_REVIEW",
+"ANOMALY_REVIEW",
+"TRADE_SETUP_REVIEW",
+"FORWARD_TEST_REVIEW",
+],
+},
+
+{
+name: "VIX and Volatility Market News",
+url:
+"https://news.google.com/rss/search?q=VIX+volatility+options+market+when%3A7d&hl=en-US&gl=US&ceid=US%3Aen",
+defaultPublisher: "Google News",
+tasks: [
+"DAILY_MARKET_REVIEW",
+"CRASH_RISK_REVIEW",
+"ANOMALY_REVIEW",
+"TRADE_SETUP_REVIEW",
+"FORWARD_TEST_REVIEW",
+],
+},
 ];
 
-
 /* =====================================================
-* HELPERS
-* ===================================================== */
+HELPERS
+===================================================== */
 
-function clamp(
-value: number,
-min = 1,
-max = 50
-): number {
-
-return Math.max(
-min,
-Math.min(
-max,
-Math.round(value)
-)
-);
-
-}
-
-
-function cleanText(
-value: string
-): string {
+function normalizeText(value: unknown): string {
+if (typeof value !== "string") return "";
 
 return value
-
-.replace(
-/<!\[CDATA\[([\s\S]*?)\]\]>/gi,
-"$1"
-)
-
-.replace(
-/<[^>]+>/g,
-" "
-)
-
-.replace(
-/&amp;/gi,
-"&"
-)
-
-.replace(
-/&lt;/gi,
-"<"
-)
-
-.replace(
-/&gt;/gi,
-">"
-)
-
-.replace(
-/&quot;/gi,
-'"'
-)
-
-.replace(
-/&#39;/gi,
-"'"
-)
-
-.replace(
-/\s+/g,
-" "
-)
-
+.replace(/<!\[CDATA\[|\]\]>/g, "")
+.replace(/<[^>]*>/g, " ")
+.replace(/\s+/g, " ")
 .trim();
-
 }
 
-
-/* =====================================================
-* XML TAG EXTRACTION
-* ===================================================== */
+function decodeXml(value: string): string {
+return value
+.replace(/&amp;/g, "&")
+.replace(/&lt;/g, "<")
+.replace(/&gt;/g, ">")
+.replace(/&quot;/g, '"')
+.replace(/&#39;/g, "'")
+.replace(/&#x27;/gi, "'")
+.replace(/&#x2F;/gi, "/");
+}
 
 function extractTag(
-item: string,
+block: string,
 tag: string
-): string | undefined {
-
-const expression =
-new RegExp(
-`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`,
+): string {
+const expression = new RegExp(
+`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`,
 "i"
 );
 
+const match = block.match(expression);
 
-const match =
-item.match(
-expression
-);
-
-
-if (
-!match?.[1]
-) {
-
-return undefined;
-
+if (!match?.[1]) {
+return "";
 }
 
-
-const value =
-cleanText(
-match[1]
+return decodeXml(
+normalizeText(match[1])
 );
-
-
-return value.length > 0
-? value
-: undefined;
-
 }
-
-
-/* =====================================================
-* LINK EXTRACTION
-* ===================================================== */
 
 function extractLink(
-item: string
-): string | undefined {
-
+block: string
+): string {
 /*
 * RSS:
 *
-* <link>
-* https://example.com
-* </link>
+* <link>https://...</link>
+*
+* Atom:
+*
+* <link href="https://..." />
 */
 
-const rssLink =
-extractTag(
-item,
+const rssLink = extractTag(
+block,
 "link"
 );
 
-
-if (
-rssLink
-) {
-
+if (rssLink) {
 return rssLink;
-
 }
 
-
-/*
-* Atom:
-*
-* <link href="https://example.com" />
-*/
-
-const atomLink =
-item.match(
-/<link\b[^>]*?\bhref=["']([^"']+)["'][^>]*\/?>/i
+const atomLink = block.match(
+/<link[^>]+href=["']([^"']+)["']/i
 );
 
-
-if (
-atomLink?.[1]
-) {
-
-return atomLink[1].trim();
-
+return atomLink?.[1]
+? decodeXml(atomLink[1])
+: "";
 }
 
+function extractItems(
+xml: string
+): string[] {
+const rssItems = [
+...xml.matchAll(
+/<item\b[\s\S]*?<\/item>/gi
+),
+].map(
+(match) => match[0]
+);
 
-return undefined;
-
+if (rssItems.length > 0) {
+return rssItems;
 }
 
+const atomEntries = [
+...xml.matchAll(
+/<entry\b[\s\S]*?<\/entry>/gi
+),
+].map(
+(match) => match[0]
+);
 
-/* =====================================================
-* DATE NORMALIZATION
-* ===================================================== */
+return atomEntries;
+}
 
-function normalizePublishedAt(
-value?: string
+function parsePublishedAt(
+value: string
 ): string | undefined {
-
-if (
-!value
-) {
-
+if (!value) {
 return undefined;
-
 }
-
 
 const timestamp =
-Date.parse(
-value
-);
+Date.parse(value);
 
-
-if (
-!Number.isFinite(
-timestamp
-)
-) {
-
+if (!Number.isFinite(timestamp)) {
 return undefined;
-
 }
 
-
-return new Date(
-timestamp
-).toISOString();
-
+return new Date(timestamp).toISOString();
 }
 
+function taskUsesFeed(
+feed: FeedDefinition,
+task: AIResearchTask
+): boolean {
+return feed.tasks.includes(task);
+}
 
 /* =====================================================
-* FEED ITEM EXTRACTION
-* ===================================================== */
+SOURCE PARSER
+===================================================== */
 
-function parseFeedItems(
-xml: string,
-feed: ExternalFeedDefinition,
-maxItems: number
-): ExternalResearchSourceInput[] {
+function parseFeed(
+feed: FeedDefinition,
+xml: string
+): AIResearchSource[] {
+const items = extractItems(xml);
 
-/*
-* RSS 2.0:
-*
-* <item>...</item>
-*
-* Atom:
-*
-* <entry>...</entry>
-*/
+const sources: AIResearchSource[] = [];
 
-const items =
-xml.match(
-/<(?:item|entry)\b[\s\S]*?<\/(?:item|entry)>/gi
-) ?? [];
-
-
-const result:
-ExternalResearchSourceInput[] = [];
-
-
-for (
-const item of items.slice(
-0,
-maxItems
-)
-) {
-
+for (const item of items) {
 const title =
-extractTag(
-item,
-"title"
-);
-
+extractTag(item, "title");
 
 const link =
-extractLink(
-item
-);
-
-
-const publishedAt =
-normalizePublishedAt(
-
-extractTag(
-item,
-"pubDate"
-) ??
-
-extractTag(
-item,
-"published"
-) ??
-
-extractTag(
-item,
-"updated"
-)
-
-);
-
+extractLink(item);
 
 const description =
 extractTag(
 item,
 "description"
-) ??
+);
 
+const summary =
 extractTag(
 item,
 "summary"
 );
 
+const pubDate =
+extractTag(
+item,
+"pubDate"
+);
 
-/*
-* Titel + Link sind die minimale Voraussetzung
-* für eine verwertbare Research-Quelle.
-*/
+const published =
+extractTag(
+item,
+"published"
+);
+
+const updated =
+extractTag(
+item,
+"updated"
+);
+
+const publishedAt =
+parsePublishedAt(
+pubDate ||
+published ||
+updated
+);
 
 if (
 !title ||
 !link
 ) {
-
 continue;
-
 }
 
-
-try {
-
-const parsedUrl =
-new URL(
-link,
-feed.url
-);
-
-
-if (
-parsedUrl.protocol !== "http:" &&
-parsedUrl.protocol !== "https:"
-) {
-
-continue;
-
-}
-
-
-result.push({
-
+sources.push({
 title,
 
-url:
-parsedUrl.toString(),
+url: link,
 
 publisher:
-feed.publisher,
+feed.defaultPublisher,
 
 ...(publishedAt
-? {
-publishedAt,
-}
+? { publishedAt }
 : {}),
 
-...(description
-? {
 summary:
-description.slice(
-0,
-2000
-),
-}
-: {}),
+description ||
+summary ||
+undefined,
 
-category:
-feed.category,
-
-relevance:
-50,
+/*
+* Relevance is intentionally NOT
+* calculated here.
+*
+* That belongs to:
+*
+* aiResearchSourceRelevance.ts
+*/
 
 });
-
-} catch {
-
-continue;
-
 }
 
+return sources;
 }
-
-
-return result;
-
-}
-
 
 /* =====================================================
-* FETCH ONE FEED
-* ===================================================== */
+FETCH
+===================================================== */
 
-async function fetchExternalFeed(
-feed: ExternalFeedDefinition,
-maxItems: number,
-timeoutMs: number
+async function fetchFeed(
+feed: FeedDefinition
 ): Promise<{
-sources: ExternalResearchSourceInput[];
-error?: string;
+sources: AIResearchSource[];
+warning?: string;
 }> {
-
-const controller =
-new AbortController();
-
-
-const timeout =
-setTimeout(
-() => controller.abort(),
-timeoutMs
-);
-
-
 try {
-
 const response =
 await fetch(
 feed.url,
 {
-method:
-"GET",
+method: "GET",
+
+cache: "no-store",
 
 headers: {
-
 Accept:
-"application/rss+xml, application/atom+xml, application/xml, text/xml, text/plain, */*",
+"application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
 
 "User-Agent":
-"Mozilla/5.0 (compatible; rotation-app-ai-research/1.0)",
-
-"Cache-Control":
-"no-cache",
-
+"Rotation-App-AI-Research-Agent/1.0",
 },
-
-cache:
-"no-store",
-
-signal:
-controller.signal,
 }
 );
 
-
-if (
-!response.ok
-) {
-
+if (!response.ok) {
 return {
-
 sources: [],
-
-error:
+warning:
 `${feed.name}: HTTP ${response.status}`,
-
 };
-
 }
-
-
-/*
-* Entscheidend:
-*
-* Wir verlassen uns NICHT auf den Content-Type.
-*
-* Manche Server liefern RSS als:
-*
-* application/xml
-* text/xml
-* application/rss+xml
-*
-* Der Response-Body ist für uns maßgeblich.
-*/
 
 const xml =
 await response.text();
 
-
 if (
-!xml.trim()
+!xml ||
+xml.length < 20
 ) {
-
 return {
-
 sources: [],
-
-error:
-`${feed.name}: empty response`,
-
+warning:
+`${feed.name}: empty feed response`,
 };
-
 }
-
 
 const sources =
-parseFeedItems(
-xml,
+parseFeed(
 feed,
-maxItems
+xml
 );
 
-
-if (
-sources.length === 0
-) {
-
 return {
-
-sources: [],
-
-error:
-`${feed.name}: feed fetched successfully but no RSS/Atom items could be parsed`,
-
-};
-
-}
-
-
-return {
-
 sources,
-
 };
-
-} catch (
-error
-) {
-
+} catch (error) {
 return {
-
 sources: [],
 
-error:
+warning:
 `${feed.name}: ${
 error instanceof Error
 ? error.message
-: "Unknown fetch error"
+: "unknown fetch error"
 }`,
-
 };
-
-} finally {
-
-clearTimeout(
-timeout
-);
-
 }
-
 }
-
 
 /* =====================================================
-* TASK FEED SELECTION
-* ===================================================== */
+DEDUPLICATION
+===================================================== */
 
-function selectFeedsForTask(
-task: AIResearchTask
-): ExternalFeedDefinition[] {
+function deduplicateSources(
+sources: AIResearchSource[]
+): AIResearchSource[] {
+const seen =
+new Set<string>();
 
-switch (
-task
-) {
+const result:
+AIResearchSource[] = [];
 
-case "REGIME_REVIEW":
-case "CRASH_RISK_REVIEW":
-case "FORWARD_TEST_REVIEW":
+for (const source of sources) {
+const key =
+source.url
+.trim()
+.toLowerCase();
 
-return EXTERNAL_FEEDS.filter(
-(feed) =>
-feed.category === "FED_ECB" ||
-feed.category === "MACRO"
-);
-
-
-case "DAILY_MARKET_REVIEW":
-case "ROTATION_REVIEW":
-case "TRADE_SETUP_REVIEW":
-case "ANOMALY_REVIEW":
-
-return EXTERNAL_FEEDS;
-
-
-default:
-
-return EXTERNAL_FEEDS;
-
+if (!key) {
+continue;
 }
 
+if (seen.has(key)) {
+continue;
 }
 
+seen.add(key);
+
+result.push(source);
+}
+
+return result;
+}
 
 /* =====================================================
-* MAIN
-* ===================================================== */
+SORT
+===================================================== */
+
+function sortByPublishedAt(
+sources: AIResearchSource[]
+): AIResearchSource[] {
+return [...sources].sort(
+(a, b) => {
+const timestampA =
+a.publishedAt
+? Date.parse(a.publishedAt)
+: 0;
+
+const timestampB =
+b.publishedAt
+? Date.parse(b.publishedAt)
+: 0;
+
+return (
+timestampB -
+timestampA
+);
+}
+);
+}
+
+/* =====================================================
+MAIN
+===================================================== */
 
 export async function fetchExternalResearchSources(
-input: FetchExternalResearchSourcesInput
-): Promise<FetchExternalResearchSourcesResult> {
-
-const maxItemsPerFeed =
-clamp(
-input.maxItemsPerFeed ?? 10
-);
-
-
-const timeoutMs =
-Math.max(
-2000,
-Math.min(
-30000,
-Math.round(
-input.timeoutMs ?? 10000
-)
-)
-);
-
-
-const feeds =
-selectFeedsForTask(
-input.task
-);
-
-
-const warnings:
-string[] = [];
-
-
-let successfulFeeds =
-0;
-
-
-let failedFeeds =
-0;
-
-
-let parsedItems =
-0;
-
-
-const rawSources:
-ExternalResearchSourceInput[] = [];
-
-
-const results =
-await Promise.all(
-
-feeds.map(
+input: {
+task: AIResearchTask;
+}
+): Promise<ExternalResearchResult> {
+const applicableFeeds =
+FEEDS.filter(
 (feed) =>
-fetchExternalFeed(
+taskUsesFeed(
 feed,
-maxItemsPerFeed,
-timeoutMs
+input.task
 )
-)
-
 );
 
+const warnings: string[] = [];
+
+let successfulFeeds = 0;
+
+let failedFeeds = 0;
+
+let parsedItems = 0;
+
+const feedResults =
+await Promise.all(
+applicableFeeds.map(
+(feed) =>
+fetchFeed(feed)
+.then((result) => ({
+feed,
+result,
+}))
+)
+);
+
+const allSources:
+AIResearchSource[] = [];
 
 for (
-const result of results
+const {
+feed,
+result,
+} of feedResults
 ) {
-
 if (
-result.error
+result.warning
 ) {
-
-failedFeeds++;
+failedFeeds += 1;
 
 warnings.push(
-result.error
+result.warning
 );
 
 continue;
-
 }
 
-
-successfulFeeds++;
+successfulFeeds += 1;
 
 parsedItems +=
 result.sources.length;
 
-
-rawSources.push(
+allSources.push(
 ...result.sources
 );
-
 }
 
-
-const normalized =
-buildResearchSources({
-
-task:
-input.task,
-
-sources:
-rawSources,
-
-});
-
-
-if (
-normalized.length === 0
-) {
-
-warnings.push(
-"No external research sources were produced."
+const sources =
+sortByPublishedAt(
+deduplicateSources(
+allSources
+)
 );
 
-}
-
-
 return {
-
-sources:
-normalized,
+sources,
 
 diagnostics: {
-
 feedCount:
-feeds.length,
+applicableFeeds.length,
 
 successfulFeeds,
 
@@ -828,12 +665,9 @@ failedFeeds,
 parsedItems,
 
 sourceCount:
-normalized.length,
+sources.length,
 
 warnings,
-
 },
-
 };
-
 }
