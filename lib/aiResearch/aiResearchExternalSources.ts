@@ -14,18 +14,14 @@ type ExternalResearchSourceInput,
 * AI RESEARCH EXTERNAL SOURCES
 * =====================================================
 *
-* Tatsächliche Beschaffung externer Quellen.
+* Beschaffung und Normalisierung externer Quellen.
 *
-* Aktuell bewusst:
+* Aktuell:
 *
-* - öffentliche RSS-Feeds
-* - keine API-Keys
+* - öffentliche RSS/Atom-Feeds
 * - keine KI
 * - keine Bewertung
 * - keine Tradingentscheidung
-*
-* Die Funktion liefert ausschließlich externe Fakten
-* in der bereits definierten AIResearchSource-Struktur.
 *
 * =====================================================
 */
@@ -37,9 +33,7 @@ type ExternalResearchSourceInput,
 
 export interface ExternalFeedDefinition {
 name: string;
-
 url: string;
-
 publisher: string;
 
 category:
@@ -56,9 +50,7 @@ category:
 
 export interface FetchExternalResearchSourcesInput {
 task: AIResearchTask;
-
 maxItemsPerFeed?: number;
-
 timeoutMs?: number;
 }
 
@@ -68,51 +60,45 @@ sources: AIResearchSource[];
 
 diagnostics: {
 feedCount: number;
-
 successfulFeeds: number;
-
 failedFeeds: number;
-
+parsedItems: number;
 sourceCount: number;
-
 warnings: string[];
 };
 }
 
 
 /* =====================================================
-* FEED DEFINITIONS
-* =====================================================
-*
-* Die URLs sind ausschließlich öffentliche Quellen.
-*
-* Fed:
-* offizielles RSS-Angebot der Federal Reserve.
-*
-* ECB:
-* offizielles RSS-Angebot der Europäischen Zentralbank.
-*
-* =====================================================
-*/
+* FEEDS
+* ===================================================== */
 
 const EXTERNAL_FEEDS: ExternalFeedDefinition[] = [
 
 {
-name: "Federal Reserve Board",
+name:
+"Federal Reserve Board",
+
 url:
 "https://www.federalreserve.gov/feeds/press_all.xml",
+
 publisher:
 "Federal Reserve Board",
+
 category:
 "FED_ECB",
 },
 
 {
-name: "ECB Market Information Dissemination",
+name:
+"European Central Bank MID",
+
 url:
 "https://mid.ecb.europa.eu/rss/mid.xml",
+
 publisher:
 "European Central Bank",
+
 category:
 "FED_ECB",
 },
@@ -121,7 +107,7 @@ category:
 
 
 /* =====================================================
-* SAFE HELPERS
+* HELPERS
 * ===================================================== */
 
 function clamp(
@@ -148,7 +134,7 @@ value: string
 return value
 
 .replace(
-/<!\[CDATA\[([\s\S]*?)\]\]>/g,
+/<!\[CDATA\[([\s\S]*?)\]\]>/gi,
 "$1"
 )
 
@@ -158,27 +144,27 @@ return value
 )
 
 .replace(
-/&amp;/g,
+/&amp;/gi,
 "&"
 )
 
 .replace(
-/&lt;/g,
+/&lt;/gi,
 "<"
 )
 
 .replace(
-/&gt;/g,
+/&gt;/gi,
 ">"
 )
 
 .replace(
-/&quot;/g,
+/&quot;/gi,
 '"'
 )
 
 .replace(
-/&#39;/g,
+/&#39;/gi,
 "'"
 )
 
@@ -192,25 +178,27 @@ return value
 }
 
 
+/* =====================================================
+* XML TAG EXTRACTION
+* ===================================================== */
+
 function extractTag(
 item: string,
 tag: string
 ): string | undefined {
 
-const escapedTag =
-tag.replace(
-/[.*+?^${}()|[\]\\]/g,
-"\\$&"
-);
-
 const expression =
 new RegExp(
-`<${escapedTag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escapedTag}>`,
+`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`,
 "i"
 );
 
+
 const match =
-item.match(expression);
+item.match(
+expression
+);
+
 
 if (
 !match?.[1]
@@ -220,8 +208,12 @@ return undefined;
 
 }
 
+
 const value =
-cleanText(match[1]);
+cleanText(
+match[1]
+);
+
 
 return value.length > 0
 ? value
@@ -230,6 +222,10 @@ return value.length > 0
 }
 
 
+/* =====================================================
+* LINK EXTRACTION
+* ===================================================== */
+
 function extractLink(
 item: string
 ): string | undefined {
@@ -237,11 +233,9 @@ item: string
 /*
 * RSS:
 *
-* <link>https://...</link>
-*
-* Atom:
-*
-* <link href="https://..." />
+* <link>
+* https://example.com
+* </link>
 */
 
 const rssLink =
@@ -249,6 +243,7 @@ extractTag(
 item,
 "link"
 );
+
 
 if (
 rssLink
@@ -259,29 +254,92 @@ return rssLink;
 }
 
 
-const atomMatch =
+/*
+* Atom:
+*
+* <link href="https://example.com" />
+*/
+
+const atomLink =
 item.match(
-/<link[^>]+href=["']([^"']+)["'][^>]*\/?>/i
+/<link\b[^>]*?\bhref=["']([^"']+)["'][^>]*\/?>/i
 );
 
+
 if (
-atomMatch?.[1]
+atomLink?.[1]
 ) {
 
-return atomMatch[1].trim();
+return atomLink[1].trim();
 
 }
+
 
 return undefined;
 
 }
 
 
+/* =====================================================
+* DATE NORMALIZATION
+* ===================================================== */
+
+function normalizePublishedAt(
+value?: string
+): string | undefined {
+
+if (
+!value
+) {
+
+return undefined;
+
+}
+
+
+const timestamp =
+Date.parse(
+value
+);
+
+
+if (
+!Number.isFinite(
+timestamp
+)
+) {
+
+return undefined;
+
+}
+
+
+return new Date(
+timestamp
+).toISOString();
+
+}
+
+
+/* =====================================================
+* FEED ITEM EXTRACTION
+* ===================================================== */
+
 function parseFeedItems(
 xml: string,
 feed: ExternalFeedDefinition,
 maxItems: number
 ): ExternalResearchSourceInput[] {
+
+/*
+* RSS 2.0:
+*
+* <item>...</item>
+*
+* Atom:
+*
+* <entry>...</entry>
+*/
 
 const items =
 xml.match(
@@ -306,23 +364,31 @@ item,
 "title"
 );
 
+
 const link =
 extractLink(
 item
 );
 
+
 const publishedAt =
+normalizePublishedAt(
+
 extractTag(
 item,
 "pubDate"
 ) ??
+
 extractTag(
 item,
 "published"
 ) ??
+
 extractTag(
 item,
 "updated"
+)
+
 );
 
 
@@ -331,11 +397,17 @@ extractTag(
 item,
 "description"
 ) ??
+
 extractTag(
 item,
 "summary"
 );
 
+
+/*
+* Titel + Link sind die minimale Voraussetzung
+* für eine verwertbare Research-Quelle.
+*/
 
 if (
 !title ||
@@ -346,10 +418,6 @@ continue;
 
 }
 
-
-/*
-* Nur absolute HTTP(S)-URLs akzeptieren.
-*/
 
 try {
 
@@ -382,10 +450,7 @@ feed.publisher,
 
 ...(publishedAt
 ? {
-publishedAt:
-new Date(
-publishedAt
-).toISOString(),
+publishedAt,
 }
 : {}),
 
@@ -409,10 +474,6 @@ relevance:
 
 } catch {
 
-/*
-* Ungültige URLs werden still verworfen.
-*/
-
 continue;
 
 }
@@ -435,12 +496,12 @@ maxItems: number,
 timeoutMs: number
 ): Promise<{
 sources: ExternalResearchSourceInput[];
-
 error?: string;
 }> {
 
 const controller =
 new AbortController();
+
 
 const timeout =
 setTimeout(
@@ -455,14 +516,20 @@ const response =
 await fetch(
 feed.url,
 {
-method: "GET",
+method:
+"GET",
 
 headers: {
+
 Accept:
-"application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+"application/rss+xml, application/atom+xml, application/xml, text/xml, text/plain, */*",
 
 "User-Agent":
-"rotation-app-ai-research/1.0",
+"Mozilla/5.0 (compatible; rotation-app-ai-research/1.0)",
+
+"Cache-Control":
+"no-cache",
+
 },
 
 cache:
@@ -490,6 +557,20 @@ error:
 }
 
 
+/*
+* Entscheidend:
+*
+* Wir verlassen uns NICHT auf den Content-Type.
+*
+* Manche Server liefern RSS als:
+*
+* application/xml
+* text/xml
+* application/rss+xml
+*
+* Der Response-Body ist für uns maßgeblich.
+*/
+
 const xml =
 await response.text();
 
@@ -510,14 +591,33 @@ error:
 }
 
 
-return {
-
-sources:
+const sources =
 parseFeedItems(
 xml,
 feed,
 maxItems
-),
+);
+
+
+if (
+sources.length === 0
+) {
+
+return {
+
+sources: [],
+
+error:
+`${feed.name}: feed fetched successfully but no RSS/Atom items could be parsed`,
+
+};
+
+}
+
+
+return {
+
+sources,
 
 };
 
@@ -550,20 +650,12 @@ timeout
 
 
 /* =====================================================
-* TASK FILTER
+* TASK FEED SELECTION
 * ===================================================== */
 
 function selectFeedsForTask(
 task: AIResearchTask
 ): ExternalFeedDefinition[] {
-
-/*
-* Aktuell sind Fed und ECB für alle Research-Aufgaben
-* zugelassen.
-*
-* Die spätere Erweiterung um Nasdaq/Russell/VIX-News
-* kann hier ergänzt werden.
-*/
 
 switch (
 task
@@ -598,7 +690,7 @@ return EXTERNAL_FEEDS;
 
 
 /* =====================================================
-* MAIN FUNCTION
+* MAIN
 * ===================================================== */
 
 export async function fetchExternalResearchSources(
@@ -633,21 +725,25 @@ const warnings:
 string[] = [];
 
 
-let successfulFeeds = 0;
+let successfulFeeds =
+0;
 
-let failedFeeds = 0;
+
+let failedFeeds =
+0;
+
+
+let parsedItems =
+0;
 
 
 const rawSources:
 ExternalResearchSourceInput[] = [];
 
 
-/*
-* Feeds parallel abrufen.
-*/
-
 const results =
 await Promise.all(
+
 feeds.map(
 (feed) =>
 fetchExternalFeed(
@@ -656,6 +752,7 @@ maxItemsPerFeed,
 timeoutMs
 )
 )
+
 );
 
 
@@ -680,6 +777,10 @@ continue;
 
 successfulFeeds++;
 
+parsedItems +=
+result.sources.length;
+
+
 rawSources.push(
 ...result.sources
 );
@@ -687,17 +788,27 @@ rawSources.push(
 }
 
 
-/*
-* Gemeinsame Normalisierung aus
-* aiResearchSources.ts verwenden.
-*/
-
 const normalized =
 buildResearchSources({
-task: input.task,
+
+task:
+input.task,
+
 sources:
 rawSources,
+
 });
+
+
+if (
+normalized.length === 0
+) {
+
+warnings.push(
+"No external research sources were produced."
+);
+
+}
 
 
 return {
@@ -713,6 +824,8 @@ feeds.length,
 successfulFeeds,
 
 failedFeeds,
+
+parsedItems,
 
 sourceCount:
 normalized.length,
