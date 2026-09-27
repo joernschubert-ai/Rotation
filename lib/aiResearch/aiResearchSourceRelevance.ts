@@ -1,35 +1,46 @@
+// lib/aiResearch/aiResearchSourceRelevance.ts
+
 import type {
 AIResearchSource,
 AIResearchTask,
 } from "./aiResearchTypes";
 
-export interface RankResearchSourcesResult {
-sources: AIResearchSource[];
-diagnostics: {
-inputCount: number;
-outputCount: number;
-};
-}
-
-const MIN_RELEVANCE = 0;
-const MAX_RELEVANCE = 100;
 
 /* =====================================================
-TEXT NORMALIZATION
+TYPES
 ===================================================== */
 
-function normalizeText(value: unknown): string {
-if (typeof value !== "string") {
-return "";
+interface ScoredResearchSource {
+source: AIResearchSource;
+score: number;
 }
 
-return value
+
+/* =====================================================
+NORMALIZATION
+===================================================== */
+
+function clamp(
+value: number,
+min = 0,
+max = 100
+): number {
+return Math.max(
+min,
+Math.min(max, value)
+);
+}
+
+
+function normalizeText(
+value: string | undefined
+): string {
+return (value ?? "")
 .toLowerCase()
-.normalize("NFKD")
-.replace(/[\u0300-\u036f]/g, "")
 .replace(/\s+/g, " ")
 .trim();
 }
+
 
 function sourceText(
 source: AIResearchSource
@@ -37,283 +48,81 @@ source: AIResearchSource
 return normalizeText(
 [
 source.title,
-source.publisher,
 source.summary,
+source.publisher,
 ]
 .filter(Boolean)
 .join(" ")
 );
 }
 
-function containsAny(
-text: string,
-keywords: string[]
-): boolean {
-return keywords.some(
-(keyword) =>
-text.includes(
-normalizeText(keyword)
-)
-);
-}
-
-function countMatches(
-text: string,
-keywords: string[]
-): number {
-return keywords.filter(
-(keyword) =>
-text.includes(
-normalizeText(keyword)
-)
-).length;
-}
-
-function clamp(
-value: number,
-min = MIN_RELEVANCE,
-max = MAX_RELEVANCE
-): number {
-return Math.max(
-min,
-Math.min(
-max,
-Math.round(value)
-)
-);
-}
-
-/* =====================================================
-KEYWORD GROUPS
-===================================================== */
-
-const VERY_HIGH_IMPACT_KEYWORDS = [
-"fomc",
-"federal open market committee",
-"fed funds",
-"federal funds rate",
-"interest rate decision",
-"rate decision",
-"monetary policy",
-"powell",
-"press conference",
-"economic projections",
-"dot plot",
-];
-
-const MACRO_KEYWORDS = [
-"inflation",
-"cpi",
-"core cpi",
-"pce",
-"core pce",
-"ppi",
-"payroll",
-"nonfarm payroll",
-"employment",
-"unemployment",
-"jobless claims",
-"gdp",
-"retail sales",
-"consumer confidence",
-"ism",
-"manufacturing",
-"services",
-];
-
-const NASDAQ_KEYWORDS = [
-"nasdaq",
-"nasdaq 100",
-"ndx",
-"qqq",
-"mega cap",
-"megacap",
-"technology stocks",
-"tech stocks",
-];
-
-const RUSSELL_KEYWORDS = [
-"russell",
-"russell 2000",
-"rut",
-"iwm",
-"small cap",
-"small-cap",
-"small caps",
-];
-
-const SEMICONDUCTOR_KEYWORDS = [
-"semiconductor",
-"semiconductors",
-"chip stocks",
-"chipmaker",
-"chipmakers",
-"nvidia",
-"amd",
-"intel",
-"micron",
-"sox",
-"philadelphia semiconductor",
-];
-
-const AI_KEYWORDS = [
-"artificial intelligence",
-"ai stocks",
-"ai spending",
-"ai demand",
-"ai infrastructure",
-"generative ai",
-];
-
-const VOLATILITY_KEYWORDS = [
-"vix",
-"volatility",
-"implied volatility",
-"fear index",
-"options volatility",
-"volatility index",
-];
-
-const MARKET_STRUCTURE_KEYWORDS = [
-"breadth",
-"market breadth",
-"participation",
-"advance decline",
-"advancers",
-"decliners",
-"leadership",
-"rotation",
-"market structure",
-"risk appetite",
-"risk-on",
-"risk off",
-"risk-off",
-];
-
-const LIQUIDITY_KEYWORDS = [
-"liquidity",
-"financial conditions",
-"credit conditions",
-"funding conditions",
-"bond market",
-"treasury yields",
-"treasury yield",
-"yield curve",
-];
-
-const GEOPOLITICAL_KEYWORDS = [
-"geopolitical",
-"geopolitics",
-"iran",
-"israel",
-"middle east",
-"china",
-"taiwan",
-"russia",
-"ukraine",
-"trade war",
-"tariff",
-];
-
-/* =====================================================
-LOW DIRECT RELEVANCE / NOISE
-===================================================== */
-
-const LOW_DIRECT_RELEVANCE_KEYWORDS = [
-"t2",
-"t2s",
-"settlement",
-"operating normally",
-"is closed",
-"pilot is closed",
-"eligible marketable assets",
-"list of monetary financial institutions",
-"enforcement action",
-"approval of application",
-"public comment",
-"application to establish",
-];
-
-const PROMOTIONAL_KEYWORDS = [
-"undervalued stock",
-"undervalued stocks",
-"stock to buy",
-"stocks to buy",
-"best stocks",
-"top stocks",
-"stock picks",
-"buy now",
-"must buy",
-"hidden gem",
-"soaring stock",
-"super semiconductor etf",
-];
-
-const OPTIONS_NOISE_KEYWORDS = [
-"options chain",
-"option chain",
-"strike price",
-"call option",
-"put option",
-"expiration",
-"open interest",
-"moomoo",
-];
 
 /* =====================================================
 SOURCE QUALITY
 ===================================================== */
 
 /*
-* Source quality is deliberately independent from
-* topical relevance.
+* Source quality answers:
 *
-* A perfectly relevant article from a weak source should
-* not automatically outrank a slightly less targeted
-* article from a highly reliable source.
+* "How trustworthy / authoritative is this publisher?"
+*
+* It does NOT answer:
+*
+* "How important is this document for the
+* current market regime?"
+*
+* That distinction is intentional.
 */
 
 function sourceQuality(
 source: AIResearchSource
 ): number {
+
 const publisher =
-normalizeText(
-source.publisher
-);
+normalizeText(source.publisher);
 
-const title =
-normalizeText(
-source.title
-);
+const url =
+normalizeText(source.url);
 
-/*
-* Official primary sources.
-*/
+const text =
+sourceText(source);
+
+
+/* ---------------------------------------------------
+PRIMARY OFFICIAL SOURCES
+--------------------------------------------------- */
 
 if (
-publisher.includes(
-"federal reserve"
-) ||
-publisher.includes(
-"federal reserve board"
-) ||
-publisher.includes(
-"european central bank"
-) ||
-publisher === "nasdaq"
+publisher.includes("federal reserve") ||
+url.includes("federalreserve.gov")
 ) {
 return 100;
 }
 
-/*
-* High-quality financial / market
-* research publishers.
-*/
+if (
+publisher.includes("ecb") ||
+url.includes("ecb.europa.eu")
+) {
+return 100;
+}
+
+if (
+publisher.includes("nasdaq") ||
+url.includes("nasdaq.com")
+) {
+return 100;
+}
+
+
+/* ---------------------------------------------------
+HIGH QUALITY FINANCIAL SOURCES
+--------------------------------------------------- */
 
 const highQualityPublishers = [
 "reuters",
 "bloomberg",
 "financial times",
+"ft.com",
 "wall street journal",
 "wsj",
 "associated press",
@@ -325,488 +134,713 @@ const highQualityPublishers = [
 "barrons",
 "investing.com",
 "s&p global",
-"sp global",
 "factset",
 ];
 
 if (
 highQualityPublishers.some(
 (name) =>
-publisher.includes(name)
+publisher.includes(name) ||
+url.includes(name.replace(/\s+/g, ""))
 )
 ) {
-return 88;
+return 94;
 }
 
-/*
-* Established but secondary financial
-* publishers.
-*/
 
-const establishedFinancialPublishers = [
+/* ---------------------------------------------------
+ESTABLISHED SECONDARY SOURCES
+--------------------------------------------------- */
+
+const establishedSecondary = [
 "tradingview",
 "benzinga",
+"t iprankings",
 "tipranks",
 "motley fool",
 "seeking alpha",
-"investor's business daily",
 "investors business daily",
+"investing",
 "fortune",
 "yahoo finance",
 "marketbeat",
-"nasdaq",
 ];
 
 if (
-establishedFinancialPublishers.some(
+establishedSecondary.some(
 (name) =>
-publisher.includes(name)
+publisher.includes(name) ||
+url.includes(name.replace(/\s+/g, ""))
 )
 ) {
-return 72;
+return 82;
 }
 
+
+/* ---------------------------------------------------
+GOOGLE NEWS AGGREGATOR
+--------------------------------------------------- */
+
+if (
+url.includes("news.google.com") ||
+publisher.includes("google news")
+) {
+return 60;
+}
+
+
+/* ---------------------------------------------------
+DEFAULT
+--------------------------------------------------- */
+
 /*
-* Google News is an aggregator, not
-* the original publisher.
+* Unknown source:
 *
-* Therefore its quality is deliberately
-* capped below established publishers.
+* trustworthy enough to inspect,
+* but not allowed to dominate the ranking.
 */
 
-if (
-publisher.includes(
-"google news"
-)
-) {
-/*
-* Try to recover some quality information
-* from the title/summary.
-*
-* This does NOT make Google News itself
-* a primary source.
-*/
-
-if (
-containsAny(
-title,
-VERY_HIGH_IMPACT_KEYWORDS
-)
-) {
-return 68;
+if (text.length > 0) {
+return 50;
 }
 
-if (
-containsAny(
-title,
-[
-...NASDAQ_KEYWORDS,
-...RUSSELL_KEYWORDS,
-...SEMICONDUCTOR_KEYWORDS,
-...VOLATILITY_KEYWORDS,
-]
-)
-) {
-return 62;
-}
-
-return 55;
-}
-
-/*
-* Unknown / other publishers.
-*/
-
-return 45;
-}
-
-/* =====================================================
-TASK BASELINE
-===================================================== */
-
-function taskBaseline(
-task: AIResearchTask
-): number {
-switch (task) {
-case "DAILY_MARKET_REVIEW":
 return 35;
-
-case "REGIME_REVIEW":
-return 32;
-
-case "ROTATION_REVIEW":
-return 32;
-
-case "CRASH_RISK_REVIEW":
-return 32;
-
-case "TRADE_SETUP_REVIEW":
-return 28;
-
-case "ANOMALY_REVIEW":
-return 28;
-
-case "FORWARD_TEST_REVIEW":
-return 28;
-
-default:
-return 30;
 }
-}
+
 
 /* =====================================================
 TOPIC RELEVANCE
 ===================================================== */
 
 /*
-* Topic relevance is capped.
+* Topic relevance answers:
 *
-* This is important:
-*
-* Ten matching keywords must NOT be able to turn
-* a low-quality article into a perfect 100-point source.
+* "Does this source discuss something connected
+* to the requested research task?"
 */
 
-function topicRelevance(
+function keywordScore(
 text: string,
-task: AIResearchTask
+keywords: string[]
 ): number {
-let score = 0;
 
-let groupsMatched = 0;
-
-if (
-containsAny(
-text,
-VERY_HIGH_IMPACT_KEYWORDS
-)
-) {
-score += 20;
-groupsMatched += 1;
+if (!text) {
+return 0;
 }
 
-if (
-containsAny(
-text,
-MACRO_KEYWORDS
-)
-) {
-score += 15;
-groupsMatched += 1;
+let matches = 0;
+
+for (const keyword of keywords) {
+if (text.includes(keyword)) {
+matches += 1;
+}
 }
 
-if (
-containsAny(
-text,
-NASDAQ_KEYWORDS
-)
-) {
-score += 15;
-groupsMatched += 1;
-}
-
-if (
-containsAny(
-text,
-RUSSELL_KEYWORDS
-)
-) {
-score += 15;
-groupsMatched += 1;
-}
-
-if (
-containsAny(
-text,
-SEMICONDUCTOR_KEYWORDS
-)
-) {
-score += 15;
-groupsMatched += 1;
-}
-
-if (
-containsAny(
-text,
-AI_KEYWORDS
-)
-) {
-score += 12;
-groupsMatched += 1;
-}
-
-if (
-containsAny(
-text,
-VOLATILITY_KEYWORDS
-)
-) {
-score += 15;
-groupsMatched += 1;
-}
-
-if (
-containsAny(
-text,
-MARKET_STRUCTURE_KEYWORDS
-)
-) {
-score += 12;
-groupsMatched += 1;
-}
-
-if (
-containsAny(
-text,
-LIQUIDITY_KEYWORDS
-)
-) {
-score += 10;
-groupsMatched += 1;
-}
-
-if (
-containsAny(
-text,
-GEOPOLITICAL_KEYWORDS
-)
-) {
-score += 8;
-groupsMatched += 1;
+if (matches === 0) {
+return 0;
 }
 
 /*
-* Task-specific emphasis.
+* First matches are highly informative.
+* Additional matches have diminishing value.
 */
 
+return clamp(
+30 +
+Math.min(matches, 5) * 12
+);
+}
+
+
+function topicRelevance(
+source: AIResearchSource,
+task: AIResearchTask
+): number {
+
+const text =
+sourceText(source);
+
+let keywords: string[] = [];
+
+
 switch (task) {
+
 case "DAILY_MARKET_REVIEW":
 
-if (
-containsAny(
-text,
-NASDAQ_KEYWORDS
-)
-) {
-score += 8;
-}
-
-if (
-containsAny(
-text,
-RUSSELL_KEYWORDS
-)
-) {
-score += 8;
-}
-
-if (
-containsAny(
-text,
-MARKET_STRUCTURE_KEYWORDS
-)
-) {
-score += 8;
-}
+keywords = [
+"market",
+"stock market",
+"equity",
+"stocks",
+"nasdaq",
+"russell",
+"s&p 500",
+"sp500",
+"dow",
+"volatility",
+"vix",
+"rates",
+"yield",
+"fed",
+"federal reserve",
+"ecb",
+"liquidity",
+"breadth",
+"rotation",
+];
 
 break;
+
 
 case "REGIME_REVIEW":
 
-if (
-containsAny(
-text,
-VERY_HIGH_IMPACT_KEYWORDS
-)
-) {
-score += 12;
-}
-
-if (
-containsAny(
-text,
-MACRO_KEYWORDS
-)
-) {
-score += 10;
-}
-
-if (
-containsAny(
-text,
-LIQUIDITY_KEYWORDS
-)
-) {
-score += 8;
-}
+keywords = [
+"regime",
+"risk",
+"risk-off",
+"risk on",
+"market breadth",
+"participation",
+"liquidity",
+"volatility",
+"vix",
+"yield",
+"rates",
+"fed",
+"federal reserve",
+"recession",
+"growth",
+"inflation",
+"equity market",
+"nasdaq",
+"russell",
+];
 
 break;
+
 
 case "ROTATION_REVIEW":
 
-if (
-containsAny(
-text,
-NASDAQ_KEYWORDS
-)
-) {
-score += 12;
-}
-
-if (
-containsAny(
-text,
-RUSSELL_KEYWORDS
-)
-) {
-score += 12;
-}
-
-if (
-containsAny(
-text,
-MARKET_STRUCTURE_KEYWORDS
-)
-) {
-score += 10;
-}
+keywords = [
+"nasdaq",
+"nasdaq 100",
+"qqq",
+"russell",
+"russell 2000",
+"rut",
+"iwm",
+"small cap",
+"small-cap",
+"large cap",
+"technology",
+"tech stocks",
+"rotation",
+"breadth",
+"leadership",
+"relative strength",
+];
 
 break;
+
 
 case "CRASH_RISK_REVIEW":
 
-if (
-containsAny(
-text,
-VOLATILITY_KEYWORDS
-)
-) {
-score += 12;
-}
-
-if (
-containsAny(
-text,
-MACRO_KEYWORDS
-)
-) {
-score += 10;
-}
-
-if (
-containsAny(
-text,
-LIQUIDITY_KEYWORDS
-)
-) {
-score += 8;
-}
+keywords = [
+"crash",
+"selloff",
+"sell-off",
+"market decline",
+"market drop",
+"volatility",
+"vix",
+"options",
+"liquidity",
+"credit",
+"yield",
+"treasury",
+"financial conditions",
+"breadth",
+"recession",
+"systemic risk",
+"risk-off",
+];
 
 break;
+
 
 case "TRADE_SETUP_REVIEW":
 
-if (
-containsAny(
-text,
-NASDAQ_KEYWORDS
-)
-) {
-score += 10;
-}
-
-if (
-containsAny(
-text,
-RUSSELL_KEYWORDS
-)
-) {
-score += 10;
-}
-
-if (
-containsAny(
-text,
-VOLATILITY_KEYWORDS
-)
-) {
-score += 8;
-}
+keywords = [
+"nasdaq",
+"nasdaq 100",
+"qqq",
+"russell",
+"russell 2000",
+"rut",
+"iwm",
+"technology",
+"small cap",
+"volatility",
+"vix",
+"momentum",
+"rotation",
+"breadth",
+"market structure",
+];
 
 break;
+
 
 case "ANOMALY_REVIEW":
 
-if (
-containsAny(
-text,
-MARKET_STRUCTURE_KEYWORDS
-)
-) {
-score += 10;
-}
-
-if (
-containsAny(
-text,
-VOLATILITY_KEYWORDS
-)
-) {
-score += 8;
-}
+keywords = [
+"unusual",
+"divergence",
+"anomaly",
+"breadth",
+"volatility",
+"vix",
+"rotation",
+"liquidity",
+"market structure",
+"relative strength",
+"nasdaq",
+"russell",
+];
 
 break;
+
 
 case "FORWARD_TEST_REVIEW":
 
-if (
-containsAny(
-text,
-MACRO_KEYWORDS
-)
-) {
-score += 10;
-}
-
-if (
-containsAny(
-text,
-NASDAQ_KEYWORDS
-)
-) {
-score += 8;
-}
-
-if (
-containsAny(
-text,
-RUSSELL_KEYWORDS
-)
-) {
-score += 8;
-}
+keywords = [
+"market",
+"nasdaq",
+"russell",
+"s&p 500",
+"volatility",
+"breadth",
+"rotation",
+"liquidity",
+"rates",
+"yield",
+"fed",
+"economic growth",
+];
 
 break;
+
 }
+
+
+return keywordScore(
+text,
+keywords
+);
+}
+
+
+/* =====================================================
+MARKET IMPACT RELEVANCE
+===================================================== */
 
 /*
-* Prevent keyword density from dominating.
+* IMPORTANT:
+*
+* This is deliberately separate from source quality.
+*
+* Example:
+*
+* Nasdaq conference announcement
+* -> Source Quality = 100
+* -> Market Impact = potentially low
+*
+* FOMC rate decision
+* -> Source Quality = 100
+* -> Market Impact = very high
+*
+* ECB technical settlement publication
+* -> Source Quality = 100
+* -> Market Impact = low unless the document
+* contains a material policy/liquidity change.
 */
 
-const keywordDensityBonus =
-Math.min(
-groupsMatched * 2,
-12
-);
+function marketImpactRelevance(
+source: AIResearchSource,
+task: AIResearchTask
+): number {
 
-score +=
-keywordDensityBonus;
+const text =
+sourceText(source);
 
-return Math.min(
-score,
-65
+let score = 50;
+
+
+/* ===================================================
+VERY HIGH MARKET IMPACT
+=================================================== */
+
+const veryHighImpactKeywords = [
+"fomc",
+"federal funds rate",
+"interest rate decision",
+"rate decision",
+"rate hike",
+"rate cut",
+"interest rate",
+"monetary policy",
+"fed statement",
+"economic projections",
+"dot plot",
+"inflation",
+"cpi",
+"ppi",
+"nonfarm payroll",
+"non-farm payroll",
+"employment report",
+"unemployment",
+"jobs report",
+"gdp",
+"gross domestic product",
+"recession",
+"treasury yield",
+"10-year yield",
+"financial conditions",
+"credit conditions",
+];
+
+const veryHighMatches =
+veryHighImpactKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+if (veryHighMatches > 0) {
+score += Math.min(
+40,
+veryHighMatches * 12
 );
 }
+
+
+/* ===================================================
+NASDAQ / LARGE CAP IMPACT
+=================================================== */
+
+const nasdaqMarketKeywords = [
+"nasdaq",
+"nasdaq 100",
+"ndx",
+"qqq",
+"technology stocks",
+"tech stocks",
+"mega cap",
+"large cap",
+"apple",
+"microsoft",
+"amazon",
+"alphabet",
+"meta",
+"nvidia",
+];
+
+const nasdaqMatches =
+nasdaqMarketKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+if (nasdaqMatches > 0) {
+score += Math.min(
+20,
+nasdaqMatches * 5
+);
+}
+
+
+/* ===================================================
+RUSSELL / SMALL CAP IMPACT
+=================================================== */
+
+const russellKeywords = [
+"russell 2000",
+"russell",
+"rut",
+"iwm",
+"small cap",
+"small-cap",
+"small caps",
+"small-cap stocks",
+"small business stocks",
+];
+
+const russellMatches =
+russellKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+if (russellMatches > 0) {
+score += Math.min(
+20,
+russellMatches * 6
+);
+}
+
+
+/* ===================================================
+SEMICONDUCTOR / AI IMPACT
+=================================================== */
+
+const semiconductorKeywords = [
+"semiconductor",
+"semiconductors",
+"chip stocks",
+"chips",
+"nvidia",
+"amd",
+"broadcom",
+"ai stocks",
+"artificial intelligence",
+"generative ai",
+"ai boom",
+];
+
+const semiconductorMatches =
+semiconductorKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+if (semiconductorMatches > 0) {
+score += Math.min(
+20,
+semiconductorMatches * 5
+);
+}
+
+
+/* ===================================================
+VOLATILITY / MARKET STRUCTURE
+=================================================== */
+
+const volatilityKeywords = [
+"vix",
+"volatility",
+"implied volatility",
+"options market",
+"options market volatility",
+"market breadth",
+"breadth",
+"advance decline",
+"market internals",
+"rotation",
+"relative strength",
+"liquidity stress",
+"liquidity tightening",
+];
+
+const volatilityMatches =
+volatilityKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+if (volatilityMatches > 0) {
+score += Math.min(
+25,
+volatilityMatches * 6
+);
+}
+
+
+/* ===================================================
+GEOPOLITICAL MARKET IMPACT
+=================================================== */
+
+const geopoliticalKeywords = [
+"tariff",
+"trade war",
+"sanctions",
+"oil price",
+"crude oil",
+"energy shock",
+"middle east",
+"ukraine",
+"russia",
+"china",
+"taiwan",
+"geopolitical risk",
+];
+
+const geopoliticalMatches =
+geopoliticalKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+if (geopoliticalMatches > 0) {
+score += Math.min(
+20,
+geopoliticalMatches * 5
+);
+}
+
+
+/* ===================================================
+LOW-IMPACT DOCUMENT TYPES
+=================================================== */
+
+const lowImpactKeywords = [
+"conference presentation",
+"conference presentations",
+"investor conference",
+"conference remarks",
+"fireside chat",
+"executive conference",
+"conference participation",
+"delisting",
+"delist",
+"listing compliance",
+"compliance notice",
+"administrative notice",
+"technical publication",
+"technical documentation",
+"settlement publication",
+"settlement calendar",
+"settlement date",
+"reference rates",
+"fx reference rates",
+"operational procedures",
+"operational framework",
+"liquidity management publication",
+"liquidity management",
+"public comment",
+"enforcement",
+"regulatory notice",
+];
+
+const lowImpactMatches =
+lowImpactKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+if (lowImpactMatches > 0) {
+score -= Math.min(
+35,
+lowImpactMatches * 12
+);
+}
+
+
+/* ===================================================
+STRONG DOCUMENT-SPECIFIC DEMOTION
+=================================================== */
+
+/*
+* Official source alone must never rescue a document
+* whose actual content has little market relevance.
+*/
+
+const isNasdaq =
+normalizeText(source.publisher)
+.includes("nasdaq") ||
+normalizeText(source.url)
+.includes("nasdaq.com");
+
+const isECB =
+normalizeText(source.publisher)
+.includes("ecb") ||
+normalizeText(source.url)
+.includes("ecb.europa.eu");
+
+const hasHighImpactContent =
+veryHighMatches > 0 ||
+volatilityMatches > 0 ||
+nasdaqMatches > 0 ||
+russellMatches > 0 ||
+semiconductorMatches > 0 ||
+geopoliticalMatches > 0;
+
+
+if (
+isNasdaq &&
+lowImpactMatches > 0 &&
+!hasHighImpactContent
+) {
+score -= 25;
+}
+
+
+if (
+isECB &&
+lowImpactMatches > 0 &&
+!hasHighImpactContent
+) {
+score -= 25;
+}
+
+
+/* ===================================================
+TASK-SPECIFIC MARKET IMPACT
+=================================================== */
+
+if (
+task === "ROTATION_REVIEW"
+) {
+
+if (
+nasdaqMatches > 0 &&
+russellMatches > 0
+) {
+score += 15;
+}
+
+if (
+text.includes("rotation") ||
+text.includes("relative strength")
+) {
+score += 12;
+}
+}
+
+
+if (
+task === "CRASH_RISK_REVIEW"
+) {
+
+if (
+text.includes("vix") ||
+text.includes("volatility") ||
+text.includes("liquidity stress") ||
+text.includes("financial conditions")
+) {
+score += 15;
+}
+}
+
+
+if (
+task === "REGIME_REVIEW"
+) {
+
+if (
+text.includes("monetary policy") ||
+text.includes("interest rate") ||
+text.includes("inflation") ||
+text.includes("financial conditions")
+) {
+score += 15;
+}
+}
+
+
+return clamp(
+score
+);
+}
+
 
 /* =====================================================
 RECENCY
@@ -815,109 +849,125 @@ RECENCY
 function recencyScore(
 source: AIResearchSource
 ): number {
-if (
-!source.publishedAt
-) {
-return 20;
+
+if (!source.publishedAt) {
+return 35;
 }
 
 const timestamp =
-Date.parse(
+new Date(
 source.publishedAt
-);
+).getTime();
 
 if (
-!Number.isFinite(
-timestamp
-)
+!Number.isFinite(timestamp)
 ) {
-return 20;
+return 35;
 }
 
 const ageHours =
-Math.max(
-0,
 (
 Date.now() -
 timestamp
 ) /
-(1000 * 60 * 60)
+(
+1000 *
+60 *
+60
 );
 
-if (
-ageHours <= 6
-) {
+
+if (ageHours <= 24) {
 return 100;
 }
 
-if (
-ageHours <= 24
-) {
-return 92;
+if (ageHours <= 48) {
+return 94;
 }
 
-if (
-ageHours <= 72
-) {
+if (ageHours <= 72) {
+return 88;
+}
+
+if (ageHours <= 120) {
 return 80;
 }
 
-if (
-ageHours <= 168
-) {
-return 65;
+if (ageHours <= 168) {
+return 72;
 }
 
-if (
-ageHours <= 336
-) {
-return 50;
+if (ageHours <= 336) {
+return 55;
 }
 
-return 30;
+return 35;
 }
+
 
 /* =====================================================
 NOISE PENALTY
 ===================================================== */
 
 function noisePenalty(
-text: string
+source: AIResearchSource
 ): number {
+
+const text =
+sourceText(source);
+
+const noiseKeywords = [
+"t2",
+"t+2",
+"t2s",
+"settlement",
+"settlement date",
+"options chain",
+"strike price",
+"expiration date",
+"open interest",
+"option chain",
+"delisting",
+"delisted",
+"listing compliance",
+"enforcement",
+"public comment",
+"administrative notice",
+"technical documentation",
+"reference rates",
+"conference presentation",
+"conference event",
+"stock to buy",
+"stocks to buy",
+"undervalued stock",
+"top stocks",
+"best stocks",
+"price target",
+"buy now",
+"promotional",
+];
+
 let penalty = 0;
 
-if (
-containsAny(
-text,
-LOW_DIRECT_RELEVANCE_KEYWORDS
-)
-) {
-penalty += 18;
-}
+for (const keyword of noiseKeywords) {
 
 if (
-containsAny(
-text,
-OPTIONS_NOISE_KEYWORDS
-)
+text.includes(keyword)
 ) {
-penalty += 20;
+
+penalty += 7;
+
 }
 
-if (
-containsAny(
-text,
-PROMOTIONAL_KEYWORDS
-)
-) {
-penalty += 12;
 }
 
-return Math.min(
+return clamp(
 penalty,
-35
+0,
+40
 );
 }
+
 
 /* =====================================================
 PUBLISHER ADJUSTMENT
@@ -926,251 +976,335 @@ PUBLISHER ADJUSTMENT
 function publisherAdjustment(
 source: AIResearchSource
 ): number {
+
 const publisher =
 normalizeText(
 source.publisher
 );
 
-/*
-* Primary sources receive a small bonus.
-*
-* This is intentionally NOT huge because
-* source quality is already part of the score.
-*/
+const url =
+normalizeText(
+source.url
+);
+
 
 if (
-publisher.includes(
-"federal reserve"
-) ||
-publisher.includes(
-"european central bank"
-) ||
-publisher === "nasdaq"
+publisher.includes("reuters") ||
+publisher.includes("bloomberg") ||
+publisher.includes("financial times") ||
+publisher.includes("wall street journal") ||
+publisher.includes("cnbc")
 ) {
-return 8;
+return 4;
 }
+
 
 if (
-publisher.includes(
-"reuters"
-) ||
-publisher.includes(
-"bloomberg"
-) ||
-publisher.includes(
-"financial times"
-) ||
-publisher.includes(
-"wall street journal"
-) ||
-publisher.includes(
-"cnbc"
-) ||
-publisher.includes(
-"associated press"
-) ||
-publisher.includes(
-"morningstar"
-)
+publisher.includes("federal reserve") ||
+url.includes("federalreserve.gov") ||
+publisher.includes("ecb") ||
+url.includes("ecb.europa.eu")
 ) {
-return 5;
+return 4;
 }
+
 
 if (
-publisher.includes(
-"google news"
-)
+publisher.includes("nasdaq") ||
+url.includes("nasdaq.com")
 ) {
-return 0;
-}
-
 return 2;
 }
 
+
+if (
+url.includes("news.google.com") ||
+publisher.includes("google news")
+) {
+return -3;
+}
+
+
+return 0;
+}
+
+
 /* =====================================================
-FINAL RELEVANCE SCORE
+FINAL RELEVANCE
 ===================================================== */
 
 /*
-* The final score intentionally combines:
+* Final pipeline:
 *
-* 35% source quality
-* 40% topic/task relevance
-* 25% recency
+* Source Quality
+* ↓
+* Topic Relevance
+* ↓
+* Market Impact Relevance
+* ↓
+* Recency
+* ↓
+* Noise
+* ↓
+* Final Relevance
 *
-* Noise is then deducted.
-*
-* This makes it difficult for a weak article with many
-* matching keywords to outrank a strong market source.
+* Source quality is therefore no longer capable of
+* dominating the ranking by itself.
 */
 
-export function scoreResearchSourceRelevance(
+function calculateRelevance(
 source: AIResearchSource,
 task: AIResearchTask
 ): number {
-const text =
-sourceText(source);
 
 const quality =
 sourceQuality(source);
 
 const topic =
 topicRelevance(
-text,
+source,
+task
+);
+
+const impact =
+marketImpactRelevance(
+source,
 task
 );
 
 const recency =
-recencyScore(
-source
-);
+recencyScore(source);
 
-const penalty =
-noisePenalty(
-text
-);
+const noise =
+noisePenalty(source);
 
-const publisherBonus =
-publisherAdjustment(
-source
-);
+const publisher =
+publisherAdjustment(source);
 
-const baseline =
-taskBaseline(
-task
-);
 
 /*
-* Topic relevance is normalized around
-* the task baseline rather than added
-* directly as an unrestricted value.
+* Existing core weighting:
+*
+* 35% quality
+* 40% topic
+* 25% recency
+*
+* Market impact is inserted as a modifier to
+* topic relevance rather than replacing the
+* established architecture.
 */
 
-const normalizedTopic =
+const adjustedTopic =
 clamp(
-baseline +
-topic
+topic * 0.65 +
+impact * 0.35
 );
+
 
 let score =
 quality * 0.35 +
-normalizedTopic * 0.40 +
-recency * 0.25 +
-publisherBonus -
-penalty;
+adjustedTopic * 0.40 +
+recency * 0.25;
+
+
+score +=
+publisher;
+
+
+score -=
+noise * 0.75;
+
 
 /*
-* Very low-quality sources should never
-* receive an extreme score merely because
-* of keyword overlap.
+* Weak / aggregator sources must not dominate.
 */
 
 if (
-quality <= 45
+quality < 60
 ) {
+
 score =
 Math.min(
 score,
-65
+74
 );
+
 }
 
+
 /*
-* Google News aggregator entries are capped.
-*
-* The actual publisher remains visible in
-* the article title/summary, but Google News
-* itself is not considered a primary source.
+* Google News sources receive an additional cap
+* unless the actual article has strong market impact.
+*/
+
+const isGoogleNews =
+normalizeText(source.url)
+.includes("news.google.com");
+
+if (
+isGoogleNews
+) {
+
+if (
+impact < 75
+) {
+
+score =
+Math.min(
+score,
+72
+);
+
+} else {
+
+score =
+Math.min(
+score,
+82
+);
+
+}
+
+}
+
+
+/*
+* Official-source documents with weak market
+* impact must not automatically occupy the top
+* of the ranking.
+*/
+
+const isOfficial =
+quality >= 100;
+
+if (
+isOfficial &&
+impact < 45
+) {
+
+score =
+Math.min(
+score,
+68
+);
+
+}
+
+
+/*
+* Very high market-impact documents can still
+* rank strongly even when the publisher is
+* an aggregator.
 */
 
 if (
-normalizeText(
-source.publisher
-).includes(
-"google news"
-)
+impact >= 90 &&
+topic >= 60
 ) {
-score =
-Math.min(
-score,
-88
-);
+
+score += 5;
+
 }
 
-return clamp(
+
+return Math.round(
+clamp(
 score
+)
 );
 }
+
 
 /* =====================================================
-RANK
+PUBLIC API
+===================================================== */
+
+export function scoreResearchSource(
+source: AIResearchSource,
+task: AIResearchTask
+): number {
+
+return calculateRelevance(
+source,
+task
+);
+}
+
+
+/* =====================================================
+SORT
 ===================================================== */
 
 export function rankResearchSources(
 sources: AIResearchSource[],
 task: AIResearchTask
-): RankResearchSourcesResult {
-const ranked =
+): AIResearchSource[] {
+
+const scored: ScoredResearchSource[] =
 sources.map(
 (source) => ({
-...source,
-relevance:
-scoreResearchSourceRelevance(
+source,
+score:
+calculateRelevance(
 source,
 task
 ),
 })
 );
 
-ranked.sort(
+
+scored.sort(
 (a, b) => {
-const relevanceDifference =
-(
-b.relevance ?? 0
-) -
-(
-a.relevance ?? 0
-);
 
 if (
-relevanceDifference !== 0
+b.score !== a.score
 ) {
-return relevanceDifference;
+
+return (
+b.score -
+a.score
+);
+
 }
 
+
 const dateA =
-a.publishedAt
-? Date.parse(
-a.publishedAt
-)
+a.source.publishedAt
+? new Date(
+a.source.publishedAt
+).getTime()
 : 0;
 
 const dateB =
-b.publishedAt
-? Date.parse(
-b.publishedAt
-)
+b.source.publishedAt
+? new Date(
+b.source.publishedAt
+).getTime()
 : 0;
+
 
 return (
 dateB -
 dateA
 );
+
 }
 );
 
+
+return scored.map(
+(item) => {
+
 return {
-sources: ranked,
-
-diagnostics: {
-inputCount:
-sources.length,
-
-outputCount:
-ranked.length,
-},
+...item.source,
+relevance:
+item.score,
 };
+
 }
+);
+}
+
 
 /* =====================================================
 TOP SOURCES
@@ -1181,16 +1315,6 @@ sources: AIResearchSource[],
 task: AIResearchTask,
 limit = 12
 ): AIResearchSource[] {
-const safeLimit =
-Math.max(
-1,
-Math.min(
-50,
-Math.round(
-limit
-)
-)
-);
 
 const ranked =
 rankResearchSources(
@@ -1198,8 +1322,12 @@ sources,
 task
 );
 
-return ranked.sources.slice(
+
+return ranked.slice(
 0,
-safeLimit
+Math.max(
+0,
+limit
+)
 );
 }
