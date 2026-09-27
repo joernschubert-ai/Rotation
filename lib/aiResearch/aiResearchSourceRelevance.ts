@@ -61,19 +61,6 @@ source.publisher,
 SOURCE QUALITY
 ===================================================== */
 
-/*
-* Source quality answers:
-*
-* "How trustworthy / authoritative is this publisher?"
-*
-* It does NOT answer:
-*
-* "How important is this document for the
-* current market regime?"
-*
-* That distinction is intentional.
-*/
-
 function sourceQuality(
 source: AIResearchSource
 ): number {
@@ -155,7 +142,6 @@ ESTABLISHED SECONDARY SOURCES
 const establishedSecondary = [
 "tradingview",
 "benzinga",
-"t iprankings",
 "tipranks",
 "motley fool",
 "seeking alpha",
@@ -193,13 +179,6 @@ return 60;
 DEFAULT
 --------------------------------------------------- */
 
-/*
-* Unknown source:
-*
-* trustworthy enough to inspect,
-* but not allowed to dominate the ranking.
-*/
-
 if (text.length > 0) {
 return 50;
 }
@@ -211,13 +190,6 @@ return 35;
 /* =====================================================
 TOPIC RELEVANCE
 ===================================================== */
-
-/*
-* Topic relevance answers:
-*
-* "Does this source discuss something connected
-* to the requested research task?"
-*/
 
 function keywordScore(
 text: string,
@@ -239,11 +211,6 @@ matches += 1;
 if (matches === 0) {
 return 0;
 }
-
-/*
-* First matches are highly informative.
-* Additional matches have diminishing value.
-*/
 
 return clamp(
 30 +
@@ -444,27 +411,6 @@ keywords
 MARKET IMPACT RELEVANCE
 ===================================================== */
 
-/*
-* IMPORTANT:
-*
-* This is deliberately separate from source quality.
-*
-* Example:
-*
-* Nasdaq conference announcement
-* -> Source Quality = 100
-* -> Market Impact = potentially low
-*
-* FOMC rate decision
-* -> Source Quality = 100
-* -> Market Impact = very high
-*
-* ECB technical settlement publication
-* -> Source Quality = 100
-* -> Market Impact = low unless the document
-* contains a material policy/liquidity change.
-*/
-
 function marketImpactRelevance(
 source: AIResearchSource,
 task: AIResearchTask
@@ -476,9 +422,9 @@ sourceText(source);
 let score = 50;
 
 
-/* ===================================================
+/* ---------------------------------------------------
 VERY HIGH MARKET IMPACT
-=================================================== */
+--------------------------------------------------- */
 
 const veryHighImpactKeywords = [
 "fomc",
@@ -523,9 +469,9 @@ veryHighMatches * 12
 }
 
 
-/* ===================================================
+/* ---------------------------------------------------
 NASDAQ / LARGE CAP IMPACT
-=================================================== */
+--------------------------------------------------- */
 
 const nasdaqMarketKeywords = [
 "nasdaq",
@@ -558,9 +504,9 @@ nasdaqMatches * 5
 }
 
 
-/* ===================================================
+/* ---------------------------------------------------
 RUSSELL / SMALL CAP IMPACT
-=================================================== */
+--------------------------------------------------- */
 
 const russellKeywords = [
 "russell 2000",
@@ -571,7 +517,6 @@ const russellKeywords = [
 "small-cap",
 "small caps",
 "small-cap stocks",
-"small business stocks",
 ];
 
 const russellMatches =
@@ -588,9 +533,9 @@ russellMatches * 6
 }
 
 
-/* ===================================================
+/* ---------------------------------------------------
 SEMICONDUCTOR / AI IMPACT
-=================================================== */
+--------------------------------------------------- */
 
 const semiconductorKeywords = [
 "semiconductor",
@@ -620,16 +565,15 @@ semiconductorMatches * 5
 }
 
 
-/* ===================================================
+/* ---------------------------------------------------
 VOLATILITY / MARKET STRUCTURE
-=================================================== */
+--------------------------------------------------- */
 
 const volatilityKeywords = [
 "vix",
 "volatility",
 "implied volatility",
 "options market",
-"options market volatility",
 "market breadth",
 "breadth",
 "advance decline",
@@ -654,9 +598,41 @@ volatilityMatches * 6
 }
 
 
-/* ===================================================
+/* ---------------------------------------------------
+TREASURY / FINANCIAL CONDITIONS
+--------------------------------------------------- */
+
+const financialConditionKeywords = [
+"treasury yield",
+"treasury yields",
+"bond yield",
+"bond yields",
+"10-year treasury",
+"2-year treasury",
+"financial conditions",
+"credit spread",
+"credit spreads",
+"real yield",
+"term premium",
+];
+
+const financialConditionMatches =
+financialConditionKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+if (financialConditionMatches > 0) {
+score += Math.min(
+25,
+financialConditionMatches * 7
+);
+}
+
+
+/* ---------------------------------------------------
 GEOPOLITICAL MARKET IMPACT
-=================================================== */
+--------------------------------------------------- */
 
 const geopoliticalKeywords = [
 "tariff",
@@ -687,9 +663,9 @@ geopoliticalMatches * 5
 }
 
 
-/* ===================================================
-LOW-IMPACT DOCUMENT TYPES
-=================================================== */
+/* ---------------------------------------------------
+LOW IMPACT DOCUMENT CONTENT
+--------------------------------------------------- */
 
 const lowImpactKeywords = [
 "conference presentation",
@@ -699,25 +675,39 @@ const lowImpactKeywords = [
 "fireside chat",
 "executive conference",
 "conference participation",
+
 "delisting",
 "delist",
 "listing compliance",
 "compliance notice",
-"administrative notice",
+
 "technical publication",
 "technical documentation",
+"technical note",
+
 "settlement publication",
 "settlement calendar",
 "settlement date",
+
 "reference rates",
 "fx reference rates",
+
 "operational procedures",
 "operational framework",
+
 "liquidity management publication",
-"liquidity management",
+
 "public comment",
 "enforcement",
 "regulatory notice",
+
+"eligible marketable assets",
+"list of eligible marketable assets",
+"list of monetary financial institutions",
+"mfi list",
+
+"ecms is closed",
+"pontes pilot is closed",
 ];
 
 const lowImpactMatches =
@@ -728,26 +718,21 @@ text.includes(keyword)
 
 if (lowImpactMatches > 0) {
 score -= Math.min(
-35,
-lowImpactMatches * 12
+45,
+lowImpactMatches * 14
 );
 }
 
 
 /* ===================================================
-STRONG DOCUMENT-SPECIFIC DEMOTION
+DOCUMENT-TYPE CLASSIFICATION
 =================================================== */
 
-/*
-* Official source alone must never rescue a document
-* whose actual content has little market relevance.
-*/
-
-const isNasdaq =
+const isFed =
 normalizeText(source.publisher)
-.includes("nasdaq") ||
+.includes("federal reserve") ||
 normalizeText(source.url)
-.includes("nasdaq.com");
+.includes("federalreserve.gov");
 
 const isECB =
 normalizeText(source.publisher)
@@ -755,35 +740,191 @@ normalizeText(source.publisher)
 normalizeText(source.url)
 .includes("ecb.europa.eu");
 
-const hasHighImpactContent =
-veryHighMatches > 0 ||
-volatilityMatches > 0 ||
-nasdaqMatches > 0 ||
-russellMatches > 0 ||
-semiconductorMatches > 0 ||
-geopoliticalMatches > 0;
+const isNasdaq =
+normalizeText(source.publisher)
+.includes("nasdaq") ||
+normalizeText(source.url)
+.includes("nasdaq.com");
+
+
+/* ---------------------------------------------------
+FED BANK / CORPORATE APPROVAL DOCUMENTS
+--------------------------------------------------- */
+
+const fedAdministrativeKeywords = [
+"approval of application",
+"announces approval",
+"bank holding company",
+"bank holding companies",
+"acquisition of control",
+"acquisition of shares",
+"formation of a bank holding company",
+"merger",
+"application by",
+"state member bank",
+"national bank",
+"trust company",
+];
+
+const fedAdministrativeMatches =
+fedAdministrativeKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
 
 
 if (
-isNasdaq &&
-lowImpactMatches > 0 &&
-!hasHighImpactContent
+isFed &&
+fedAdministrativeMatches > 0
 ) {
-score -= 25;
+
+/*
+* These are authoritative Fed documents,
+* but they are not monetary-policy information.
+*
+* They should therefore remain available but
+* rank substantially below FOMC / macro material.
+*/
+
+score -= 35;
+
 }
+
+
+/* ---------------------------------------------------
+FED SUPERVISORY / ENFORCEMENT DOCUMENTS
+--------------------------------------------------- */
+
+const fedSupervisoryKeywords = [
+"enforcement action",
+"cease and desist",
+"written agreement",
+"consent order",
+"supervisory action",
+"bank enforcement",
+];
+
+const fedSupervisoryMatches =
+fedSupervisoryKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+
+if (
+isFed &&
+fedSupervisoryMatches > 0 &&
+veryHighMatches === 0
+) {
+
+score -= 20;
+
+}
+
+
+/* ---------------------------------------------------
+ECB OPERATIONAL / REFERENCE DOCUMENTS
+--------------------------------------------------- */
+
+const ecbOperationalKeywords = [
+"list of eligible marketable assets",
+"eligible marketable assets",
+"list of monetary financial institutions",
+"mfi list",
+"ecms is closed",
+"pontes pilot is closed",
+"reference rates",
+"fx reference rates",
+"settlement",
+"operational procedures",
+"operational framework",
+"technical publication",
+"technical documentation",
+];
+
+const ecbOperationalMatches =
+ecbOperationalKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
 
 
 if (
 isECB &&
-lowImpactMatches > 0 &&
-!hasHighImpactContent
+ecbOperationalMatches > 0 &&
+veryHighMatches === 0 &&
+financialConditionMatches === 0
 ) {
+
+score -= 30;
+
+}
+
+
+/* ---------------------------------------------------
+NASDAQ CORPORATE / INFRASTRUCTURE ANNOUNCEMENTS
+--------------------------------------------------- */
+
+const nasdaqCorporateKeywords = [
+"conference",
+"conference presentation",
+"investor conference",
+"partnership",
+"relationship",
+"investment",
+"tokenized equities",
+"market surveillance agreement",
+"listing",
+"delisting",
+];
+
+const nasdaqCorporateMatches =
+nasdaqCorporateKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+
+if (
+isNasdaq &&
+nasdaqCorporateMatches > 0 &&
+nasdaqMatches <= 1 &&
+veryHighMatches === 0 &&
+volatilityMatches === 0
+) {
+
 score -= 25;
+
 }
 
 
 /* ===================================================
-TASK-SPECIFIC MARKET IMPACT
+STRONG MARKET-IMPACT OVERRIDE
+=================================================== */
+
+/*
+* Administrative wording must not suppress a document
+* that also contains a genuine macro/market catalyst.
+*/
+
+const hasStrongMarketCatalyst =
+veryHighMatches > 0 ||
+volatilityMatches >= 2 ||
+financialConditionMatches >= 2 ||
+geopoliticalMatches >= 2;
+
+
+if (
+hasStrongMarketCatalyst
+) {
+
+score += 10;
+
+}
+
+
+/* ===================================================
+TASK-SPECIFIC IMPACT
 =================================================== */
 
 if (
@@ -839,6 +980,188 @@ score += 15;
 return clamp(
 score
 );
+}
+
+
+/* =====================================================
+DOCUMENT-TYPE RELEVANCE
+===================================================== */
+
+/*
+* Separate explicit document-type score.
+*
+* This is intentionally conservative.
+*
+* 100 = directly relevant market document
+* 50 = potentially relevant
+* 0 = administrative / technical document
+*
+* It is used as an additional modifier in the final
+* relevance calculation.
+*/
+
+function documentTypeRelevance(
+source: AIResearchSource
+): number {
+
+const text =
+sourceText(source);
+
+
+/* ---------------------------------------------------
+DIRECT MACRO / POLICY DOCUMENTS
+--------------------------------------------------- */
+
+const directMacroKeywords = [
+"fomc statement",
+"economic projections",
+"federal open market committee",
+"federal funds rate",
+"interest rate decision",
+"monetary policy",
+"inflation report",
+"consumer price index",
+"producer price index",
+"employment report",
+"nonfarm payroll",
+"gross domestic product",
+"gdp",
+"minutes of the federal open market committee",
+];
+
+if (
+directMacroKeywords.some(
+(keyword) =>
+text.includes(keyword)
+)
+) {
+return 100;
+}
+
+
+/* ---------------------------------------------------
+DIRECT MARKET DOCUMENTS
+--------------------------------------------------- */
+
+const directMarketKeywords = [
+"nasdaq 100",
+"nasdaq composite",
+"russell 2000",
+"small cap",
+"technology stocks",
+"semiconductor",
+"semiconductors",
+"vix",
+"volatility",
+"market breadth",
+"market internals",
+"rotation",
+"treasury yields",
+"financial conditions",
+"credit spreads",
+];
+
+const directMarketMatches =
+directMarketKeywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
+
+if (
+directMarketMatches >= 2
+) {
+return 90;
+}
+
+if (
+directMarketMatches === 1
+) {
+return 78;
+}
+
+
+/* ---------------------------------------------------
+FED ADMINISTRATIVE
+--------------------------------------------------- */
+
+const fedAdministrativeKeywords = [
+"approval of application",
+"announces approval",
+"bank holding company",
+"acquisition of control",
+"application by",
+"state member bank",
+"merger",
+];
+
+if (
+fedAdministrativeKeywords.some(
+(keyword) =>
+text.includes(keyword)
+)
+) {
+return 15;
+}
+
+
+/* ---------------------------------------------------
+ECB TECHNICAL / OPERATIONAL
+--------------------------------------------------- */
+
+const technicalKeywords = [
+"list of eligible marketable assets",
+"eligible marketable assets",
+"list of monetary financial institutions",
+"mfi list",
+"ecms is closed",
+"pontes pilot is closed",
+"reference rates",
+"fx reference rates",
+"settlement",
+"technical publication",
+"technical documentation",
+"operational procedures",
+"operational framework",
+];
+
+if (
+technicalKeywords.some(
+(keyword) =>
+text.includes(keyword)
+)
+) {
+return 10;
+}
+
+
+/* ---------------------------------------------------
+NASDAQ CORPORATE / INFRASTRUCTURE
+--------------------------------------------------- */
+
+const corporateKeywords = [
+"conference",
+"conference presentation",
+"investor conference",
+"partnership",
+"relationship",
+"investment",
+"tokenized equities",
+"market surveillance agreement",
+"listing",
+"delisting",
+];
+
+if (
+corporateKeywords.some(
+(keyword) =>
+text.includes(keyword)
+)
+) {
+return 30;
+}
+
+
+return 55;
 }
 
 
@@ -954,9 +1277,7 @@ for (const keyword of noiseKeywords) {
 if (
 text.includes(keyword)
 ) {
-
 penalty += 7;
-
 }
 
 }
@@ -1033,25 +1354,6 @@ return 0;
 FINAL RELEVANCE
 ===================================================== */
 
-/*
-* Final pipeline:
-*
-* Source Quality
-* ↓
-* Topic Relevance
-* ↓
-* Market Impact Relevance
-* ↓
-* Recency
-* ↓
-* Noise
-* ↓
-* Final Relevance
-*
-* Source quality is therefore no longer capable of
-* dominating the ranking by itself.
-*/
-
 function calculateRelevance(
 source: AIResearchSource,
 task: AIResearchTask
@@ -1072,6 +1374,11 @@ source,
 task
 );
 
+const documentType =
+documentTypeRelevance(
+source
+);
+
 const recency =
 recencyScore(source);
 
@@ -1083,23 +1390,25 @@ publisherAdjustment(source);
 
 
 /*
-* Existing core weighting:
-*
-* 35% quality
-* 40% topic
-* 25% recency
-*
-* Market impact is inserted as a modifier to
-* topic relevance rather than replacing the
-* established architecture.
+* Topic relevance and market impact remain the
+* main content signals.
 */
 
 const adjustedTopic =
 clamp(
-topic * 0.65 +
-impact * 0.35
+topic * 0.60 +
+impact * 0.25 +
+documentType * 0.15
 );
 
+
+/*
+* Existing core architecture remains:
+*
+* 35% Source Quality
+* 40% Content Relevance
+* 25% Recency
+*/
 
 let score =
 quality * 0.35 +
@@ -1115,9 +1424,9 @@ score -=
 noise * 0.75;
 
 
-/*
-* Weak / aggregator sources must not dominate.
-*/
+/* ---------------------------------------------------
+WEAK SOURCES
+--------------------------------------------------- */
 
 if (
 quality < 60
@@ -1132,10 +1441,9 @@ score,
 }
 
 
-/*
-* Google News sources receive an additional cap
-* unless the actual article has strong market impact.
-*/
+/* ---------------------------------------------------
+GOOGLE NEWS
+--------------------------------------------------- */
 
 const isGoogleNews =
 normalizeText(source.url)
@@ -1168,38 +1476,39 @@ score,
 }
 
 
-/*
-* Official-source documents with weak market
-* impact must not automatically occupy the top
-* of the ranking.
-*/
+/* ---------------------------------------------------
+OFFICIAL BUT LOW-IMPACT SOURCES
+--------------------------------------------------- */
 
 const isOfficial =
 quality >= 100;
 
 if (
 isOfficial &&
-impact < 45
+documentType <= 30
 ) {
+
+/*
+* Official does not mean market relevant.
+*/
 
 score =
 Math.min(
 score,
-68
+65
 );
 
 }
 
 
-/*
-* Very high market-impact documents can still
-* rank strongly even when the publisher is
-* an aggregator.
-*/
+/* ---------------------------------------------------
+VERY HIGH MARKET IMPACT
+--------------------------------------------------- */
 
 if (
 impact >= 90 &&
-topic >= 60
+topic >= 60 &&
+documentType >= 78
 ) {
 
 score += 5;
@@ -1293,15 +1602,11 @@ dateA
 
 
 return scored.map(
-(item) => {
-
-return {
+(item) => ({
 ...item.source,
 relevance:
 item.score,
-};
-
-}
+})
 );
 }
 
