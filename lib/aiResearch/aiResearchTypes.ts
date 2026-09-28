@@ -1,5 +1,10 @@
 // /lib/aiResearch/aiResearchTypes.ts
 
+import type {
+AIResearchCOTData,
+} from "./aiResearchCOTTypes";
+
+
 /* =====================================================
 AI RESEARCH TYPES
 ===================================================== */
@@ -124,9 +129,7 @@ EXTERNAL RESEARCH
 * External information is deliberately separated from
 * the quantitative Rotation-App snapshot.
 *
-* The first version does not fetch anything yet.
-*
-* Later this section can contain:
+* This layer contains attributable external sources:
 *
 * - market news
 * - central-bank information
@@ -137,7 +140,11 @@ EXTERNAL RESEARCH
 * - volatility information
 * - relevant analyst / market commentary
 *
-* Each source must remain attributable.
+* Structured positioning data such as COT does NOT
+* belong here.
+*
+* COT is represented separately through the
+* AIResearchCOTData structure below.
 */
 
 export interface AIResearchSource {
@@ -213,11 +220,27 @@ context: AIResearchContext;
 /*
 * External sources are optional.
 *
-* The first implementation will normally receive
-* an empty array.
+* These remain attributable research documents/news.
 */
 
 sources?: AIResearchSource[];
+
+
+/*
+* Structured positioning data.
+*
+* COT is deliberately separate from sources because
+* it is not an article or qualitative news document.
+*
+* It contains structured futures positioning data
+* from the CFTC/COT layer.
+*
+* The AI Research Agent may use this information
+* as an additional evidence class, but COT does not
+* modify the underlying market engine.
+*/
+
+positioning?: AIResearchCOTData;
 
 }
 
@@ -383,7 +406,7 @@ string;
 /*
 * Whether the risk is directly supported by
 * quantitative snapshot data, external information,
-* or both.
+* structured positioning data, or a combination.
 */
 
 evidenceType:
