@@ -1,4 +1,4 @@
-// /lib/aiResearch/aiResearchContext.ts
+// lib/aiResearch/aiResearchContext.ts
 
 import type {
 AIResearchContext,
@@ -9,38 +9,48 @@ AIResearchSource,
 AIResearchTask,
 } from "./aiResearchTypes";
 
+import type {
+AIResearchCOTData,
+} from "./aiResearchCOTTypes";
 
-/* =====================================================
-CONSTANTS
-===================================================== */
-
-/*
-* The AI agent should not receive an unlimited amount
-* of historical data.
-*
-* The complete market history remains stored in Redis.
-* This adapter only creates the bounded research context.
-*/
 
 const MAX_HISTORY_SNAPSHOTS = 30;
 
 
 /* =====================================================
-TYPES
+INPUT
 ===================================================== */
 
 export interface BuildAIResearchContextInput {
-snapshot: AIResearchSnapshot;
 
-history?: AIResearchHistory;
+snapshot:
+AIResearchSnapshot;
 
-task: AIResearchTask;
+history?:
+AIResearchHistory;
 
-question?: string;
+task:
+AIResearchTask;
 
-requestedAt?: string;
+question?:
+string;
 
-sources?: AIResearchSource[];
+requestedAt?:
+string;
+
+sources?:
+AIResearchSource[];
+
+/*
+* Structured COT positioning data.
+*
+* COT is deliberately kept separate from
+* external news/research sources.
+*/
+
+positioning?:
+AIResearchCOTData;
+
 }
 
 
@@ -60,6 +70,10 @@ value !== null &&
 
 }
 
+
+/* =====================================================
+TIMESTAMP
+===================================================== */
 
 function getTimestamp(
 snapshot: AIResearchSnapshot
@@ -82,6 +96,10 @@ return null;
 }
 
 
+/* =====================================================
+HISTORY SORT
+===================================================== */
+
 function sortHistoryChronologically(
 history: AIResearchHistory
 ): AIResearchHistory {
@@ -95,17 +113,30 @@ getTimestamp(a);
 const timestampB =
 getTimestamp(b);
 
-if (!timestampA && !timestampB) {
+
+if (
+!timestampA &&
+!timestampB
+) {
+
 return 0;
+
 }
+
 
 if (!timestampA) {
+
 return -1;
+
 }
 
+
 if (!timestampB) {
+
 return 1;
+
 }
+
 
 return (
 new Date(timestampA).getTime() -
@@ -118,6 +149,10 @@ new Date(timestampB).getTime()
 }
 
 
+/* =====================================================
+HISTORY SANITIZATION
+===================================================== */
+
 function sanitizeHistory(
 history: AIResearchHistory
 ): AIResearchHistory {
@@ -129,16 +164,12 @@ isObject(snapshot) &&
 getTimestamp(snapshot) !== null
 );
 
+
 const chronological =
 sortHistoryChronologically(
 validSnapshots
 );
 
-/*
-* Keep the most recent research window.
-*
-* Older history remains untouched in Redis.
-*/
 
 return chronological.slice(
 -MAX_HISTORY_SNAPSHOTS
@@ -148,25 +179,8 @@ return chronological.slice(
 
 
 /* =====================================================
-BUILD RESEARCH CONTEXT
+BUILD CONTEXT
 ===================================================== */
-
-/**
-* Converts the existing Rotation-App snapshot/history
-* into the standardized input contract for the
-* AI Research Agent.
-*
-* IMPORTANT:
-*
-* - Does NOT modify the market engine.
-* - Does NOT modify the snapshot.
-* - Does NOT call an external AI service.
-* - Does NOT make trading decisions.
-* - Does NOT generate a CALL/PUT signal.
-*
-* It only creates the data contract consumed by the
-* future research engine.
-*/
 
 export function buildAIResearchContext(
 input: BuildAIResearchContextInput
@@ -187,14 +201,18 @@ new Date().toISOString(),
 
 sources = [],
 
+positioning,
+
 } = input;
 
 
-/* -------------------------------------------------
-CURRENT SNAPSHOT
-------------------------------------------------- */
+/* ===================================================
+SNAPSHOT VALIDATION
+=================================================== */
 
-if (!isObject(snapshot)) {
+if (
+!isObject(snapshot)
+) {
 
 throw new Error(
 "AI Research Context: invalid snapshot"
@@ -207,7 +225,9 @@ const snapshotTimestamp =
 getTimestamp(snapshot);
 
 
-if (!snapshotTimestamp) {
+if (
+!snapshotTimestamp
+) {
 
 throw new Error(
 "AI Research Context: snapshot has no timestamp"
@@ -216,19 +236,22 @@ throw new Error(
 }
 
 
-/* -------------------------------------------------
+/* ===================================================
 HISTORY
-------------------------------------------------- */
+=================================================== */
 
 const sanitizedHistory =
-sanitizeHistory(history);
+sanitizeHistory(
+history
+);
 
 
-/* -------------------------------------------------
-CONTEXT
-------------------------------------------------- */
+/* ===================================================
+CONTEXT META
+=================================================== */
 
-const context: AIResearchContext = {
+const context:
+AIResearchContext = {
 
 task,
 
@@ -243,9 +266,9 @@ question,
 };
 
 
-/* -------------------------------------------------
-RESULT
-------------------------------------------------- */
+/* ===================================================
+RETURN
+=================================================== */
 
 return {
 
@@ -260,6 +283,17 @@ sources:
 Array.isArray(sources)
 ? sources
 : [],
+
+/*
+* Only attach positioning when
+* actual COT data was supplied.
+*/
+
+...(positioning
+? {
+positioning,
+}
+: {}),
 
 };
 
