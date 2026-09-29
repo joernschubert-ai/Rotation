@@ -1,9 +1,12 @@
+// lib/aiResearch/aiResearchRunner.ts
+
 import { loadMarketHistory } from "@/lib/history/marketHistory";
 
 import { buildAIResearchContext } from "./aiResearchContext";
 import { runAIResearch } from "./aiResearchEngine";
 import { fetchExternalResearchSources } from "./aiResearchExternalSources";
 import { selectTopResearchSources } from "./aiResearchSourceRelevance";
+import { fetchCOTData } from "./aiResearchCOTProvider";
 
 import type {
 AIResearchResult,
@@ -11,60 +14,24 @@ AIResearchTask,
 } from "./aiResearchTypes";
 
 
-/*
-* =====================================================
-* AI RESEARCH RUNNER
-* =====================================================
-*
-* Gesamtpipeline:
-*
-* Market History
-* +
-* External Research Sources
-* ↓
-* Source Relevance / Ranking
-* ↓
-* AI Research Context
-* ↓
-* AI Research Engine
-* ↓
-* Research Report
-*
-* WICHTIG:
-*
-* Dieser Runner verändert keine bestehenden
-* Market-Engine-Werte.
-*
-* Er führt ausschließlich die Research-Schicht
-* zusammen.
-*
-* Die Relevanzbewertung bestimmt nur,
-* welche externen Quellen für die jeweilige
-* Research-Aufgabe priorisiert werden.
-*
-* Sie erzeugt kein Bull/Bear-Signal.
-*
-* =====================================================
-*/
-
-
 /* =====================================================
-* INPUT
-* ===================================================== */
+INPUT
+===================================================== */
 
 export interface RunAIResearchFromHistoryInput {
 
 task:
 AIResearchTask;
 
-question?: string;
+question?:
+string;
 
 }
 
 
 /* =====================================================
-* MAIN RUNNER
-* ===================================================== */
+RUN AI RESEARCH
+===================================================== */
 
 export async function runAIResearchFromHistory(
 input: RunAIResearchFromHistoryInput
@@ -72,36 +39,31 @@ input: RunAIResearchFromHistoryInput
 
 try {
 
-/*
-* -------------------------------------------------
-* MARKET HISTORY + EXTERNAL SOURCES
-* -------------------------------------------------
-*
-* Beide Datenquellen sind voneinander unabhängig.
-*
-* Deshalb parallel laden.
-*/
+/* =================================================
+LOAD DATA IN PARALLEL
+================================================= */
 
 const [
 history,
 externalSources,
+positioningResult,
 ] = await Promise.all([
 
 loadMarketHistory(),
 
 fetchExternalResearchSources({
-
 task:
 input.task,
-
 }),
+
+fetchCOTData(),
 
 ]);
 
 
-/* -------------------------------------------------
-* HISTORY VALIDATION
-* ------------------------------------------------- */
+/* =================================================
+HISTORY VALIDATION
+================================================= */
 
 if (
 !Array.isArray(history) ||
@@ -128,7 +90,13 @@ warnings: [
 
 "No persisted market history available.",
 
-...externalSources.diagnostics.warnings,
+...externalSources
+.diagnostics
+.warnings,
+
+...positioningResult
+.diagnostics
+.warnings,
 
 ],
 
@@ -139,9 +107,9 @@ warnings: [
 }
 
 
-/* -------------------------------------------------
-* CURRENT SNAPSHOT
-* ------------------------------------------------- */
+/* =================================================
+CURRENT SNAPSHOT
+================================================= */
 
 const currentSnapshot =
 history[0];
@@ -172,7 +140,13 @@ warnings: [
 
 "Latest market history entry is invalid.",
 
-...externalSources.diagnostics.warnings,
+...externalSources
+.diagnostics
+.warnings,
+
+...positioningResult
+.diagnostics
+.warnings,
 
 ],
 
@@ -183,45 +157,25 @@ warnings: [
 }
 
 
-/* -------------------------------------------------
-* SOURCE RELEVANCE / RANKING
-* -------------------------------------------------
-*
-* Die externe Quellebeschaffung bleibt unverändert.
-*
-* Erst hier werden die Quellen für die konkrete
-* Research-Aufgabe bewertet und sortiert.
-*
-* WICHTIG:
-*
-* relevance bedeutet ausschließlich:
-*
-* "Wie relevant ist diese Quelle für diese
-* Research-Aufgabe?"
-*
-* Es bedeutet NICHT:
-*
-* - bullish
-* - bearish
-* - Call
-* - Put
-* - Crash-Signal
-*
-* Anschließend werden nur die relevantesten Quellen
-* in den Research-Context übernommen.
-*/
+/* =================================================
+EXTERNAL RESEARCH SOURCES
+================================================= */
 
 const rankedSources =
 selectTopResearchSources(
+
 externalSources.sources,
+
 input.task,
+
 12
+
 );
 
 
-/* -------------------------------------------------
-* BUILD AI RESEARCH CONTEXT
-* ------------------------------------------------- */
+/* =================================================
+BUILD AI RESEARCH CONTEXT
+================================================= */
 
 const researchInput =
 buildAIResearchContext({
@@ -240,12 +194,16 @@ input.question,
 sources:
 rankedSources,
 
+positioning:
+positioningResult
+.data,
+
 });
 
 
-/* -------------------------------------------------
-* RUN RESEARCH ENGINE
-* ------------------------------------------------- */
+/* =================================================
+RUN AI RESEARCH
+================================================= */
 
 const result =
 runAIResearch(
@@ -253,9 +211,9 @@ researchInput
 );
 
 
-/* -------------------------------------------------
-* MERGE DIAGNOSTICS
-* ------------------------------------------------- */
+/* =================================================
+DIAGNOSTICS
+================================================= */
 
 if (
 result.diagnostics
@@ -273,9 +231,19 @@ rankedSources.length,
 
 warnings: [
 
-...(result.diagnostics.warnings ?? []),
+...(
+result
+.diagnostics
+.warnings ?? []
+),
 
-...externalSources.diagnostics.warnings,
+...externalSources
+.diagnostics
+.warnings,
+
+...positioningResult
+.diagnostics
+.warnings,
 
 ],
 
@@ -288,8 +256,12 @@ else {
 result.diagnostics = {
 
 snapshotTimestamp:
-typeof currentSnapshot.timestamp === "string"
+
+typeof currentSnapshot.timestamp ===
+"string"
+
 ? currentSnapshot.timestamp
+
 : undefined,
 
 historyCount:
@@ -298,8 +270,17 @@ history.length,
 sourceCount:
 rankedSources.length,
 
-warnings:
-externalSources.diagnostics.warnings,
+warnings: [
+
+...externalSources
+.diagnostics
+.warnings,
+
+...positioningResult
+.diagnostics
+.warnings,
+
+],
 
 };
 
@@ -308,9 +289,8 @@ externalSources.diagnostics.warnings,
 
 return result;
 
-} catch (
-error
-) {
+
+} catch (error) {
 
 return {
 
@@ -325,7 +305,9 @@ diagnostics: {
 warnings: [
 
 error instanceof Error
+
 ? error.message
+
 : "Unknown AI research error",
 
 ],
