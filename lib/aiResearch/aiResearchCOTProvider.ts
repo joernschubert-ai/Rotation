@@ -17,8 +17,23 @@ COTWeeklyObservation,
 CONFIGURATION
 ===================================================== */
 
+/*
+* Official CFTC Public Reporting Environment:
+*
+* Traders in Financial Futures (TFF)
+* Futures Only
+*
+* Dataset:
+* gpe5-46if
+*
+* IMPORTANT:
+*
+* The previous dataset id "jun7-fc8v" was not the
+* TFF Futures Only dataset required by this provider.
+*/
+
 const CFTC_API_URL =
-"https://publicreporting.cftc.gov/resource/jun7-fc8v.json";
+"https://publicreporting.cftc.gov/resource/gpe5-46if.json";
 
 const REQUEST_TIMEOUT_MS =
 15000;
@@ -262,6 +277,7 @@ const normalized =
 contractName
 .toUpperCase()
 .trim();
+
 
 /*
 * Russell before generic names.
@@ -684,14 +700,10 @@ CFTC_API_URL
 
 
 /*
-* The CFTC Socrata endpoint supports:
+* Official CFTC Socrata endpoint.
 *
-* $limit
-* $order
-* $where
-*
-* We keep the query deliberately broad and
-* perform market filtering locally.
+* The query remains deliberately broad.
+* Market selection is performed locally.
 */
 
 url.searchParams.set(
@@ -1267,6 +1279,95 @@ return divergences;
 
 
 /* =====================================================
+EMPTY / FAIL-SOFT RESULT
+===================================================== */
+
+/*
+* COT is an additional research layer.
+*
+* A temporary CFTC outage, API change or timeout must
+* therefore NOT invalidate the complete AI Research
+* report.
+*
+* Instead we return a valid but empty COT structure
+* together with a diagnostic warning.
+*/
+
+function buildUnavailableResult(
+warning:
+string
+): FetchCOTResult {
+
+const warnings =
+[
+warning,
+];
+
+
+const data:
+AIResearchCOTData = {
+
+generatedAt:
+new Date().toISOString(),
+
+latestReportDate:
+null,
+
+observations:
+[],
+
+summaries:
+[],
+
+divergences:
+[],
+
+history:
+[],
+
+diagnostics: {
+
+source:
+CFTC_API_URL,
+
+observationCount:
+0,
+
+marketsCovered:
+[],
+
+warnings,
+
+},
+
+};
+
+
+return {
+
+data,
+
+diagnostics: {
+
+source:
+CFTC_API_URL,
+
+recordsFetched:
+0,
+
+observationsCreated:
+0,
+
+warnings,
+
+},
+
+};
+
+}
+
+
+/* =====================================================
 MAIN PROVIDER
 ===================================================== */
 
@@ -1302,10 +1403,48 @@ input.markets ??
 ];
 
 
-const records =
+let records:
+CFTCRecord[];
+
+
+try {
+
+records =
 await fetchCFTCRecords(
 lookbackWeeks
 );
+
+}
+
+catch (error) {
+
+const message =
+error instanceof Error
+? error.message
+: "Unknown CFTC request error";
+
+
+return buildUnavailableResult(
+`COT data unavailable: ${message}`
+);
+
+}
+
+
+/*
+* An empty response is not fatal to the Research Engine,
+* but it should remain visible in diagnostics.
+*/
+
+if (
+records.length === 0
+) {
+
+warnings.push(
+"CFTC returned no TFF Futures Only records for the requested lookback period."
+);
+
+}
 
 
 const observations =
@@ -1371,6 +1510,24 @@ unique.values()
 );
 
 
+/*
+* If records were returned but none matched our
+* four target equity-index markets, preserve the
+* information as a diagnostic warning.
+*/
+
+if (
+records.length > 0 &&
+normalized.length === 0
+) {
+
+warnings.push(
+"CFTC TFF data was received, but no NASDAQ, S&P 500, Russell 2000 or Dow observations matched the current market definitions."
+);
+
+}
+
+
 const withChanges =
 applyWeeklyChanges(
 normalized
@@ -1415,6 +1572,26 @@ observation.market
 )
 )
 );
+
+
+const missingMarkets =
+requestedMarkets.filter(
+market =>
+!marketsCovered.includes(
+market
+)
+);
+
+
+if (
+missingMarkets.length > 0
+) {
+
+warnings.push(
+`COT markets not covered in current result: ${missingMarkets.join(", ")}.`
+);
+
+}
 
 
 const data:
