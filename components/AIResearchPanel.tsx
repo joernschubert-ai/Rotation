@@ -406,7 +406,7 @@ setError(null);
 
 const response =
 await fetch(
-"/api/ai-research?task=DAILY_MARKET_REVIEW",
+"/api/ai-research/dashboard?task=DAILY_MARKET_REVIEW",
 {
 
 method:
