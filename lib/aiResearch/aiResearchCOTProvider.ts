@@ -33,6 +33,18 @@ const DEFAULT_LOOKBACK_WEEKS =
 TYPES
 ===================================================== */
 
+/*
+* IMPORTANT:
+*
+* These field names must match the actual Socrata API
+* field identifiers of the CFTC:
+*
+* TFF - Futures Only
+* Dataset: gpe5-46if
+*
+* Do NOT use the human-readable CFTC column labels here.
+*/
+
 interface CFTCRecord {
 
 report_date_as_yyyy_mm_dd?: string;
@@ -43,35 +55,61 @@ cftc_contract_market_code?: string;
 
 open_interest_all?: string;
 
-dealer_intermediary_long_all?: string;
 
-dealer_intermediary_short_all?: string;
+/*
+* Dealer / Intermediary
+*/
 
-dealer_intermediary_spreads_all?: string;
+dealer_positions_long_all?: string;
 
-asset_mgr_lev_long_all?: string;
+dealer_positions_short_all?: string;
 
-asset_mgr_lev_short_all?: string;
+dealer_positions_spread_all?: string;
 
-asset_mgr_lev_spread_all?: string;
 
-lev_money_long_all?: string;
+/*
+* Asset Manager / Institutional
+*/
 
-lev_money_short_all?: string;
+asset_mgr_positions_long?: string;
 
-lev_money_spread_all?: string;
+asset_mgr_positions_short?: string;
 
-other_rept_long_all?: string;
+asset_mgr_positions_spread?: string;
 
-other_rept_short_all?: string;
 
-other_rept_spread_all?: string;
+/*
+* Leveraged Money
+*/
 
-nonrept_long_all?: string;
+lev_money_positions_long?: string;
 
-nonrept_short_all?: string;
+lev_money_positions_short?: string;
 
-nonrept_spread_all?: string;
+lev_money_positions_spread?: string;
+
+
+/*
+* Other Reportables
+*/
+
+other_rept_positions_long?: string;
+
+other_rept_positions_short?: string;
+
+other_rept_positions_spread?: string;
+
+
+/*
+* Non-Reportables
+*
+* The TFF dataset exposes long and short positions
+* for this group but no equivalent spread field.
+*/
+
+nonrept_positions_long_all?: string;
+
+nonrept_positions_short_all?: string;
 
 }
 
@@ -294,7 +332,12 @@ keyof CFTCRecord;
 short:
 keyof CFTCRecord;
 
-spread:
+/*
+* Spread is optional because the CFTC TFF dataset
+* does not expose a Non-Reportables spread field.
+*/
+
+spread?:
 keyof CFTCRecord;
 
 }
@@ -309,65 +352,62 @@ COTRecordFieldSet
 DEALER: {
 
 long:
-"dealer_intermediary_long_all",
+"dealer_positions_long_all",
 
 short:
-"dealer_intermediary_short_all",
+"dealer_positions_short_all",
 
 spread:
-"dealer_intermediary_spreads_all",
+"dealer_positions_spread_all",
 
 },
 
 ASSET_MANAGER: {
 
 long:
-"asset_mgr_lev_long_all",
+"asset_mgr_positions_long",
 
 short:
-"asset_mgr_lev_short_all",
+"asset_mgr_positions_short",
 
 spread:
-"asset_mgr_lev_spread_all",
+"asset_mgr_positions_spread",
 
 },
 
 LEVERAGED_MONEY: {
 
 long:
-"lev_money_long_all",
+"lev_money_positions_long",
 
 short:
-"lev_money_short_all",
+"lev_money_positions_short",
 
 spread:
-"lev_money_spread_all",
+"lev_money_positions_spread",
 
 },
 
 OTHER_REPORTABLES: {
 
 long:
-"other_rept_long_all",
+"other_rept_positions_long",
 
 short:
-"other_rept_short_all",
+"other_rept_positions_short",
 
 spread:
-"other_rept_spread_all",
+"other_rept_positions_spread",
 
 },
 
 NON_REPORTABLES: {
 
 long:
-"nonrept_long_all",
+"nonrept_positions_long_all",
 
 short:
-"nonrept_short_all",
-
-spread:
-"nonrept_spread_all",
+"nonrept_positions_short_all",
 
 },
 
@@ -408,11 +448,13 @@ fields.short
 
 
 const spread =
-toNumber(
+fields.spread
+? toNumber(
 record[
 fields.spread
 ]
-);
+)
+: null;
 
 
 if (
