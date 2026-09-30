@@ -35,6 +35,7 @@ import SignalHistoryPanel from "@/components/SignalHistoryPanel";
 import SystemDiagnosticsPanel from "@/components/SystemDiagnosticsPanel";
 import RegimeRibbonPanel from "@/components/RegimeRibbonPanel";
 import SuperSignalPanel from "@/components/SuperSignalPanel";
+import AIResearchPanel from "@/components/AIResearchPanel";
 
 /* =====================================================
 INSTITUTIONAL PANELS
@@ -1042,7 +1043,23 @@ data={engine}
 
 
 {/* =====================================================
-7. HISTORY & HISTORICAL REPLAY
+7. AI RESEARCH
+===================================================== */}
+
+<section className="mb-8">
+
+<SectionHeader
+title="AI RESEARCH"
+subtitle="Independent research layer, positioning, divergences and forward-testable market thesis"
+/>
+
+<AIResearchPanel />
+
+</section>
+
+
+{/* =====================================================
+8. HISTORY & HISTORICAL REPLAY
 ===================================================== */}
 
 <section className="mb-8">
@@ -1063,7 +1080,7 @@ engine.replay
 
 
 {/* =====================================================
-8. DIAGNOSTICS
+9. DIAGNOSTICS
 ===================================================== */}
 
 <section className="mb-8">
