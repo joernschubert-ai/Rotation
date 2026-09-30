@@ -3,34 +3,21 @@
 import type {
 AIResearchCOTData,
 COTContract,
-COTGroupDivergence,
 COTMarket,
-COTMarketPositioningSummary,
 COTPosition,
-COTPositioningBias,
 COTTraderGroup,
 COTWeeklyObservation,
 } from "./aiResearchCOTTypes";
+
+import {
+calculateCOTMetrics,
+buildCOTSummary,
+} from "./aiResearchCOTMetrics";
 
 
 /* =====================================================
 CONFIGURATION
 ===================================================== */
-
-/*
-* Official CFTC Public Reporting Environment:
-*
-* Traders in Financial Futures (TFF)
-* Futures Only
-*
-* Dataset:
-* gpe5-46if
-*
-* IMPORTANT:
-*
-* The previous dataset id "jun7-fc8v" was not the
-* TFF Futures Only dataset required by this provider.
-*/
 
 const CFTC_API_URL =
 "https://publicreporting.cftc.gov/resource/gpe5-46if.json";
@@ -47,31 +34,45 @@ TYPES
 ===================================================== */
 
 interface CFTCRecord {
+
 report_date_as_yyyy_mm_dd?: string;
+
 contract_market_name?: string;
+
 cftc_contract_market_code?: string;
 
 open_interest_all?: string;
 
 dealer_intermediary_long_all?: string;
+
 dealer_intermediary_short_all?: string;
+
 dealer_intermediary_spreads_all?: string;
 
 asset_mgr_lev_long_all?: string;
+
 asset_mgr_lev_short_all?: string;
+
 asset_mgr_lev_spread_all?: string;
 
 lev_money_long_all?: string;
+
 lev_money_short_all?: string;
+
 lev_money_spread_all?: string;
 
 other_rept_long_all?: string;
+
 other_rept_short_all?: string;
+
 other_rept_spread_all?: string;
 
 nonrept_long_all?: string;
+
 nonrept_short_all?: string;
+
 nonrept_spread_all?: string;
+
 }
 
 
@@ -79,8 +80,7 @@ export interface FetchCOTInput {
 
 markets?: COTMarket[];
 
-lookbackWeeks?:
-number;
+lookbackWeeks?: number;
 
 }
 
@@ -110,68 +110,6 @@ string[];
 
 
 /* =====================================================
-MARKET DEFINITIONS
-===================================================== */
-
-interface MarketDefinition {
-
-market:
-COTMarket;
-
-keywords:
-string[];
-
-}
-
-
-const MARKET_DEFINITIONS:
-MarketDefinition[] = [
-
-{
-market: "NASDAQ",
-
-keywords: [
-"NASDAQ-100",
-"NASDAQ 100",
-"E-MINI NASDAQ",
-"NASDAQ",
-],
-},
-
-{
-market: "SP500",
-
-keywords: [
-"S&P 500",
-"E-MINI S&P",
-"S&P",
-],
-},
-
-{
-market: "RUSSELL_2000",
-
-keywords: [
-"RUSSELL 2000",
-"E-MINI RUSSELL",
-"RUSSELL",
-],
-},
-
-{
-market: "DOW",
-
-keywords: [
-"DOW JONES",
-"E-MINI DOW",
-"DOW",
-],
-},
-
-];
-
-
-/* =====================================================
 HELPERS
 ===================================================== */
 
@@ -190,41 +128,33 @@ return null;
 
 }
 
-const parsed =
-Number(value);
 
-return Number.isFinite(parsed)
+const parsed =
+Number(
+value
+);
+
+
+return Number.isFinite(
+parsed
+)
 ? parsed
 : null;
 
 }
 
 
-function clamp(
-value: number,
-min = 0,
-max = 100
-): number {
-
-return Math.max(
-min,
-Math.min(
-max,
-value
-)
-);
-
-}
-
-
 function isObject(
-value: unknown
+value:
+unknown
 ): value is Record<string, unknown> {
 
 return (
 typeof value === "object" &&
 value !== null &&
-!Array.isArray(value)
+!Array.isArray(
+value
+)
 );
 
 }
@@ -244,8 +174,12 @@ return null;
 
 }
 
+
 const date =
-new Date(value);
+new Date(
+value
+);
+
 
 if (
 Number.isNaN(
@@ -257,9 +191,13 @@ return null;
 
 }
 
+
 return date
 .toISOString()
-.slice(0, 10);
+.slice(
+0,
+10
+);
 
 }
 
@@ -280,11 +218,13 @@ contractName
 
 
 /*
-* Russell before generic names.
+* Russell before generic index names.
 */
 
 if (
-normalized.includes("RUSSELL")
+normalized.includes(
+"RUSSELL"
+)
 ) {
 
 return "RUSSELL_2000";
@@ -293,11 +233,13 @@ return "RUSSELL_2000";
 
 
 /*
-* Nasdaq before generic index names.
+* Nasdaq.
 */
 
 if (
-normalized.includes("NASDAQ")
+normalized.includes(
+"NASDAQ"
+)
 ) {
 
 return "NASDAQ";
@@ -310,7 +252,9 @@ return "NASDAQ";
 */
 
 if (
-normalized.includes("S&P")
+normalized.includes(
+"S&P"
+)
 ) {
 
 return "SP500";
@@ -323,7 +267,9 @@ return "SP500";
 */
 
 if (
-normalized.includes("DOW")
+normalized.includes(
+"DOW"
+)
 ) {
 
 return "DOW";
@@ -444,6 +390,7 @@ GROUP_FIELDS[
 traderGroup
 ];
 
+
 const long =
 toNumber(
 record[
@@ -451,12 +398,14 @@ fields.long
 ]
 );
 
+
 const short =
 toNumber(
 record[
 fields.short
 ]
 );
+
 
 const spread =
 toNumber(
@@ -479,6 +428,7 @@ return null;
 const safeLong =
 long ?? 0;
 
+
 const safeShort =
 short ?? 0;
 
@@ -494,7 +444,9 @@ short:
 safeShort,
 
 ...(spread !== null
-? { spread }
+? {
+spread,
+}
 : {}),
 
 net:
@@ -563,9 +515,11 @@ normalizeDate(
 record.report_date_as_yyyy_mm_dd
 );
 
+
 const contractName =
 record.contract_market_name ??
 "";
+
 
 if (
 !reportDate ||
@@ -581,6 +535,7 @@ const market =
 detectMarket(
 contractName
 );
+
 
 if (!market) {
 
@@ -602,9 +557,13 @@ const traderGroups:
 COTTraderGroup[] = [
 
 "DEALER",
+
 "ASSET_MANAGER",
+
 "LEVERAGED_MONEY",
+
 "OTHER_REPORTABLES",
+
 "NON_REPORTABLES",
 
 ];
@@ -621,9 +580,12 @@ record,
 group
 );
 
+
 if (position) {
 
-groups[group] =
+groups[
+group
+] =
 position;
 
 }
@@ -675,6 +637,7 @@ number
 const now =
 new Date();
 
+
 const start =
 new Date(
 now.getTime() -
@@ -690,7 +653,10 @@ lookbackWeeks *
 const startDate =
 start
 .toISOString()
-.slice(0, 10);
+.slice(
+0,
+10
+);
 
 
 const url =
@@ -700,10 +666,11 @@ CFTC_API_URL
 
 
 /*
-* Official CFTC Socrata endpoint.
+* CFTC Socrata query.
 *
-* The query remains deliberately broad.
-* Market selection is performed locally.
+* Market filtering is deliberately performed locally
+* so the provider remains independent of exact CFTC
+* contract naming conventions.
 */
 
 url.searchParams.set(
@@ -711,10 +678,12 @@ url.searchParams.set(
 "5000"
 );
 
+
 url.searchParams.set(
 "$order",
 "report_date_as_yyyy_mm_dd DESC"
 );
+
 
 url.searchParams.set(
 "$where",
@@ -724,6 +693,7 @@ url.searchParams.set(
 
 const controller =
 new AbortController();
+
 
 const timeout =
 setTimeout(
@@ -739,14 +709,18 @@ const response =
 await fetch(
 url.toString(),
 {
-method: "GET",
+
+method:
+"GET",
 
 headers: {
+
 Accept:
 "application/json",
 
 "User-Agent":
 "rotation-app-ai-research/1.0",
+
 },
 
 cache:
@@ -754,6 +728,7 @@ cache:
 
 signal:
 controller.signal,
+
 }
 );
 
@@ -774,7 +749,9 @@ await response.json();
 
 
 if (
-!Array.isArray(json)
+!Array.isArray(
+json
+)
 ) {
 
 throw new Error(
@@ -789,7 +766,9 @@ return json
 (
 item
 ): item is CFTCRecord =>
-isObject(item)
+isObject(
+item
+)
 );
 
 }
@@ -863,10 +842,15 @@ of groups
 ) {
 
 const current =
-positions[group];
+positions[
+group
+];
+
 
 const previousPosition =
-previous.positions[group];
+previous.positions[
+group
+];
 
 
 if (
@@ -878,21 +862,29 @@ continue;
 }
 
 
-positions[group] = {
+positions[
+group
+] = {
 
 ...current,
 
 changeLong:
-current.long -
-(previousPosition?.long ?? 0),
+previousPosition
+? current.long -
+previousPosition.long
+: null,
 
 changeShort:
-current.short -
-(previousPosition?.short ?? 0),
+previousPosition
+? current.short -
+previousPosition.short
+: null,
 
 changeNet:
-current.net -
-(previousPosition?.net ?? 0),
+previousPosition
+? current.net -
+previousPosition.net
+: null,
 
 };
 
@@ -922,390 +914,15 @@ positions,
 
 
 /* =====================================================
-POSITIONING BIAS
+EMPTY DATA FALLBACK
 ===================================================== */
 
-function determineBias(
-netPosition:
-number | null,
-percentile:
-number | null
-): COTPositioningBias {
-
-if (
-netPosition === null
-) {
-
-return "UNKNOWN";
-
-}
-
-
-/*
-* No historical percentile yet.
-*
-* Until the historical layer is added,
-* classify only the sign.
-*/
-
-if (
-percentile !== null &&
-percentile >= 90
-) {
-
-return "EXTREME_LONG";
-
-}
-
-
-if (
-percentile !== null &&
-percentile <= 10
-) {
-
-return "EXTREME_SHORT";
-
-}
-
-
-if (
-netPosition > 0
-) {
-
-return "NET_LONG";
-
-}
-
-
-if (
-netPosition < 0
-) {
-
-return "NET_SHORT";
-
-}
-
-
-return "BALANCED";
-
-}
-
-
-/* =====================================================
-SUMMARY
-===================================================== */
-
-function buildSummaries(
-observations:
-COTWeeklyObservation[]
-): COTMarketPositioningSummary[] {
-
-const latestByMarket =
-new Map<
-COTMarket,
-COTWeeklyObservation
->();
-
-
-for (
-const observation
-of observations
-) {
-
-const existing =
-latestByMarket.get(
-observation.market
-);
-
-
-if (
-!existing ||
-new Date(
-observation.reportDate
-).getTime() >
-new Date(
-existing.reportDate
-).getTime()
-) {
-
-latestByMarket.set(
-observation.market,
-observation
-);
-
-}
-
-}
-
-
-const summaries:
-COTMarketPositioningSummary[] = [];
-
-
-for (
-const [
-market,
-observation
-]
-of latestByMarket
-) {
-
-const groups =
-Object.entries(
-observation.positions
-) as [
-COTTraderGroup,
-COTPosition
-][];
-
-
-for (
-const [
-group,
-position
-]
-of groups
-) {
-
-const bias =
-determineBias(
-position.net,
-null
-);
-
-
-summaries.push({
-
-market,
-
-reportDate:
-observation.reportDate,
-
-group,
-
-bias,
-
-netPosition:
-position.net,
-
-weeklyChange:
-position.changeNet ??
-null,
-
-percentile:
-null,
-
-summary:
-`${group}: net ${position.net.toLocaleString(
-"en-US"
-)} contracts`,
-
-});
-
-}
-
-}
-
-
-return summaries;
-
-}
-
-
-/* =====================================================
-GROUP DIVERGENCES
-===================================================== */
-
-function buildDivergences(
-observations:
-COTWeeklyObservation[]
-): COTGroupDivergence[] {
-
-const latestByMarket =
-new Map<
-COTMarket,
-COTWeeklyObservation
->();
-
-
-for (
-const observation
-of observations
-) {
-
-const existing =
-latestByMarket.get(
-observation.market
-);
-
-
-if (
-!existing ||
-new Date(
-observation.reportDate
-).getTime() >
-new Date(
-existing.reportDate
-).getTime()
-) {
-
-latestByMarket.set(
-observation.market,
-observation
-);
-
-}
-
-}
-
-
-const divergences:
-COTGroupDivergence[] = [];
-
-
-for (
-const [
-market,
-observation
-]
-of latestByMarket
-) {
-
-const leveraged =
-observation.positions
-.LEVERAGED_MONEY;
-
-const assetManager =
-observation.positions
-.ASSET_MANAGER;
-
-
-if (
-!leveraged ||
-!assetManager
-) {
-
-continue;
-
-}
-
-
-const leveragedChange =
-leveraged.changeNet;
-
-const assetManagerChange =
-assetManager.changeNet;
-
-
-if (
-leveragedChange === null ||
-leveragedChange === undefined ||
-assetManagerChange === null ||
-assetManagerChange === undefined
-) {
-
-continue;
-
-}
-
-
-/*
-* Divergence exists when the weekly changes
-* point in opposite directions.
-*/
-
-if (
-leveragedChange === 0 ||
-assetManagerChange === 0 ||
-Math.sign(
-leveragedChange
-) === Math.sign(
-assetManagerChange
-)
-) {
-
-continue;
-
-}
-
-
-divergences.push({
-
-market,
-
-groupA:
-"LEVERAGED_MONEY",
-
-groupB:
-"ASSET_MANAGER",
-
-observation:
-"Leveraged Money und Asset Manager haben ihre Netto-Positionen in entgegengesetzte Richtungen verändert.",
-
-significance:
-"Unterschiedliche institutionelle Positionierungsrichtung.",
-
-netChangeA:
-leveragedChange,
-
-netChangeB:
-assetManagerChange,
-
-confidence:
-clamp(
-50 +
-Math.min(
-25,
-Math.abs(
-leveragedChange
-) / 10000
-) +
-Math.min(
-25,
-Math.abs(
-assetManagerChange
-) / 10000
-)
-),
-
-});
-
-}
-
-
-return divergences;
-
-}
-
-
-/* =====================================================
-EMPTY / FAIL-SOFT RESULT
-===================================================== */
-
-/*
-* COT is an additional research layer.
-*
-* A temporary CFTC outage, API change or timeout must
-* therefore NOT invalidate the complete AI Research
-* report.
-*
-* Instead we return a valid but empty COT structure
-* together with a diagnostic warning.
-*/
-
-function buildUnavailableResult(
-warning:
-string
-): FetchCOTResult {
-
-const warnings =
-[
-warning,
-];
-
-
-const data:
-AIResearchCOTData = {
+function buildEmptyCOTData(
+warnings:
+string[]
+): AIResearchCOTData {
+
+return {
 
 generatedAt:
 new Date().toISOString(),
@@ -1342,10 +959,84 @@ warnings,
 
 };
 
+}
+
+
+/* =====================================================
+MAIN PROVIDER
+===================================================== */
+
+export async function fetchCOTData(
+input:
+FetchCOTInput = {}
+): Promise<FetchCOTResult> {
+
+const warnings:
+string[] = [];
+
+
+const lookbackWeeks =
+Math.max(
+5,
+Math.min(
+260,
+Math.round(
+input.lookbackWeeks ??
+DEFAULT_LOOKBACK_WEEKS
+)
+)
+);
+
+
+const requestedMarkets =
+input.markets ??
+[
+"NASDAQ",
+"SP500",
+"RUSSELL_2000",
+"DOW",
+];
+
+
+let records:
+CFTCRecord[] = [];
+
+
+/*
+* COT is supplementary research evidence.
+*
+* A temporary CFTC failure must not stop the
+* complete AI Research pipeline.
+*/
+
+try {
+
+records =
+await fetchCFTCRecords(
+lookbackWeeks
+);
+
+}
+
+catch (error) {
+
+const message =
+error instanceof Error
+? error.message
+: "Unknown CFTC error";
+
+
+warnings.push(
+message
+);
+
 
 return {
 
-data,
+data:
+buildEmptyCOTData(
+warnings
+),
 
 diagnostics: {
 
@@ -1368,84 +1059,8 @@ warnings,
 
 
 /* =====================================================
-MAIN PROVIDER
+NORMALIZE OBSERVATIONS
 ===================================================== */
-
-export async function fetchCOTData(
-input:
-FetchCOTInput = {}
-): Promise<FetchCOTResult> {
-
-const warnings:
-string[] = [];
-
-
-const lookbackWeeks =
-Math.max(
-1,
-Math.min(
-260,
-Math.round(
-input.lookbackWeeks ??
-DEFAULT_LOOKBACK_WEEKS
-)
-)
-);
-
-
-const requestedMarkets =
-input.markets ??
-[
-"NASDAQ",
-"SP500",
-"RUSSELL_2000",
-"DOW",
-];
-
-
-let records:
-CFTCRecord[];
-
-
-try {
-
-records =
-await fetchCFTCRecords(
-lookbackWeeks
-);
-
-}
-
-catch (error) {
-
-const message =
-error instanceof Error
-? error.message
-: "Unknown CFTC request error";
-
-
-return buildUnavailableResult(
-`COT data unavailable: ${message}`
-);
-
-}
-
-
-/*
-* An empty response is not fatal to the Research Engine,
-* but it should remain visible in diagnostics.
-*/
-
-if (
-records.length === 0
-) {
-
-warnings.push(
-"CFTC returned no TFF Futures Only records for the requested lookback period."
-);
-
-}
-
 
 const observations =
 records
@@ -1467,11 +1082,11 @@ observation.market
 
 
 /*
-* One observation per market/report-date.
+* One observation per market / report date.
 *
-* The CFTC feed can contain multiple records
-* for the same market. We keep the first matching
-* contract for the current implementation.
+* Multiple matching contracts can exist in the CFTC
+* dataset. For the current research layer we retain
+* one representative contract per market/week.
 */
 
 const unique =
@@ -1491,7 +1106,9 @@ const key =
 
 
 if (
-!unique.has(key)
+!unique.has(
+key
+)
 ) {
 
 unique.set(
@@ -1511,22 +1128,9 @@ unique.values()
 
 
 /*
-* If records were returned but none matched our
-* four target equity-index markets, preserve the
-* information as a diagnostic warning.
+* Weekly changes must be calculated before the
+* historical metrics layer is executed.
 */
-
-if (
-records.length > 0 &&
-normalized.length === 0
-) {
-
-warnings.push(
-"CFTC TFF data was received, but no NASDAQ, S&P 500, Russell 2000 or Dow observations matched the current market definitions."
-);
-
-}
-
 
 const withChanges =
 applyWeeklyChanges(
@@ -1534,17 +1138,47 @@ normalized
 );
 
 
-const summaries =
-buildSummaries(
-withChanges
+/* =====================================================
+HISTORICAL COT METRICS
+===================================================== */
+
+const metrics =
+calculateCOTMetrics(
+withChanges,
+requestedMarkets,
+lookbackWeeks
 );
 
+
+/*
+* Convert historical metrics into the standard
+* COT summary format consumed by AI Research.
+*/
+
+const summaries =
+metrics.flatMap(
+metric =>
+buildCOTSummary(
+metric
+)
+);
+
+
+/*
+* Divergences are calculated by the historical
+* metrics layer.
+*/
 
 const divergences =
-buildDivergences(
-withChanges
+metrics.flatMap(
+metric =>
+metric.divergences
 );
 
+
+/* =====================================================
+LATEST REPORT DATE
+===================================================== */
 
 const latestReportDate =
 withChanges.length > 0
@@ -1563,6 +1197,10 @@ withChanges[0]
 : null;
 
 
+/* =====================================================
+MARKETS COVERED
+===================================================== */
+
 const marketsCovered =
 Array.from(
 new Set(
@@ -1574,25 +1212,48 @@ observation.market
 );
 
 
-const missingMarkets =
-requestedMarkets.filter(
-market =>
-!marketsCovered.includes(
-market
-)
-);
-
+/* =====================================================
+DIAGNOSTICS
+===================================================== */
 
 if (
-missingMarkets.length > 0
+withChanges.length === 0
 ) {
 
 warnings.push(
-`COT markets not covered in current result: ${missingMarkets.join(", ")}.`
+"No COT observations were created from the CFTC response."
 );
 
 }
 
+
+if (
+metrics.length === 0 &&
+withChanges.length > 0
+) {
+
+warnings.push(
+"COT observations exist, but no market metrics were created."
+);
+
+}
+
+
+if (
+summaries.length === 0 &&
+metrics.length > 0
+) {
+
+warnings.push(
+"COT market metrics exist, but no positioning summaries were created."
+);
+
+}
+
+
+/* =====================================================
+FINAL DATA
+===================================================== */
 
 const data:
 AIResearchCOTData = {
