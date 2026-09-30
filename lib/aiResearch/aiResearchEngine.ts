@@ -409,6 +409,197 @@ indices["russell"],
 
 
 /* =====================================================
+COT POSITIONING
+===================================================== */
+
+/*
+* IMPORTANT:
+*
+* COT is a separate positioning layer.
+*
+* It is NOT converted into an AIDivergence.
+* It is NOT a new evidenceType.
+*
+* The existing AIResearch type system only allows:
+*
+* SNAPSHOT
+* HISTORY
+* EXTERNAL
+* COMBINED
+*
+* Therefore COT is represented as additional
+* positioning evidence and, where appropriate,
+* as a COMBINED research risk.
+*/
+
+interface COTResearchSummary {
+
+available: boolean;
+
+observationCount: number;
+
+summaryCount: number;
+
+divergenceCount: number;
+
+extremeCount: number;
+
+}
+
+
+function extractCOTResearchSummary(
+positioning: AIResearchInput["positioning"]
+): COTResearchSummary {
+
+if (!positioning) {
+
+return {
+
+available:
+false,
+
+observationCount:
+0,
+
+summaryCount:
+0,
+
+divergenceCount:
+0,
+
+extremeCount:
+0,
+
+};
+
+}
+
+
+const observations =
+Array.isArray(
+positioning.observations
+)
+? positioning.observations
+: [];
+
+
+const summaries =
+Array.isArray(
+positioning.summaries
+)
+? positioning.summaries
+: [];
+
+
+const divergences =
+Array.isArray(
+positioning.divergences
+)
+? positioning.divergences
+: [];
+
+
+let extremeCount = 0;
+
+
+/*
+* Count observations that contain an extreme
+* positioning state.
+*
+* The provider already calculates percentile,
+* zScore and isExtreme.
+*
+* We deliberately keep this defensive because
+* COT provider output can evolve without making
+* the AI Research Engine fragile.
+*/
+
+for (
+const observation of observations
+) {
+
+const observationObject =
+objectValue(
+observation
+);
+
+if (
+Boolean(
+observationObject["isExtreme"]
+)
+) {
+
+extremeCount++;
+
+continue;
+
+}
+
+
+const positions =
+Array.isArray(
+observationObject["positions"]
+)
+? observationObject["positions"]
+: [];
+
+
+for (
+const position of positions
+) {
+
+const positionObject =
+objectValue(
+position
+);
+
+const extreme =
+objectValue(
+positionObject["extreme"]
+);
+
+if (
+Boolean(
+positionObject["isExtreme"]
+) ||
+Boolean(
+extreme["isExtreme"]
+)
+) {
+
+extremeCount++;
+
+break;
+
+}
+
+}
+
+}
+
+
+return {
+
+available:
+true,
+
+observationCount:
+observations.length,
+
+summaryCount:
+summaries.length,
+
+divergenceCount:
+divergences.length,
+
+extremeCount,
+
+};
+
+}
+
+
+/* =====================================================
 RESEARCH REGIME ASSESSMENT
 ===================================================== */
 
@@ -740,7 +931,8 @@ THESIS
 
 function buildThesis(
 data: ExtractedSnapshot,
-divergences: AIDivergence[]
+divergences: AIDivergence[],
+cot: COTResearchSummary
 ): AIResearchThesis {
 
 const supportingEvidence:
@@ -908,6 +1100,60 @@ data.priceMomentumScore
 
 
 /*
+* COT positioning.
+*
+* COT is additional positioning evidence.
+* It does not create a new divergence type.
+*/
+
+if (
+cot.available
+) {
+
+if (
+cot.observationCount > 0
+) {
+
+supportingEvidence.push(
+`COT positioning layer contains ${cot.observationCount} weekly observation(s).`
+);
+
+}
+
+if (
+cot.summaryCount > 0
+) {
+
+supportingEvidence.push(
+`COT positioning summaries are available for ${cot.summaryCount} market(s).`
+);
+
+}
+
+if (
+cot.extremeCount > 0
+) {
+
+supportingEvidence.push(
+`${cot.extremeCount} COT positioning observation(s) are at historical extremes.`
+);
+
+}
+
+if (
+cot.divergenceCount > 0
+) {
+
+supportingEvidence.push(
+`${cot.divergenceCount} COT positioning divergence(s) detected between trader groups.`
+);
+
+}
+
+}
+
+
+/*
 * Divergences.
 */
 
@@ -966,6 +1212,25 @@ statement =
 }
 
 
+/*
+* COT can strengthen the research context without
+* overriding the market-engine thesis.
+*/
+
+if (
+cot.available &&
+(
+cot.extremeCount > 0 ||
+cot.divergenceCount > 0
+)
+) {
+
+statement +=
+" COT positioning provides additional positioning context that should be evaluated alongside, not instead of, the market-engine evidence.";
+
+}
+
+
 return {
 
 statement,
@@ -987,7 +1252,8 @@ RISKS
 
 function buildRisks(
 data: ExtractedSnapshot,
-divergences: AIDivergence[]
+divergences: AIDivergence[],
+cot: COTResearchSummary
 ): AIResearchRisk[] {
 
 const risks:
@@ -1095,6 +1361,52 @@ data.liquidityScore
 
 evidenceType:
 "SNAPSHOT",
+
+});
+
+}
+
+
+/*
+* COT positioning.
+*
+* COT is a separate positioning layer.
+*
+* We deliberately use COMBINED here because
+* the existing AIResearchRisk type does not
+* define a COT-specific evidence type.
+*/
+
+if (
+cot.available &&
+(
+cot.extremeCount > 0 ||
+cot.divergenceCount > 0
+)
+) {
+
+risks.push({
+
+risk:
+"COT positioning divergence",
+
+explanation:
+[
+cot.extremeCount > 0
+? `${cot.extremeCount} historical COT extreme(s)`
+: "",
+
+cot.divergenceCount > 0
+? `${cot.divergenceCount} trader-group divergence(s)`
+: "",
+
+]
+.filter(Boolean)
+.join(" and ") +
+" detected in the COT positioning layer.",
+
+evidenceType:
+"COMBINED",
 
 });
 
@@ -1281,7 +1593,8 @@ SUMMARY
 function buildSummary(
 data: ExtractedSnapshot,
 regime: AIRegimeAssessment,
-divergences: AIDivergence[]
+divergences: AIDivergence[],
+cot: COTResearchSummary
 ): string {
 
 return [
@@ -1304,6 +1617,12 @@ data.masterScore
 data.crashProbability
 )}%.`,
 
+`COT positioning: ${
+cot.available
+? `${cot.observationCount} observation(s), ${cot.summaryCount} market summary(ies), ${cot.divergenceCount} divergence(s), ${cot.extremeCount} extreme(s).`
+: "not available."
+}`,
+
 ].join(" ");
 
 }
@@ -1325,6 +1644,12 @@ input.snapshot
 );
 
 
+const cot =
+extractCOTResearchSummary(
+input.positioning
+);
+
+
 const regime =
 buildRegimeAssessment(
 data
@@ -1340,14 +1665,16 @@ data
 const thesis =
 buildThesis(
 data,
-divergences
+divergences,
+cot
 );
 
 
 const risks =
 buildRisks(
 data,
-divergences
+divergences,
+cot
 );
 
 
@@ -1383,7 +1710,8 @@ summary:
 buildSummary(
 data,
 regime,
-divergences
+divergences,
+cot
 ),
 
 };
