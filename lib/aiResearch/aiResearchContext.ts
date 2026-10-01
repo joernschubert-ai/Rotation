@@ -16,6 +16,42 @@ AIResearchCOTData,
 
 const MAX_HISTORY_SNAPSHOTS = 30;
 
+/*
+* =====================================================
+* TRUSTED AI RESEARCH HISTORY
+* =====================================================
+*
+* Persisted market history exists before this date,
+* but snapshots before 2026-09-16 were not yet fully
+* comparable with the current snapshot structure.
+*
+* In particular, additional market / price information
+* was added during the development phase.
+*
+* IMPORTANT:
+*
+* This cutoff applies ONLY to the AI Research context.
+*
+* It does NOT:
+*
+* - delete persisted market history
+* - modify the Rotation App history
+* - modify Forward Tests
+* - modify engine calculations
+*
+* AI Research should only use structurally comparable
+* snapshots for persistence / confirmation analysis.
+*/
+
+const AI_RESEARCH_TRUSTED_HISTORY_START =
+"2026-09-16T00:00:00.000Z";
+
+
+const AI_RESEARCH_TRUSTED_HISTORY_START_MS =
+new Date(
+AI_RESEARCH_TRUSTED_HISTORY_START
+).getTime();
+
 
 /* =====================================================
 INPUT
@@ -97,6 +133,48 @@ return null;
 
 
 /* =====================================================
+TRUSTED HISTORY
+===================================================== */
+
+function isTrustedHistorySnapshot(
+snapshot: AIResearchSnapshot
+): boolean {
+
+const timestamp =
+getTimestamp(snapshot);
+
+
+if (!timestamp) {
+
+return false;
+
+}
+
+
+const timestampMs =
+new Date(
+timestamp
+).getTime();
+
+
+if (
+!Number.isFinite(timestampMs)
+) {
+
+return false;
+
+}
+
+
+return (
+timestampMs >=
+AI_RESEARCH_TRUSTED_HISTORY_START_MS
+);
+
+}
+
+
+/* =====================================================
 HISTORY SORT
 ===================================================== */
 
@@ -165,9 +243,25 @@ getTimestamp(snapshot) !== null
 );
 
 
+/*
+* AI Research deliberately ignores legacy snapshots
+* from before the trusted-history boundary.
+*
+* The original persisted history remains untouched.
+*/
+
+const trustedSnapshots =
+validSnapshots.filter(
+(snapshot) =>
+isTrustedHistorySnapshot(
+snapshot
+)
+);
+
+
 const chronological =
 sortHistoryChronologically(
-validSnapshots
+trustedSnapshots
 );
 
 
