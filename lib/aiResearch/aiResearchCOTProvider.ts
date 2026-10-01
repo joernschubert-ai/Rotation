@@ -30,6 +30,35 @@ const DEFAULT_LOOKBACK_WEEKS =
 
 
 /* =====================================================
+COT TRADER GROUPS
+===================================================== */
+
+/*
+* Keep the complete TFF participant structure available
+* throughout the historical research layer.
+*
+* Historical COT analysis must not be restricted to
+* Leveraged Money because positioning becomes especially
+* useful when participant groups diverge.
+*/
+
+const COT_TRADER_GROUPS:
+COTTraderGroup[] = [
+
+"DEALER",
+
+"ASSET_MANAGER",
+
+"LEVERAGED_MONEY",
+
+"OTHER_REPORTABLES",
+
+"NON_REPORTABLES",
+
+];
+
+
+/* =====================================================
 TYPES
 ===================================================== */
 
@@ -595,25 +624,9 @@ COTPosition
 > = {};
 
 
-const traderGroups:
-COTTraderGroup[] = [
-
-"DEALER",
-
-"ASSET_MANAGER",
-
-"LEVERAGED_MONEY",
-
-"OTHER_REPORTABLES",
-
-"NON_REPORTABLES",
-
-];
-
-
 for (
 const group
-of traderGroups
+of COT_TRADER_GROUPS
 ) {
 
 const position =
@@ -1255,6 +1268,69 @@ observation.market
 
 
 /* =====================================================
+HISTORICAL SERIES
+===================================================== */
+
+/*
+* Build one historical series for every available
+* market / trader-group combination.
+*
+* Example:
+*
+* NASDAQ / DEALER
+* NASDAQ / ASSET_MANAGER
+* NASDAQ / LEVERAGED_MONEY
+* ...
+* RUSSELL_2000 / ASSET_MANAGER
+* RUSSELL_2000 / LEVERAGED_MONEY
+*
+* The observations themselves still contain the full
+* position map. The group property identifies which
+* participant group the historical series represents.
+*
+* No synthetic observations are created here.
+*/
+
+const history =
+marketsCovered.flatMap(
+market => {
+
+const marketObservations =
+withChanges.filter(
+observation =>
+observation.market ===
+market
+);
+
+
+return COT_TRADER_GROUPS
+.filter(
+group =>
+marketObservations.some(
+observation =>
+observation.positions[
+group
+] !== undefined
+)
+)
+.map(
+group => ({
+
+market,
+
+group,
+
+observations:
+marketObservations,
+
+})
+);
+
+}
+);
+
+
+/* =====================================================
 DIAGNOSTICS
 ===================================================== */
 
@@ -1293,6 +1369,18 @@ warnings.push(
 }
 
 
+if (
+withChanges.length > 0 &&
+history.length === 0
+) {
+
+warnings.push(
+"COT observations exist, but no historical market/group series were created."
+);
+
+}
+
+
 /* =====================================================
 FINAL DATA
 ===================================================== */
@@ -1312,24 +1400,7 @@ summaries,
 
 divergences,
 
-history:
-marketsCovered.map(
-market => ({
-
-market,
-
-group:
-"LEVERAGED_MONEY",
-
-observations:
-withChanges.filter(
-observation =>
-observation.market ===
-market
-),
-
-})
-),
+history,
 
 diagnostics: {
 
