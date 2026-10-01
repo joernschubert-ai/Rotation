@@ -2095,7 +2095,7 @@ confidence:
 0,
 
 summary:
-"No usable historical snapshots are available for persistence analysis.",
+"No usable trusted research-history snapshots are available for persistence analysis.",
 
 evidence:
 [],
@@ -2107,6 +2107,34 @@ evidence:
 
 const evidence:
 string[] = [];
+
+
+/*
+* ===================================================
+* TRUSTED RESEARCH HISTORY
+* ===================================================
+*
+* IMPORTANT:
+*
+* input.history has already been sanitized by
+* aiResearchContext.ts.
+*
+* Only snapshots from the trusted AI Research
+* history window are allowed to determine:
+*
+* - persistence
+* - HISTORY evidence state
+* - HISTORY evidence strength
+* - HISTORY confidence
+*
+* Long-running historyMetrics embedded in the
+* current snapshot may include legacy observations
+* from before the trusted research-history boundary.
+*
+* They remain useful engine context, but they must
+* NOT increase AI Research history confirmation.
+* ===================================================
+*/
 
 
 const defensivePersistence =
@@ -2121,12 +2149,32 @@ history.snapshotCount,
 ) >= 0.6;
 
 
+const highFragilityPersistence =
+history.highFragilitySnapshotCount /
+Math.max(
+history.snapshotCount,
+1
+) >= 0.6;
+
+
+const weakParticipationPersistence =
+history.weakParticipationSnapshotCount /
+Math.max(
+history.snapshotCount,
+1
+) >= 0.6;
+
+
+/*
+* Trusted research-history evidence.
+*/
+
 if (
 defensivePersistence
 ) {
 
 evidence.push(
-`${history.defensiveSnapshotCount} of ${history.snapshotCount} recent snapshots were in the defensive Master Score zone.`
+`${history.defensiveSnapshotCount} of ${history.snapshotCount} trusted research snapshots were in the defensive Master Score zone.`
 );
 
 }
@@ -2137,20 +2185,80 @@ structuralPersistence
 ) {
 
 evidence.push(
-`${history.structuralBreakdownSnapshotCount} of ${history.snapshotCount} recent snapshots contained structural deterioration.`
+`${history.structuralBreakdownSnapshotCount} of ${history.snapshotCount} trusted research snapshots contained structural deterioration.`
 );
 
 }
 
 
 if (
+highFragilityPersistence
+) {
+
+evidence.push(
+`${history.highFragilitySnapshotCount} of ${history.snapshotCount} trusted research snapshots showed elevated structural fragility.`
+);
+
+}
+
+
+if (
+weakParticipationPersistence
+) {
+
+evidence.push(
+`${history.weakParticipationSnapshotCount} of ${history.snapshotCount} trusted research snapshots showed weak participation.`
+);
+
+}
+
+
+evidence.push(
+`Trusted research history currently spans ${history.uniqueTradingDays} trading day(s).`
+);
+
+
+if (
+history.masterScoreTrend !== null
+) {
+
+evidence.push(
+`Master Score changed ${history.masterScoreTrend >= 0 ? "+" : ""}${history.masterScoreTrend.toFixed(
+1
+)} points across the trusted research-history window.`
+);
+
+}
+
+
+/*
+* ===================================================
+* LEGACY-DERIVED ENGINE CONTEXT
+* ===================================================
+*
+* These values come from historyMetrics embedded in
+* the current Rotation-App snapshot.
+*
+* They may span observations from before the trusted
+* AI Research history boundary.
+*
+* Therefore they are shown only as contextual
+* information and do NOT influence:
+*
+* - state
+* - strength
+* - confidence
+* ===================================================
+*/
+
+if (
 data.daysInPhase > 0
 ) {
 
 evidence.push(
-`Current phase age is ${Math.round(
+`Rotation-App engine history reports current phase age ${Math.round(
 data.daysInPhase
-)} day(s).`
+)} day(s); this metric may include legacy observations outside the trusted AI Research window.`
 );
 
 }
@@ -2161,9 +2269,9 @@ data.distributionDays > 0
 ) {
 
 evidence.push(
-`History metrics report ${Math.round(
+`Rotation-App engine history reports ${Math.round(
 data.distributionDays
-)} distribution day(s).`
+)} distribution day(s); this metric may include legacy observations outside the trusted AI Research window.`
 );
 
 }
@@ -2174,9 +2282,9 @@ data.fragilityHighDays > 0
 ) {
 
 evidence.push(
-`Fragility has been elevated for ${Math.round(
+`Rotation-App engine history reports elevated fragility across ${Math.round(
 data.fragilityHighDays
-)} tracked day(s).`
+)} tracked day(s); this metric may include legacy observations outside the trusted AI Research window.`
 );
 
 }
@@ -2187,25 +2295,28 @@ data.institutionalPressure >= 70
 ) {
 
 evidence.push(
-`Institutional pressure is elevated at ${Math.round(
+`Rotation-App engine history reports institutional pressure at ${Math.round(
 data.institutionalPressure
-)}.`
+)}; this is contextual engine history and does not increase trusted AI Research persistence strength.`
 );
 
 }
 
 
-if (
-history.masterScoreTrend !== null
-) {
+/*
+* ===================================================
+* EVIDENCE STATE
+* ===================================================
+*
+* Only trusted research-history observations are
+* allowed to determine the state.
+*/
 
-evidence.push(
-`Master Score changed ${history.masterScoreTrend >= 0 ? "+" : ""}${history.masterScoreTrend.toFixed(
-1
-)} points across the available research-history window.`
-);
-
-}
+const trustedPersistence =
+defensivePersistence ||
+structuralPersistence ||
+highFragilityPersistence ||
+weakParticipationPersistence;
 
 
 let state:
@@ -2218,10 +2329,7 @@ structuralBias === "BEARISH"
 ) {
 
 if (
-defensivePersistence ||
-structuralPersistence ||
-data.distributionDays >= 10 ||
-data.fragilityHighDays >= 10
+trustedPersistence
 ) {
 
 state =
@@ -2236,8 +2344,7 @@ structuralBias === "BULLISH"
 ) {
 
 if (
-defensivePersistence ||
-structuralPersistence
+trustedPersistence
 ) {
 
 state =
@@ -2248,28 +2355,128 @@ state =
 }
 
 
+/*
+* ===================================================
+* EVIDENCE STRENGTH
+* ===================================================
+*
+* Again: only trusted research-history persistence
+* contributes.
+*/
+
 let persistenceCount = 0;
 
 
-if (defensivePersistence) {
+if (
+defensivePersistence
+) {
+
 persistenceCount++;
+
 }
 
-if (structuralPersistence) {
+
+if (
+structuralPersistence
+) {
+
 persistenceCount++;
+
 }
 
-if (data.distributionDays >= 10) {
+
+if (
+highFragilityPersistence
+) {
+
 persistenceCount++;
+
 }
 
-if (data.fragilityHighDays >= 10) {
+
+if (
+weakParticipationPersistence
+) {
+
 persistenceCount++;
+
 }
 
-if (data.institutionalPressure >= 70) {
-persistenceCount++;
+
+/*
+* A very short trusted history window should not be
+* labelled VERY_HIGH merely because several related
+* structural conditions agree.
+*
+* The number of unique trading days therefore caps
+* the maximum historical evidence strength.
+*/
+
+let strength =
+evidenceStrengthFromCount(
+persistenceCount
+);
+
+
+if (
+history.uniqueTradingDays < 5
+) {
+
+strength =
+"LOW";
+
 }
+
+else if (
+history.uniqueTradingDays < 10 &&
+(
+strength === "HIGH" ||
+strength === "VERY_HIGH"
+)
+) {
+
+strength =
+"MODERATE";
+
+}
+
+else if (
+history.uniqueTradingDays < 15 &&
+strength === "VERY_HIGH"
+) {
+
+strength =
+"HIGH";
+
+}
+
+
+/*
+* Confidence grows with both agreement and actual
+* trusted trading-day coverage.
+*
+* It is deliberately capped while the trusted
+* history window is still relatively young.
+*/
+
+const coverageConfidence =
+clamp(
+history.uniqueTradingDays * 4,
+0,
+60
+);
+
+
+const persistenceConfidence =
+persistenceCount * 8;
+
+
+const confidence =
+clamp(
+25 +
+coverageConfidence +
+persistenceConfidence
+);
 
 
 return {
@@ -2279,21 +2486,19 @@ category:
 
 state,
 
-strength:
-evidenceStrengthFromCount(
-persistenceCount
-),
+strength,
 
 confidence:
-clamp(
-45 +
-persistenceCount * 9
+Math.round(
+confidence
 ),
 
 summary:
 state === "SUPPORTS"
-? "Historical persistence supports the current structural thesis."
-: "Historical persistence does not yet strongly confirm the current structural thesis.",
+? `Trusted research history supports the current structural thesis across ${history.uniqueTradingDays} trading day(s).`
+: state === "CONTRADICTS"
+? `Trusted research history contradicts the current structural thesis across ${history.uniqueTradingDays} trading day(s).`
+: `Trusted research history does not yet strongly confirm the current structural thesis across ${history.uniqueTradingDays} trading day(s).`,
 
 evidence:
 uniqueStrings(
@@ -2303,6 +2508,7 @@ evidence
 };
 
 }
+
 
 
 function buildPriceEvidence(
