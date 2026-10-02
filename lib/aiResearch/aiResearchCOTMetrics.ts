@@ -4,7 +4,6 @@ import type {
 COTGroupDivergence,
 COTMarket,
 COTMarketPositioningSummary,
-COTPosition,
 COTTraderGroup,
 COTWeeklyObservation,
 } from "./aiResearchCOTTypes";
@@ -28,8 +27,51 @@ string;
 netPosition:
 number;
 
+/*
+* Short- and medium-term changes in net positioning.
+*
+* These values remain descriptive.
+* Directional interpretation belongs to AI Research.
+*/
+
 weeklyChange:
 number;
+
+change4W:
+number | null;
+
+change13W:
+number | null;
+
+change26W:
+number | null;
+
+
+/*
+* Changes normalized against the historical net-position
+* range of the same market / trader group.
+*
+* Example:
+*
+* normalizedChange13W = 0.25
+*
+* means the 13-week positioning change equals roughly
+* 25% of the observed historical net-position range.
+*/
+
+normalizedChange4W:
+number | null;
+
+normalizedChange13W:
+number | null;
+
+normalizedChange26W:
+number | null;
+
+
+/*
+* Historical distribution metrics.
+*/
 
 percentile:
 number | null;
@@ -321,6 +363,125 @@ deviation;
 
 
 /* =====================================================
+HISTORICAL NET POSITION
+===================================================== */
+
+/*
+* Returns the net position approximately N weekly
+* observations before the current observation.
+*
+* COT data are weekly, therefore an observation offset
+* is preferable here to calendar-day arithmetic.
+*/
+
+function getHistoricalNetPosition(
+history:
+COTWeeklyObservation[],
+market:
+COTMarket,
+group:
+COTTraderGroup,
+reportDate:
+string,
+weeksBack:
+number
+): number | null {
+
+const marketHistory =
+history
+.filter(
+item =>
+item.market === market &&
+item.reportDate <= reportDate &&
+finite(
+item.positions[group]
+?.net
+) !== null
+)
+.sort(
+(a, b) =>
+new Date(
+a.reportDate
+).getTime() -
+new Date(
+b.reportDate
+).getTime()
+);
+
+
+if (
+marketHistory.length <= weeksBack
+) {
+
+return null;
+
+}
+
+
+const historicalObservation =
+marketHistory[
+marketHistory.length -
+1 -
+weeksBack
+];
+
+
+return finite(
+historicalObservation
+.positions[group]
+?.net
+);
+
+}
+
+
+/* =====================================================
+NORMALIZED POSITION CHANGE
+===================================================== */
+
+function normalizePositionChange(
+change:
+number | null,
+historicalMin:
+number | null,
+historicalMax:
+number | null
+): number | null {
+
+if (
+change === null ||
+historicalMin === null ||
+historicalMax === null
+) {
+
+return null;
+
+}
+
+
+const range =
+historicalMax -
+historicalMin;
+
+
+if (
+range === 0
+) {
+
+return null;
+
+}
+
+
+return (
+change /
+range
+);
+
+}
+
+
+/* =====================================================
 POSITION METRIC
 ===================================================== */
 
@@ -357,6 +518,15 @@ item =>
 item.market === market &&
 item.reportDate <=
 observation.reportDate
+)
+.sort(
+(a, b) =>
+new Date(
+a.reportDate
+).getTime() -
+new Date(
+b.reportDate
+).getTime()
 )
 .slice(
 -lookback
@@ -401,6 +571,65 @@ position.changeNet
 ) ?? 0;
 
 
+/* =====================================================
+MULTI-WEEK POSITIONING CHANGES
+===================================================== */
+
+const net4W =
+getHistoricalNetPosition(
+history,
+market,
+group,
+observation.reportDate,
+4
+);
+
+
+const net13W =
+getHistoricalNetPosition(
+history,
+market,
+group,
+observation.reportDate,
+13
+);
+
+
+const net26W =
+getHistoricalNetPosition(
+history,
+market,
+group,
+observation.reportDate,
+26
+);
+
+
+const change4W =
+net4W !== null
+? currentNet -
+net4W
+: null;
+
+
+const change13W =
+net13W !== null
+? currentNet -
+net13W
+: null;
+
+
+const change26W =
+net26W !== null
+? currentNet -
+net26W
+: null;
+
+
+/* =====================================================
+HISTORICAL DISTRIBUTION
+===================================================== */
+
 const percentile =
 calculatePercentile(
 currentNet,
@@ -431,6 +660,34 @@ historicalNet.length > 0
 : null;
 
 
+/* =====================================================
+NORMALIZED MULTI-WEEK CHANGES
+===================================================== */
+
+const normalizedChange4W =
+normalizePositionChange(
+change4W,
+historicalMin,
+historicalMax
+);
+
+
+const normalizedChange13W =
+normalizePositionChange(
+change13W,
+historicalMin,
+historicalMax
+);
+
+
+const normalizedChange26W =
+normalizePositionChange(
+change26W,
+historicalMin,
+historicalMax
+);
+
+
 const isExtreme =
 percentile !== null &&
 (
@@ -454,6 +711,18 @@ netPosition:
 currentNet,
 
 weeklyChange,
+
+change4W,
+
+change13W,
+
+change26W,
+
+normalizedChange4W,
+
+normalizedChange13W,
+
+normalizedChange26W,
 
 percentile,
 
@@ -598,6 +867,10 @@ return [];
 /*
 * Confidence reflects the magnitude of the
 * opposing changes, but remains bounded.
+*
+* This remains a descriptive divergence measure.
+* Directional interpretation is performed later
+* by AI Research.
 */
 
 const magnitude =
