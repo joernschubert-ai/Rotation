@@ -37,6 +37,9 @@ value: string | undefined
 ): string {
 return (value ?? "")
 .toLowerCase()
+.replace(/<[^>]*>/g, " ")
+.replace(/&nbsp;/g, " ")
+.replace(/&amp;/g, "&")
 .replace(/\s+/g, " ")
 .trim();
 }
@@ -57,22 +60,148 @@ source.publisher,
 }
 
 
+function normalizedTitle(
+source: AIResearchSource
+): string {
+return normalizeText(
+source.title
+)
+.replace(/[®™©]/g, "")
+.replace(/[^\p{L}\p{N}\s-]/gu, " ")
+.replace(/\s+/g, " ")
+.trim();
+}
+
+
+/* =====================================================
+SOURCE CLASSIFICATION
+===================================================== */
+
+function isFederalReserveSource(
+source: AIResearchSource
+): boolean {
+
+const publisher =
+normalizeText(
+source.publisher
+);
+
+const url =
+normalizeText(
+source.url
+);
+
+return (
+publisher.includes("federal reserve") ||
+url.includes("federalreserve.gov")
+);
+}
+
+
+function isECBSource(
+source: AIResearchSource
+): boolean {
+
+const publisher =
+normalizeText(
+source.publisher
+);
+
+const url =
+normalizeText(
+source.url
+);
+
+return (
+publisher.includes("ecb") ||
+publisher.includes(
+"european central bank"
+) ||
+url.includes("ecb.europa.eu")
+);
+}
+
+
+function isNasdaqSource(
+source: AIResearchSource
+): boolean {
+
+const publisher =
+normalizeText(
+source.publisher
+);
+
+const url =
+normalizeText(
+source.url
+);
+
+return (
+publisher.includes("nasdaq") ||
+url.includes("nasdaq.com")
+);
+}
+
+
+function isGoogleNewsSource(
+source: AIResearchSource
+): boolean {
+
+const publisher =
+normalizeText(
+source.publisher
+);
+
+const url =
+normalizeText(
+source.url
+);
+
+return (
+publisher.includes(
+"google news"
+) ||
+url.includes(
+"news.google.com"
+)
+);
+}
+
+
 /* =====================================================
 SOURCE QUALITY
 ===================================================== */
+
+/*
+* IMPORTANT:
+*
+* Source quality measures credibility / authority.
+*
+* It does NOT measure market relevance.
+*
+* An official Fed or ECB administrative publication
+* may therefore receive quality 100 while still
+* receiving a low final relevance score.
+*/
 
 function sourceQuality(
 source: AIResearchSource
 ): number {
 
 const publisher =
-normalizeText(source.publisher);
+normalizeText(
+source.publisher
+);
 
 const url =
-normalizeText(source.url);
+normalizeText(
+source.url
+);
 
 const text =
-sourceText(source);
+sourceText(
+source
+);
 
 
 /* ---------------------------------------------------
@@ -80,24 +209,17 @@ PRIMARY OFFICIAL SOURCES
 --------------------------------------------------- */
 
 if (
-publisher.includes("federal reserve") ||
-url.includes("federalreserve.gov")
+isFederalReserveSource(source) ||
+isECBSource(source)
 ) {
 return 100;
 }
 
-if (
-publisher.includes("ecb") ||
-url.includes("ecb.europa.eu")
-) {
-return 100;
-}
 
 if (
-publisher.includes("nasdaq") ||
-url.includes("nasdaq.com")
+isNasdaqSource(source)
 ) {
-return 100;
+return 98;
 }
 
 
@@ -119,16 +241,21 @@ const highQualityPublishers = [
 "morningstar",
 "barron's",
 "barrons",
-"investing.com",
 "s&p global",
 "factset",
 ];
+
 
 if (
 highQualityPublishers.some(
 (name) =>
 publisher.includes(name) ||
-url.includes(name.replace(/\s+/g, ""))
+url.includes(
+name.replace(
+/\s+/g,
+""
+)
+)
 )
 ) {
 return 94;
@@ -146,17 +273,23 @@ const establishedSecondary = [
 "motley fool",
 "seeking alpha",
 "investors business daily",
-"investing",
+"investing.com",
 "fortune",
 "yahoo finance",
 "marketbeat",
 ];
 
+
 if (
 establishedSecondary.some(
 (name) =>
 publisher.includes(name) ||
-url.includes(name.replace(/\s+/g, ""))
+url.includes(
+name.replace(
+/\s+/g,
+""
+)
+)
 )
 ) {
 return 82;
@@ -168,8 +301,9 @@ GOOGLE NEWS AGGREGATOR
 --------------------------------------------------- */
 
 if (
-url.includes("news.google.com") ||
-publisher.includes("google news")
+isGoogleNewsSource(
+source
+)
 ) {
 return 60;
 }
@@ -179,19 +313,22 @@ return 60;
 DEFAULT
 --------------------------------------------------- */
 
-if (text.length > 0) {
+if (
+text.length > 0
+) {
 return 50;
 }
+
 
 return 35;
 }
 
 
 /* =====================================================
-TOPIC RELEVANCE
+KEYWORD HELPERS
 ===================================================== */
 
-function keywordScore(
+function countKeywordMatches(
 text: string,
 keywords: string[]
 ): number {
@@ -200,24 +337,46 @@ if (!text) {
 return 0;
 }
 
-let matches = 0;
 
-for (const keyword of keywords) {
-if (text.includes(keyword)) {
-matches += 1;
-}
+return keywords.filter(
+(keyword) =>
+text.includes(keyword)
+).length;
 }
 
-if (matches === 0) {
+
+function keywordScore(
+text: string,
+keywords: string[]
+): number {
+
+const matches =
+countKeywordMatches(
+text,
+keywords
+);
+
+
+if (
+matches === 0
+) {
 return 0;
 }
 
+
 return clamp(
 30 +
-Math.min(matches, 5) * 12
+Math.min(
+matches,
+5
+) * 12
 );
 }
 
+
+/* =====================================================
+TOPIC RELEVANCE
+===================================================== */
 
 function topicRelevance(
 source: AIResearchSource,
@@ -225,9 +384,13 @@ task: AIResearchTask
 ): number {
 
 const text =
-sourceText(source);
+sourceText(
+source
+);
 
-let keywords: string[] = [];
+
+let keywords:
+string[] = [];
 
 
 switch (task) {
@@ -235,25 +398,38 @@ switch (task) {
 case "DAILY_MARKET_REVIEW":
 
 keywords = [
-"market",
 "stock market",
-"equity",
+"equity market",
+"equities",
 "stocks",
 "nasdaq",
-"russell",
+"nasdaq 100",
+"russell 2000",
+"small cap",
+"small-cap",
 "s&p 500",
 "sp500",
 "dow",
 "volatility",
 "vix",
-"rates",
-"yield",
-"fed",
-"federal reserve",
-"ecb",
+"treasury yield",
+"bond yield",
+"interest rate",
+"rate cut",
+"rate hike",
+"fomc",
+"monetary policy",
+"inflation",
+"cpi",
+"ppi",
+"employment",
+"payroll",
+"unemployment",
+"financial conditions",
 "liquidity",
-"breadth",
+"market breadth",
 "rotation",
+"credit spreads",
 ];
 
 break;
@@ -262,8 +438,7 @@ break;
 case "REGIME_REVIEW":
 
 keywords = [
-"regime",
-"risk",
+"market regime",
 "risk-off",
 "risk on",
 "market breadth",
@@ -271,16 +446,18 @@ keywords = [
 "liquidity",
 "volatility",
 "vix",
-"yield",
-"rates",
-"fed",
-"federal reserve",
+"treasury yield",
+"interest rate",
+"fomc",
+"monetary policy",
 "recession",
 "growth",
 "inflation",
+"financial conditions",
+"credit spreads",
 "equity market",
 "nasdaq",
-"russell",
+"russell 2000",
 ];
 
 break;
@@ -299,10 +476,10 @@ keywords = [
 "small cap",
 "small-cap",
 "large cap",
-"technology",
+"technology stocks",
 "tech stocks",
 "rotation",
-"breadth",
+"market breadth",
 "leadership",
 "relative strength",
 ];
@@ -320,13 +497,12 @@ keywords = [
 "market drop",
 "volatility",
 "vix",
-"options",
-"liquidity",
-"credit",
-"yield",
-"treasury",
+"liquidity stress",
+"credit stress",
+"treasury yield",
 "financial conditions",
-"breadth",
+"credit spreads",
+"market breadth",
 "recession",
 "systemic risk",
 "risk-off",
@@ -345,13 +521,13 @@ keywords = [
 "russell 2000",
 "rut",
 "iwm",
-"technology",
+"technology stocks",
 "small cap",
 "volatility",
 "vix",
 "momentum",
 "rotation",
-"breadth",
+"market breadth",
 "market structure",
 ];
 
@@ -364,7 +540,7 @@ keywords = [
 "unusual",
 "divergence",
 "anomaly",
-"breadth",
+"market breadth",
 "volatility",
 "vix",
 "rotation",
@@ -372,7 +548,7 @@ keywords = [
 "market structure",
 "relative strength",
 "nasdaq",
-"russell",
+"russell 2000",
 ];
 
 break;
@@ -381,17 +557,18 @@ break;
 case "FORWARD_TEST_REVIEW":
 
 keywords = [
-"market",
+"stock market",
+"equity market",
 "nasdaq",
-"russell",
+"russell 2000",
 "s&p 500",
 "volatility",
-"breadth",
+"market breadth",
 "rotation",
 "liquidity",
-"rates",
-"yield",
-"fed",
+"interest rate",
+"treasury yield",
+"fomc",
 "economic growth",
 ];
 
@@ -417,54 +594,73 @@ task: AIResearchTask
 ): number {
 
 const text =
-sourceText(source);
+sourceText(
+source
+);
 
-let score = 50;
+
+/*
+* Start below neutral.
+*
+* A source must earn market-impact relevance.
+* Merely being recent or official is not enough.
+*/
+
+let score = 30;
 
 
 /* ---------------------------------------------------
-VERY HIGH MARKET IMPACT
+VERY HIGH MACRO / POLICY IMPACT
 --------------------------------------------------- */
 
 const veryHighImpactKeywords = [
 "fomc",
+"federal open market committee",
 "federal funds rate",
 "interest rate decision",
 "rate decision",
 "rate hike",
 "rate cut",
-"interest rate",
 "monetary policy",
 "fed statement",
 "economic projections",
+"summary of economic projections",
 "dot plot",
 "inflation",
+"consumer price index",
 "cpi",
+"producer price index",
 "ppi",
 "nonfarm payroll",
 "non-farm payroll",
 "employment report",
-"unemployment",
+"unemployment rate",
 "jobs report",
-"gdp",
 "gross domestic product",
+"gdp",
 "recession",
 "treasury yield",
 "10-year yield",
+"2-year yield",
 "financial conditions",
 "credit conditions",
 ];
 
-const veryHighMatches =
-veryHighImpactKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
 
-if (veryHighMatches > 0) {
+const veryHighMatches =
+countKeywordMatches(
+text,
+veryHighImpactKeywords
+);
+
+
+if (
+veryHighMatches > 0
+) {
+
 score += Math.min(
-40,
-veryHighMatches * 12
+50,
+veryHighMatches * 14
 );
 }
 
@@ -474,32 +670,39 @@ NASDAQ / LARGE CAP IMPACT
 --------------------------------------------------- */
 
 const nasdaqMarketKeywords = [
-"nasdaq",
 "nasdaq 100",
+"nasdaq-100",
+"nasdaq composite",
 "ndx",
 "qqq",
 "technology stocks",
 "tech stocks",
 "mega cap",
-"large cap",
+"mega-cap",
+"large cap growth",
 "apple",
 "microsoft",
 "amazon",
 "alphabet",
-"meta",
+"meta platforms",
 "nvidia",
 ];
 
-const nasdaqMatches =
-nasdaqMarketKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
 
-if (nasdaqMatches > 0) {
+const nasdaqMatches =
+countKeywordMatches(
+text,
+nasdaqMarketKeywords
+);
+
+
+if (
+nasdaqMatches > 0
+) {
+
 score += Math.min(
-20,
-nasdaqMatches * 5
+24,
+nasdaqMatches * 6
 );
 }
 
@@ -510,7 +713,6 @@ RUSSELL / SMALL CAP IMPACT
 
 const russellKeywords = [
 "russell 2000",
-"russell",
 "rut",
 "iwm",
 "small cap",
@@ -519,45 +721,54 @@ const russellKeywords = [
 "small-cap stocks",
 ];
 
-const russellMatches =
-russellKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
 
-if (russellMatches > 0) {
+const russellMatches =
+countKeywordMatches(
+text,
+russellKeywords
+);
+
+
+if (
+russellMatches > 0
+) {
+
 score += Math.min(
-20,
-russellMatches * 6
+24,
+russellMatches * 7
 );
 }
 
 
 /* ---------------------------------------------------
-SEMICONDUCTOR / AI IMPACT
+SEMICONDUCTOR / AI MARKET IMPACT
 --------------------------------------------------- */
 
 const semiconductorKeywords = [
 "semiconductor",
 "semiconductors",
 "chip stocks",
-"chips",
 "nvidia",
 "amd",
 "broadcom",
 "ai stocks",
-"artificial intelligence",
-"generative ai",
-"ai boom",
+"artificial intelligence stocks",
+"ai spending",
+"ai capex",
 ];
 
-const semiconductorMatches =
-semiconductorKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
 
-if (semiconductorMatches > 0) {
+const semiconductorMatches =
+countKeywordMatches(
+text,
+semiconductorKeywords
+);
+
+
+if (
+semiconductorMatches > 0
+) {
+
 score += Math.min(
 20,
 semiconductorMatches * 5
@@ -575,8 +786,8 @@ const volatilityKeywords = [
 "implied volatility",
 "options market",
 "market breadth",
-"breadth",
 "advance decline",
+"advance-decline",
 "market internals",
 "rotation",
 "relative strength",
@@ -584,16 +795,21 @@ const volatilityKeywords = [
 "liquidity tightening",
 ];
 
-const volatilityMatches =
-volatilityKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
 
-if (volatilityMatches > 0) {
+const volatilityMatches =
+countKeywordMatches(
+text,
+volatilityKeywords
+);
+
+
+if (
+volatilityMatches > 0
+) {
+
 score += Math.min(
-25,
-volatilityMatches * 6
+30,
+volatilityMatches * 7
 );
 }
 
@@ -613,19 +829,25 @@ const financialConditionKeywords = [
 "credit spread",
 "credit spreads",
 "real yield",
+"real yields",
 "term premium",
 ];
 
-const financialConditionMatches =
-financialConditionKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
 
-if (financialConditionMatches > 0) {
+const financialConditionMatches =
+countKeywordMatches(
+text,
+financialConditionKeywords
+);
+
+
+if (
+financialConditionMatches > 0
+) {
+
 score += Math.min(
-25,
-financialConditionMatches * 7
+30,
+financialConditionMatches * 8
 );
 }
 
@@ -649,13 +871,18 @@ const geopoliticalKeywords = [
 "geopolitical risk",
 ];
 
-const geopoliticalMatches =
-geopoliticalKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
 
-if (geopoliticalMatches > 0) {
+const geopoliticalMatches =
+countKeywordMatches(
+text,
+geopoliticalKeywords
+);
+
+
+if (
+geopoliticalMatches > 0
+) {
+
 score += Math.min(
 20,
 geopoliticalMatches * 5
@@ -664,7 +891,7 @@ geopoliticalMatches * 5
 
 
 /* ---------------------------------------------------
-LOW IMPACT DOCUMENT CONTENT
+LOW IMPACT / ADMINISTRATIVE CONTENT
 --------------------------------------------------- */
 
 const lowImpactKeywords = [
@@ -698,7 +925,7 @@ const lowImpactKeywords = [
 "liquidity management publication",
 
 "public comment",
-"enforcement",
+"enforcement action",
 "regulatory notice",
 
 "eligible marketable assets",
@@ -710,46 +937,28 @@ const lowImpactKeywords = [
 "pontes pilot is closed",
 ];
 
-const lowImpactMatches =
-lowImpactKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
 
-if (lowImpactMatches > 0) {
+const lowImpactMatches =
+countKeywordMatches(
+text,
+lowImpactKeywords
+);
+
+
+if (
+lowImpactMatches > 0
+) {
+
 score -= Math.min(
-45,
-lowImpactMatches * 14
+50,
+lowImpactMatches * 16
 );
 }
 
 
 /* ===================================================
-DOCUMENT-TYPE CLASSIFICATION
+FED ADMINISTRATIVE / SUPERVISORY CONTENT
 =================================================== */
-
-const isFed =
-normalizeText(source.publisher)
-.includes("federal reserve") ||
-normalizeText(source.url)
-.includes("federalreserve.gov");
-
-const isECB =
-normalizeText(source.publisher)
-.includes("ecb") ||
-normalizeText(source.url)
-.includes("ecb.europa.eu");
-
-const isNasdaq =
-normalizeText(source.publisher)
-.includes("nasdaq") ||
-normalizeText(source.url)
-.includes("nasdaq.com");
-
-
-/* ---------------------------------------------------
-FED BANK / CORPORATE APPROVAL DOCUMENTS
---------------------------------------------------- */
 
 const fedAdministrativeKeywords = [
 "approval of application",
@@ -759,40 +968,32 @@ const fedAdministrativeKeywords = [
 "acquisition of control",
 "acquisition of shares",
 "formation of a bank holding company",
-"merger",
 "application by",
 "state member bank",
 "national bank",
 "trust company",
 ];
 
+
 const fedAdministrativeMatches =
-fedAdministrativeKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
+countKeywordMatches(
+text,
+fedAdministrativeKeywords
+);
 
 
 if (
-isFed &&
-fedAdministrativeMatches > 0
+isFederalReserveSource(source) &&
+fedAdministrativeMatches > 0 &&
+veryHighMatches === 0
 ) {
 
-/*
-* These are authoritative Fed documents,
-* but they are not monetary-policy information.
-*
-* They should therefore remain available but
-* rank substantially below FOMC / macro material.
-*/
-
 score -= 35;
-
 }
 
 
 /* ---------------------------------------------------
-FED SUPERVISORY / ENFORCEMENT DOCUMENTS
+FED SUPERVISORY / BANK REGULATION
 --------------------------------------------------- */
 
 const fedSupervisoryKeywords = [
@@ -802,31 +1003,46 @@ const fedSupervisoryKeywords = [
 "consent order",
 "supervisory action",
 "bank enforcement",
+"stress test",
+"stress tests",
+"stress test-related",
+"capital requirements",
+"resolution plan",
+"resolution plans",
+"resolution plan feedback",
+"banking organizations",
+"bank regulation",
+"supervision and regulation",
 ];
 
+
 const fedSupervisoryMatches =
-fedSupervisoryKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
+countKeywordMatches(
+text,
+fedSupervisoryKeywords
+);
 
 
 if (
-isFed &&
+isFederalReserveSource(source) &&
 fedSupervisoryMatches > 0 &&
 veryHighMatches === 0
 ) {
 
-score -= 20;
-
+score -= Math.min(
+35,
+15 +
+fedSupervisoryMatches * 5
+);
 }
 
 
 /* ---------------------------------------------------
-ECB OPERATIONAL / REFERENCE DOCUMENTS
+ECB OPERATIONAL / TECHNICAL
 --------------------------------------------------- */
 
 const ecbOperationalKeywords = [
+"liquidity management publication",
 "list of eligible marketable assets",
 "eligible marketable assets",
 "list of monetary financial institutions",
@@ -835,34 +1051,39 @@ const ecbOperationalKeywords = [
 "pontes pilot is closed",
 "reference rates",
 "fx reference rates",
-"settlement",
+"settlement publication",
+"settlement calendar",
 "operational procedures",
 "operational framework",
 "technical publication",
 "technical documentation",
 ];
 
+
 const ecbOperationalMatches =
-ecbOperationalKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
+countKeywordMatches(
+text,
+ecbOperationalKeywords
+);
 
 
 if (
-isECB &&
+isECBSource(source) &&
 ecbOperationalMatches > 0 &&
 veryHighMatches === 0 &&
 financialConditionMatches === 0
 ) {
 
-score -= 30;
-
+score -= Math.min(
+45,
+20 +
+ecbOperationalMatches * 10
+);
 }
 
 
 /* ---------------------------------------------------
-NASDAQ CORPORATE / INFRASTRUCTURE ANNOUNCEMENTS
+NASDAQ CORPORATE / COMMERCIAL CONTENT
 --------------------------------------------------- */
 
 const nasdaqCorporateKeywords = [
@@ -870,42 +1091,92 @@ const nasdaqCorporateKeywords = [
 "conference presentation",
 "investor conference",
 "partnership",
-"relationship",
-"investment",
-"tokenized equities",
+"partners with",
+"adopts nasdaq",
+"adopts nasdaq calypso",
+"nasdaq calypso",
+"calypso",
+"launches agentic capabilities",
+"platform",
+"trade lifecycle",
+"clearing platform",
 "market surveillance agreement",
-"listing",
+"technology platform",
+"software platform",
+"listing compliance",
 "delisting",
 ];
 
+
 const nasdaqCorporateMatches =
-nasdaqCorporateKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
+countKeywordMatches(
+text,
+nasdaqCorporateKeywords
+);
 
 
 if (
-isNasdaq &&
+isNasdaqSource(source) &&
 nasdaqCorporateMatches > 0 &&
-nasdaqMatches <= 1 &&
 veryHighMatches === 0 &&
 volatilityMatches === 0
 ) {
 
-score -= 25;
+score -= Math.min(
+40,
+18 +
+nasdaqCorporateMatches * 6
+);
+}
 
+
+/* ---------------------------------------------------
+INDEX CONSTITUENT CHANGES
+--------------------------------------------------- */
+
+const indexConstituentKeywords = [
+"to join the nasdaq-100",
+"to join the nasdaq 100",
+"become a component",
+"becomes a component",
+"will become a component",
+"replacing",
+"index inclusion",
+"index deletion",
+"index reconstitution",
+"index rebalance",
+];
+
+
+const indexConstituentMatches =
+countKeywordMatches(
+text,
+indexConstituentKeywords
+);
+
+
+if (
+indexConstituentMatches > 0 &&
+veryHighMatches === 0
+) {
+
+/*
+* Index changes can affect individual names and
+* passive flows, but they normally do not define
+* the broad macro / regime picture.
+*/
+
+score -= Math.min(
+25,
+10 +
+indexConstituentMatches * 5
+);
 }
 
 
 /* ===================================================
-STRONG MARKET-IMPACT OVERRIDE
+STRONG MARKET CATALYST OVERRIDE
 =================================================== */
-
-/*
-* Administrative wording must not suppress a document
-* that also contains a genuine macro/market catalyst.
-*/
 
 const hasStrongMarketCatalyst =
 veryHighMatches > 0 ||
@@ -919,7 +1190,6 @@ hasStrongMarketCatalyst
 ) {
 
 score += 10;
-
 }
 
 
@@ -935,13 +1205,18 @@ if (
 nasdaqMatches > 0 &&
 russellMatches > 0
 ) {
+
 score += 15;
 }
 
+
 if (
 text.includes("rotation") ||
-text.includes("relative strength")
+text.includes(
+"relative strength"
+)
 ) {
+
 score += 12;
 }
 }
@@ -954,9 +1229,17 @@ task === "CRASH_RISK_REVIEW"
 if (
 text.includes("vix") ||
 text.includes("volatility") ||
-text.includes("liquidity stress") ||
-text.includes("financial conditions")
+text.includes(
+"liquidity stress"
+) ||
+text.includes(
+"financial conditions"
+) ||
+text.includes(
+"credit spreads"
+)
 ) {
+
 score += 15;
 }
 }
@@ -967,11 +1250,18 @@ task === "REGIME_REVIEW"
 ) {
 
 if (
-text.includes("monetary policy") ||
-text.includes("interest rate") ||
+text.includes(
+"monetary policy"
+) ||
+text.includes(
+"interest rate"
+) ||
 text.includes("inflation") ||
-text.includes("financial conditions")
+text.includes(
+"financial conditions"
+)
 ) {
+
 score += 15;
 }
 }
@@ -988,16 +1278,16 @@ DOCUMENT-TYPE RELEVANCE
 ===================================================== */
 
 /*
-* Separate explicit document-type score.
+* This score answers a different question from
+* sourceQuality():
 *
-* This is intentionally conservative.
+* "What kind of document is this for the purpose of
+* market-regime research?"
 *
-* 100 = directly relevant market document
-* 50 = potentially relevant
-* 0 = administrative / technical document
-*
-* It is used as an additional modifier in the final
-* relevance calculation.
+* 100 = direct macro / policy / market catalyst
+* 70+ = meaningful market research material
+* 40-60 = contextual
+* <=30 = administrative / corporate / technical
 */
 
 function documentTypeRelevance(
@@ -1005,7 +1295,9 @@ source: AIResearchSource
 ): number {
 
 const text =
-sourceText(source);
+sourceText(
+source
+);
 
 
 /* ---------------------------------------------------
@@ -1014,20 +1306,21 @@ DIRECT MACRO / POLICY DOCUMENTS
 
 const directMacroKeywords = [
 "fomc statement",
-"economic projections",
 "federal open market committee",
+"economic projections",
+"summary of economic projections",
 "federal funds rate",
 "interest rate decision",
 "monetary policy",
-"inflation report",
+"minutes of the federal open market committee",
 "consumer price index",
 "producer price index",
 "employment report",
 "nonfarm payroll",
 "gross domestic product",
 "gdp",
-"minutes of the federal open market committee",
 ];
+
 
 if (
 directMacroKeywords.some(
@@ -1035,48 +1328,94 @@ directMacroKeywords.some(
 text.includes(keyword)
 )
 ) {
+
 return 100;
 }
 
 
 /* ---------------------------------------------------
-DIRECT MARKET DOCUMENTS
+DIRECT MARKET / FINANCIAL-CONDITION DOCUMENTS
 --------------------------------------------------- */
 
 const directMarketKeywords = [
 "nasdaq 100",
+"nasdaq-100",
 "nasdaq composite",
 "russell 2000",
-"small cap",
+"small cap stocks",
 "technology stocks",
-"semiconductor",
-"semiconductors",
+"semiconductor stocks",
 "vix",
-"volatility",
+"implied volatility",
 "market breadth",
 "market internals",
-"rotation",
+"market rotation",
+"relative strength",
 "treasury yields",
 "financial conditions",
 "credit spreads",
+"real yields",
+"term premium",
 ];
 
+
 const directMarketMatches =
-directMarketKeywords.filter(
-(keyword) =>
-text.includes(keyword)
-).length;
+countKeywordMatches(
+text,
+directMarketKeywords
+);
+
 
 if (
 directMarketMatches >= 2
 ) {
-return 90;
+
+return 92;
 }
+
 
 if (
 directMarketMatches === 1
 ) {
+
 return 78;
+}
+
+
+/* ---------------------------------------------------
+FED SUPERVISORY / BANK REGULATORY DOCUMENTS
+--------------------------------------------------- */
+
+const fedSupervisoryKeywords = [
+"stress test",
+"stress tests",
+"stress test-related",
+"capital requirements",
+"resolution plan",
+"resolution plans",
+"resolution plan feedback",
+"banking organizations",
+"supervisory action",
+"enforcement action",
+"bank regulation",
+"supervision and regulation",
+];
+
+
+if (
+isFederalReserveSource(source) &&
+fedSupervisoryKeywords.some(
+(keyword) =>
+text.includes(keyword)
+)
+) {
+
+/*
+* Potentially useful systemic context,
+* but not equivalent to monetary policy.
+*/
+
+return 32;
 }
 
 
@@ -1089,10 +1428,12 @@ const fedAdministrativeKeywords = [
 "announces approval",
 "bank holding company",
 "acquisition of control",
+"acquisition of shares",
 "application by",
 "state member bank",
-"merger",
+"trust company",
 ];
+
 
 if (
 fedAdministrativeKeywords.some(
@@ -1100,7 +1441,8 @@ fedAdministrativeKeywords.some(
 text.includes(keyword)
 )
 ) {
-return 15;
+
+return 12;
 }
 
 
@@ -1108,7 +1450,8 @@ return 15;
 ECB TECHNICAL / OPERATIONAL
 --------------------------------------------------- */
 
-const technicalKeywords = [
+const ecbTechnicalKeywords = [
+"liquidity management publication",
 "list of eligible marketable assets",
 "eligible marketable assets",
 "list of monetary financial institutions",
@@ -1117,39 +1460,101 @@ const technicalKeywords = [
 "pontes pilot is closed",
 "reference rates",
 "fx reference rates",
-"settlement",
+"settlement publication",
+"settlement calendar",
 "technical publication",
 "technical documentation",
 "operational procedures",
 "operational framework",
 ];
 
+
 if (
-technicalKeywords.some(
+ecbTechnicalKeywords.some(
 (keyword) =>
 text.includes(keyword)
 )
 ) {
-return 10;
+
+return 8;
 }
 
 
 /* ---------------------------------------------------
-NASDAQ CORPORATE / INFRASTRUCTURE
+NASDAQ COMMERCIAL / INFRASTRUCTURE
+--------------------------------------------------- */
+
+const nasdaqCorporateKeywords = [
+"nasdaq calypso",
+"calypso",
+"launches agentic capabilities",
+"adopts nasdaq",
+"clearing platform",
+"trade lifecycle",
+"technology platform",
+"software platform",
+"conference presentation",
+"investor conference",
+"market surveillance agreement",
+];
+
+
+if (
+isNasdaqSource(source) &&
+nasdaqCorporateKeywords.some(
+(keyword) =>
+text.includes(keyword)
+)
+) {
+
+return 20;
+}
+
+
+/* ---------------------------------------------------
+INDEX CONSTITUENT / REBALANCE NEWS
+--------------------------------------------------- */
+
+const indexChangeKeywords = [
+"to join the nasdaq-100",
+"to join the nasdaq 100",
+"become a component",
+"becomes a component",
+"will become a component",
+"index inclusion",
+"index deletion",
+"index reconstitution",
+"index rebalance",
+];
+
+
+if (
+indexChangeKeywords.some(
+(keyword) =>
+text.includes(keyword)
+)
+) {
+
+return 38;
+}
+
+
+/* ---------------------------------------------------
+GENERIC CORPORATE / PROMOTIONAL CONTENT
 --------------------------------------------------- */
 
 const corporateKeywords = [
-"conference",
 "conference presentation",
 "investor conference",
+"fireside chat",
 "partnership",
-"relationship",
-"investment",
+"partners with",
 "tokenized equities",
 "market surveillance agreement",
-"listing",
+"listing compliance",
 "delisting",
 ];
+
 
 if (
 corporateKeywords.some(
@@ -1157,11 +1562,12 @@ corporateKeywords.some(
 text.includes(keyword)
 )
 ) {
-return 30;
+
+return 25;
 }
 
 
-return 55;
+return 50;
 }
 
 
@@ -1173,20 +1579,29 @@ function recencyScore(
 source: AIResearchSource
 ): number {
 
-if (!source.publishedAt) {
+if (
+!source.publishedAt
+) {
+
 return 35;
 }
+
 
 const timestamp =
 new Date(
 source.publishedAt
 ).getTime();
 
+
 if (
-!Number.isFinite(timestamp)
+!Number.isFinite(
+timestamp
+)
 ) {
+
 return 35;
 }
+
 
 const ageHours =
 (
@@ -1200,29 +1615,47 @@ timestamp
 );
 
 
-if (ageHours <= 24) {
+if (
+ageHours <= 24
+) {
 return 100;
 }
 
-if (ageHours <= 48) {
+
+if (
+ageHours <= 48
+) {
 return 94;
 }
 
-if (ageHours <= 72) {
+
+if (
+ageHours <= 72
+) {
 return 88;
 }
 
-if (ageHours <= 120) {
+
+if (
+ageHours <= 120
+) {
 return 80;
 }
 
-if (ageHours <= 168) {
+
+if (
+ageHours <= 168
+) {
 return 72;
 }
 
-if (ageHours <= 336) {
+
+if (
+ageHours <= 336
+) {
 return 55;
 }
+
 
 return 35;
 }
@@ -1237,26 +1670,27 @@ source: AIResearchSource
 ): number {
 
 const text =
-sourceText(source);
+sourceText(
+source
+);
+
 
 const noiseKeywords = [
 "t2",
 "t+2",
 "t2s",
-"settlement",
 "settlement date",
+"settlement calendar",
 "options chain",
 "strike price",
 "expiration date",
-"open interest",
 "option chain",
 "delisting",
 "delisted",
 "listing compliance",
-"enforcement",
-"public comment",
 "administrative notice",
 "technical documentation",
+"technical publication",
 "reference rates",
 "conference presentation",
 "conference event",
@@ -1268,24 +1702,30 @@ const noiseKeywords = [
 "price target",
 "buy now",
 "promotional",
+"liquidity management publication",
 ];
+
 
 let penalty = 0;
 
-for (const keyword of noiseKeywords) {
+
+for (
+const keyword of noiseKeywords
+) {
 
 if (
 text.includes(keyword)
 ) {
+
 penalty += 7;
 }
-
 }
+
 
 return clamp(
 penalty,
 0,
-40
+45
 );
 }
 
@@ -1293,6 +1733,14 @@ penalty,
 /* =====================================================
 PUBLISHER ADJUSTMENT
 ===================================================== */
+
+/*
+* Publisher adjustment is deliberately small.
+*
+* Authority is already represented by sourceQuality().
+* We do not want official status to rescue irrelevant
+* content.
+*/
 
 function publisherAdjustment(
 source: AIResearchSource
@@ -1303,45 +1751,44 @@ normalizeText(
 source.publisher
 );
 
-const url =
-normalizeText(
-source.url
-);
-
 
 if (
 publisher.includes("reuters") ||
 publisher.includes("bloomberg") ||
-publisher.includes("financial times") ||
-publisher.includes("wall street journal") ||
+publisher.includes(
+"financial times"
+) ||
+publisher.includes(
+"wall street journal"
+) ||
 publisher.includes("cnbc")
 ) {
-return 4;
+
+return 3;
 }
 
 
 if (
-publisher.includes("federal reserve") ||
-url.includes("federalreserve.gov") ||
-publisher.includes("ecb") ||
-url.includes("ecb.europa.eu")
+isFederalReserveSource(source) ||
+isECBSource(source)
 ) {
-return 4;
-}
 
-
-if (
-publisher.includes("nasdaq") ||
-url.includes("nasdaq.com")
-) {
 return 2;
 }
 
 
 if (
-url.includes("news.google.com") ||
-publisher.includes("google news")
+isNasdaqSource(source)
 ) {
+
+return 1;
+}
+
+
+if (
+isGoogleNewsSource(source)
+) {
+
 return -3;
 }
 
@@ -1360,7 +1807,10 @@ task: AIResearchTask
 ): number {
 
 const quality =
-sourceQuality(source);
+sourceQuality(
+source
+);
+
 
 const topic =
 topicRelevance(
@@ -1368,52 +1818,72 @@ source,
 task
 );
 
+
 const impact =
 marketImpactRelevance(
 source,
 task
 );
 
+
 const documentType =
 documentTypeRelevance(
 source
 );
 
+
 const recency =
-recencyScore(source);
+recencyScore(
+source
+);
+
 
 const noise =
-noisePenalty(source);
+noisePenalty(
+source
+);
+
 
 const publisher =
-publisherAdjustment(source);
-
-
-/*
-* Topic relevance and market impact remain the
-* main content signals.
-*/
-
-const adjustedTopic =
-clamp(
-topic * 0.60 +
-impact * 0.25 +
-documentType * 0.15
+publisherAdjustment(
+source
 );
 
 
 /*
-* Existing core architecture remains:
+* CONTENT RELEVANCE
 *
-* 35% Source Quality
-* 40% Content Relevance
-* 25% Recency
+* Market impact is deliberately the strongest
+* content component.
+*
+* A document should not rank highly merely because
+* its publisher is authoritative.
+*/
+
+const contentRelevance =
+clamp(
+topic * 0.35 +
+impact * 0.40 +
+documentType * 0.25
+);
+
+
+/*
+* FINAL ARCHITECTURE
+*
+* 25% source authority
+* 55% actual market relevance
+* 20% recency
+*
+* This is intentionally different from the previous
+* 35 / 40 / 25 model because that model allowed
+* official but irrelevant documents to rank too high.
 */
 
 let score =
-quality * 0.35 +
-adjustedTopic * 0.40 +
-recency * 0.25;
+quality * 0.25 +
+contentRelevance * 0.55 +
+recency * 0.20;
 
 
 score +=
@@ -1435,9 +1905,8 @@ quality < 60
 score =
 Math.min(
 score,
-74
+72
 );
-
 }
 
 
@@ -1445,22 +1914,19 @@ score,
 GOOGLE NEWS
 --------------------------------------------------- */
 
-const isGoogleNews =
-normalizeText(source.url)
-.includes("news.google.com");
-
 if (
-isGoogleNews
+isGoogleNewsSource(source)
 ) {
 
 if (
-impact < 75
+impact < 75 ||
+documentType < 70
 ) {
 
 score =
 Math.min(
 score,
-72
+70
 );
 
 } else {
@@ -1468,41 +1934,110 @@ score,
 score =
 Math.min(
 score,
-82
+80
 );
-
 }
-
 }
 
 
 /* ---------------------------------------------------
-OFFICIAL BUT LOW-IMPACT SOURCES
+OFFICIAL BUT TECHNICAL / ADMINISTRATIVE
 --------------------------------------------------- */
 
 const isOfficial =
-quality >= 100;
+isFederalReserveSource(source) ||
+isECBSource(source) ||
+isNasdaqSource(source);
+
 
 if (
 isOfficial &&
-documentType <= 30
+documentType <= 10
 ) {
-
-/*
-* Official does not mean market relevant.
-*/
 
 score =
 Math.min(
 score,
-65
+42
 );
+}
 
+
+if (
+isOfficial &&
+documentType > 10 &&
+documentType <= 20
+) {
+
+score =
+Math.min(
+score,
+50
+);
+}
+
+
+if (
+isOfficial &&
+documentType > 20 &&
+documentType <= 30
+) {
+
+score =
+Math.min(
+score,
+58
+);
+}
+
+
+if (
+isOfficial &&
+documentType > 30 &&
+documentType <= 40 &&
+impact < 70
+) {
+
+score =
+Math.min(
+score,
+64
+);
 }
 
 
 /* ---------------------------------------------------
-VERY HIGH MARKET IMPACT
+LOW MARKET IMPACT HARD CAP
+--------------------------------------------------- */
+
+if (
+impact <= 20
+) {
+
+score =
+Math.min(
+score,
+45
+);
+}
+
+
+if (
+impact > 20 &&
+impact <= 35 &&
+documentType < 50
+) {
+
+score =
+Math.min(
+score,
+58
+);
+}
+
+
+/* ---------------------------------------------------
+GENUINE HIGH-IMPACT MATERIAL
 --------------------------------------------------- */
 
 if (
@@ -1511,8 +2046,7 @@ topic >= 60 &&
 documentType >= 78
 ) {
 
-score += 5;
-
+score += 6;
 }
 
 
@@ -1521,6 +2055,211 @@ clamp(
 score
 )
 );
+}
+
+
+/* =====================================================
+DEDUPLICATION
+===================================================== */
+
+/*
+* External feeds can contain several publications that
+* are effectively the same research item.
+*
+* We deduplicate BEFORE ranking so repeated operational
+* publications cannot occupy several Top-N slots.
+*
+* Exact URL duplicates are removed first.
+*
+* Then same-publisher / same-normalized-title duplicates
+* are collapsed, keeping the newest observation.
+*/
+
+function deduplicateResearchSources(
+sources: AIResearchSource[]
+): AIResearchSource[] {
+
+const byUrl =
+new Map<
+string,
+AIResearchSource
+>();
+
+
+const withoutUrlDuplicates:
+AIResearchSource[] = [];
+
+
+for (
+const source of sources
+) {
+
+const url =
+normalizeText(
+source.url
+);
+
+
+if (
+!url
+) {
+
+withoutUrlDuplicates.push(
+source
+);
+
+continue;
+}
+
+
+const existing =
+byUrl.get(
+url
+);
+
+
+if (
+!existing
+) {
+
+byUrl.set(
+url,
+source
+);
+
+continue;
+}
+
+
+const existingDate =
+existing.publishedAt
+? new Date(
+existing.publishedAt
+).getTime()
+: 0;
+
+
+const candidateDate =
+source.publishedAt
+? new Date(
+source.publishedAt
+).getTime()
+: 0;
+
+
+if (
+candidateDate >
+existingDate
+) {
+
+byUrl.set(
+url,
+source
+);
+}
+}
+
+
+withoutUrlDuplicates.push(
+...byUrl.values()
+);
+
+
+const bySemanticKey =
+new Map<
+string,
+AIResearchSource
+>();
+
+
+const noSemanticKey:
+AIResearchSource[] = [];
+
+
+for (
+const source of withoutUrlDuplicates
+) {
+
+const title =
+normalizedTitle(
+source
+);
+
+
+const publisher =
+normalizeText(
+source.publisher
+);
+
+
+if (
+!title
+) {
+
+noSemanticKey.push(
+source
+);
+
+continue;
+}
+
+
+const semanticKey =
+`${publisher}::${title}`;
+
+
+const existing =
+bySemanticKey.get(
+semanticKey
+);
+
+
+if (
+!existing
+) {
+
+bySemanticKey.set(
+semanticKey,
+source
+);
+
+continue;
+}
+
+
+const existingDate =
+existing.publishedAt
+? new Date(
+existing.publishedAt
+).getTime()
+: 0;
+
+
+const candidateDate =
+source.publishedAt
+? new Date(
+source.publishedAt
+).getTime()
+: 0;
+
+
+if (
+candidateDate >
+existingDate
+) {
+
+bySemanticKey.set(
+semanticKey,
+source
+);
+}
+}
+
+
+return [
+...noSemanticKey,
+...bySemanticKey.values(),
+];
 }
 
 
@@ -1549,10 +2288,18 @@ sources: AIResearchSource[],
 task: AIResearchTask
 ): AIResearchSource[] {
 
-const scored: ScoredResearchSource[] =
-sources.map(
+const deduplicated =
+deduplicateResearchSources(
+sources
+);
+
+
+const scored:
+ScoredResearchSource[] =
+deduplicated.map(
 (source) => ({
 source,
+
 score:
 calculateRelevance(
 source,
@@ -1573,7 +2320,6 @@ return (
 b.score -
 a.score
 );
-
 }
 
 
@@ -1583,6 +2329,7 @@ a.source.publishedAt
 a.source.publishedAt
 ).getTime()
 : 0;
+
 
 const dateB =
 b.source.publishedAt
@@ -1596,7 +2343,6 @@ return (
 dateB -
 dateA
 );
-
 }
 );
 
@@ -1604,6 +2350,7 @@ dateA
 return scored.map(
 (item) => ({
 ...item.source,
+
 relevance:
 item.score,
 })
