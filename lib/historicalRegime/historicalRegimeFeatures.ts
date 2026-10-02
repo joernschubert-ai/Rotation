@@ -1,6 +1,6 @@
 import type {
-HistoricalAlignedDay,
-} from "./historicalRegimeAlignment";
+HistoricalRatesAlignedDay,
+} from "./historicalRegimeRatesAlignment";
 
 
 /* =====================================================
@@ -8,10 +8,12 @@ HISTORICAL REGIME FEATURES
 
 Purpose:
 - Build observable historical market features
-- Use only real aligned historical price data
+- Use only real aligned historical market data
+- Use only rates known as-of historical day T
 - No Rotation-App engine reconstruction
 - No synthetic Master Scores
 - No synthetic market phases
+- No similarity scoring
 ===================================================== */
 
 
@@ -19,12 +21,24 @@ export type HistoricalRegimeFeatures = {
 
 date: string;
 
+
 /* ================= PRICE LEVELS ================= */
 
 nasdaq: number;
 sp500: number;
 russell: number;
 vix: number;
+
+
+/* ================= RATES ================= */
+
+fedFunds: number;
+
+treasury2Y: number;
+
+treasury10Y: number;
+
+treasury10Y2YSpread: number;
 
 
 /* ================= NASDAQ RETURNS ================= */
@@ -227,7 +241,7 @@ BUILD FEATURES
 ===================================================== */
 
 export function buildHistoricalRegimeFeatures(
-days: HistoricalAlignedDay[]
+days: HistoricalRatesAlignedDay[]
 ): HistoricalRegimeFeatures[] {
 
 if (!days.length) {
@@ -417,6 +431,13 @@ vixMA20
 );
 
 
+/* =============================================
+OUTPUT
+
+Rates are already validated as-of values.
+No source date is allowed to be > day.date.
+============================================= */
+
 return {
 
 date:
@@ -433,6 +454,19 @@ day.russell,
 
 vix:
 day.vix,
+
+
+fedFunds:
+day.rates.fedFunds,
+
+treasury2Y:
+day.rates.treasury2Y,
+
+treasury10Y:
+day.rates.treasury10Y,
+
+treasury10Y2YSpread:
+day.rates.treasury10Y2YSpread,
 
 
 nasdaqReturn5D,
