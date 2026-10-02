@@ -9,6 +9,14 @@ alignHistoricalRegimeMarketData,
 } from "@/lib/historicalRegime/historicalRegimeAlignment";
 
 import {
+loadHistoricalRegimeRatesData,
+} from "@/lib/historicalRegime/historicalRegimeRatesProvider";
+
+import {
+alignHistoricalRegimeRates,
+} from "@/lib/historicalRegime/historicalRegimeRatesAlignment";
+
+import {
 buildHistoricalRegimeFeatures,
 } from "@/lib/historicalRegime/historicalRegimeFeatures";
 
@@ -30,6 +38,10 @@ Purpose:
 - Verify historical feature generation
 - Verify forward outcome generation
 - Verify feature/outcome observation join
+- Verify historical rates provider
+- Verify as-of rates alignment
+- Detect future rates leakage
+- Verify 10Y - 2Y spread calculation
 - Detect boundary / lookback / forward-horizon issues
 - No engine integration
 - No scoring
@@ -44,7 +56,7 @@ export async function GET() {
 try {
 
 /* =================================================
-LOAD RAW HISTORICAL DATA
+LOAD RAW HISTORICAL MARKET DATA
 ================================================= */
 
 const data =
@@ -154,13 +166,287 @@ item.lastDate !== null
 
 
 /* =================================================
-ALIGNMENT
+MARKET ALIGNMENT
 ================================================= */
 
 const aligned =
 alignHistoricalRegimeMarketData(
 data
 );
+
+
+/* =================================================
+LOAD HISTORICAL RATES
+================================================= */
+
+const ratesData =
+await loadHistoricalRegimeRatesData();
+
+
+/* =================================================
+ALIGN RATES AS-OF MARKET DAY
+
+Critical rule:
+
+rateSourceDate <= marketDate
+
+A future rate observation must never be used.
+================================================= */
+
+const ratesAligned =
+alignHistoricalRegimeRates(
+aligned,
+ratesData
+);
+
+
+/* =================================================
+RATES SOURCE SUMMARY
+================================================= */
+
+const ratesSummary = {
+
+fedFunds: {
+
+seriesId:
+ratesData.fedFunds.seriesId,
+
+count:
+ratesData.fedFunds.count,
+
+firstDate:
+ratesData.fedFunds.firstDate,
+
+lastDate:
+ratesData.fedFunds.lastDate,
+
+},
+
+
+treasury2Y: {
+
+seriesId:
+ratesData.treasury2Y.seriesId,
+
+count:
+ratesData.treasury2Y.count,
+
+firstDate:
+ratesData.treasury2Y.firstDate,
+
+lastDate:
+ratesData.treasury2Y.lastDate,
+
+},
+
+
+treasury10Y: {
+
+seriesId:
+ratesData.treasury10Y.seriesId,
+
+count:
+ratesData.treasury10Y.count,
+
+firstDate:
+ratesData.treasury10Y.firstDate,
+
+lastDate:
+ratesData.treasury10Y.lastDate,
+
+},
+
+};
+
+
+/* =================================================
+RATES VALIDATION
+
+Check every aligned historical day.
+
+1. No source date may be later than market date.
+2. 10Y-2Y spread must equal aligned 10Y minus 2Y.
+================================================= */
+
+let futureRateLeakageCount =
+0;
+
+
+let spreadMismatchCount =
+0;
+
+
+let maxFedFundsCarryDays =
+0;
+
+let maxTreasury2YCarryDays =
+0;
+
+let maxTreasury10YCarryDays =
+0;
+
+
+function calendarDayDifference(
+laterDate: string,
+earlierDate: string
+): number {
+
+const later =
+Date.parse(
+`${laterDate}T00:00:00Z`
+);
+
+const earlier =
+Date.parse(
+`${earlierDate}T00:00:00Z`
+);
+
+
+if (
+!Number.isFinite(later) ||
+!Number.isFinite(earlier)
+) {
+return 0;
+}
+
+
+return Math.round(
+(later - earlier) /
+86_400_000
+);
+
+}
+
+
+for (
+const day
+of ratesAligned.days
+) {
+
+const {
+fedFunds,
+treasury2Y,
+treasury10Y,
+} =
+day.rateSourceDates;
+
+
+if (
+fedFunds > day.date ||
+treasury2Y > day.date ||
+treasury10Y > day.date
+) {
+
+futureRateLeakageCount += 1;
+
+}
+
+
+const expectedSpread =
+day.rates.treasury10Y -
+day.rates.treasury2Y;
+
+
+const actualSpread =
+day.rates.treasury10Y2YSpread;
+
+
+if (
+Math.abs(
+expectedSpread -
+actualSpread
+) > 1e-12
+) {
+
+spreadMismatchCount += 1;
+
+}
+
+
+maxFedFundsCarryDays =
+Math.max(
+maxFedFundsCarryDays,
+calendarDayDifference(
+day.date,
+fedFunds
+)
+);
+
+
+maxTreasury2YCarryDays =
+Math.max(
+maxTreasury2YCarryDays,
+calendarDayDifference(
+day.date,
+treasury2Y
+)
+);
+
+
+maxTreasury10YCarryDays =
+Math.max(
+maxTreasury10YCarryDays,
+calendarDayDifference(
+day.date,
+treasury10Y
+)
+);
+
+}
+
+
+/* =================================================
+RATES CHECKS
+================================================= */
+
+const ratesChecks = {
+
+fedFundsHasData:
+ratesData.fedFunds.count > 0,
+
+treasury2YHasData:
+ratesData.treasury2Y.count > 0,
+
+treasury10YHasData:
+ratesData.treasury10Y.count > 0,
+
+ratesAlignmentHasData:
+ratesAligned.count > 0,
+
+ratesDoNotExceedMarketDays:
+ratesAligned.count <=
+aligned.count,
+
+noFutureRateLeakage:
+futureRateLeakageCount === 0,
+
+spreadCalculationCorrect:
+spreadMismatchCount === 0,
+
+allAlignedRateValuesFinite:
+ratesAligned.days.every(
+day =>
+Number.isFinite(
+day.rates.fedFunds
+) &&
+Number.isFinite(
+day.rates.treasury2Y
+) &&
+Number.isFinite(
+day.rates.treasury10Y
+) &&
+Number.isFinite(
+day.rates.treasury10Y2YSpread
+)
+),
+
+};
+
+
+const ratesHealthy =
+Object.values(
+ratesChecks
+).every(Boolean);
 
 
 /* =================================================
@@ -331,12 +617,6 @@ pipelineChecks
 
 /* =================================================
 BOUNDARY SAMPLES
-
-Only tiny samples are returned.
-
-These help verify:
-- MA200 becomes available where expected
-- Forward 60D disappears where expected
 ================================================= */
 
 const firstObservation =
@@ -372,6 +652,40 @@ null;
 
 
 /* =================================================
+RATES SAMPLES
+
+Find one example where Treasury data was carried
+from an earlier source date.
+
+This proves the as-of mechanism is actually used.
+================================================= */
+
+const firstRatesDay =
+ratesAligned.days[0] ??
+null;
+
+
+const firstCarriedTreasuryDay =
+ratesAligned.days.find(
+day =>
+day.rateSourceDates
+.treasury2Y !==
+day.date ||
+day.rateSourceDates
+.treasury10Y !==
+day.date
+) ??
+null;
+
+
+const lastRatesDay =
+ratesAligned.days[
+ratesAligned.days.length - 1
+] ??
+null;
+
+
+/* =================================================
 RESPONSE
 ================================================= */
 
@@ -381,7 +695,8 @@ ok:
 allHaveData &&
 allHaveDates &&
 allHaveLongHistory &&
-pipelineHealthy,
+pipelineHealthy &&
+ratesHealthy,
 
 
 quality: {
@@ -405,6 +720,46 @@ aligned.lastDate,
 
 
 summary,
+
+
+rates: {
+
+summary:
+ratesSummary,
+
+alignment: {
+
+count:
+ratesAligned.count,
+
+firstDate:
+ratesAligned.firstDate,
+
+lastDate:
+ratesAligned.lastDate,
+
+},
+
+diagnostics: {
+
+...ratesAligned.diagnostics,
+
+futureRateLeakageCount,
+
+spreadMismatchCount,
+
+maxFedFundsCarryDays,
+
+maxTreasury2YCarryDays,
+
+maxTreasury10YCarryDays,
+
+},
+
+checks:
+ratesChecks,
+
+},
 
 
 pipeline: {
@@ -528,6 +883,55 @@ lastObservation.outcomes
 forward60D:
 lastObservation.outcomes
 .forward60D,
+}
+: null,
+
+},
+
+
+ratesSamples: {
+
+firstRatesDay:
+firstRatesDay
+? {
+date:
+firstRatesDay.date,
+
+rates:
+firstRatesDay.rates,
+
+sourceDates:
+firstRatesDay.rateSourceDates,
+}
+: null,
+
+
+firstCarriedTreasuryDay:
+firstCarriedTreasuryDay
+? {
+date:
+firstCarriedTreasuryDay.date,
+
+rates:
+firstCarriedTreasuryDay.rates,
+
+sourceDates:
+firstCarriedTreasuryDay.rateSourceDates,
+}
+: null,
+
+
+lastRatesDay:
+lastRatesDay
+? {
+date:
+lastRatesDay.date,
+
+rates:
+lastRatesDay.rates,
+
+sourceDates:
+lastRatesDay.rateSourceDates,
 }
 : null,
 
