@@ -22,6 +22,13 @@ AIResearchTensionState,
 AIResearchThesis,
 } from "./aiResearchTypes";
 
+import type {
+COTGroupDivergence,
+COTMarket,
+COTMarketPositioningSummary,
+COTTraderGroup,
+} from "./aiResearchCOTTypes";
+
 
 /* =====================================================
 HELPERS
@@ -59,6 +66,17 @@ return Number.isFinite(parsed)
 function optionalNumber(
 value: unknown
 ): number | null {
+
+if (
+value === null ||
+value === undefined ||
+value === ""
+) {
+
+return null;
+
+}
+
 
 const parsed =
 Number(value);
@@ -1368,15 +1386,6 @@ snapshot
 ).length;
 
 
-/*
-* Count consecutive tension snapshots backwards
-* from the latest historical observation.
-*
-* Multiple development snapshots can exist on the
-* same trading day. Therefore we also separately
-* count unique trading days.
-*/
-
 let consecutiveTensionSnapshots = 0;
 
 const consecutiveTradingDays =
@@ -1472,15 +1481,6 @@ previous.masterScore
 : null;
 
 
-/*
-* Simple history-window trend:
-*
-* latest Master Score minus oldest Master Score.
-*
-* This is deliberately descriptive and is NOT a
-* newly invented market-engine score.
-*/
-
 const oldest =
 chronological[0];
 
@@ -1536,21 +1536,111 @@ COT POSITIONING
 ===================================================== */
 
 /*
+* COT is supplementary positioning evidence.
+*
 * IMPORTANT:
 *
-* COT remains a separate positioning layer.
+* The COT layer does NOT create a trade signal.
 *
-* In this development step we deliberately preserve
-* the existing COT interpretation.
+* We distinguish:
 *
-* Detailed market/group interpretation will be added
-* in a separate bounded step after the history and
-* price-vs-structure layer has been verified.
+* - positioning level
+* - 1W change
+* - 4W change
+* - 13W change
+* - 26W change
+* - 52W percentile / z-score context
+* - Asset Manager vs Leveraged Money divergence
+*
+* Dealer positioning is retained as context but is
+* deliberately NOT treated as a simple bullish or
+* bearish directional signal because dealers often
+* act as intermediaries / hedgers.
 */
+
+type COTDirectionalState =
+| "BULLISH"
+| "BEARISH"
+| "NEUTRAL"
+| "MIXED"
+| "UNKNOWN";
+
+
+interface COTGroupResearchSummary {
+
+market: COTMarket;
+
+group: COTTraderGroup;
+
+reportDate: string;
+
+bias: string;
+
+netPosition: number | null;
+
+weeklyChange: number | null;
+
+change4W: number | null;
+
+change13W: number | null;
+
+change26W: number | null;
+
+normalizedChange4W: number | null;
+
+normalizedChange13W: number | null;
+
+normalizedChange26W: number | null;
+
+percentile: number | null;
+
+zScore: number | null;
+
+isExtreme: boolean;
+
+direction: COTDirectionalState;
+
+directionScore: number;
+
+confidence: number;
+
+}
+
+
+interface COTMarketResearchSummary {
+
+market: COTMarket;
+
+reportDate: string | null;
+
+available: boolean;
+
+assetManager: COTGroupResearchSummary | null;
+
+leveragedMoney: COTGroupResearchSummary | null;
+
+dealer: COTGroupResearchSummary | null;
+
+otherReportables: COTGroupResearchSummary | null;
+
+nonReportables: COTGroupResearchSummary | null;
+
+direction: COTDirectionalState;
+
+directionScore: number;
+
+confidence: number;
+
+divergenceCount: number;
+
+}
+
 
 interface COTResearchSummary {
 
 available: boolean;
+
+latestReportDate: string | null;
 
 observationCount: number;
 
@@ -1559,6 +1649,759 @@ summaryCount: number;
 divergenceCount: number;
 
 extremeCount: number;
+
+historySeriesCount: number;
+
+markets: COTMarketResearchSummary[];
+
+divergences: COTGroupDivergence[];
+
+overallDirection: COTDirectionalState;
+
+overallDirectionScore: number;
+
+confidence: number;
+
+}
+
+
+/* =====================================================
+COT HELPERS
+===================================================== */
+
+function cotSignedScore(
+value: number | null,
+threshold: number,
+weight: number
+): number {
+
+if (
+value === null ||
+Math.abs(value) < threshold
+) {
+
+return 0;
+
+}
+
+
+return value > 0
+? weight
+: -weight;
+
+}
+
+
+function cotPercentileScore(
+percentile: number | null
+): number {
+
+if (
+percentile === null
+) {
+
+return 0;
+
+}
+
+
+if (
+percentile >= 90
+) {
+
+return 2;
+
+}
+
+
+if (
+percentile >= 70
+) {
+
+return 1;
+
+}
+
+
+if (
+percentile <= 10
+) {
+
+return -2;
+
+}
+
+
+if (
+percentile <= 30
+) {
+
+return -1;
+
+}
+
+
+return 0;
+
+}
+
+
+function cotZScoreContribution(
+zScore: number | null
+): number {
+
+if (
+zScore === null
+) {
+
+return 0;
+
+}
+
+
+if (
+zScore >= 1.5
+) {
+
+return 2;
+
+}
+
+
+if (
+zScore >= 0.75
+) {
+
+return 1;
+
+}
+
+
+if (
+zScore <= -1.5
+) {
+
+return -2;
+
+}
+
+
+if (
+zScore <= -0.75
+) {
+
+return -1;
+
+}
+
+
+return 0;
+
+}
+
+
+function directionFromScore(
+score: number
+): COTDirectionalState {
+
+if (
+score >= 4
+) {
+
+return "BULLISH";
+
+}
+
+
+if (
+score <= -4
+) {
+
+return "BEARISH";
+
+}
+
+
+if (
+Math.abs(score) <= 1
+) {
+
+return "NEUTRAL";
+
+}
+
+
+return "MIXED";
+
+}
+
+
+/*
+* Asset Managers and Leveraged Money are interpreted
+* differently from Dealer positioning.
+*
+* Asset Manager:
+* longer-horizon institutional positioning receives
+* the highest directional relevance.
+*
+* Leveraged Money:
+* tactical positioning is useful confirmation but
+* receives slightly less weight.
+*
+* Dealer:
+* descriptive context only; no direct directional
+* contribution is assigned here.
+*/
+
+function buildCOTGroupResearchSummary(
+summary: COTMarketPositioningSummary
+): COTGroupResearchSummary {
+
+const netPosition =
+optionalNumber(
+summary.netPosition
+);
+
+const weeklyChange =
+optionalNumber(
+summary.weeklyChange
+);
+
+const change4W =
+optionalNumber(
+summary.change4W
+);
+
+const change13W =
+optionalNumber(
+summary.change13W
+);
+
+const change26W =
+optionalNumber(
+summary.change26W
+);
+
+const normalizedChange4W =
+optionalNumber(
+summary.normalizedChange4W
+);
+
+const normalizedChange13W =
+optionalNumber(
+summary.normalizedChange13W
+);
+
+const normalizedChange26W =
+optionalNumber(
+summary.normalizedChange26W
+);
+
+const percentile =
+optionalNumber(
+summary.percentile
+);
+
+const zScore =
+optionalNumber(
+summary.zScore
+);
+
+
+let directionScore = 0;
+
+
+if (
+summary.group === "ASSET_MANAGER"
+) {
+
+directionScore +=
+cotSignedScore(
+normalizedChange4W,
+0.05,
+1
+);
+
+directionScore +=
+cotSignedScore(
+normalizedChange13W,
+0.08,
+2
+);
+
+directionScore +=
+cotSignedScore(
+normalizedChange26W,
+0.12,
+2
+);
+
+directionScore +=
+cotPercentileScore(
+percentile
+);
+
+directionScore +=
+cotZScoreContribution(
+zScore
+);
+
+}
+
+
+else if (
+summary.group === "LEVERAGED_MONEY"
+) {
+
+directionScore +=
+cotSignedScore(
+normalizedChange4W,
+0.05,
+1
+);
+
+directionScore +=
+cotSignedScore(
+normalizedChange13W,
+0.08,
+2
+);
+
+directionScore +=
+cotSignedScore(
+normalizedChange26W,
+0.12,
+1
+);
+
+directionScore +=
+cotPercentileScore(
+percentile
+);
+
+directionScore +=
+cotZScoreContribution(
+zScore
+);
+
+}
+
+
+/*
+* Other Reportables and Non-Reportables are retained
+* as secondary context only.
+*
+* They receive only a light directional contribution
+* inside their own descriptive group assessment.
+*/
+
+else if (
+summary.group === "OTHER_REPORTABLES" ||
+summary.group === "NON_REPORTABLES"
+) {
+
+directionScore +=
+cotSignedScore(
+normalizedChange13W,
+0.10,
+1
+);
+
+directionScore +=
+cotPercentileScore(
+percentile
+);
+
+}
+
+
+/*
+* Dealer positioning deliberately remains neutral
+* at the directional level.
+*/
+
+else {
+
+directionScore = 0;
+
+}
+
+
+const availableMetricCount =
+[
+weeklyChange,
+change4W,
+change13W,
+change26W,
+percentile,
+zScore,
+]
+.filter(
+(value) =>
+value !== null
+)
+.length;
+
+
+const confidence =
+summary.group === "DEALER"
+? clamp(
+30 +
+availableMetricCount * 5
+)
+: clamp(
+40 +
+availableMetricCount * 8
+);
+
+
+return {
+
+market:
+summary.market,
+
+group:
+summary.group,
+
+reportDate:
+summary.reportDate,
+
+bias:
+summary.bias,
+
+netPosition,
+
+weeklyChange,
+
+change4W,
+
+change13W,
+
+change26W,
+
+normalizedChange4W,
+
+normalizedChange13W,
+
+normalizedChange26W,
+
+percentile,
+
+zScore,
+
+isExtreme:
+summary.isExtreme === true,
+
+direction:
+summary.group === "DEALER"
+? "NEUTRAL"
+: directionFromScore(
+directionScore
+),
+
+directionScore,
+
+confidence:
+Math.round(
+confidence
+),
+
+};
+
+}
+
+
+function getCOTGroup(
+groups: COTGroupResearchSummary[],
+group: COTTraderGroup
+): COTGroupResearchSummary | null {
+
+return groups.find(
+(item) =>
+item.group === group
+) ?? null;
+
+}
+
+
+/*
+* Market direction is primarily derived from:
+*
+* 1. Asset Manager
+* 2. Leveraged Money
+*
+* Dealer positioning is not directionally scored.
+*
+* When Asset Manager and Leveraged Money disagree,
+* the result is intentionally MIXED rather than
+* forcing a directional conclusion.
+*/
+
+function buildCOTMarketResearchSummary(
+market: COTMarket,
+groups: COTGroupResearchSummary[],
+divergences: COTGroupDivergence[]
+): COTMarketResearchSummary {
+
+const marketGroups =
+groups.filter(
+(item) =>
+item.market === market
+);
+
+
+const assetManager =
+getCOTGroup(
+marketGroups,
+"ASSET_MANAGER"
+);
+
+const leveragedMoney =
+getCOTGroup(
+marketGroups,
+"LEVERAGED_MONEY"
+);
+
+const dealer =
+getCOTGroup(
+marketGroups,
+"DEALER"
+);
+
+const otherReportables =
+getCOTGroup(
+marketGroups,
+"OTHER_REPORTABLES"
+);
+
+const nonReportables =
+getCOTGroup(
+marketGroups,
+"NON_REPORTABLES"
+);
+
+
+const reportDate =
+marketGroups
+.map(
+(item) =>
+item.reportDate
+)
+.sort()
+.reverse()[0] ?? null;
+
+
+const marketDivergences =
+divergences.filter(
+(item) =>
+item.market === market
+);
+
+
+let directionScore = 0;
+
+let direction:
+COTDirectionalState =
+"UNKNOWN";
+
+
+if (
+assetManager &&
+leveragedMoney
+) {
+
+const assetDirection =
+assetManager.direction;
+
+const leveragedDirection =
+leveragedMoney.direction;
+
+
+if (
+assetDirection === "BULLISH" &&
+leveragedDirection === "BULLISH"
+) {
+
+directionScore =
+assetManager.directionScore +
+leveragedMoney.directionScore;
+
+direction =
+"BULLISH";
+
+}
+
+else if (
+assetDirection === "BEARISH" &&
+leveragedDirection === "BEARISH"
+) {
+
+directionScore =
+assetManager.directionScore +
+leveragedMoney.directionScore;
+
+direction =
+"BEARISH";
+
+}
+
+else if (
+(
+assetDirection === "BULLISH" &&
+leveragedDirection === "BEARISH"
+) ||
+(
+assetDirection === "BEARISH" &&
+leveragedDirection === "BULLISH"
+)
+) {
+
+directionScore =
+assetManager.directionScore +
+leveragedMoney.directionScore;
+
+direction =
+"MIXED";
+
+}
+
+else {
+
+directionScore =
+assetManager.directionScore +
+leveragedMoney.directionScore;
+
+
+if (
+Math.abs(
+directionScore
+) >= 5
+) {
+
+direction =
+directionScore > 0
+? "BULLISH"
+: "BEARISH";
+
+}
+
+else if (
+Math.abs(
+directionScore
+) <= 1
+) {
+
+direction =
+"NEUTRAL";
+
+}
+
+else {
+
+direction =
+"MIXED";
+
+}
+
+}
+
+}
+
+else if (
+assetManager
+) {
+
+directionScore =
+assetManager.directionScore;
+
+direction =
+assetManager.direction;
+
+}
+
+else if (
+leveragedMoney
+) {
+
+directionScore =
+leveragedMoney.directionScore;
+
+direction =
+leveragedMoney.direction;
+
+}
+
+
+const coreGroups =
+[
+assetManager,
+leveragedMoney,
+]
+.filter(
+(
+item
+): item is COTGroupResearchSummary =>
+item !== null
+);
+
+
+const averageCoreConfidence =
+coreGroups.length > 0
+? coreGroups.reduce(
+(total, item) =>
+total +
+item.confidence,
+0
+) /
+coreGroups.length
+: 0;
+
+
+const divergencePenalty =
+marketDivergences.length > 0
+? 15
+: 0;
+
+
+const confidence =
+clamp(
+averageCoreConfidence -
+divergencePenalty
+);
+
+
+return {
+
+market,
+
+reportDate,
+
+available:
+marketGroups.length > 0,
+
+assetManager,
+
+leveragedMoney,
+
+dealer,
+
+otherReportables,
+
+nonReportables,
+
+direction,
+
+directionScore,
+
+confidence:
+Math.round(
+confidence
+),
+
+divergenceCount:
+marketDivergences.length,
+
+};
 
 }
 
@@ -1574,6 +2417,9 @@ return {
 available:
 false,
 
+latestReportDate:
+null,
+
 observationCount:
 0,
 
@@ -1584,6 +2430,24 @@ divergenceCount:
 0,
 
 extremeCount:
+0,
+
+historySeriesCount:
+0,
+
+markets:
+[],
+
+divergences:
+[],
+
+overallDirection:
+"UNKNOWN",
+
+overallDirectionScore:
+0,
+
+confidence:
 0,
 
 };
@@ -1615,79 +2479,202 @@ positioning.divergences
 : [];
 
 
-let extremeCount = 0;
+const history =
+Array.isArray(
+positioning.history
+)
+? positioning.history
+: [];
 
 
-for (
-const observation of observations
-) {
-
-const observationObject =
-objectValue(
-observation
+const groupSummaries =
+summaries.map(
+(summary) =>
+buildCOTGroupResearchSummary(
+summary
+)
 );
 
 
-if (
-Boolean(
-observationObject["isExtreme"]
+const marketsToEvaluate:
+COTMarket[] = [
+"NASDAQ",
+"SP500",
+"RUSSELL_2000",
+"DOW",
+];
+
+
+const markets =
+marketsToEvaluate
+.map(
+(market) =>
+buildCOTMarketResearchSummary(
+market,
+groupSummaries,
+divergences
 )
+)
+.filter(
+(item) =>
+item.available
+);
+
+
+const extremeCount =
+summaries.filter(
+(summary) =>
+summary.isExtreme === true
+).length;
+
+
+/*
+* Overall positioning deliberately focuses on the
+* equity-index markets relevant to the Rotation App.
+*
+* NASDAQ and Russell receive the greatest relevance
+* because the app explicitly studies the rotation
+* between growth and small caps.
+*
+* S&P 500 provides broad-market confirmation.
+* Dow receives a smaller contextual weight.
+*/
+
+const marketWeights:
+Partial<
+Record<
+COTMarket,
+number
+>
+> = {
+
+NASDAQ:
+3,
+
+RUSSELL_2000:
+3,
+
+SP500:
+2,
+
+DOW:
+1,
+
+};
+
+
+let weightedScore = 0;
+
+let totalWeight = 0;
+
+let confidenceWeight = 0;
+
+
+for (
+const market of markets
 ) {
 
-extremeCount++;
+if (
+market.direction === "UNKNOWN"
+) {
 
 continue;
 
 }
 
 
-const positions =
-Array.isArray(
-observationObject["positions"]
-)
-? observationObject["positions"]
-: [];
+const weight =
+marketWeights[
+market.market
+] ?? 1;
 
 
-for (
-const position of positions
-) {
+weightedScore +=
+market.directionScore *
+weight;
 
-const positionObject =
-objectValue(
-position
-);
+totalWeight +=
+weight;
 
-const extreme =
-objectValue(
-positionObject["extreme"]
-);
+confidenceWeight +=
+market.confidence *
+weight;
+
+}
+
+
+const normalizedOverallScore =
+totalWeight > 0
+? weightedScore /
+totalWeight
+: 0;
+
+
+let overallDirection:
+COTDirectionalState =
+"UNKNOWN";
 
 
 if (
-Boolean(
-positionObject["isExtreme"]
-) ||
-Boolean(
-extreme["isExtreme"]
-)
+totalWeight > 0
 ) {
 
-extremeCount++;
+if (
+normalizedOverallScore >= 4
+) {
 
-break;
+overallDirection =
+"BULLISH";
+
+}
+
+else if (
+normalizedOverallScore <= -4
+) {
+
+overallDirection =
+"BEARISH";
+
+}
+
+else if (
+Math.abs(
+normalizedOverallScore
+) <= 1
+) {
+
+overallDirection =
+"NEUTRAL";
+
+}
+
+else {
+
+overallDirection =
+"MIXED";
 
 }
 
 }
 
-}
+
+const confidence =
+totalWeight > 0
+? clamp(
+confidenceWeight /
+totalWeight
+)
+: 0;
 
 
 return {
 
 available:
-true,
+observations.length > 0 &&
+summaries.length > 0,
+
+latestReportDate:
+positioning.latestReportDate ?? null,
 
 observationCount:
 observations.length,
@@ -1700,6 +2687,23 @@ divergences.length,
 
 extremeCount,
 
+historySeriesCount:
+history.length,
+
+markets,
+
+divergences,
+
+overallDirection,
+
+overallDirectionScore:
+normalizedOverallScore,
+
+confidence:
+Math.round(
+confidence
+),
+
 };
 
 }
@@ -1708,15 +2712,6 @@ extremeCount,
 /* =====================================================
 RESEARCH REGIME ASSESSMENT
 ===================================================== */
-
-/*
-* IMPORTANT SEMANTIC RULE
-*
-* This is NOT the Rotation-App regime.
-*
-* It is an AI research interpretation of the current
-* risk configuration.
-*/
 
 function buildRegimeAssessment(
 data: ExtractedSnapshot
@@ -1752,26 +2747,11 @@ bias =
 
 else {
 
-/*
-* Elevated risk remains DEFENSIVE here.
-*
-* CRISIS is intentionally not generated from
-* Master Score alone.
-*/
-
 bias =
 "DEFENSIVE";
 
 }
 
-
-/*
-* Rotation confidence can legitimately be zero
-* while rotationConfirm carries strong confidence.
-*
-* Prefer the stronger explicit confirmation value
-* when available.
-*/
 
 const rotationResearchConfidence =
 Math.max(
@@ -2109,34 +3089,6 @@ const evidence:
 string[] = [];
 
 
-/*
-* ===================================================
-* TRUSTED RESEARCH HISTORY
-* ===================================================
-*
-* IMPORTANT:
-*
-* input.history has already been sanitized by
-* aiResearchContext.ts.
-*
-* Only snapshots from the trusted AI Research
-* history window are allowed to determine:
-*
-* - persistence
-* - HISTORY evidence state
-* - HISTORY evidence strength
-* - HISTORY confidence
-*
-* Long-running historyMetrics embedded in the
-* current snapshot may include legacy observations
-* from before the trusted research-history boundary.
-*
-* They remain useful engine context, but they must
-* NOT increase AI Research history confirmation.
-* ===================================================
-*/
-
-
 const defensivePersistence =
 history.defensiveShare >= 0.6;
 
@@ -2164,10 +3116,6 @@ history.snapshotCount,
 1
 ) >= 0.6;
 
-
-/*
-* Trusted research-history evidence.
-*/
 
 if (
 defensivePersistence
@@ -2231,26 +3179,6 @@ evidence.push(
 }
 
 
-/*
-* ===================================================
-* LEGACY-DERIVED ENGINE CONTEXT
-* ===================================================
-*
-* These values come from historyMetrics embedded in
-* the current Rotation-App snapshot.
-*
-* They may span observations from before the trusted
-* AI Research history boundary.
-*
-* Therefore they are shown only as contextual
-* information and do NOT influence:
-*
-* - state
-* - strength
-* - confidence
-* ===================================================
-*/
-
 if (
 data.daysInPhase > 0
 ) {
@@ -2303,15 +3231,6 @@ data.institutionalPressure
 }
 
 
-/*
-* ===================================================
-* EVIDENCE STATE
-* ===================================================
-*
-* Only trusted research-history observations are
-* allowed to determine the state.
-*/
-
 const trustedPersistence =
 defensivePersistence ||
 structuralPersistence ||
@@ -2355,15 +3274,6 @@ state =
 }
 
 
-/*
-* ===================================================
-* EVIDENCE STRENGTH
-* ===================================================
-*
-* Again: only trusted research-history persistence
-* contributes.
-*/
-
 let persistenceCount = 0;
 
 
@@ -2403,15 +3313,6 @@ persistenceCount++;
 }
 
 
-/*
-* A very short trusted history window should not be
-* labelled VERY_HIGH merely because several related
-* structural conditions agree.
-*
-* The number of unique trading days therefore caps
-* the maximum historical evidence strength.
-*/
-
 let strength =
 evidenceStrengthFromCount(
 persistenceCount
@@ -2450,14 +3351,6 @@ strength =
 
 }
 
-
-/*
-* Confidence grows with both agreement and actual
-* trusted trading-day coverage.
-*
-* It is deliberately capped while the trusted
-* history window is still relatively young.
-*/
 
 const coverageConfidence =
 clamp(
@@ -2508,7 +3401,6 @@ evidence
 };
 
 }
-
 
 
 function buildPriceEvidence(
@@ -3026,6 +3918,448 @@ evidence
 
 
 /* =====================================================
+COT POSITIONING EVIDENCE
+===================================================== */
+
+function formatCOTChange(
+value: number | null
+): string {
+
+if (
+value === null
+) {
+
+return "n/a";
+
+}
+
+
+return `${value >= 0 ? "+" : ""}${Math.round(
+value
+).toLocaleString(
+"en-US"
+)}`;
+
+}
+
+
+function formatCOTNormalizedChange(
+value: number | null
+): string {
+
+if (
+value === null
+) {
+
+return "n/a";
+
+}
+
+
+return `${value >= 0 ? "+" : ""}${(
+value * 100
+).toFixed(
+1
+)}% of 52W range`;
+
+}
+
+
+function buildCOTGroupEvidenceText(
+group: COTGroupResearchSummary
+): string {
+
+return [
+`${group.market} ${group.group}:`,
+`net ${group.netPosition !== null ? Math.round(
+group.netPosition
+).toLocaleString(
+"en-US"
+) : "n/a"},`,
+`1W ${formatCOTChange(
+group.weeklyChange
+)},`,
+`4W ${formatCOTChange(
+group.change4W
+)},`,
+`13W ${formatCOTChange(
+group.change13W
+)},`,
+`26W ${formatCOTChange(
+group.change26W
+)},`,
+`13W normalized ${formatCOTNormalizedChange(
+group.normalizedChange13W
+)},`,
+`52W percentile ${group.percentile !== null ? group.percentile.toFixed(
+1
+) : "n/a"},`,
+`z-score ${group.zScore !== null ? group.zScore.toFixed(
+2
+) : "n/a"},`,
+`research direction ${group.direction}.`,
+].join(" ");
+
+}
+
+
+function buildPositioningEvidence(
+cot: COTResearchSummary,
+structuralBias: AIResearchStructuralBias
+): AIResearchEvidenceBlock {
+
+if (
+!cot.available
+) {
+
+return {
+
+category:
+"POSITIONING",
+
+state:
+"NOT_AVAILABLE",
+
+strength:
+"LOW",
+
+confidence:
+0,
+
+summary:
+"COT positioning data are not available.",
+
+evidence:
+[],
+
+};
+
+}
+
+
+const evidence:
+string[] = [];
+
+
+if (
+cot.latestReportDate
+) {
+
+evidence.push(
+`Latest COT report date is ${cot.latestReportDate}.`
+);
+
+}
+
+
+evidence.push(
+`${cot.observationCount} weekly COT observation(s), ${cot.summaryCount} market/group summary(ies), and ${cot.historySeriesCount} historical market/group series are available.`
+);
+
+
+for (
+const market of cot.markets
+) {
+
+if (
+market.assetManager
+) {
+
+evidence.push(
+buildCOTGroupEvidenceText(
+market.assetManager
+)
+);
+
+}
+
+
+if (
+market.leveragedMoney
+) {
+
+evidence.push(
+buildCOTGroupEvidenceText(
+market.leveragedMoney
+)
+);
+
+}
+
+
+/*
+* Dealer positioning is shown explicitly as context,
+* but its direction is not used to determine the
+* positioning evidence state.
+*/
+
+if (
+market.dealer
+) {
+
+evidence.push(
+[
+`${market.market} DEALER context:`,
+`net ${market.dealer.netPosition !== null ? Math.round(
+market.dealer.netPosition
+).toLocaleString(
+"en-US"
+) : "n/a"},`,
+`13W ${formatCOTChange(
+market.dealer.change13W
+)},`,
+`26W ${formatCOTChange(
+market.dealer.change26W
+)},`,
+`52W percentile ${market.dealer.percentile !== null ? market.dealer.percentile.toFixed(
+1
+) : "n/a"}.`,
+"Dealer positioning is treated as intermediary/hedging context rather than a direct directional signal.",
+].join(" ")
+);
+
+}
+
+
+evidence.push(
+`${market.market} combined COT positioning is ${market.direction} with research confidence ${Math.round(
+market.confidence
+)}.`
+);
+
+}
+
+
+for (
+const divergence of cot.divergences
+) {
+
+evidence.push(
+`${divergence.market} COT divergence: ${divergence.groupA} change ${formatCOTChange(
+optionalNumber(
+divergence.netChangeA
+)
+)} versus ${divergence.groupB} change ${formatCOTChange(
+optionalNumber(
+divergence.netChangeB
+)
+)}; confidence ${Math.round(
+divergence.confidence
+)}.`
+);
+
+}
+
+
+if (
+cot.extremeCount > 0
+) {
+
+evidence.push(
+`${cot.extremeCount} current market/group positioning summary(ies) are at a 52-week historical extreme.`
+);
+
+}
+
+
+let state:
+AIResearchEvidenceState =
+"NEUTRAL";
+
+
+if (
+structuralBias === "BEARISH"
+) {
+
+if (
+cot.overallDirection === "BEARISH"
+) {
+
+state =
+"SUPPORTS";
+
+}
+
+else if (
+cot.overallDirection === "BULLISH"
+) {
+
+state =
+"CONTRADICTS";
+
+}
+
+else if (
+cot.overallDirection === "MIXED"
+) {
+
+state =
+"UNRESOLVED";
+
+}
+
+}
+
+else if (
+structuralBias === "BULLISH"
+) {
+
+if (
+cot.overallDirection === "BULLISH"
+) {
+
+state =
+"SUPPORTS";
+
+}
+
+else if (
+cot.overallDirection === "BEARISH"
+) {
+
+state =
+"CONTRADICTS";
+
+}
+
+else if (
+cot.overallDirection === "MIXED"
+) {
+
+state =
+"UNRESOLVED";
+
+}
+
+}
+
+else {
+
+state =
+cot.overallDirection === "MIXED"
+? "UNRESOLVED"
+: "NEUTRAL";
+
+}
+
+
+/*
+* COT remains supplementary evidence.
+*
+* Even broad agreement across several trader groups
+* is capped at HIGH strength. It must not become a
+* dominant substitute for structure, price or
+* liquidity.
+*/
+
+let strength:
+AIResearchEvidenceStrength =
+"LOW";
+
+
+const directionalMarkets =
+cot.markets.filter(
+(market) =>
+market.direction === "BULLISH" ||
+market.direction === "BEARISH"
+);
+
+
+const bullishMarkets =
+directionalMarkets.filter(
+(market) =>
+market.direction === "BULLISH"
+).length;
+
+
+const bearishMarkets =
+directionalMarkets.filter(
+(market) =>
+market.direction === "BEARISH"
+).length;
+
+
+const dominantMarketCount =
+Math.max(
+bullishMarkets,
+bearishMarkets
+);
+
+
+if (
+dominantMarketCount >= 3
+) {
+
+strength =
+"HIGH";
+
+}
+
+else if (
+dominantMarketCount >= 2
+) {
+
+strength =
+"MODERATE";
+
+}
+
+else {
+
+strength =
+"LOW";
+
+}
+
+
+if (
+cot.overallDirection === "MIXED" ||
+cot.overallDirection === "NEUTRAL"
+) {
+
+strength =
+cot.divergenceCount > 0
+? "MODERATE"
+: "LOW";
+
+}
+
+
+return {
+
+category:
+"POSITIONING",
+
+state,
+
+strength,
+
+confidence:
+Math.round(
+cot.confidence
+),
+
+summary:
+[
+`COT positioning is ${cot.overallDirection}.`,
+`The assessment combines Asset Manager and Leveraged Money positioning across 1W, 4W, 13W and 26W horizons with 52W percentile/z-score context.`,
+`Dealer positioning is contextual only.`,
+cot.divergenceCount > 0
+? `${cot.divergenceCount} Asset-Manager/Leveraged-Money divergence(s) remain unresolved.`
+: "No current Asset-Manager/Leveraged-Money divergence is detected.",
+].join(" "),
+
+evidence:
+uniqueStrings(
+evidence
+),
+
+};
+
+}
+
+
+/* =====================================================
 TENSION ASSESSMENT
 ===================================================== */
 
@@ -3365,15 +4699,6 @@ return "IMMATURE";
 }
 
 
-/*
-* A strongly developed price move in the same
-* direction as the thesis can make a new entry late.
-*
-* For the current defensive use case we only mark
-* exhaustion after material downside has already
-* occurred.
-*/
-
 if (
 structuralBias === "BEARISH" &&
 data.nasdaq.return20D !== null &&
@@ -3421,14 +4746,6 @@ return "CONFIRMING";
 
 }
 
-
-/*
-* EARLY explicitly allows structural evidence to be
-* strong while price confirmation is still missing.
-*
-* High contradiction keeps the setup early rather
-* than falsely calling it confirmed.
-*/
 
 if (
 tension.state === "ESTABLISHED" ||
@@ -3496,14 +4813,6 @@ return "WATCH";
 
 }
 
-
-/*
-* Strong price-vs-structure tension is intentionally
-* ARMED rather than automatically EARLY_STARTER.
-*
-* This is the central protection against converting
-* "structurally bearish" directly into "buy PUT".
-*/
 
 if (
 (
@@ -3629,50 +4938,11 @@ structuralBias
 );
 
 
-/*
-* COT and external research are deliberately exposed
-* in the evidence model but NOT interpreted yet.
-*
-* This makes the current limitation explicit instead
-* of silently pretending that these data have already
-* influenced the opportunity assessment.
-*/
-
-const positioningEvidence:
-AIResearchEvidenceBlock = {
-
-category:
-"POSITIONING",
-
-state:
-cot.available
-? "UNRESOLVED"
-: "NOT_AVAILABLE",
-
-strength:
-"LOW",
-
-confidence:
-cot.available
-? 25
-: 0,
-
-summary:
-cot.available
-? "COT positioning data are available but detailed market/group interpretation is not yet part of this evidence-synthesis step."
-: "COT positioning data are not available.",
-
-evidence:
-cot.available
-? [
-`${cot.observationCount} COT observation(s) available.`,
-`${cot.summaryCount} market/group positioning summary(ies) available.`,
-`${cot.divergenceCount} trader-group divergence(s) detected.`,
-`${cot.extremeCount} historical extreme(s) detected.`,
-]
-: [],
-
-};
+const positioningEvidence =
+buildPositioningEvidence(
+cot,
+structuralBias
+);
 
 
 const externalEvidence:
@@ -3792,6 +5062,7 @@ summary:
 `Entry maturity ${entryMaturity}.`,
 `Research opportunity state ${opportunityState}.`,
 `Price-vs-structure tension ${tension.state}.`,
+`COT positioning ${cot.available ? cot.overallDirection : "NOT_AVAILABLE"}.`,
 ].join(" "),
 
 };
@@ -3811,10 +5082,6 @@ history: HistoryResearchSummary
 const divergences:
 AIDivergence[] = [];
 
-
-/* -----------------------------------------------------
-PRICE VS INTERNALS
------------------------------------------------------ */
 
 if (
 hasDefensivePriceStructureTension(
@@ -3860,10 +5127,6 @@ confidence:
 
 }
 
-
-/* -----------------------------------------------------
-NASDAQ VS RUSSELL
------------------------------------------------------ */
 
 const relative20D =
 data.nasdaq.return20D !== null &&
@@ -3918,10 +5181,6 @@ confidence:
 }
 
 
-/* -----------------------------------------------------
-ROTATION VS PRICE
------------------------------------------------------ */
-
 if (
 data.rotationConfirmState ===
 "INTERNAL_BREAKDOWN" &&
@@ -3949,10 +5208,6 @@ data.rotationConfirmConfidence
 }
 
 
-/* -----------------------------------------------------
-PRICE VS FRAGILITY
------------------------------------------------------ */
-
 if (
 data.fragilityScore >= 70 &&
 isNasdaqPriceConstructive(data)
@@ -3979,10 +5234,6 @@ confidence:
 }
 
 
-/* -----------------------------------------------------
-PRICE VS LIQUIDITY
------------------------------------------------------ */
-
 if (
 data.liquidityScore < 35 &&
 isNasdaqPriceConstructive(data)
@@ -4006,10 +5257,6 @@ confidence:
 
 }
 
-
-/* -----------------------------------------------------
-REGIME VS PRICE
------------------------------------------------------ */
 
 if (
 data.regimeSyncScore < 35 &&
@@ -4062,10 +5309,6 @@ string[] = [];
 const invalidationConditions:
 string[] = [];
 
-
-/* -----------------------------------------------------
-STRUCTURAL EVIDENCE
------------------------------------------------------ */
 
 if (
 data.masterScore >= 65
@@ -4206,10 +5449,6 @@ data.liquidityScore
 }
 
 
-/* -----------------------------------------------------
-PRICE COUNTER-EVIDENCE
------------------------------------------------------ */
-
 if (
 evidenceAssessment.structuralBias ===
 "BEARISH" &&
@@ -4249,10 +5488,6 @@ data.falseBreakRisk
 }
 
 
-/* -----------------------------------------------------
-HISTORY / TENSION
------------------------------------------------------ */
-
 if (
 evidenceAssessment.tension.state !==
 "NONE"
@@ -4273,34 +5508,79 @@ if (
 cot.available
 ) {
 
+const positioningEvidence =
+evidenceAssessment.evidence.find(
+(item) =>
+item.category === "POSITIONING"
+);
+
+
 if (
-cot.observationCount > 0
+positioningEvidence?.state === "SUPPORTS"
 ) {
 
 supportingEvidence.push(
-`COT positioning layer contains ${cot.observationCount} weekly observation(s).`
+`COT positioning supports the structural thesis with ${positioningEvidence.strength} evidence strength.`
+);
+
+}
+
+else if (
+positioningEvidence?.state === "CONTRADICTS"
+) {
+
+counterEvidence.push(
+`COT positioning contradicts the structural thesis with ${positioningEvidence.strength} evidence strength.`
+);
+
+}
+
+else if (
+positioningEvidence?.state === "UNRESOLVED"
+) {
+
+counterEvidence.push(
+"COT positioning remains mixed or internally divergent and does not provide clean directional confirmation."
 );
 
 }
 
 
+const nasdaqCOT =
+cot.markets.find(
+(item) =>
+item.market === "NASDAQ"
+);
+
+
 if (
-cot.summaryCount > 0
+nasdaqCOT
 ) {
 
 supportingEvidence.push(
-`COT positioning contains ${cot.summaryCount} market/group positioning summary(ies).`
+`NASDAQ COT positioning is ${nasdaqCOT.direction} with confidence ${Math.round(
+nasdaqCOT.confidence
+)}.`
 );
 
 }
 
 
+const russellCOT =
+cot.markets.find(
+(item) =>
+item.market === "RUSSELL_2000"
+);
+
+
 if (
-cot.extremeCount > 0
+russellCOT
 ) {
 
 supportingEvidence.push(
-`${cot.extremeCount} COT positioning observation(s) are at historical extremes.`
+`Russell 2000 COT positioning is ${russellCOT.direction} with confidence ${Math.round(
+russellCOT.confidence
+)}.`
 );
 
 }
@@ -4310,18 +5590,14 @@ if (
 cot.divergenceCount > 0
 ) {
 
-supportingEvidence.push(
-`${cot.divergenceCount} COT positioning divergence(s) detected between trader groups.`
+counterEvidence.push(
+`${cot.divergenceCount} COT Asset-Manager/Leveraged-Money divergence(s) reduce positioning certainty.`
 );
 
 }
 
 }
 
-
-/* -----------------------------------------------------
-DIVERGENCES
------------------------------------------------------ */
 
 for (
 const divergence of divergences
@@ -4338,17 +5614,6 @@ divergence.type ===
 "REGIME_VS_PRICE"
 ) {
 
-/*
-* These divergences describe a conflict.
-*
-* The structural component supports the thesis,
-* while resilient price is simultaneously
-* counter-evidence.
-*
-* Do not blindly classify every divergence as
-* supporting evidence.
-*/
-
 continue;
 
 }
@@ -4360,10 +5625,6 @@ divergence.observation
 
 }
 
-
-/* -----------------------------------------------------
-INVALIDATION
------------------------------------------------------ */
 
 invalidationConditions.push(
 "Aggregate risk score returns sustainably below the defensive zone."
@@ -4381,10 +5642,6 @@ invalidationConditions.push(
 "Rotation confirmation recovers from internal breakdown and false-break risk declines."
 );
 
-
-/* -----------------------------------------------------
-RESEARCH THESIS
------------------------------------------------------ */
 
 let statement =
 "Market structure is currently balanced; no dominant research thesis is confirmed.";
@@ -4438,15 +5695,11 @@ statement =
 
 
 if (
-cot.available &&
-(
-cot.extremeCount > 0 ||
-cot.divergenceCount > 0
-)
+cot.available
 ) {
 
 statement +=
-" COT positioning provides additional context but has not yet been directionally synthesized in this research version.";
+` COT positioning is currently ${cot.overallDirection} and is used as supplementary positioning evidence rather than as an execution signal.`;
 
 }
 
@@ -4491,10 +5744,6 @@ const risks:
 AIResearchRisk[] = [];
 
 
-/* -----------------------------------------------------
-CRASH PROBABILITY
------------------------------------------------------ */
-
 if (
 data.crashProbability >= 50
 ) {
@@ -4516,10 +5765,6 @@ evidenceType:
 
 }
 
-
-/* -----------------------------------------------------
-STRUCTURAL FRAGILITY
------------------------------------------------------ */
 
 if (
 data.fragilityScore >= 70
@@ -4543,10 +5788,6 @@ evidenceType:
 }
 
 
-/* -----------------------------------------------------
-ROTATION DECAY
------------------------------------------------------ */
-
 if (
 data.rotationDecayScore >= 60
 ) {
@@ -4568,10 +5809,6 @@ evidenceType:
 
 }
 
-
-/* -----------------------------------------------------
-LIQUIDITY
------------------------------------------------------ */
 
 if (
 data.liquidityScore < 40
@@ -4595,10 +5832,6 @@ evidenceType:
 }
 
 
-/* -----------------------------------------------------
-FALSE BREAK
------------------------------------------------------ */
-
 if (
 data.falseBreakRisk >= 60
 ) {
@@ -4620,10 +5853,6 @@ evidenceType:
 
 }
 
-
-/* -----------------------------------------------------
-PERSISTENT PRICE / STRUCTURE TENSION
------------------------------------------------------ */
 
 if (
 evidenceAssessment.tension.state ===
@@ -4661,10 +5890,7 @@ COT
 
 if (
 cot.available &&
-(
-cot.extremeCount > 0 ||
 cot.divergenceCount > 0
-)
 ) {
 
 risks.push({
@@ -4673,18 +5899,7 @@ risk:
 "COT positioning divergence",
 
 explanation:
-[
-cot.extremeCount > 0
-? `${cot.extremeCount} historical COT extreme(s)`
-: "",
-
-cot.divergenceCount > 0
-? `${cot.divergenceCount} trader-group divergence(s)`
-: "",
-]
-.filter(Boolean)
-.join(" and ") +
-" detected in the COT positioning layer.",
+`${cot.divergenceCount} Asset-Manager/Leveraged-Money divergence(s) detected across the COT positioning layer.`,
 
 evidenceType:
 "COMBINED",
@@ -4694,9 +5909,26 @@ evidenceType:
 }
 
 
-/* -----------------------------------------------------
-DIVERGENCES
------------------------------------------------------ */
+if (
+cot.available &&
+cot.extremeCount > 0
+) {
+
+risks.push({
+
+risk:
+"COT positioning extreme",
+
+explanation:
+`${cot.extremeCount} market/group COT positioning summary(ies) are at a 52-week historical extreme.`,
+
+evidenceType:
+"COMBINED",
+
+});
+
+}
+
 
 if (
 divergences.length > 0
@@ -4717,10 +5949,6 @@ evidenceType:
 
 }
 
-
-/* -----------------------------------------------------
-NO DOMINANT RISK
------------------------------------------------------ */
 
 if (
 risks.length === 0
@@ -4759,10 +5987,6 @@ evidenceAssessment: AIResearchEvidenceAssessment
 const claims:
 AIForwardTestClaim[] = [];
 
-
-/* -----------------------------------------------------
-DEFENSIVE STRUCTURE
------------------------------------------------------ */
 
 if (
 evidenceAssessment.structuralBias ===
@@ -4806,10 +6030,6 @@ evidenceAssessment.confirmation ===
 }
 
 
-/* -----------------------------------------------------
-CONSTRUCTIVE STRUCTURE
------------------------------------------------------ */
-
 if (
 evidenceAssessment.structuralBias ===
 "BULLISH"
@@ -4845,10 +6065,6 @@ evidenceAssessment.confirmation ===
 
 }
 
-
-/* -----------------------------------------------------
-FRAGILITY WARNING
------------------------------------------------------ */
 
 if (
 data.fragilityScore >= 70 &&
@@ -4936,7 +6152,7 @@ data.crashProbability
 
 `COT positioning: ${
 cot.available
-? `${cot.observationCount} observation(s), ${cot.summaryCount} market/group summary(ies), ${cot.divergenceCount} divergence(s), ${cot.extremeCount} extreme(s).`
+? `${cot.overallDirection}, confidence ${cot.confidence}, ${cot.observationCount} observation(s), ${cot.summaryCount} market/group summary(ies), ${cot.historySeriesCount} historical series, ${cot.divergenceCount} divergence(s), ${cot.extremeCount} extreme(s).`
 : "not available."
 }`,
 
