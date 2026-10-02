@@ -29,6 +29,10 @@ COTMarketPositioningSummary,
 COTTraderGroup,
 } from "./aiResearchCOTTypes";
 
+import {
+buildExternalEvidence,
+} from "./aiResearchExternalEvidence";
+
 
 /* =====================================================
 HELPERS
@@ -4893,7 +4897,7 @@ function buildEvidenceAssessment(
 data: ExtractedSnapshot,
 history: HistoryResearchSummary,
 cot: COTResearchSummary,
-sourceCount: number
+sources: AIResearchInput["sources"]
 ): AIResearchEvidenceAssessment {
 
 const structuralBias =
@@ -4901,13 +4905,11 @@ determineStructuralBias(
 data
 );
 
-
 const structureEvidence =
 buildStructureEvidence(
 data,
 structuralBias
 );
-
 
 const historyEvidence =
 buildHistoryEvidence(
@@ -4916,13 +4918,11 @@ history,
 structuralBias
 );
 
-
 const priceEvidence =
 buildPriceEvidence(
 data,
 structuralBias
 );
-
 
 const rotationEvidence =
 buildRotationEvidence(
@@ -4930,13 +4930,11 @@ data,
 structuralBias
 );
 
-
 const liquidityEvidence =
 buildLiquidityEvidence(
 data,
 structuralBias
 );
-
 
 const positioningEvidence =
 buildPositioningEvidence(
@@ -4944,40 +4942,31 @@ cot,
 structuralBias
 );
 
+/*
+* External evidence is synthesized independently
+* from the Rotation-App engines.
+*
+* The external layer receives the already ranked
+* research sources and interprets them relative to
+* the structural research bias.
+*
+* It does NOT modify:
+*
+* - Master Score
+* - structural bias
+* - Rotation-App engine outputs
+* - COT positioning
+* - execution state
+*
+* It is therefore an independent confirmation /
+* contradiction evidence class.
+*/
 
-const externalEvidence:
-AIResearchEvidenceBlock = {
-
-category:
-"EXTERNAL",
-
-state:
-sourceCount > 0
-? "UNRESOLVED"
-: "NOT_AVAILABLE",
-
-strength:
-"LOW",
-
-confidence:
-sourceCount > 0
-? 20
-: 0,
-
-summary:
-sourceCount > 0
-? "External research sources are available but are not yet directionally synthesized in this development step."
-: "No external research sources are available.",
-
-evidence:
-sourceCount > 0
-? [
-`${sourceCount} ranked external research source(s) available.`,
-]
-: [],
-
-};
-
+const externalEvidence =
+buildExternalEvidence(
+sources ?? [],
+structuralBias
+);
 
 const evidence:
 AIResearchEvidenceBlock[] = [
@@ -4998,25 +4987,21 @@ externalEvidence,
 
 ];
 
-
 const confirmation =
 determineConfirmation(
 evidence
 );
-
 
 const contradiction =
 determineContradiction(
 evidence
 );
 
-
 const tension =
 buildTensionAssessment(
 data,
 history
 );
-
 
 const entryMaturity =
 determineEntryMaturity(
@@ -5027,7 +5012,6 @@ tension,
 data
 );
 
-
 const opportunityState =
 determineOpportunityState(
 structuralBias,
@@ -5036,7 +5020,6 @@ contradiction,
 entryMaturity,
 tension
 );
-
 
 return {
 
@@ -5063,11 +5046,15 @@ summary:
 `Research opportunity state ${opportunityState}.`,
 `Price-vs-structure tension ${tension.state}.`,
 `COT positioning ${cot.available ? cot.overallDirection : "NOT_AVAILABLE"}.`,
+`External evidence ${externalEvidence.state} with ${externalEvidence.strength} strength and confidence ${Math.round(
+externalEvidence.confidence
+)}.`,
 ].join(" "),
 
 };
 
 }
+
 
 
 /* =====================================================
@@ -6390,8 +6377,9 @@ buildEvidenceAssessment(
 data,
 history,
 cot,
-input.sources?.length ?? 0
+input.sources
 );
+
 
 
 const divergences =
