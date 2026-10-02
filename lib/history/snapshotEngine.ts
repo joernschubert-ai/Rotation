@@ -260,6 +260,7 @@ VIX TERM STRUCTURE
 vixTermRatio:
 mapIndices?.vixTermRatio ??
 mapIndices?.VIX_TERM_RATIO ??
+map?.vixTermRatio ??
 liquidity.vixTermRatio ??
 null,
 
@@ -271,6 +272,7 @@ VOLATILITY OF VOLATILITY
 volOfVolRatio:
 mapIndices?.volOfVolRatio ??
 mapIndices?.VOL_OF_VOL_RATIO ??
+map?.volOfVolRatio ??
 liquidity.volOfVolRatio ??
 null,
 
