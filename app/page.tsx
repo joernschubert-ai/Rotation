@@ -69,9 +69,33 @@ export default function Home() {
 
 const router = useRouter();
 
-const [engine, setEngine] = useState<any>(null);
+const [engine, setEngine] =
+useState<any>(null);
+
+/*
+* Keep the complete mapped input used by the Market Engine.
+*
+* This is important for manual snapshot creation because
+* several raw market values are not necessarily exposed
+* again on the final engine object.
+*
+* Examples:
+*
+* - marketData
+* - VIX
+* - VIX term ratio
+* - volatility-of-volatility ratio
+*
+* The manual snapshot must use the same mapped data basis
+* as the automatically persisted history snapshot.
+*/
+const [snapshotMap, setSnapshotMap] =
+useState<any>(null);
 
 const [checkedAuth, setCheckedAuth] =
+useState(false);
+
+const [isReloading, setIsReloading] =
 useState(false);
 
 
@@ -107,6 +131,21 @@ MARKET LOAD
 
 async function load() {
 
+/*
+* Prevent overlapping manual refreshes.
+*
+* A second request while the first market/history pipeline
+* is still running could otherwise create duplicate or
+* inconsistent snapshots.
+*/
+if (isReloading) {
+
+return;
+
+}
+
+setIsReloading(true);
+
 try {
 
 /* ===================================================
@@ -114,7 +153,20 @@ MARKET
 =================================================== */
 
 const res =
-await fetch("/api/market");
+await fetch(
+"/api/market",
+{
+cache: "no-store"
+}
+);
+
+if (!res.ok) {
+
+throw new Error(
+`MARKET REQUEST FAILED: ${res.status}`
+);
+
+}
 
 const json =
 await res.json();
@@ -162,7 +214,20 @@ HISTORY
 =================================================== */
 
 const historyRes =
-await fetch("/api/history");
+await fetch(
+"/api/history",
+{
+cache: "no-store"
+}
+);
+
+if (!historyRes.ok) {
+
+throw new Error(
+`HISTORY REQUEST FAILED: ${historyRes.status}`
+);
+
+}
 
 const history =
 await historyRes.json();
@@ -206,6 +271,20 @@ const mappedWithHistory = {
 historyMetrics
 
 };
+
+
+/*
+* Preserve the complete mapped input.
+*
+* This exact object is also used below for the automatic
+* history snapshot and later by the manual snapshot button.
+*
+* This prevents the manual snapshot from losing raw market
+* inputs that are not copied back onto engine.indices.
+*/
+setSnapshotMap(
+mappedWithHistory
+);
 
 
 /* ===================================================
@@ -263,6 +342,30 @@ snapshot.timestamp
 );
 
 
+/*
+* Explicit volatility diagnostics.
+*
+* These values make it immediately visible whether the
+* complete market mapping reaches the snapshot pipeline.
+*/
+
+console.log(
+"SNAPSHOT VOLATILITY CHECK",
+{
+
+vix:
+snapshot?.indices?.vix,
+
+vixTermRatio:
+snapshot?.indices?.vixTermRatio,
+
+volOfVolRatio:
+snapshot?.indices?.volOfVolRatio
+
+}
+);
+
+
 console.log(
 "SNAPSHOT CHECK",
 {
@@ -296,6 +399,7 @@ hasFragility:
 SAVE HISTORY
 =================================================== */
 
+const saveHistoryRes =
 await fetch(
 "/api/history",
 {
@@ -314,6 +418,15 @@ snapshot
 
 }
 );
+
+if (!saveHistoryRes.ok) {
+
+console.error(
+"HISTORY SNAPSHOT SAVE FAILED",
+saveHistoryRes.status
+);
+
+}
 
 
 /* ===================================================
@@ -387,6 +500,12 @@ err
 
 }
 
+finally {
+
+setIsReloading(false);
+
+}
+
 }
 
 
@@ -394,37 +513,70 @@ err
 SNAPSHOT COPY
 ===================================================== */
 
-function copySnapshot() {
+async function copySnapshot() {
 
-if (!engine) {
+if (
+!engine ||
+!snapshotMap
+) {
+
+console.error(
+"SNAPSHOT COPY FAILED: engine or snapshot map missing"
+);
 
 return;
 
 }
 
 
+/*
+* IMPORTANT:
+*
+* Use the complete mapped input from the latest successful
+* market load.
+*
+* Previously this function reconstructed a reduced map from
+* only:
+*
+* - engine.indices
+* - engine.futures
+* - engine.historyMetrics
+*
+* That discarded raw marketData and adapter-level values,
+* including volatility inputs.
+*/
+
 const snapshot =
 createMarketSnapshot({
 
-map: {
-
-indices:
-engine.indices,
-
-futures:
-engine.futures,
-
-historyMetrics:
-engine.historyMetrics
-
-},
+map:
+snapshotMap,
 
 engine
 
 });
 
 
-navigator.clipboard.writeText(
+console.log(
+"MANUAL SNAPSHOT VOLATILITY CHECK",
+{
+
+vix:
+snapshot?.indices?.vix,
+
+vixTermRatio:
+snapshot?.indices?.vixTermRatio,
+
+volOfVolRatio:
+snapshot?.indices?.volOfVolRatio
+
+}
+);
+
+
+try {
+
+await navigator.clipboard.writeText(
 JSON.stringify(
 snapshot,
 null,
@@ -432,11 +584,42 @@ null,
 )
 );
 
-
 console.log(
 "📸 SNAPSHOT COPIED",
 snapshot
 );
+
+}
+
+catch (err) {
+
+console.error(
+"SNAPSHOT COPY FAILED",
+err
+);
+
+}
+
+}
+
+
+/* =====================================================
+MANUAL REFRESH
+===================================================== */
+
+async function refreshMarket() {
+
+if (isReloading) {
+
+return;
+
+}
+
+console.log(
+"↻ MANUAL MARKET REFRESH"
+);
+
+await load();
 
 }
 
@@ -456,7 +639,8 @@ if (!engine) {
 
 return (
 
-<div className="flex min-h-screen items-center justify-center bg-black p-10 text-white">
+<div className="flex min-h-screen items-center justify-center bg-black
+p-10 text-white">
 
 Loading Market Engine...
 
@@ -530,14 +714,16 @@ RENDER
 
 return (
 
-<main className="min-h-screen bg-black p-3 font-mono text-white sm:p-4 md:p-6 lg:p-8">
+<main className="min-h-screen bg-black p-3 font-mono text-white sm:p-4
+md:p-6 lg:p-8">
 
 
 {/* =====================================================
 HEADER
 ===================================================== */}
 
-<header className="mb-6 flex flex-col gap-4 border-b border-[#222] pb-4 sm:flex-row sm:items-center sm:justify-between">
+<header className="mb-6 flex flex-col gap-4 border-b border-[#222]
+pb-4 sm:flex-row sm:items-center sm:justify-between">
 
 <div>
 
@@ -561,18 +747,44 @@ Institutional Market Structure Engine
 <div className="flex gap-2">
 
 <button
-onClick={load}
-className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333]}"
+type="button"
+onClick={refreshMarket}
+disabled={isReloading}
+title={
+isReloading
+? "Market data is refreshing"
+: "Refresh market data"
+}
+className={`border border-[#444] bg-[#222] px-3 py-2 text-sm transition
+hover:bg-[#333] ${
+isReloading
+? "cursor-not-allowed opacity-50"
+: ""
+}`}
 >
 
-↻
+{isReloading
+? "↻ ..."
+: "↻"}
 
 </button>
 
 
 <button
+type="button"
 onClick={copySnapshot}
-className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333]}"
+disabled={
+!engine ||
+!snapshotMap
+}
+title="Copy current market snapshot"
+className={`border border-[#444] bg-[#222] px-3 py-2 text-sm transition
+hover:bg-[#333] ${
+!engine ||
+!snapshotMap
+? "cursor-not-allowed opacity-50"
+: ""
+}`}
 >
 
 📸
@@ -581,6 +793,7 @@ className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-
 
 
 <button
+type="button"
 onClick={() => {
 
 localStorage.removeItem(
@@ -592,7 +805,8 @@ router.push(
 );
 
 }}
-className="border border-[#444] bg-[#8b0000] px-3 py-2 text-sm transition hover:bg-[#a00000]}"
+className="border border-[#444] bg-[#8b0000] px-3 py-2 text-sm
+transition hover:bg-[#a00000]}"
 >
 
 🔒
@@ -645,7 +859,8 @@ subtitle="Master score, execution and directional positioning"
 />
 
 
-<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3
+2xl:grid-cols-7">
 
 <MasterPanel
 master={engine.master}
@@ -1011,7 +1226,8 @@ subtitle="Liquidity, fragility, participation and breadth"
 />
 
 
-<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3
+2xl:grid-cols-6">
 
 <LiquidityPanel
 data={engine}
@@ -1050,7 +1266,8 @@ data={engine}
 
 <SectionHeader
 title="AI RESEARCH"
-subtitle="Independent research layer, positioning, divergences and forward-testable market thesis"
+subtitle="Independent research layer, positioning, divergences and
+forward-testable market thesis"
 />
 
 <AIResearchPanel />
