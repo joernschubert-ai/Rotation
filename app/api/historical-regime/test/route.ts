@@ -457,7 +457,7 @@ Information available at historical day T.
 
 const features =
 buildHistoricalRegimeFeatures(
-aligned.days
+ratesAligned.days
 );
 
 
