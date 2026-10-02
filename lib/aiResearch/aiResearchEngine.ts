@@ -5880,6 +5880,43 @@ statement +=
 
 }
 
+const externalEvidence =
+evidenceAssessment.evidence.find(
+(item) =>
+item.category === "EXTERNAL"
+);
+
+if (
+externalEvidence?.state === "SUPPORTS"
+) {
+supportingEvidence.push(
+`External macro/market research supports the current structural thesis with ${externalEvidence.strength} evidence strength and confidence ${Math.round(
+externalEvidence.confidence
+)}.`
+);
+}
+
+else if (
+externalEvidence?.state === "CONTRADICTS"
+) {
+counterEvidence.push(
+`External macro/market research contradicts the current structural thesis with ${externalEvidence.strength} evidence strength and confidence ${Math.round(
+externalEvidence.confidence
+)}.`
+);
+}
+
+else if (
+externalEvidence?.state === "UNRESOLVED"
+) {
+counterEvidence.push(
+`External macro/market research remains directionally unresolved with ${externalEvidence.strength} evidence strength and confidence ${Math.round(
+externalEvidence.confidence
+)}; it currently provides neither clean confirmation nor clean contradiction.`
+);
+}
+
+
 
 return {
 
