@@ -1221,8 +1221,32 @@ data.netPosition,
 weeklyChange:
 data.weeklyChange,
 
+change4W:
+data.change4W,
+
+change13W:
+data.change13W,
+
+change26W:
+data.change26W,
+
+normalizedChange4W:
+data.normalizedChange4W,
+
+normalizedChange13W:
+data.normalizedChange13W,
+
+normalizedChange26W:
+data.normalizedChange26W,
+
 percentile:
 data.percentile,
+
+zScore:
+data.zScore,
+
+isExtreme:
+data.isExtreme,
 
 summary:
 `${entry.group}: net ${data.netPosition.toLocaleString(
@@ -1230,6 +1254,7 @@ summary:
 )} contracts`,
 
 };
+
 
 }
 );

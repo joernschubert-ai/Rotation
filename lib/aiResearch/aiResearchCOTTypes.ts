@@ -242,8 +242,37 @@ MARKET POSITIONING SUMMARY
 /*
 * This summary is generated from structured COT data.
 *
-* "bias" is deliberately descriptive rather than
-* an execution signal.
+* "bias" remains descriptive rather than an
+* execution signal.
+*
+* The summary deliberately transports several
+* positioning horizons:
+*
+* weeklyChange
+* =
+* latest one-week net-position change.
+*
+* change4W
+* =
+* short-term positioning tendency.
+*
+* change13W
+* =
+* medium-term positioning tendency.
+*
+* change26W
+* =
+* half-year positioning tendency.
+*
+* percentile / zScore
+* =
+* current positioning relative to the historical
+* distribution, normally using the provider's
+* 52-week research window.
+*
+* normalized changes allow cross-market comparisons
+* without treating identical contract changes as
+* economically identical across different markets.
 */
 
 export type COTPositioningBias =
@@ -269,14 +298,64 @@ COTTraderGroup;
 bias:
 COTPositioningBias;
 
+
+/*
+* Current positioning level.
+*/
+
 netPosition:
 NullableNumber;
+
+
+/*
+* Multi-horizon positioning changes.
+*/
 
 weeklyChange:
 NullableNumber;
 
+change4W:
+NullableNumber;
+
+change13W:
+NullableNumber;
+
+change26W:
+NullableNumber;
+
+
+/*
+* Changes normalized against the historical
+* net-position range of the same market/group.
+*/
+
+normalizedChange4W:
+NullableNumber;
+
+normalizedChange13W:
+NullableNumber;
+
+normalizedChange26W:
+NullableNumber;
+
+
+/*
+* Historical distribution context.
+*/
+
 percentile:
 NullableNumber;
+
+zScore:
+NullableNumber;
+
+isExtreme:
+boolean;
+
+
+/*
+* Human-readable descriptive summary.
+*/
 
 summary:
 string;
@@ -287,6 +366,21 @@ string;
 /* =====================================================
 COT HISTORY
 ===================================================== */
+
+/*
+* One series represents one market / trader-group
+* combination.
+*
+* Example:
+*
+* NASDAQ / ASSET_MANAGER
+* NASDAQ / LEVERAGED_MONEY
+* RUSSELL_2000 / ASSET_MANAGER
+*
+* The provider normally supplies up to:
+*
+* 4 markets × 5 trader groups = 20 series.
+*/
 
 export interface COTHistoricalSeries {
 
@@ -312,6 +406,26 @@ COT RESEARCH DATA
 *
 * It remains completely separate from
 * AIResearchSource[].
+*
+* Important:
+*
+* observations
+* =
+* raw normalized weekly COT observations.
+*
+* summaries
+* =
+* latest market/group positioning metrics including
+* multi-horizon changes and historical context.
+*
+* divergences
+* =
+* detected disagreement between trader groups.
+*
+* history
+* =
+* historical market/group series used for trend and
+* persistence research.
 */
 
 export interface AIResearchCOTData {
