@@ -4345,7 +4345,7 @@ summary:
 `The assessment combines Asset Manager and Leveraged Money positioning across 1W, 4W, 13W and 26W horizons with 52W percentile/z-score context.`,
 `Dealer positioning is contextual only.`,
 cot.divergenceCount > 0
-? `${cot.divergenceCount} Asset-Manager/Leveraged-Money divergence(s) remain unresolved.`
+? `${cot.divergenceCount} Asset-Manager/Leveraged-Money divergence(s) indicate positioning disagreement and reduce directional certainty.`
 : "No current Asset-Manager/Leveraged-Money divergence is detected.",
 ].join(" "),
 
@@ -5290,6 +5290,100 @@ return divergences;
 
 
 /* =====================================================
+COT THESIS CLASSIFICATION
+===================================================== */
+
+/*
+* A market-level COT direction is not automatically
+* supporting or contradictory evidence.
+*
+* It must first be interpreted RELATIVE to the current
+* structural research bias.
+*
+* Example:
+*
+* structural bias = BEARISH
+* NASDAQ COT = BULLISH
+*
+* => counter-evidence
+*
+* structural bias = BEARISH
+* NASDAQ COT = BEARISH
+*
+* => supporting evidence
+*
+* MIXED / NEUTRAL positioning remains unresolved and
+* must not be placed in the supporting-evidence bucket.
+*/
+
+function classifyCOTMarketAgainstStructuralBias(
+market: COTMarketResearchSummary,
+structuralBias: AIResearchStructuralBias
+):
+| "SUPPORTS"
+| "CONTRADICTS"
+| "UNRESOLVED" {
+
+if (
+market.direction === "MIXED" ||
+market.direction === "NEUTRAL" ||
+market.direction === "UNKNOWN"
+) {
+
+return "UNRESOLVED";
+
+}
+
+
+if (
+structuralBias === "BEARISH"
+) {
+
+return market.direction === "BEARISH"
+? "SUPPORTS"
+: "CONTRADICTS";
+
+}
+
+
+if (
+structuralBias === "BULLISH"
+) {
+
+return market.direction === "BULLISH"
+? "SUPPORTS"
+: "CONTRADICTS";
+
+}
+
+
+return "UNRESOLVED";
+
+}
+
+
+function buildCOTMarketThesisText(
+market: COTMarketResearchSummary
+): string {
+
+const divergenceText =
+market.divergenceCount > 0
+? ` Asset Manager and Leveraged Money currently diverge in this market.`
+: "";
+
+
+return (
+`${market.market} COT positioning is ${market.direction} ` +
+`with confidence ${Math.round(
+market.confidence
+)}.` +
+divergenceText
+);
+
+}
+
+
+/* =====================================================
 THESIS
 ===================================================== */
 
@@ -5515,12 +5609,17 @@ item.category === "POSITIONING"
 );
 
 
+/*
+* First classify the complete COT layer relative
+* to the current structural thesis.
+*/
+
 if (
 positioningEvidence?.state === "SUPPORTS"
 ) {
 
 supportingEvidence.push(
-`COT positioning supports the structural thesis with ${positioningEvidence.strength} evidence strength.`
+`Aggregate COT positioning supports the structural thesis with ${positioningEvidence.strength} evidence strength.`
 );
 
 }
@@ -5530,7 +5629,7 @@ positioningEvidence?.state === "CONTRADICTS"
 ) {
 
 counterEvidence.push(
-`COT positioning contradicts the structural thesis with ${positioningEvidence.strength} evidence strength.`
+`Aggregate COT positioning contradicts the structural thesis with ${positioningEvidence.strength} evidence strength.`
 );
 
 }
@@ -5540,58 +5639,127 @@ positioningEvidence?.state === "UNRESOLVED"
 ) {
 
 counterEvidence.push(
-"COT positioning remains mixed or internally divergent and does not provide clean directional confirmation."
+"Aggregate COT positioning remains mixed or internally divergent and therefore does not provide clean directional confirmation."
+);
+
+}
+
+else if (
+positioningEvidence?.state === "NEUTRAL"
+) {
+
+counterEvidence.push(
+"Aggregate COT positioning is neutral and currently provides neither directional confirmation nor directional contradiction."
 );
 
 }
 
 
-const nasdaqCOT =
+/*
+* Market-level COT evidence must also be classified
+* relative to structural bias.
+*
+* Previously NASDAQ and Russell COT observations
+* were always inserted into supportingEvidence.
+* That was semantically wrong whenever their COT
+* direction opposed the structural thesis.
+*/
+
+const relevantCOTMarkets:
+COTMarket[] = [
+"NASDAQ",
+"RUSSELL_2000",
+];
+
+
+for (
+const marketName of relevantCOTMarkets
+) {
+
+const market =
 cot.markets.find(
 (item) =>
-item.market === "NASDAQ"
+item.market === marketName
+);
+
+
+if (!market) {
+
+continue;
+
+}
+
+
+const classification =
+classifyCOTMarketAgainstStructuralBias(
+market,
+evidenceAssessment.structuralBias
+);
+
+
+const text =
+buildCOTMarketThesisText(
+market
 );
 
 
 if (
-nasdaqCOT
+classification === "SUPPORTS"
 ) {
 
 supportingEvidence.push(
-`NASDAQ COT positioning is ${nasdaqCOT.direction} with confidence ${Math.round(
-nasdaqCOT.confidence
-)}.`
+text
 );
 
 }
 
+else {
 
-const russellCOT =
-cot.markets.find(
-(item) =>
-item.market === "RUSSELL_2000"
-);
+/*
+* CONTRADICTS as well as MIXED / NEUTRAL /
+* UNKNOWN are intentionally placed in the
+* counter-evidence bucket because they either
+* oppose the thesis or reduce its certainty.
+*/
 
-
-if (
-russellCOT
-) {
-
-supportingEvidence.push(
-`Russell 2000 COT positioning is ${russellCOT.direction} with confidence ${Math.round(
-russellCOT.confidence
-)}.`
+counterEvidence.push(
+text
 );
 
 }
 
+}
+
+
+/*
+* Asset-Manager / Leveraged-Money divergences are
+* uncertainty evidence.
+*
+* They are not inherently bearish or bullish.
+*/
 
 if (
 cot.divergenceCount > 0
 ) {
 
 counterEvidence.push(
-`${cot.divergenceCount} COT Asset-Manager/Leveraged-Money divergence(s) reduce positioning certainty.`
+`${cot.divergenceCount} COT Asset-Manager/Leveraged-Money divergence(s) indicate positioning disagreement and reduce directional certainty.`
+);
+
+}
+
+
+/*
+* Historical extremes are relevant context, but an
+* extreme is not automatically a reversal signal.
+*/
+
+if (
+cot.extremeCount > 0
+) {
+
+counterEvidence.push(
+`${cot.extremeCount} COT market/group positioning summary(ies) are at 52-week historical extremes; these extremes increase positioning sensitivity but are not interpreted as automatic reversal signals.`
 );
 
 }
@@ -5698,8 +5866,30 @@ if (
 cot.available
 ) {
 
+if (
+cot.overallDirection === "NEUTRAL"
+) {
+
 statement +=
-` COT positioning is currently ${cot.overallDirection} and is used as supplementary positioning evidence rather than as an execution signal.`;
+" Aggregate COT positioning is currently neutral and therefore does not provide directional confirmation.";
+
+}
+
+else if (
+cot.overallDirection === "MIXED"
+) {
+
+statement +=
+" Aggregate COT positioning is currently mixed and therefore reduces positioning certainty.";
+
+}
+
+else {
+
+statement +=
+` Aggregate COT positioning is currently ${cot.overallDirection} and is used as supplementary positioning evidence rather than as an execution signal.`;
+
+}
 
 }
 
@@ -5896,10 +6086,10 @@ cot.divergenceCount > 0
 risks.push({
 
 risk:
-"COT positioning divergence",
+"COT positioning uncertainty",
 
 explanation:
-`${cot.divergenceCount} Asset-Manager/Leveraged-Money divergence(s) detected across the COT positioning layer.`,
+`${cot.divergenceCount} Asset-Manager/Leveraged-Money divergence(s) indicate disagreement between participant groups. This reduces directional COT certainty but is not inherently bearish or bullish.`,
 
 evidenceType:
 "COMBINED",
@@ -5917,10 +6107,10 @@ cot.extremeCount > 0
 risks.push({
 
 risk:
-"COT positioning extreme",
+"COT positioning sensitivity",
 
 explanation:
-`${cot.extremeCount} market/group COT positioning summary(ies) are at a 52-week historical extreme.`,
+`${cot.extremeCount} market/group COT positioning summary(ies) are at a 52-week historical extreme. Extreme positioning can increase sensitivity to reversals or continuation but is not treated as an automatic contrarian signal.`,
 
 evidenceType:
 "COMBINED",
@@ -6152,7 +6342,7 @@ data.crashProbability
 
 `COT positioning: ${
 cot.available
-? `${cot.overallDirection}, confidence ${cot.confidence}, ${cot.observationCount} observation(s), ${cot.summaryCount} market/group summary(ies), ${cot.historySeriesCount} historical series, ${cot.divergenceCount} divergence(s), ${cot.extremeCount} extreme(s).`
+? `${cot.overallDirection}, confidence ${cot.confidence}, ${cot.observationCount} observation(s), ${cot.summaryCount} market/group summary(ies), ${cot.historySeriesCount} historical series, ${cot.divergenceCount} participant-group divergence(s), ${cot.extremeCount} historical extreme(s).`
 : "not available."
 }`,
 
