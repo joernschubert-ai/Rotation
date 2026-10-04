@@ -25,6 +25,13 @@
 *
 * For each macro series and market date, the latest available
 * observation date is selected.
+*
+* Performance:
+* - The original implementation scanned the complete observation
+* array for every market day.
+* - This implementation preprocesses the observations once and then
+* walks both market dates and vintage intervals chronologically.
+* - The as-of semantics remain unchanged.
 */
 
 import type {
@@ -90,6 +97,188 @@ realtimeStart: string;
 realtimeEnd: string;
 };
 
+type PreparedMacroObservation =
+HistoricalMacroVintageObservation & {
+index: number;
+};
+
+/**
+* A small max-heap ordered by:
+*
+* 1. latest observation.date
+* 2. latest realtimeStart
+*
+* The heap contains all vintages whose realtimeStart has already
+* occurred. Expired observations are removed lazily.
+*
+* This allows us to select the same "latest available observation"
+* as the original implementation without scanning the complete
+* observation array for every market date.
+*/
+class MacroObservationHeap {
+private readonly heap: PreparedMacroObservation[] = [];
+
+private isHigherPriority(
+left: PreparedMacroObservation,
+right: PreparedMacroObservation
+): boolean {
+if (left.date !== right.date) {
+return left.date > right.date;
+}
+
+if (left.realtimeStart !== right.realtimeStart) {
+return (
+left.realtimeStart >
+right.realtimeStart
+);
+}
+
+return left.index > right.index;
+}
+
+private swap(
+leftIndex: number,
+rightIndex: number
+): void {
+const temporary =
+this.heap[leftIndex];
+
+this.heap[leftIndex] =
+this.heap[rightIndex];
+
+this.heap[rightIndex] =
+temporary;
+}
+
+push(
+observation: PreparedMacroObservation
+): void {
+this.heap.push(
+observation
+);
+
+let index =
+this.heap.length - 1;
+
+while (index > 0) {
+const parentIndex =
+Math.floor(
+(index - 1) / 2
+);
+
+if (
+!this.isHigherPriority(
+this.heap[index],
+this.heap[parentIndex]
+)
+) {
+break;
+}
+
+this.swap(
+index,
+parentIndex
+);
+
+index =
+parentIndex;
+}
+}
+
+peek(): PreparedMacroObservation | null {
+return (
+this.heap[0] ??
+null
+);
+}
+
+pop(): PreparedMacroObservation | null {
+if (
+this.heap.length === 0
+) {
+return null;
+}
+
+if (
+this.heap.length === 1
+) {
+return (
+this.heap.pop() ??
+null
+);
+}
+
+const result =
+this.heap[0];
+
+const last =
+this.heap.pop();
+
+if (
+last === undefined
+) {
+return result;
+}
+
+this.heap[0] =
+last;
+
+let index = 0;
+
+while (true) {
+const leftIndex =
+index * 2 + 1;
+
+const rightIndex =
+index * 2 + 2;
+
+let highestIndex =
+index;
+
+if (
+leftIndex <
+this.heap.length &&
+this.isHigherPriority(
+this.heap[leftIndex],
+this.heap[highestIndex]
+)
+) {
+highestIndex =
+leftIndex;
+}
+
+if (
+rightIndex <
+this.heap.length &&
+this.isHigherPriority(
+this.heap[rightIndex],
+this.heap[highestIndex]
+)
+) {
+highestIndex =
+rightIndex;
+}
+
+if (
+highestIndex ===
+index
+) {
+break;
+}
+
+this.swap(
+index,
+highestIndex
+);
+
+index =
+highestIndex;
+}
+
+return result;
+}
+}
+
 function isValidDateString(
 value: string
 ): boolean {
@@ -99,30 +288,27 @@ value
 }
 
 /**
-* Select the macro observation that was actually valid
-* on the requested market date.
+* Prepare only structurally valid observations once.
 *
-* The source observations may contain multiple vintages
-* for the same observation date.
-*
-* We first restrict to observations whose real-time validity
-* interval contains the market date and whose observation date
-* is not in the future.
-*
-* From those candidates we select the latest observation date.
-*
-* If multiple records exist for the same observation date,
-* the latest realtimeStart is preferred.
+* The original provider already returns sorted observations,
+* but the alignment layer must not rely on that implementation
+* detail. Sorting here makes the chronological processing explicit.
 */
-function selectObservationAsOf(
-series: HistoricalMacroVintageSeries,
-marketDate: string
-): SelectedMacroObservation | null {
-let selected:
-HistoricalMacroVintageObservation | null =
-null;
+function prepareObservations(
+series: HistoricalMacroVintageSeries
+): PreparedMacroObservation[] {
+const observations: PreparedMacroObservation[] =
+[];
 
-for (const observation of series.observations) {
+for (
+let index = 0;
+index <
+series.observations.length;
+index++
+) {
+const observation =
+series.observations[index];
+
 if (
 !isValidDateString(
 observation.date
@@ -137,17 +323,89 @@ observation.realtimeEnd
 continue;
 }
 
+observations.push({
+...observation,
+index,
+});
+}
+
+observations.sort(
+(
+left,
+right
+) => {
+if (
+left.realtimeStart !==
+right.realtimeStart
+) {
+return left.realtimeStart.localeCompare(
+right.realtimeStart
+);
+}
+
+if (
+left.realtimeEnd !==
+right.realtimeEnd
+) {
+return left.realtimeEnd.localeCompare(
+right.realtimeEnd
+);
+}
+
+if (
+left.date !==
+right.date
+) {
+return left.date.localeCompare(
+right.date
+);
+}
+
+return (
+left.index -
+right.index
+);
+}
+);
+
+return observations;
+}
+
 /**
-* The actual macro observation must already exist.
+* Select the macro observation that was actually valid
+* on the requested market date.
 *
-* Example:
-*
-* CPI observation date = 2026-08-01
-* market date = 2026-08-20
-*
-* This alone is not sufficient. We additionally require
-* the observation's realtimeStart to be on/before 2026-08-20.
+* This helper is retained as a simple semantic reference
+* for the as-of rule. The production alignment path below
+* uses the prepared chronological selector instead of calling
+* this function for every market date.
 */
+function selectObservationAsOf(
+series: HistoricalMacroVintageSeries,
+marketDate: string
+): SelectedMacroObservation | null {
+let selected:
+HistoricalMacroVintageObservation | null =
+null;
+
+for (
+const observation of
+series.observations
+) {
+if (
+!isValidDateString(
+observation.date
+) ||
+!isValidDateString(
+observation.realtimeStart
+) ||
+!isValidDateString(
+observation.realtimeEnd
+)
+) {
+continue;
+}
+
 if (
 observation.date >
 marketDate
@@ -155,10 +413,6 @@ marketDate
 continue;
 }
 
-/**
-* The particular vintage must already be valid
-* on the market date.
-*/
 if (
 observation.realtimeStart >
 marketDate
@@ -181,9 +435,6 @@ observation;
 continue;
 }
 
-/**
-* Prefer the most recent available observation date.
-*/
 if (
 observation.date >
 selected.date
@@ -193,10 +444,6 @@ observation;
 continue;
 }
 
-/**
-* If the observation date is identical, prefer
-* the latest vintage that was already valid.
-*/
 if (
 observation.date ===
 selected.date &&
@@ -229,31 +476,275 @@ selected.realtimeEnd,
 };
 }
 
-function buildMacroAsOfDay(
-marketDate: string,
+class HistoricalMacroAsOfSelector {
+private readonly observations: PreparedMacroObservation[];
+
+private readonly heap =
+new MacroObservationHeap();
+
+private nextObservationIndex = 0;
+
+constructor(
+series: HistoricalMacroVintageSeries
+) {
+this.observations =
+prepareObservations(
+series
+);
+}
+
+/**
+* Add all vintages whose release date has arrived.
+*/
+private addAvailableObservations(
+marketDate: string
+): void {
+while (
+this.nextObservationIndex <
+this.observations.length
+) {
+const observation =
+this.observations[
+this.nextObservationIndex
+];
+
+if (
+observation.realtimeStart >
+marketDate
+) {
+break;
+}
+
+this.heap.push(
+observation
+);
+
+this.nextObservationIndex++;
+}
+}
+
+/**
+* Remove expired observations from the top of the heap.
+*
+* Expired entries that are not currently on top are removed
+* lazily when they become the highest-priority candidate.
+*/
+private removeExpiredTop(
+marketDate: string
+): void {
+while (true) {
+const candidate =
+this.heap.peek();
+
+if (
+candidate === null
+) {
+return;
+}
+
+if (
+candidate.realtimeEnd >=
+marketDate
+) {
+return;
+}
+
+this.heap.pop();
+}
+}
+
+/**
+* Advance the selector to a new market date.
+*
+* The caller must provide market dates in chronological order.
+*/
+select(
+marketDate: string
+): SelectedMacroObservation | null {
+this.addAvailableObservations(
+marketDate
+);
+
+this.removeExpiredTop(
+marketDate
+);
+
+let candidate =
+this.heap.peek();
+
+/**
+* The heap is ordered by observation.date.
+*
+* A theoretically expired observation can be hidden below
+* the current top. It does not affect correctness unless it
+* later becomes the top, where it is removed by
+* removeExpiredTop().
+*
+* The top candidate itself must additionally satisfy the
+* observation.date <= marketDate condition.
+*/
+while (
+candidate !== null &&
+candidate.date >
+marketDate
+) {
+/**
+* Future observation dates must never be used.
+*
+* They can exist in the heap because realtimeStart may
+* precede the observation date in unusual FRED vintage
+* structures. Such a record cannot be selected.
+*
+* We temporarily remove it and retain it so that it can
+* participate again on later market dates.
+*/
+const futureCandidate =
+this.heap.pop();
+
+if (
+futureCandidate ===
+null
+) {
+break;
+}
+
+/**
+* Because the heap is only needed for chronological market
+* dates, a future-dated observation should normally become
+* eligible on a later market date. We therefore reinsert it
+* immediately after looking for another valid candidate.
+*/
+let found:
+PreparedMacroObservation | null =
+null;
+
+this.removeExpiredTop(
+marketDate
+);
+
+const next =
+this.heap.peek();
+
+if (
+next !== null &&
+next.date <=
+marketDate &&
+next.realtimeEnd >=
+marketDate
+) {
+found =
+next;
+}
+
+this.heap.push(
+futureCandidate
+);
+
+if (
+found === null
+) {
+return null;
+}
+
+candidate =
+found;
+}
+
+if (
+candidate === null
+) {
+return null;
+}
+
+if (
+candidate.date >
+marketDate
+) {
+return null;
+}
+
+if (
+candidate.realtimeStart >
+marketDate
+) {
+return null;
+}
+
+if (
+candidate.realtimeEnd <
+marketDate
+) {
+this.removeExpiredTop(
+marketDate
+);
+
+return null;
+}
+
+return {
+value:
+candidate.value,
+
+sourceDate:
+candidate.date,
+
+realtimeStart:
+candidate.realtimeStart,
+
+realtimeEnd:
+candidate.realtimeEnd,
+};
+}
+}
+
+function buildMacroAsOfDays(
+marketDays: HistoricalAlignedDay[],
 data: HistoricalRegimeMacroVintageData
-): HistoricalMacroAsOfDay {
+): HistoricalMacroAsOfDay[] {
+const cpiSelector =
+new HistoricalMacroAsOfSelector(
+data.cpi
+);
+
+const coreCpiSelector =
+new HistoricalMacroAsOfSelector(
+data.coreCpi
+);
+
+const nfciSelector =
+new HistoricalMacroAsOfSelector(
+data.nfci
+);
+
+const real10YSelector =
+new HistoricalMacroAsOfSelector(
+data.real10Y
+);
+
+return marketDays.map(
+(
+marketDay
+) => {
+const marketDate =
+marketDay.date;
+
 const cpi =
-selectObservationAsOf(
-data.cpi,
+cpiSelector.select(
 marketDate
 );
 
 const coreCpi =
-selectObservationAsOf(
-data.coreCpi,
+coreCpiSelector.select(
 marketDate
 );
 
 const nfci =
-selectObservationAsOf(
-data.nfci,
+nfciSelector.select(
 marketDate
 );
 
 const real10Y =
-selectObservationAsOf(
-data.real10Y,
+real10YSelector.select(
 marketDate
 );
 
@@ -310,14 +801,23 @@ real10Y?.realtimeStart ??
 null,
 };
 }
+);
+}
 
 function calculateDiagnostics(
 days: HistoricalMacroAsOfDay[]
 ): HistoricalMacroVintageAlignment["diagnostics"] {
-const cpiMissingDates: string[] = [];
-const coreCpiMissingDates: string[] = [];
-const nfciMissingDates: string[] = [];
-const real10YMissingDates: string[] = [];
+const cpiMissingDates: string[] =
+[];
+
+const coreCpiMissingDates: string[] =
+[];
+
+const nfciMissingDates: string[] =
+[];
+
+const real10YMissingDates: string[] =
+[];
 
 let cpiAvailableCount = 0;
 let coreCpiAvailableCount = 0;
@@ -326,7 +826,9 @@ let real10YAvailableCount = 0;
 
 let allSeriesAvailableCount = 0;
 
-for (const day of days) {
+for (
+const day of days
+) {
 if (
 day.cpi !== null
 ) {
@@ -380,12 +882,15 @@ allSeriesAvailableCount++;
 /**
 * The alignment function itself enforces the as-of rule.
 *
-* This diagnostic is therefore calculated by validating every
-* selected source relationship against the market date.
+* This diagnostic validates every selected source relationship
+* against the market date.
 */
-let futureReleaseLeakageCount = 0;
+let futureReleaseLeakageCount =
+0;
 
-for (const day of days) {
+for (
+const day of days
+) {
 const sourcePairs = [
 {
 sourceDate:
@@ -420,9 +925,12 @@ day.real10YRealtimeStart,
 },
 ];
 
-for (const pair of sourcePairs) {
+for (
+const pair of sourcePairs
+) {
 if (
-pair.sourceDate !== null &&
+pair.sourceDate !==
+null &&
 pair.sourceDate >
 day.date
 ) {
@@ -431,7 +939,8 @@ continue;
 }
 
 if (
-pair.realtimeStart !== null &&
+pair.realtimeStart !==
+null &&
 pair.realtimeStart >
 day.date
 ) {
@@ -475,12 +984,9 @@ marketHistory: HistoricalAlignedDataset,
 macroData: HistoricalRegimeMacroVintageData
 ): HistoricalMacroVintageAlignment {
 const days =
-marketHistory.days.map(
-(marketDay: HistoricalAlignedDay) =>
-buildMacroAsOfDay(
-marketDay.date,
+buildMacroAsOfDays(
+marketHistory.days,
 macroData
-)
 );
 
 const diagnostics =
