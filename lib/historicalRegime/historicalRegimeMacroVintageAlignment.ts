@@ -29,9 +29,15 @@
 * Performance:
 * - The original implementation scanned the complete observation
 * array for every market day.
-* - This implementation preprocesses the observations once and then
-* walks both market dates and vintage intervals chronologically.
-* - The as-of semantics remain unchanged.
+* - This implementation preprocesses observations once and then
+* processes market dates chronologically.
+* - An observation becomes eligible only when both its observation
+* date and realtimeStart have been reached.
+* - A max-heap then selects the latest valid observation date.
+* - Expired observations are removed lazily when they reach the top.
+*
+* This preserves the original as-of semantics while avoiding
+* repeated full-array scans.
 */
 
 import type {
@@ -100,40 +106,56 @@ realtimeEnd: string;
 type PreparedMacroObservation =
 HistoricalMacroVintageObservation & {
 index: number;
+eligibleFrom: string;
 };
 
 /**
-* A small max-heap ordered by:
+* Max-heap ordered by:
 *
 * 1. latest observation.date
 * 2. latest realtimeStart
+* 3. original observation index
 *
-* The heap contains all vintages whose realtimeStart has already
-* occurred. Expired observations are removed lazily.
+* The heap contains observations whose:
 *
-* This allows us to select the same "latest available observation"
-* as the original implementation without scanning the complete
-* observation array for every market date.
+* observation.date <= current market date
+* AND
+* observation.realtimeStart <= current market date
+*
+* Expired observations are removed lazily from the top.
 */
 class MacroObservationHeap {
-private readonly heap: PreparedMacroObservation[] = [];
+private readonly heap: PreparedMacroObservation[] =
+[];
 
 private isHigherPriority(
 left: PreparedMacroObservation,
 right: PreparedMacroObservation
 ): boolean {
-if (left.date !== right.date) {
-return left.date > right.date;
+if (
+left.date !==
+right.date
+) {
+return (
+left.date >
+right.date
+);
 }
 
-if (left.realtimeStart !== right.realtimeStart) {
+if (
+left.realtimeStart !==
+right.realtimeStart
+) {
 return (
 left.realtimeStart >
 right.realtimeStart
 );
 }
 
-return left.index > right.index;
+return (
+left.index >
+right.index
+);
 }
 
 private swap(
@@ -160,10 +182,13 @@ observation
 let index =
 this.heap.length - 1;
 
-while (index > 0) {
+while (
+index > 0
+) {
 const parentIndex =
 Math.floor(
-(index - 1) / 2
+(index - 1) /
+2
 );
 
 if (
@@ -225,7 +250,9 @@ last;
 
 let index = 0;
 
-while (true) {
+while (
+true
+) {
 const leftIndex =
 index * 2 + 1;
 
@@ -288,11 +315,42 @@ value
 }
 
 /**
-* Prepare only structurally valid observations once.
+* Return the date on which an observation becomes eligible
+* for the as-of selector.
 *
-* The original provider already returns sorted observations,
-* but the alignment layer must not rely on that implementation
-* detail. Sorting here makes the chronological processing explicit.
+* Both conditions must be satisfied:
+*
+* observation.date <= marketDate
+* realtimeStart <= marketDate
+*
+* Therefore the observation becomes eligible on:
+*
+* max(
+* observation.date,
+* observation.realtimeStart
+* )
+*
+* This prevents future observation dates from entering the heap
+* before they can actually be used.
+*/
+function getEligibleFrom(
+observation: HistoricalMacroVintageObservation
+): string {
+return (
+observation.date >
+observation.realtimeStart
+? observation.date
+: observation.realtimeStart
+);
+}
+
+/**
+* Prepare structurally valid observations once.
+*
+* Observations are sorted by the date on which they become
+* eligible. This allows the selector to add observations with
+* a single forward-only pointer while market dates advance
+* chronologically.
 */
 function prepareObservations(
 series: HistoricalMacroVintageSeries
@@ -323,9 +381,15 @@ observation.realtimeEnd
 continue;
 }
 
+const eligibleFrom =
+getEligibleFrom(
+observation
+);
+
 observations.push({
 ...observation,
 index,
+eligibleFrom,
 });
 }
 
@@ -335,20 +399,11 @@ left,
 right
 ) => {
 if (
-left.realtimeStart !==
-right.realtimeStart
+left.eligibleFrom !==
+right.eligibleFrom
 ) {
-return left.realtimeStart.localeCompare(
-right.realtimeStart
-);
-}
-
-if (
-left.realtimeEnd !==
-right.realtimeEnd
-) {
-return left.realtimeEnd.localeCompare(
-right.realtimeEnd
+return left.eligibleFrom.localeCompare(
+right.eligibleFrom
 );
 }
 
@@ -358,6 +413,15 @@ right.date
 ) {
 return left.date.localeCompare(
 right.date
+);
+}
+
+if (
+left.realtimeStart !==
+right.realtimeStart
+) {
+return left.realtimeStart.localeCompare(
+right.realtimeStart
 );
 }
 
@@ -375,10 +439,11 @@ return observations;
 * Select the macro observation that was actually valid
 * on the requested market date.
 *
-* This helper is retained as a simple semantic reference
-* for the as-of rule. The production alignment path below
-* uses the prepared chronological selector instead of calling
-* this function for every market date.
+* This function represents the original O(n) reference logic.
+*
+* It is intentionally retained as a semantic reference and
+* debugging helper. The production alignment path below uses
+* HistoricalMacroAsOfSelector instead.
 */
 function selectObservationAsOf(
 series: HistoricalMacroVintageSeries,
@@ -476,13 +541,19 @@ selected.realtimeEnd,
 };
 }
 
+/**
+* Chronological as-of selector for one macro series.
+*
+* The market dates supplied to select() must be chronological.
+*/
 class HistoricalMacroAsOfSelector {
 private readonly observations: PreparedMacroObservation[];
 
 private readonly heap =
 new MacroObservationHeap();
 
-private nextObservationIndex = 0;
+private nextObservationIndex =
+0;
 
 constructor(
 series: HistoricalMacroVintageSeries
@@ -494,9 +565,12 @@ series
 }
 
 /**
-* Add all vintages whose release date has arrived.
+* Add every observation that has become eligible.
+*
+* Because observations are sorted by eligibleFrom, this is
+* strictly forward-only.
 */
-private addAvailableObservations(
+private addEligibleObservations(
 marketDate: string
 ): void {
 while (
@@ -509,7 +583,7 @@ this.nextObservationIndex
 ];
 
 if (
-observation.realtimeStart >
+observation.eligibleFrom >
 marketDate
 ) {
 break;
@@ -524,15 +598,19 @@ this.nextObservationIndex++;
 }
 
 /**
-* Remove expired observations from the top of the heap.
+* Remove expired observations from the top.
 *
-* Expired entries that are not currently on top are removed
-* lazily when they become the highest-priority candidate.
+* An expired observation below the current top does not need
+* immediate removal. It can never be selected while a higher
+* priority observation remains active. Once it reaches the top,
+* it is removed here.
 */
 private removeExpiredTop(
 marketDate: string
 ): void {
-while (true) {
+while (
+true
+) {
 const candidate =
 this.heap.peek();
 
@@ -554,14 +632,22 @@ this.heap.pop();
 }
 
 /**
-* Advance the selector to a new market date.
+* Select the latest macro observation available on marketDate.
 *
-* The caller must provide market dates in chronological order.
+* The heap guarantees:
+*
+* - observation.date <= marketDate
+* - observation.realtimeStart <= marketDate
+*
+* because observations enter the heap only after
+* max(date, realtimeStart) <= marketDate.
+*
+* Expired candidates are removed before selection.
 */
 select(
 marketDate: string
 ): SelectedMacroObservation | null {
-this.addAvailableObservations(
+this.addEligibleObservations(
 marketDate
 );
 
@@ -569,86 +655,8 @@ this.removeExpiredTop(
 marketDate
 );
 
-let candidate =
+const candidate =
 this.heap.peek();
-
-/**
-* The heap is ordered by observation.date.
-*
-* A theoretically expired observation can be hidden below
-* the current top. It does not affect correctness unless it
-* later becomes the top, where it is removed by
-* removeExpiredTop().
-*
-* The top candidate itself must additionally satisfy the
-* observation.date <= marketDate condition.
-*/
-while (
-candidate !== null &&
-candidate.date >
-marketDate
-) {
-/**
-* Future observation dates must never be used.
-*
-* They can exist in the heap because realtimeStart may
-* precede the observation date in unusual FRED vintage
-* structures. Such a record cannot be selected.
-*
-* We temporarily remove it and retain it so that it can
-* participate again on later market dates.
-*/
-const futureCandidate =
-this.heap.pop();
-
-if (
-futureCandidate ===
-null
-) {
-break;
-}
-
-/**
-* Because the heap is only needed for chronological market
-* dates, a future-dated observation should normally become
-* eligible on a later market date. We therefore reinsert it
-* immediately after looking for another valid candidate.
-*/
-let found:
-PreparedMacroObservation | null =
-null;
-
-this.removeExpiredTop(
-marketDate
-);
-
-const next =
-this.heap.peek();
-
-if (
-next !== null &&
-next.date <=
-marketDate &&
-next.realtimeEnd >=
-marketDate
-) {
-found =
-next;
-}
-
-this.heap.push(
-futureCandidate
-);
-
-if (
-found === null
-) {
-return null;
-}
-
-candidate =
-found;
-}
 
 if (
 candidate === null
@@ -656,6 +664,12 @@ candidate === null
 return null;
 }
 
+/**
+* Defensive validation of the complete as-of rule.
+*
+* These checks should always be true because of the
+* eligibility and expiration logic above.
+*/
 if (
 candidate.date >
 marketDate
@@ -674,10 +688,6 @@ if (
 candidate.realtimeEnd <
 marketDate
 ) {
-this.removeExpiredTop(
-marketDate
-);
-
 return null;
 }
 
