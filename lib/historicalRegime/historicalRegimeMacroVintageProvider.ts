@@ -17,8 +17,9 @@
 * This returns observations together with their realtime_start /
 * realtime_end validity periods.
 *
-* The windows are deliberately limited because FRED imposes a maximum
-* number of vintage dates that may be requested in a single response.
+* FRED limits the number of observations returned by one request.
+* Therefore every real-time window is paginated with offset so that
+* large revision-aware series such as NFCI are never truncated.
 */
 
 const FRED_API_BASE =
@@ -43,8 +44,9 @@ return new Date()
 }
 
 /**
-* Five-year real-time windows keep even the daily DFII10 series
-* comfortably below FRED's vintage-date request limits.
+* Five-year real-time windows keep the amount of revision data
+* manageable while preserving the complete historical observation
+* range needed for as-of reconstruction.
 */
 const REALTIME_WINDOWS = [
 {
@@ -65,7 +67,17 @@ end: "2026-12-31",
 },
 ] as const;
 
+/**
+* FRED permits up to 100,000 observations per response.
+*
+* We deliberately use the documented maximum and paginate with
+* offset whenever a window contains more observations.
+*/
+const FRED_PAGE_SIZE = 100000;
+
 type FredObservationResponse = {
+count?: number;
+
 observations?: Array<{
 realtime_start?: string;
 realtime_end?: string;
@@ -177,9 +189,11 @@ url.searchParams.set(
 "json"
 );
 
-for (const [key, value] of Object.entries(
+for (
+const [key, value] of Object.entries(
 params
-)) {
+)
+) {
 url.searchParams.set(
 key,
 value
@@ -193,18 +207,22 @@ async function fetchFredJson<T>(
 path: string,
 params: Record<string, string>
 ): Promise<T> {
-const url = buildFredUrl(
+const url =
+buildFredUrl(
 path,
 params
 );
 
-const response = await fetch(
+const response =
+await fetch(
 url,
 {
 headers: {
-Accept: "application/json",
+Accept:
+"application/json",
 },
-cache: "no-store",
+cache:
+"no-store",
 }
 );
 
@@ -218,7 +236,8 @@ await response.json();
 
 if (
 errorBody &&
-typeof errorBody === "object"
+typeof errorBody ===
+"object"
 ) {
 const body =
 errorBody as {
@@ -228,7 +247,9 @@ error_message?: string;
 
 errorDetails =
 body.error_message ??
-JSON.stringify(errorBody);
+JSON.stringify(
+errorBody
+);
 }
 } catch {
 try {
@@ -249,6 +270,87 @@ throw new Error(
 return response.json() as Promise<T>;
 }
 
+function isValidDateString(
+value: string
+): boolean {
+return /^\d{4}-\d{2}-\d{2}$/.test(
+value
+);
+}
+
+function parseFredObservations(
+observations:
+Array<{
+realtime_start?: string;
+realtime_end?: string;
+date?: string;
+value?: string;
+}> = []
+): HistoricalMacroVintageObservation[] {
+return observations
+.map(
+(
+observation
+) => {
+const date =
+observation.date ??
+"";
+
+const value =
+Number(
+observation.value
+);
+
+const sourceRealtimeStart =
+observation.realtime_start ??
+"";
+
+const sourceRealtimeEnd =
+observation.realtime_end ??
+"";
+
+return {
+date,
+value,
+realtimeStart:
+sourceRealtimeStart,
+realtimeEnd:
+sourceRealtimeEnd,
+};
+}
+)
+.filter(
+(
+observation
+) =>
+isValidDateString(
+observation.date
+) &&
+Number.isFinite(
+observation.value
+) &&
+isValidDateString(
+observation.realtimeStart
+) &&
+isValidDateString(
+observation.realtimeEnd
+)
+);
+}
+
+/**
+* Fetch one complete real-time window.
+*
+* Important:
+* FRED may return more than 100,000 observations for a single
+* real-time window, especially for NFCI because the requested
+* observation history starts in 2011 while many historical
+* real-time periods are represented.
+*
+* Pagination is therefore mandatory. Without it the API response
+* is silently truncated at the page limit and later observation
+* dates can disappear from the dataset.
+*/
 async function fetchVintageObservationsForWindow(
 seriesId: string,
 realtimeStart: string,
@@ -259,9 +361,6 @@ realtimeEnd: string
 *
 * This matters for the final configured window:
 * 2026-01-01 → 2026-12-31
-*
-* On 2026-10-03 the effective end therefore becomes:
-* 2026-01-01 → 2026-10-03
 */
 const today =
 getFredToday();
@@ -282,11 +381,19 @@ realtimeStart
 return [];
 }
 
+const allObservations:
+HistoricalMacroVintageObservation[] =
+[];
+
+let offset = 0;
+
+while (true) {
 const data =
 await fetchFredJson<FredObservationResponse>(
 "series/observations",
 {
-series_id: seriesId,
+series_id:
+seriesId,
 
 observation_start:
 HISTORICAL_MACRO_START,
@@ -300,7 +407,8 @@ realtimeStart,
 realtime_end:
 effectiveRealtimeEnd,
 
-output_type: "1",
+output_type:
+"1",
 
 order_by:
 "observation_date",
@@ -308,51 +416,46 @@ order_by:
 sort_order:
 "asc",
 
-limit: "100000",
+limit:
+String(
+FRED_PAGE_SIZE
+),
+
+offset:
+String(
+offset
+),
 }
 );
 
-return (data.observations ?? [])
-.map((observation) => {
-const date =
-observation.date ?? "";
-
-const value = Number(
-observation.value
+const page =
+parseFredObservations(
+data.observations
 );
 
-const sourceRealtimeStart =
-observation.realtime_start ??
-"";
-
-const sourceRealtimeEnd =
-observation.realtime_end ??
-"";
-
-return {
-date,
-value,
-realtimeStart:
-sourceRealtimeStart,
-realtimeEnd:
-sourceRealtimeEnd,
-};
-})
-.filter(
-(observation) =>
-/^\d{4}-\d{2}-\d{2}$/.test(
-observation.date
-) &&
-Number.isFinite(
-observation.value
-) &&
-/^\d{4}-\d{2}-\d{2}$/.test(
-observation.realtimeStart
-) &&
-/^\d{4}-\d{2}-\d{2}$/.test(
-observation.realtimeEnd
-)
+allObservations.push(
+...page
 );
+
+/**
+* Stop when the returned page is smaller than the requested
+* page size. This is the normal final-page condition.
+*
+* We also stop on an empty page as an additional safeguard.
+*/
+if (
+page.length === 0 ||
+page.length <
+FRED_PAGE_SIZE
+) {
+break;
+}
+
+offset +=
+FRED_PAGE_SIZE;
+}
+
+return allObservations;
 }
 
 function observationKey(
@@ -367,7 +470,8 @@ observation.value,
 }
 
 function deduplicateObservations(
-observations: HistoricalMacroVintageObservation[]
+observations:
+HistoricalMacroVintageObservation[]
 ): HistoricalMacroVintageObservation[] {
 const seen =
 new Set<string>();
@@ -376,30 +480,41 @@ const result:
 HistoricalMacroVintageObservation[] =
 [];
 
-for (const observation of observations) {
+for (
+const observation of
+observations
+) {
 const key =
 observationKey(
 observation
 );
 
-if (seen.has(key)) {
+if (
+seen.has(key)
+) {
 continue;
 }
 
 seen.add(key);
+
 result.push(
 observation
 );
 }
 
-return result.sort((a, b) => {
+return result.sort(
+(
+a,
+b
+) => {
 const dateComparison =
 a.date.localeCompare(
 b.date
 );
 
 if (
-dateComparison !== 0
+dateComparison !==
+0
 ) {
 return dateComparison;
 }
@@ -419,7 +534,8 @@ return realtimeStartComparison;
 return a.realtimeEnd.localeCompare(
 b.realtimeEnd
 );
-});
+}
+);
 }
 
 async function fetchSeriesMetadata(
@@ -427,7 +543,9 @@ seriesId: string
 ): Promise<{
 frequency: string | null;
 units: string | null;
-seasonalAdjustment: string | null;
+seasonalAdjustment:
+| string
+| null;
 }> {
 type FredSeriesResponse = {
 seriess?: Array<{
@@ -470,7 +588,9 @@ config: SeriesConfig
 const observationsByWindow =
 await Promise.all(
 REALTIME_WINDOWS.map(
-(window) =>
+(
+window
+) =>
 fetchVintageObservationsForWindow(
 config.seriesId,
 window.start,
@@ -490,9 +610,14 @@ config.seriesId
 );
 
 return {
-key: config.key,
-seriesId: config.seriesId,
-label: config.label,
+key:
+config.key,
+
+seriesId:
+config.seriesId,
+
+label:
+config.label,
 
 frequency:
 metadata.frequency,
@@ -506,11 +631,13 @@ metadata.seasonalAdjustment,
 observations,
 
 firstDate:
-observations[0]?.date ??
+observations[0]
+?.date ??
 null,
 
 lastDate:
-observations.at(-1)?.date ??
+observations.at(-1)
+?.date ??
 null,
 
 count:
@@ -542,10 +669,14 @@ loadHistoricalMacroVintageSeries
 
 const byKey =
 Object.fromEntries(
-series.map((item) => [
+series.map(
+(
+item
+) => [
 item.key,
 item,
-])
+]
+)
 ) as Record<
 HistoricalMacroVintageSeriesKey,
 HistoricalMacroVintageSeries
