@@ -447,6 +447,48 @@ previousValue,
 );
 }
 
+function calculateMacroTradingDayChange(
+currentDate: string,
+currentValue: number | null,
+history: HistoricalMacroHistoryPoint[],
+historyMap: Map<string, number>,
+daysBack: number,
+): number | null {
+if (!isFiniteNumber(currentValue)) {
+return null;
+}
+
+const dates = history.map(
+(point) => point.date,
+);
+
+const currentIndex =
+dates.indexOf(currentDate);
+
+if (currentIndex < 0) {
+return null;
+}
+
+const previousDate =
+findPreviousTradingDate(
+dates,
+currentIndex,
+daysBack,
+);
+
+if (!previousDate) {
+return null;
+}
+
+const previousValue =
+historyMap.get(previousDate) ?? null;
+
+return calculateAbsoluteChange(
+currentValue,
+previousValue,
+);
+}
+
 export function buildHistoricalMacroFeatures(
 macroAlignment: HistoricalMacroVintageAlignment,
 rates: HistoricalRatesAlignedDay[],
@@ -598,22 +640,20 @@ const real10Y =
 day.real10Y;
 
 const real10YChange20D =
-calculateTradingDayChange(
+calculateMacroTradingDayChange(
 day.date,
 real10Y,
-ratesDates,
-ratesMap,
-"treasury10Y",
+real10YHistory,
+real10YMap,
 20,
 );
 
 const real10YChange60D =
-calculateTradingDayChange(
+calculateMacroTradingDayChange(
 day.date,
 real10Y,
-ratesDates,
-ratesMap,
-"treasury10Y",
+real10YHistory,
+real10YMap,
 60,
 );
 
@@ -824,4 +864,3 @@ dateMismatchCount,
 },
 };
 }
-
