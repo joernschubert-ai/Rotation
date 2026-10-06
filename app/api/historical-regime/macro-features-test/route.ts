@@ -4,22 +4,39 @@ import { NextResponse } from "next/server";
 
 import { loadHistoricalRegimeMarketData } from
 "@/lib/historicalRegime/historicalRegimeProvider";
+
 import { alignHistoricalRegimeMarketData } from
 "@/lib/historicalRegime/historicalRegimeAlignment";
+
 import { loadHistoricalRegimeRatesData } from
 "@/lib/historicalRegime/historicalRegimeRatesProvider";
+
 import { alignHistoricalRegimeRates } from
 "@/lib/historicalRegime/historicalRegimeRatesAlignment";
+
 import { loadHistoricalRegimeMacroVintageData } from
 "@/lib/historicalRegime/historicalRegimeMacroVintageProvider";
+
 import { alignHistoricalMacroVintage } from
 "@/lib/historicalRegime/historicalRegimeMacroVintageAlignment";
+
 import { buildHistoricalMacroFeatures } from
 "@/lib/historicalRegime/historicalRegimeMacroFeatures";
+
+import { buildHistoricalRegimeFeatures } from
+"@/lib/historicalRegime/historicalRegimeFeatures";
+
+import { buildHistoricalRegimeOutcomes } from
+"@/lib/historicalRegime/historicalRegimeOutcomes";
+
+import { buildHistoricalRegimeFeatureSet } from
+"@/lib/historicalRegime/historicalRegimeFeatureSet";
+
 
 function isFiniteNumber(value: unknown): value is number {
 return typeof value === "number" && Number.isFinite(value);
 }
+
 
 function round(
 value: number | null,
@@ -29,6 +46,7 @@ return isFiniteNumber(value)
 ? Number(value.toFixed(digits))
 : null;
 }
+
 
 function summarizeAvailability(
 rows: Array<Record<string, unknown>>,
@@ -49,6 +67,7 @@ rows.length > 0
 : 0,
 };
 }
+
 
 function normalizeFeatureRow(
 row: Record<string, unknown>,
@@ -114,6 +133,7 @@ result[key] = row[key] ?? null;
 return result;
 }
 
+
 function findSample(
 rows: Array<Record<string, unknown>>,
 date: string,
@@ -126,6 +146,7 @@ return row
 ? normalizeFeatureRow(row)
 : null;
 }
+
 
 function calculateChecks(
 rows: Array<Record<string, unknown>>,
@@ -264,6 +285,7 @@ Boolean,
 return checks;
 }
 
+
 export async function GET() {
 try {
 const [
@@ -276,10 +298,24 @@ loadHistoricalRegimeRatesData(),
 loadHistoricalRegimeMacroVintageData(),
 ]);
 
+
+/*
+* =====================================================
+* 1. MARKET ALIGNMENT
+* =====================================================
+*/
+
 const marketAlignment =
 alignHistoricalRegimeMarketData(
 marketData,
 );
+
+
+/*
+* =====================================================
+* 2. RATES ALIGNMENT
+* =====================================================
+*/
 
 const ratesAlignment =
 alignHistoricalRegimeRates(
@@ -287,22 +323,93 @@ marketAlignment,
 ratesData,
 );
 
+
+/*
+* =====================================================
+* 3. MACRO VINTAGE ALIGNMENT
+* =====================================================
+*/
+
 const macroAlignment =
 alignHistoricalMacroVintage(
 marketAlignment,
 macroVintageData,
 );
 
-const featureDataset =
+
+/*
+* =====================================================
+* 4. MACRO FEATURES
+* =====================================================
+*/
+
+const macroFeatureDataset =
 buildHistoricalMacroFeatures(
 macroAlignment,
 ratesAlignment.days,
 );
 
+
+/*
+* =====================================================
+* 5. MARKET FEATURES
+*
+* buildHistoricalRegimeFeatures() returns
+* HistoricalRegimeFeatures[] directly.
+* =====================================================
+*/
+
+const marketFeatureDataset =
+buildHistoricalRegimeFeatures(
+ratesAlignment.days,
+);
+
+
+/*
+* =====================================================
+* 6. HISTORICAL FORWARD OUTCOMES
+* =====================================================
+*/
+
+const outcomeDataset =
+buildHistoricalRegimeOutcomes(
+marketAlignment.days,
+);
+
+
+/*
+* =====================================================
+* 7. HISTORICAL REGIME FEATURE SET
+*
+* Exact-date integration only.
+*
+* No scoring.
+* No regime classification.
+* No analog logic.
+* No interpolation.
+* No forward filling.
+* =====================================================
+*/
+
+const historicalFeatureSet =
+buildHistoricalRegimeFeatureSet(
+marketFeatureDataset,
+macroFeatureDataset.days,
+outcomeDataset,
+);
+
+
+/*
+* =====================================================
+* EXISTING MACRO FEATURE OUTPUT
+* =====================================================
+*/
+
 const rows =
-featureDataset.days as Array<
+macroFeatureDataset.days as Array<
 Record<string, unknown>
 >;
+
 
 const featureAvailability = {
 cpi: summarizeAvailability(
@@ -437,6 +544,13 @@ rows,
 ),
 };
 
+
+/*
+* =====================================================
+* SAMPLE DATES
+* =====================================================
+*/
+
 const sampleDates = [
 marketAlignment.firstDate,
 "2011-10-03",
@@ -466,14 +580,78 @@ date,
 }),
 );
 
+
+/*
+* =====================================================
+* EXISTING MACRO CHECKS
+* =====================================================
+*/
+
 const checks =
 calculateChecks(
 rows,
 macroAlignment,
 );
 
+
+/*
+* =====================================================
+* HISTORICAL FEATURE SET CHECKS
+* =====================================================
+*/
+
+const historicalFeatureSetChecks = {
+marketFeatureCountMatchesAlignment:
+marketFeatureDataset.length ===
+marketAlignment.count,
+
+macroFeatureCountMatchesAlignment:
+macroFeatureDataset.days.length ===
+macroAlignment.count,
+
+outcomeCountMatchesMarketAlignment:
+outcomeDataset.length ===
+marketAlignment.count,
+
+joinedFeatureSetNotEmpty:
+historicalFeatureSet.count > 0,
+
+chronological:
+historicalFeatureSet
+.diagnostics
+.chronological,
+
+noDuplicateMarketDates:
+historicalFeatureSet
+.diagnostics
+.duplicateMarketDates === 0,
+
+noDuplicateMacroDates:
+historicalFeatureSet
+.diagnostics
+.duplicateMacroDates === 0,
+
+noDuplicateOutcomeDates:
+historicalFeatureSet
+.diagnostics
+.duplicateOutcomeDates === 0,
+};
+
+const allChecks =
+checks.all &&
+Object.values(
+historicalFeatureSetChecks,
+).every(Boolean);
+
+
+/*
+* =====================================================
+* RESPONSE
+* =====================================================
+*/
+
 const response = {
-ok: checks.all,
+ok: allChecks,
 
 source: {
 marketProvider:
@@ -545,7 +723,8 @@ ratesAlignment.days.length - 1
 },
 
 features: {
-count: rows.length,
+count:
+rows.length,
 
 firstDate:
 rows.length > 0
@@ -560,7 +739,65 @@ rows.length > 0
 
 featureAvailability,
 
+marketFeatures: {
+count:
+marketFeatureDataset.length,
+
+firstDate:
+marketFeatureDataset.length > 0
+? marketFeatureDataset[0].date
+: null,
+
+lastDate:
+marketFeatureDataset.length > 0
+? marketFeatureDataset[
+marketFeatureDataset.length - 1
+].date
+: null,
+},
+
+outcomes: {
+count:
+outcomeDataset.length,
+
+firstDate:
+outcomeDataset.length > 0
+? outcomeDataset[0].date
+: null,
+
+lastDate:
+outcomeDataset.length > 0
+? outcomeDataset[
+outcomeDataset.length - 1
+].date
+: null,
+},
+
+historicalFeatureSet: {
+count:
+historicalFeatureSet.count,
+
+firstDate:
+historicalFeatureSet.firstDate,
+
+lastDate:
+historicalFeatureSet.lastDate,
+
+diagnostics:
+historicalFeatureSet
+.diagnostics,
+
+checks:
+historicalFeatureSetChecks,
+},
+
+checks: {
+macro:
 checks,
+
+all:
+allChecks,
+},
 
 samples,
 };
