@@ -32,6 +32,15 @@ import { buildHistoricalRegimeOutcomes } from
 import { buildHistoricalRegimeFeatureSet } from
 "@/lib/historicalRegime/historicalRegimeFeatureSet";
 
+import { buildHistoricalRegimeDistributions } from
+"@/lib/historicalRegime/historicalRegimeDistributions";
+
+import {
+buildHistoricalRegimeConditionalOutcomes,
+type HistoricalConditionalCombination,
+} from
+"@/lib/historicalRegime/historicalRegimeConditionalOutcomes";
+
 
 function isFiniteNumber(value: unknown): value is number {
 return typeof value === "number" && Number.isFinite(value);
@@ -286,6 +295,357 @@ return checks;
 }
 
 
+/*
+* =========================================================
+* HISTORICAL CONDITIONAL THRESHOLDS
+*
+* Thresholds are derived directly from the historical
+* feature set. They are descriptive test conditions only.
+*
+* No regime classification.
+* No score.
+* No trading signal.
+* =========================================================
+*/
+
+function calculatePercentile(
+values: number[],
+percentile: number,
+): number | null {
+if (values.length === 0) {
+return null;
+}
+
+const sorted = [...values].sort(
+(a, b) => a - b,
+);
+
+if (sorted.length === 1) {
+return sorted[0];
+}
+
+const position =
+(sorted.length - 1) * percentile;
+
+const lowerIndex =
+Math.floor(position);
+
+const upperIndex =
+Math.ceil(position);
+
+if (
+lowerIndex === upperIndex
+) {
+return sorted[lowerIndex];
+}
+
+const weight =
+position - lowerIndex;
+
+return (
+sorted[lowerIndex] +
+(
+sorted[upperIndex] -
+sorted[lowerIndex]
+) *
+weight
+);
+}
+
+
+function extractMarketFeatureValues(
+historicalFeatureSet:
+ReturnType<
+typeof buildHistoricalRegimeFeatureSet
+>,
+selector:
+(
+day: ReturnType<
+typeof buildHistoricalRegimeFeatureSet
+>["days"][number]
+) => number | null,
+) {
+return historicalFeatureSet.days
+.map(selector)
+.filter(
+(value): value is number =>
+isFiniteNumber(value),
+);
+}
+
+
+function buildConditionalCombinations(
+historicalFeatureSet:
+ReturnType<
+typeof buildHistoricalRegimeFeatureSet
+>,
+): {
+combinations: HistoricalConditionalCombination[];
+thresholds: {
+nasdaqDistanceMA200P90: number | null;
+russellVsNasdaq20DP10: number | null;
+real10YChange60DP75: number | null;
+};
+} {
+const nasdaqDistanceMA200Values =
+extractMarketFeatureValues(
+historicalFeatureSet,
+(day) =>
+day.market.nasdaqDistanceMA200,
+);
+
+const russellVsNasdaq20DValues =
+extractMarketFeatureValues(
+historicalFeatureSet,
+(day) =>
+day.market.russellVsNasdaq20D,
+);
+
+const real10YChange60DValues =
+extractMarketFeatureValues(
+historicalFeatureSet,
+(day) =>
+day.macro.real10YChange60D,
+);
+
+const nasdaqDistanceMA200P90 =
+calculatePercentile(
+nasdaqDistanceMA200Values,
+0.9,
+);
+
+const russellVsNasdaq20DP10 =
+calculatePercentile(
+russellVsNasdaq20DValues,
+0.1,
+);
+
+const real10YChange60DP75 =
+calculatePercentile(
+real10YChange60DValues,
+0.75,
+);
+
+const combinations:
+HistoricalConditionalCombination[] =
+[];
+
+if (
+nasdaqDistanceMA200P90 !== null
+) {
+combinations.push({
+id:
+"nasdaq-above-ma200-p90",
+
+label:
+"Nasdaq distance MA200 >= P90",
+
+conditions: [
+{
+id:
+"nasdaq-distance-ma200-p90",
+
+label:
+"Nasdaq distance to MA200 >= P90",
+
+feature:
+"market.nasdaqDistanceMA200",
+
+operator:
+"gte",
+
+value:
+nasdaqDistanceMA200P90,
+},
+],
+});
+}
+
+if (
+russellVsNasdaq20DP10 !== null
+) {
+combinations.push({
+id:
+"russell-vs-nasdaq-p10",
+
+label:
+"Russell vs Nasdaq 20D <= P10",
+
+conditions: [
+{
+id:
+"russell-vs-nasdaq-p10",
+
+label:
+"Russell vs Nasdaq 20D <= P10",
+
+feature:
+"market.russellVsNasdaq20D",
+
+operator:
+"lte",
+
+value:
+russellVsNasdaq20DP10,
+},
+],
+});
+}
+
+if (
+real10YChange60DP75 !== null
+) {
+combinations.push({
+id:
+"real10y-rising-p75",
+
+label:
+"Real10Y 60D change >= P75",
+
+conditions: [
+{
+id:
+"real10y-change-60d-p75",
+
+label:
+"Real10Y 60D change >= P75",
+
+feature:
+"macro.real10YChange60D",
+
+operator:
+"gte",
+
+value:
+real10YChange60DP75,
+},
+],
+});
+}
+
+combinations.push({
+id:
+"vix-rising-20d",
+
+label:
+"VIX 20D change > 0",
+
+conditions: [
+{
+id:
+"vix-change-20d-positive",
+
+label:
+"VIX 20D change > 0",
+
+feature:
+"market.vixChange20D",
+
+operator:
+"gt",
+
+value:
+0,
+},
+],
+});
+
+if (
+nasdaqDistanceMA200P90 !== null &&
+russellVsNasdaq20DP10 !== null &&
+real10YChange60DP75 !== null
+) {
+combinations.push({
+id:
+"combined-structural-stress",
+
+label:
+"Nasdaq extended + Russell weak + Real10Y rising + VIX rising",
+
+conditions: [
+{
+id:
+"nasdaq-distance-ma200-p90",
+
+label:
+"Nasdaq distance to MA200 >= P90",
+
+feature:
+"market.nasdaqDistanceMA200",
+
+operator:
+"gte",
+
+value:
+nasdaqDistanceMA200P90,
+},
+
+{
+id:
+"russell-vs-nasdaq-p10",
+
+label:
+"Russell vs Nasdaq 20D <= P10",
+
+feature:
+"market.russellVsNasdaq20D",
+
+operator:
+"lte",
+
+value:
+russellVsNasdaq20DP10,
+},
+
+{
+id:
+"real10y-change-60d-p75",
+
+label:
+"Real10Y 60D change >= P75",
+
+feature:
+"macro.real10YChange60D",
+
+operator:
+"gte",
+
+value:
+real10YChange60DP75,
+},
+
+{
+id:
+"vix-change-20d-positive",
+
+label:
+"VIX 20D change > 0",
+
+feature:
+"market.vixChange20D",
+
+operator:
+"gt",
+
+value:
+0,
+},
+],
+});
+}
+
+return {
+combinations,
+
+thresholds: {
+nasdaqDistanceMA200P90,
+russellVsNasdaq20DP10,
+real10YChange60DP75,
+},
+};
+}
+
+
 export async function GET() {
 try {
 const [
@@ -396,6 +756,55 @@ buildHistoricalRegimeFeatureSet(
 marketFeatureDataset,
 macroFeatureDataset.days,
 outcomeDataset,
+);
+
+
+/*
+* =====================================================
+* 8. HISTORICAL DISTRIBUTIONS
+*
+* Neutral descriptive statistics only.
+*
+* No scoring.
+* No regime classification.
+* No analog logic.
+* No synthetic history.
+* =====================================================
+*/
+
+const historicalDistributions =
+buildHistoricalRegimeDistributions(
+historicalFeatureSet,
+);
+
+
+/*
+* =====================================================
+* 9. HISTORICAL CONDITIONAL OUTCOMES
+*
+* Empirical condition -> historical outcome only.
+*
+* No score.
+* No regime classification.
+* No trading signal.
+* =====================================================
+*/
+
+const {
+combinations:
+historicalConditionalCombinations,
+
+thresholds:
+historicalConditionalThresholds,
+} =
+buildConditionalCombinations(
+historicalFeatureSet,
+);
+
+const historicalConditionalOutcomes =
+buildHistoricalRegimeConditionalOutcomes(
+historicalFeatureSet,
+historicalConditionalCombinations,
 );
 
 
@@ -789,6 +1198,33 @@ historicalFeatureSet
 
 checks:
 historicalFeatureSetChecks,
+},
+
+/*
+* ===================================================
+* HISTORICAL DISTRIBUTIONS
+*
+* Descriptive statistics only.
+* ===================================================
+*/
+
+historicalDistributions,
+
+/*
+* ===================================================
+* HISTORICAL CONDITIONAL OUTCOMES
+*
+* Thresholds are exposed separately so the test
+* output remains transparent and auditable.
+* ===================================================
+*/
+
+historicalConditionalOutcomes: {
+thresholds:
+historicalConditionalThresholds,
+
+results:
+historicalConditionalOutcomes,
 },
 
 checks: {
