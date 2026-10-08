@@ -10,6 +10,10 @@ import type {
 HistoricalForwardOutcome,
 } from "./historicalRegimeOutcomes";
 
+import type {
+HistoricalBreadthDay,
+} from "./historicalRegimeBreadthProvider";
+
 
 /* =====================================================
 HISTORICAL REGIME FEATURE SET
@@ -19,6 +23,7 @@ Purpose:
 - Join strictly by exact market date
 - Preserve existing feature calculations
 - Preserve historical forward outcomes
+- Add historical Breadth as a separate evidence layer
 - No new scoring
 - No regime classification
 - No similarity scoring
@@ -31,6 +36,8 @@ Architecture:
 Historical Market Features
 +
 Historical Macro Features
++
+Historical Breadth
 +
 Historical Forward Outcomes
 ↓
@@ -56,6 +63,10 @@ market: HistoricalRegimeFeatures;
 
 macro: HistoricalMacroFeatureDay;
 
+/* ================= BREADTH ================= */
+
+breadth: HistoricalBreadthDay | null;
+
 /* ================= FORWARD OUTCOMES ================= */
 
 outcome: HistoricalForwardOutcome;
@@ -78,6 +89,8 @@ marketFeatureCount: number;
 
 macroFeatureCount: number;
 
+breadthFeatureCount: number;
+
 outcomeCount: number;
 
 joinedCount: number;
@@ -86,11 +99,15 @@ missingMarketCount: number;
 
 missingMacroCount: number;
 
+missingBreadthCount: number;
+
 missingOutcomeCount: number;
 
 duplicateMarketDates: number;
 
 duplicateMacroDates: number;
+
+duplicateBreadthDates: number;
 
 duplicateOutcomeDates: number;
 
@@ -237,6 +254,34 @@ return map;
 }
 
 
+function createBreadthFeatureMap(
+features: HistoricalBreadthDay[],
+): Map<string, HistoricalBreadthDay> {
+
+const map =
+new Map<string, HistoricalBreadthDay>();
+
+for (const feature of features) {
+
+if (
+!isValidDate(feature.date)
+) {
+continue;
+}
+
+if (!map.has(feature.date)) {
+
+map.set(
+feature.date,
+feature,
+);
+}
+}
+
+return map;
+}
+
+
 function createOutcomeMap(
 outcomes: HistoricalForwardOutcome[],
 ): Map<string, HistoricalForwardOutcome> {
@@ -273,6 +318,7 @@ export function buildHistoricalRegimeFeatureSet(
 marketFeatures: HistoricalRegimeFeatures[],
 macroFeatures: HistoricalMacroFeatureDay[],
 outcomes: HistoricalForwardOutcome[],
+breadthFeatures?: HistoricalBreadthDay[],
 ): HistoricalRegimeFeatureSet {
 
 const marketDates =
@@ -289,6 +335,18 @@ feature.date,
 
 const macroDates =
 macroFeatures
+.filter(
+(feature) =>
+isValidDate(feature.date),
+)
+.map(
+(feature) =>
+feature.date,
+);
+
+
+const breadthDates =
+(breadthFeatures ?? [])
 .filter(
 (feature) =>
 isValidDate(feature.date),
@@ -323,6 +381,12 @@ macroFeatures,
 );
 
 
+const breadthMap =
+createBreadthFeatureMap(
+breadthFeatures ?? [],
+);
+
+
 const outcomeMap =
 createOutcomeMap(
 outcomes,
@@ -333,8 +397,19 @@ outcomes,
 The market feature layer defines the primary
 historical market calendar.
 
-We only join exact dates that are present in
-all three layers.
+We join market, macro and outcome data by
+exact date.
+
+Breadth is an additional historical evidence
+layer. A missing Breadth observation does NOT
+remove the complete market/macro/outcome day.
+
+This is intentional:
+
+- Breadth has its own historical coverage
+- Missing Breadth must remain visible as missing
+- We must not manufacture a Breadth value
+- Existing historical observations remain usable
 
 No forward-fill.
 No backward-fill.
@@ -353,6 +428,7 @@ a.localeCompare(b),
 
 let missingMarketCount = 0;
 let missingMacroCount = 0;
+let missingBreadthCount = 0;
 let missingOutcomeCount = 0;
 
 
@@ -367,6 +443,9 @@ marketMap.get(date);
 
 const macro =
 macroMap.get(date);
+
+const breadth =
+breadthMap.get(date) ?? null;
 
 const outcome =
 outcomeMap.get(date);
@@ -396,6 +475,12 @@ continue;
 }
 
 
+if (!breadth) {
+
+missingBreadthCount += 1;
+}
+
+
 days.push({
 
 date,
@@ -403,6 +488,8 @@ date,
 market,
 
 macro,
+
+breadth,
 
 outcome,
 
@@ -438,6 +525,9 @@ marketFeatures.length,
 macroFeatureCount:
 macroFeatures.length,
 
+breadthFeatureCount:
+breadthFeatures?.length ?? 0,
+
 outcomeCount:
 outcomes.length,
 
@@ -447,6 +537,8 @@ days.length,
 missingMarketCount,
 
 missingMacroCount,
+
+missingBreadthCount,
 
 missingOutcomeCount,
 
@@ -458,6 +550,11 @@ marketDates,
 duplicateMacroDates:
 countDuplicateDates(
 macroDates,
+),
+
+duplicateBreadthDates:
+countDuplicateDates(
+breadthDates,
 ),
 
 duplicateOutcomeDates:
