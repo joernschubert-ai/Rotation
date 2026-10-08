@@ -482,6 +482,36 @@ getValue: (day) =>
 day.macro
 .treasury10Y2YSpreadChange20D,
 },
+
+// Historical breadth is kept separate
+// from the market/macro feature groups.
+// Raw values represent the actual
+// cross-sectional breadth for the day.
+{
+name: "breadth.rawBreadth50",
+getValue: (day) =>
+day.breadth?.rawBreadth50,
+},
+{
+name: "breadth.rawBreadth200",
+getValue: (day) =>
+day.breadth?.rawBreadth200,
+},
+
+// These are the historically reconstructed
+// smoothed breadth values using the same
+// 50/50 smoothing concept as the legacy
+// snapshot breadth logic.
+{
+name: "breadth.breadth50",
+getValue: (day) =>
+day.breadth?.breadth50,
+},
+{
+name: "breadth.breadth200",
+getValue: (day) =>
+day.breadth?.breadth200,
+},
 ];
 
 const OUTCOME_DEFINITIONS:
