@@ -1,86 +1,49 @@
-// app/api/historical-regime/macro-features-test/route.ts
-
 import { NextResponse } from "next/server";
 
-import { loadHistoricalRegimeMarketData } from
-"@/lib/historicalRegime/historicalRegimeProvider";
-
-import { alignHistoricalRegimeMarketData } from
-"@/lib/historicalRegime/historicalRegimeAlignment";
-
-import { loadHistoricalRegimeRatesData } from
-"@/lib/historicalRegime/historicalRegimeRatesProvider";
-
-import { alignHistoricalRegimeRates } from
-"@/lib/historicalRegime/historicalRegimeRatesAlignment";
-
-import { loadHistoricalRegimeMacroVintageData } from
-"@/lib/historicalRegime/historicalRegimeMacroVintageProvider";
-
-import { alignHistoricalMacroVintage } from
-"@/lib/historicalRegime/historicalRegimeMacroVintageAlignment";
-
-import { buildHistoricalMacroFeatures } from
-"@/lib/historicalRegime/historicalRegimeMacroFeatures";
-
-import { buildHistoricalRegimeFeatures } from
-"@/lib/historicalRegime/historicalRegimeFeatures";
-
-import { buildHistoricalRegimeOutcomes } from
-"@/lib/historicalRegime/historicalRegimeOutcomes";
-
-import { buildHistoricalRegimeFeatureSet } from
-"@/lib/historicalRegime/historicalRegimeFeatureSet";
-
-import { buildHistoricalRegimeDistributions } from
-"@/lib/historicalRegime/historicalRegimeDistributions";
+import { loadHistoricalRegimeMarketData } from "@/lib/historicalRegime/historicalRegimeProvider";
+import { alignHistoricalRegimeMarketData } from "@/lib/historicalRegime/historicalRegimeAlignment";
+import { loadHistoricalRegimeRatesData } from "@/lib/historicalRegime/historicalRegimeRatesProvider";
+import { alignHistoricalRegimeRates } from "@/lib/historicalRegime/historicalRegimeRatesAlignment";
+import { loadHistoricalRegimeMacroVintageData } from "@/lib/historicalRegime/historicalRegimeMacroVintageProvider";
+import { alignHistoricalMacroVintage } from "@/lib/historicalRegime/historicalRegimeMacroVintageAlignment";
+import { loadHistoricalRegimeBreadthData } from "@/lib/historicalRegime/historicalRegimeBreadthProvider";
+import { buildHistoricalMacroFeatures } from "@/lib/historicalRegime/historicalRegimeMacroFeatures";
+import { buildHistoricalRegimeFeatures } from "@/lib/historicalRegime/historicalRegimeFeatures";
+import { buildHistoricalRegimeOutcomes } from "@/lib/historicalRegime/historicalRegimeOutcomes";
+import { buildHistoricalRegimeFeatureSet } from "@/lib/historicalRegime/historicalRegimeFeatureSet";
+import { buildHistoricalRegimeDistributions } from "@/lib/historicalRegime/historicalRegimeDistributions";
 
 import {
 buildHistoricalRegimeConditionalOutcomes,
 type HistoricalConditionalCombination,
-} from
-"@/lib/historicalRegime/historicalRegimeConditionalOutcomes";
-
+type HistoricalConditionalCondition,
+} from "@/lib/historicalRegime/historicalRegimeConditionalOutcomes";
 
 function isFiniteNumber(value: unknown): value is number {
 return typeof value === "number" && Number.isFinite(value);
 }
 
-
-function round(
-value: number | null,
-digits = 4,
-): number | null {
-return isFiniteNumber(value)
-? Number(value.toFixed(digits))
-: null;
+function round(value: number | null, digits = 4): number | null {
+return isFiniteNumber(value) ? Number(value.toFixed(digits)) : null;
 }
-
 
 function summarizeAvailability(
 rows: Array<Record<string, unknown>>,
 key: string,
 ) {
-const available = rows.filter((row) =>
-isFiniteNumber(row[key]),
-).length;
+const available = rows.filter((row) => isFiniteNumber(row[key])).length;
 
 return {
 available,
 missing: rows.length - available,
 coverage:
 rows.length > 0
-? Number(
-((available / rows.length) * 100).toFixed(2),
-)
+? Number(((available / rows.length) * 100).toFixed(2))
 : 0,
 };
 }
 
-
-function normalizeFeatureRow(
-row: Record<string, unknown>,
-) {
+function normalizeFeatureRow(row: Record<string, unknown>) {
 const result: Record<string, unknown> = {
 date: row.date,
 };
@@ -90,25 +53,20 @@ const numericKeys = [
 "coreCpi",
 "nfci",
 "real10Y",
-
 "cpiYoY",
 "coreCpiYoY",
 "cpiChange3M",
 "cpiChange6M",
 "coreCpiChange3M",
 "coreCpiChange6M",
-
 "nfciChange4W",
 "nfciChange12W",
-
 "real10YChange20D",
 "real10YChange60D",
-
 "fedFunds",
 "treasury2Y",
 "treasury10Y",
 "treasury10Y2YSpread",
-
 "fedFundsChange20D",
 "treasury2YChange20D",
 "treasury10YChange20D",
@@ -116,11 +74,7 @@ const numericKeys = [
 ];
 
 for (const key of numericKeys) {
-result[key] = round(
-isFiniteNumber(row[key])
-? row[key]
-: null,
-);
+result[key] = round(isFiniteNumber(row[key]) ? row[key] : null);
 }
 
 const provenanceKeys = [
@@ -128,7 +82,6 @@ const provenanceKeys = [
 "coreCpiSourceDate",
 "nfciSourceDate",
 "real10YSourceDate",
-
 "cpiRealtimeStart",
 "coreCpiRealtimeStart",
 "nfciRealtimeStart",
@@ -142,100 +95,42 @@ result[key] = row[key] ?? null;
 return result;
 }
 
-
-function findSample(
-rows: Array<Record<string, unknown>>,
-date: string,
-) {
-const row = rows.find(
-(item) => item.date === date,
-);
-
-return row
-? normalizeFeatureRow(row)
-: null;
+function findSample(rows: Array<Record<string, unknown>>, date: string) {
+const row = rows.find((item) => item.date === date);
+return row ? normalizeFeatureRow(row) : null;
 }
-
 
 function calculateChecks(
 rows: Array<Record<string, unknown>>,
-alignment: ReturnType<
-typeof alignHistoricalMacroVintage
->,
+alignment: ReturnType<typeof alignHistoricalMacroVintage>,
 ) {
 const checks: Record<string, boolean> = {};
 
-checks.featureCountMatchesAlignment =
-rows.length === alignment.count;
+checks.featureCountMatchesAlignment = rows.length === alignment.count;
+checks.firstDateMatches = rows[0]?.date === alignment.firstDate;
+checks.lastDateMatches = rows[rows.length - 1]?.date === alignment.lastDate;
 
-checks.firstDateMatches =
-rows[0]?.date === alignment.firstDate;
+checks.chronological = rows.every((row, index) => {
+if (index === 0) return true;
+return String(rows[index - 1].date) < String(row.date);
+});
 
-checks.lastDateMatches =
-rows[rows.length - 1]?.date ===
-alignment.lastDate;
-
-checks.chronological = rows.every(
-(row, index) => {
-if (index === 0) {
-return true;
-}
-
-return (
-String(rows[index - 1].date) <
-String(row.date)
-);
-},
-);
-
-checks.rawCpiCoverage =
-summarizeAvailability(
-rows,
-"cpi",
-).available > 0;
-
+checks.rawCpiCoverage = summarizeAvailability(rows, "cpi").available > 0;
 checks.rawCoreCpiCoverage =
-summarizeAvailability(
-rows,
-"coreCpi",
-).available > 0;
-
-checks.rawNfciCoverage =
-summarizeAvailability(
-rows,
-"nfci",
-).available > 0;
-
+summarizeAvailability(rows, "coreCpi").available > 0;
+checks.rawNfciCoverage = summarizeAvailability(rows, "nfci").available > 0;
 checks.rawReal10YCoverage =
-summarizeAvailability(
-rows,
-"real10Y",
-).available > 0;
+summarizeAvailability(rows, "real10Y").available > 0;
 
 checks.rateCoverage =
-summarizeAvailability(
-rows,
-"fedFunds",
-).available > 0 &&
-summarizeAvailability(
-rows,
-"treasury2Y",
-).available > 0 &&
-summarizeAvailability(
-rows,
-"treasury10Y",
-).available > 0;
+summarizeAvailability(rows, "fedFunds").available > 0 &&
+summarizeAvailability(rows, "treasury2Y").available > 0 &&
+summarizeAvailability(rows, "treasury10Y").available > 0;
 
-checks.spreadConsistency =
-rows.every((row) => {
-const treasury10Y =
-row.treasury10Y;
-
-const treasury2Y =
-row.treasury2Y;
-
-const spread =
-row.treasury10Y2YSpread;
+checks.spreadConsistency = rows.every((row) => {
+const treasury10Y = row.treasury10Y;
+const treasury2Y = row.treasury2Y;
+const spread = row.treasury10Y2YSpread;
 
 if (
 !isFiniteNumber(treasury10Y) ||
@@ -245,19 +140,11 @@ if (
 return true;
 }
 
-return (
-Math.abs(
-treasury10Y -
-treasury2Y -
-spread,
-) < 0.000001
-);
+return Math.abs(treasury10Y - treasury2Y - spread) < 0.000001;
 });
 
-checks.provenanceNotAfterMarketDate =
-rows.every((row) => {
-const marketDate =
-String(row.date);
+checks.provenanceNotAfterMarketDate = rows.every((row) => {
+const marketDate = String(row.date);
 
 const provenanceKeys = [
 "cpiSourceDate",
@@ -270,536 +157,405 @@ const provenanceKeys = [
 "real10YRealtimeStart",
 ];
 
-return provenanceKeys.every(
-(key) => {
+return provenanceKeys.every((key) => {
 const value = row[key];
-
-if (value == null) {
-return true;
-}
-
-return (
-String(value) <=
-marketDate
-);
-},
-);
+if (value == null) return true;
+return String(value) <= marketDate;
+});
 });
 
-checks.all =
-Object.values(checks).every(
-Boolean,
-);
+checks.all = Object.values(checks).every(Boolean);
 
 return checks;
 }
 
-
 /*
-* =========================================================
 * HISTORICAL CONDITIONAL THRESHOLDS
 *
-* Thresholds are derived directly from the historical
-* feature set. They are descriptive test conditions only.
+* Thresholds are descriptive percentiles calculated from
+* the available historical feature set.
 *
-* No regime classification.
-* No score.
-* No trading signal.
-* =========================================================
+* This is retrospective research, not a live signal engine.
+* Full-sample percentiles must not be treated as thresholds
+* that were known at each historical observation date.
 */
 
 function calculatePercentile(
 values: number[],
 percentile: number,
 ): number | null {
-if (values.length === 0) {
-return null;
-}
+if (values.length === 0) return null;
 
-const sorted = [...values].sort(
-(a, b) => a - b,
-);
+const sorted = [...values].sort((a, b) => a - b);
 
-if (sorted.length === 1) {
-return sorted[0];
-}
+if (sorted.length === 1) return sorted[0];
 
-const position =
-(sorted.length - 1) * percentile;
+const position = (sorted.length - 1) * percentile;
+const lowerIndex = Math.floor(position);
+const upperIndex = Math.ceil(position);
 
-const lowerIndex =
-Math.floor(position);
+if (lowerIndex === upperIndex) return sorted[lowerIndex];
 
-const upperIndex =
-Math.ceil(position);
-
-if (
-lowerIndex === upperIndex
-) {
-return sorted[lowerIndex];
-}
-
-const weight =
-position - lowerIndex;
+const weight = position - lowerIndex;
 
 return (
 sorted[lowerIndex] +
-(
-sorted[upperIndex] -
-sorted[lowerIndex]
-) *
-weight
+(sorted[upperIndex] - sorted[lowerIndex]) * weight
 );
 }
 
-
-function extractMarketFeatureValues(
-historicalFeatureSet:
-ReturnType<
-typeof buildHistoricalRegimeFeatureSet
->,
-selector:
-(
-day: ReturnType<
-typeof buildHistoricalRegimeFeatureSet
->["days"][number]
+function extractFeatureValues(
+historicalFeatureSet: ReturnType<typeof buildHistoricalRegimeFeatureSet>,
+selector: (
+day: ReturnType<typeof buildHistoricalRegimeFeatureSet>["days"][number],
 ) => number | null,
 ) {
 return historicalFeatureSet.days
 .map(selector)
-.filter(
-(value): value is number =>
-isFiniteNumber(value),
-);
+.filter((value): value is number => isFiniteNumber(value));
 }
 
+function createCondition(
+id: string,
+label: string,
+feature: HistoricalConditionalCondition["feature"],
+operator: HistoricalConditionalCondition["operator"],
+value: number,
+): HistoricalConditionalCondition {
+return { id, label, feature, operator, value };
+}
 
 function buildConditionalCombinations(
-historicalFeatureSet:
-ReturnType<
-typeof buildHistoricalRegimeFeatureSet
->,
+historicalFeatureSet: ReturnType<typeof buildHistoricalRegimeFeatureSet>,
 ): {
 combinations: HistoricalConditionalCombination[];
-thresholds: {
-nasdaqDistanceMA200P90: number | null;
-russellVsNasdaq20DP10: number | null;
-real10YChange60DP75: number | null;
-};
+thresholds: Record<string, number | null>;
+thresholdSampleCounts: Record<string, number>;
 } {
-const nasdaqDistanceMA200Values =
-extractMarketFeatureValues(
+const days = historicalFeatureSet.days;
+
+const nasdaqDistanceValues = extractFeatureValues(
 historicalFeatureSet,
-(day) =>
-day.market.nasdaqDistanceMA200,
+(day) => day.market.nasdaqDistanceMA200,
 );
 
-const russellVsNasdaq20DValues =
-extractMarketFeatureValues(
+const russellVsNasdaqValues = extractFeatureValues(
 historicalFeatureSet,
-(day) =>
-day.market.russellVsNasdaq20D,
+(day) => day.market.russellVsNasdaq20D,
 );
 
-const real10YChange60DValues =
-extractMarketFeatureValues(
+const real10YChangeValues = extractFeatureValues(
 historicalFeatureSet,
-(day) =>
-day.macro.real10YChange60D,
+(day) => day.macro.real10YChange60D,
 );
 
-const nasdaqDistanceMA200P90 =
-calculatePercentile(
-nasdaqDistanceMA200Values,
+const breadth50Values = extractFeatureValues(
+historicalFeatureSet,
+(day) => day.breadth?.breadth50 ?? null,
+);
+
+const breadth200Values = extractFeatureValues(
+historicalFeatureSet,
+(day) => day.breadth?.breadth200 ?? null,
+);
+
+const nasdaqDistanceMA200P90 = calculatePercentile(
+nasdaqDistanceValues,
 0.9,
 );
 
-const russellVsNasdaq20DP10 =
-calculatePercentile(
-russellVsNasdaq20DValues,
+const russellVsNasdaq20DP10 = calculatePercentile(
+russellVsNasdaqValues,
 0.1,
 );
 
-const real10YChange60DP75 =
-calculatePercentile(
-real10YChange60DValues,
+const real10YChange60DP75 = calculatePercentile(
+real10YChangeValues,
 0.75,
 );
 
-const combinations:
-HistoricalConditionalCombination[] =
-[];
+const breadth50P10 = calculatePercentile(breadth50Values, 0.1);
+const breadth50P25 = calculatePercentile(breadth50Values, 0.25);
+const breadth200P10 = calculatePercentile(breadth200Values, 0.1);
+const breadth200P25 = calculatePercentile(breadth200Values, 0.25);
 
-if (
-nasdaqDistanceMA200P90 !== null
-) {
-combinations.push({
-id:
-"nasdaq-above-ma200-p90",
-
-label:
-"Nasdaq distance MA200 >= P90",
-
-conditions: [
-{
-id:
-"nasdaq-distance-ma200-p90",
-
-label:
-"Nasdaq distance to MA200 >= P90",
-
-feature:
-"market.nasdaqDistanceMA200",
-
-operator:
-"gte",
-
-value:
+const thresholds: Record<string, number | null> = {
 nasdaqDistanceMA200P90,
-},
-],
-});
-}
-
-if (
-russellVsNasdaq20DP10 !== null
-) {
-combinations.push({
-id:
-"russell-vs-nasdaq-p10",
-
-label:
-"Russell vs Nasdaq 20D <= P10",
-
-conditions: [
-{
-id:
-"russell-vs-nasdaq-p10",
-
-label:
-"Russell vs Nasdaq 20D <= P10",
-
-feature:
-"market.russellVsNasdaq20D",
-
-operator:
-"lte",
-
-value:
 russellVsNasdaq20DP10,
-},
-],
-});
-}
-
-if (
-real10YChange60DP75 !== null
-) {
-combinations.push({
-id:
-"real10y-rising-p75",
-
-label:
-"Real10Y 60D change >= P75",
-
-conditions: [
-{
-id:
-"real10y-change-60d-p75",
-
-label:
-"Real10Y 60D change >= P75",
-
-feature:
-"macro.real10YChange60D",
-
-operator:
-"gte",
-
-value:
 real10YChange60DP75,
-},
-],
+breadth50P10,
+breadth50P25,
+breadth200P10,
+breadth200P25,
+};
+
+const thresholdSampleCounts: Record<string, number> = {
+nasdaqDistanceMA200: nasdaqDistanceValues.length,
+russellVsNasdaq20D: russellVsNasdaqValues.length,
+real10YChange60D: real10YChangeValues.length,
+breadth50: breadth50Values.length,
+breadth200: breadth200Values.length,
+};
+
+const combinations: HistoricalConditionalCombination[] = [];
+
+const nasdaqExtended =
+nasdaqDistanceMA200P90 === null
+? null
+: createCondition(
+"nasdaq-distance-ma200-p90",
+"Nasdaq distance to MA200 >= P90",
+"market.nasdaqDistanceMA200",
+"gte",
+nasdaqDistanceMA200P90,
+);
+
+const russellWeak =
+russellVsNasdaq20DP10 === null
+? null
+: createCondition(
+"russell-vs-nasdaq-p10",
+"Russell vs Nasdaq 20D <= P10",
+"market.russellVsNasdaq20D",
+"lte",
+russellVsNasdaq20DP10,
+);
+
+const real10YRising =
+real10YChange60DP75 === null
+? null
+: createCondition(
+"real10y-change-60d-p75",
+"Real10Y 60D change >= P75",
+"macro.real10YChange60D",
+"gte",
+real10YChange60DP75,
+);
+
+const vixRising = createCondition(
+"vix-change-20d-positive",
+"VIX 20D change > 0",
+"market.vixChange20D",
+"gt",
+0,
+);
+
+const breadth50WeakP10 =
+breadth50P10 === null
+? null
+: createCondition(
+"breadth50-p10",
+"Breadth50 <= historical P10",
+"breadth.breadth50",
+"lte",
+breadth50P10,
+);
+
+const breadth50WeakP25 =
+breadth50P25 === null
+? null
+: createCondition(
+"breadth50-p25",
+"Breadth50 <= historical P25",
+"breadth.breadth50",
+"lte",
+breadth50P25,
+);
+
+const breadth200WeakP10 =
+breadth200P10 === null
+? null
+: createCondition(
+"breadth200-p10",
+"Breadth200 <= historical P10",
+"breadth.breadth200",
+"lte",
+breadth200P10,
+);
+
+const breadth200WeakP25 =
+breadth200P25 === null
+? null
+: createCondition(
+"breadth200-p25",
+"Breadth200 <= historical P25",
+"breadth.breadth200",
+"lte",
+breadth200P25,
+);
+
+function addCombination(
+id: string,
+label: string,
+conditions: Array<HistoricalConditionalCondition | null>,
+) {
+if (conditions.some((condition) => condition === null)) return;
+
+combinations.push({
+id,
+label,
+conditions: conditions as HistoricalConditionalCondition[],
 });
 }
 
-combinations.push({
-id:
-"vix-rising-20d",
+addCombination("nasdaq-above-ma200-p90", "Nasdaq distance MA200 >= P90", [
+nasdaqExtended,
+]);
 
-label:
-"VIX 20D change > 0",
+addCombination("russell-vs-nasdaq-p10", "Russell vs Nasdaq 20D <= P10", [
+russellWeak,
+]);
 
-conditions: [
-{
-id:
-"vix-change-20d-positive",
+addCombination("real10y-rising-p75", "Real10Y 60D change >= P75", [
+real10YRising,
+]);
 
-label:
-"VIX 20D change > 0",
+addCombination("vix-rising-20d", "VIX 20D change > 0", [vixRising]);
 
-feature:
-"market.vixChange20D",
+addCombination("breadth50-weak-p10", "Breadth50 <= P10", [
+breadth50WeakP10,
+]);
 
-operator:
-"gt",
+addCombination("breadth50-weak-p25", "Breadth50 <= P25", [
+breadth50WeakP25,
+]);
 
-value:
-0,
-},
-],
-});
+addCombination("breadth200-weak-p10", "Breadth200 <= P10", [
+breadth200WeakP10,
+]);
 
-if (
-nasdaqDistanceMA200P90 !== null &&
-russellVsNasdaq20DP10 !== null &&
-real10YChange60DP75 !== null
-) {
-combinations.push({
-id:
+addCombination("breadth200-weak-p25", "Breadth200 <= P25", [
+breadth200WeakP25,
+]);
+
+addCombination(
+"nasdaq-extended-breadth50-weak",
+"Nasdaq extended + Breadth50 weak (P25)",
+[nasdaqExtended, breadth50WeakP25],
+);
+
+addCombination(
+"nasdaq-extended-breadth200-weak",
+"Nasdaq extended + Breadth200 weak (P25)",
+[nasdaqExtended, breadth200WeakP25],
+);
+
+addCombination(
+"russell-weak-breadth50-weak",
+"Russell relative weakness + Breadth50 weak (P25)",
+[russellWeak, breadth50WeakP25],
+);
+
+addCombination(
+"breadth50-weak-vix-rising",
+"Breadth50 weak (P25) + VIX rising",
+[breadth50WeakP25, vixRising],
+);
+
+addCombination(
+"breadth200-weak-vix-rising",
+"Breadth200 weak (P25) + VIX rising",
+[breadth200WeakP25, vixRising],
+);
+
+addCombination(
+"breadth50-weak-real10y-rising",
+"Breadth50 weak (P25) + Real10Y rising",
+[breadth50WeakP25, real10YRising],
+);
+
+addCombination(
 "combined-structural-stress",
-
-label:
 "Nasdaq extended + Russell weak + Real10Y rising + VIX rising",
-
-conditions: [
-{
-id:
-"nasdaq-distance-ma200-p90",
-
-label:
-"Nasdaq distance to MA200 >= P90",
-
-feature:
-"market.nasdaqDistanceMA200",
-
-operator:
-"gte",
-
-value:
-nasdaqDistanceMA200P90,
-},
-
-{
-id:
-"russell-vs-nasdaq-p10",
-
-label:
-"Russell vs Nasdaq 20D <= P10",
-
-feature:
-"market.russellVsNasdaq20D",
-
-operator:
-"lte",
-
-value:
-russellVsNasdaq20DP10,
-},
-
-{
-id:
-"real10y-change-60d-p75",
-
-label:
-"Real10Y 60D change >= P75",
-
-feature:
-"macro.real10YChange60D",
-
-operator:
-"gte",
-
-value:
-real10YChange60DP75,
-},
-
-{
-id:
-"vix-change-20d-positive",
-
-label:
-"VIX 20D change > 0",
-
-feature:
-"market.vixChange20D",
-
-operator:
-"gt",
-
-value:
-0,
-},
-],
-});
-}
+[nasdaqExtended, russellWeak, real10YRising, vixRising],
+);
 
 return {
 combinations,
-
-thresholds: {
-nasdaqDistanceMA200P90,
-russellVsNasdaq20DP10,
-real10YChange60DP75,
-},
+thresholds,
+thresholdSampleCounts,
 };
 }
 
-
 export async function GET() {
 try {
-const [
-marketData,
-ratesData,
-macroVintageData,
-] = await Promise.all([
+const [marketData, ratesData, macroVintageData, breadthData] =
+await Promise.all([
 loadHistoricalRegimeMarketData(),
 loadHistoricalRegimeRatesData(),
 loadHistoricalRegimeMacroVintageData(),
+loadHistoricalRegimeBreadthData(),
 ]);
 
-
 /*
-* =====================================================
 * 1. MARKET ALIGNMENT
-* =====================================================
 */
-
-const marketAlignment =
-alignHistoricalRegimeMarketData(
-marketData,
-);
-
+const marketAlignment = alignHistoricalRegimeMarketData(marketData);
 
 /*
-* =====================================================
 * 2. RATES ALIGNMENT
-* =====================================================
 */
-
-const ratesAlignment =
-alignHistoricalRegimeRates(
+const ratesAlignment = alignHistoricalRegimeRates(
 marketAlignment,
 ratesData,
 );
 
-
 /*
-* =====================================================
 * 3. MACRO VINTAGE ALIGNMENT
-* =====================================================
 */
-
-const macroAlignment =
-alignHistoricalMacroVintage(
+const macroAlignment = alignHistoricalMacroVintage(
 marketAlignment,
 macroVintageData,
 );
 
-
 /*
-* =====================================================
 * 4. MACRO FEATURES
-* =====================================================
 */
-
-const macroFeatureDataset =
-buildHistoricalMacroFeatures(
+const macroFeatureDataset = buildHistoricalMacroFeatures(
 macroAlignment,
 ratesAlignment.days,
 );
 
-
 /*
-* =====================================================
 * 5. MARKET FEATURES
-*
-* buildHistoricalRegimeFeatures() returns
-* HistoricalRegimeFeatures[] directly.
-* =====================================================
 */
-
-const marketFeatureDataset =
-buildHistoricalRegimeFeatures(
+const marketFeatureDataset = buildHistoricalRegimeFeatures(
 ratesAlignment.days,
 );
 
-
 /*
-* =====================================================
-* 6. HISTORICAL FORWARD OUTCOMES
-* =====================================================
+* 6. FORWARD OUTCOMES
 */
-
-const outcomeDataset =
-buildHistoricalRegimeOutcomes(
+const outcomeDataset = buildHistoricalRegimeOutcomes(
 marketAlignment.days,
 );
 
-
 /*
-* =====================================================
-* 7. HISTORICAL REGIME FEATURE SET
+* 7. JOIN MARKET + MACRO + BREADTH + OUTCOMES
 *
-* Exact-date integration only.
-*
-* No scoring.
-* No regime classification.
-* No analog logic.
-* No interpolation.
-* No forward filling.
-* =====================================================
+* Exact-date joins only. Missing breadth remains null.
 */
-
-const historicalFeatureSet =
-buildHistoricalRegimeFeatureSet(
+const historicalFeatureSet = buildHistoricalRegimeFeatureSet(
 marketFeatureDataset,
 macroFeatureDataset.days,
 outcomeDataset,
+breadthData.days,
 );
 
-
 /*
-* =====================================================
 * 8. HISTORICAL DISTRIBUTIONS
-*
-* Neutral descriptive statistics only.
-*
-* No scoring.
-* No regime classification.
-* No analog logic.
-* No synthetic history.
-* =====================================================
 */
-
 const historicalDistributions =
-buildHistoricalRegimeDistributions(
-historicalFeatureSet,
-);
-
+buildHistoricalRegimeDistributions(historicalFeatureSet);
 
 /*
-* =====================================================
 * 9. HISTORICAL CONDITIONAL OUTCOMES
-*
-* Empirical condition -> historical outcome only.
-*
-* No score.
-* No regime classification.
-* No trading signal.
-* =====================================================
 */
-
 const {
-combinations:
-historicalConditionalCombinations,
-
-thresholds:
-historicalConditionalThresholds,
-} =
-buildConditionalCombinations(
-historicalFeatureSet,
-);
+combinations: historicalConditionalCombinations,
+thresholds: historicalConditionalThresholds,
+thresholdSampleCounts: historicalThresholdSampleCounts,
+} = buildConditionalCombinations(historicalFeatureSet);
 
 const historicalConditionalOutcomes =
 buildHistoricalRegimeConditionalOutcomes(
@@ -807,159 +563,53 @@ historicalFeatureSet,
 historicalConditionalCombinations,
 );
 
-
 /*
-* =====================================================
 * EXISTING MACRO FEATURE OUTPUT
-* =====================================================
 */
-
-const rows =
-macroFeatureDataset.days as Array<
+const rows = macroFeatureDataset.days as Array<
 Record<string, unknown>
 >;
 
-
 const featureAvailability = {
-cpi: summarizeAvailability(
-rows,
-"cpi",
-),
-
-coreCpi:
-summarizeAvailability(
-rows,
-"coreCpi",
-),
-
-nfci:
-summarizeAvailability(
-rows,
-"nfci",
-),
-
-real10Y:
-summarizeAvailability(
-rows,
-"real10Y",
-),
-
-cpiYoY:
-summarizeAvailability(
-rows,
-"cpiYoY",
-),
-
-coreCpiYoY:
-summarizeAvailability(
-rows,
-"coreCpiYoY",
-),
-
-cpiChange3M:
-summarizeAvailability(
-rows,
-"cpiChange3M",
-),
-
-cpiChange6M:
-summarizeAvailability(
-rows,
-"cpiChange6M",
-),
-
-coreCpiChange3M:
-summarizeAvailability(
-rows,
-"coreCpiChange3M",
-),
-
-coreCpiChange6M:
-summarizeAvailability(
-rows,
-"coreCpiChange6M",
-),
-
-nfciChange4W:
-summarizeAvailability(
-rows,
-"nfciChange4W",
-),
-
-nfciChange12W:
-summarizeAvailability(
-rows,
-"nfciChange12W",
-),
-
-real10YChange20D:
-summarizeAvailability(
-rows,
-"real10YChange20D",
-),
-
-real10YChange60D:
-summarizeAvailability(
-rows,
-"real10YChange60D",
-),
-
-fedFunds:
-summarizeAvailability(
-rows,
-"fedFunds",
-),
-
-treasury2Y:
-summarizeAvailability(
-rows,
-"treasury2Y",
-),
-
-treasury10Y:
-summarizeAvailability(
-rows,
-"treasury10Y",
-),
-
-treasury10Y2YSpread:
-summarizeAvailability(
+cpi: summarizeAvailability(rows, "cpi"),
+coreCpi: summarizeAvailability(rows, "coreCpi"),
+nfci: summarizeAvailability(rows, "nfci"),
+real10Y: summarizeAvailability(rows, "real10Y"),
+cpiYoY: summarizeAvailability(rows, "cpiYoY"),
+coreCpiYoY: summarizeAvailability(rows, "coreCpiYoY"),
+cpiChange3M: summarizeAvailability(rows, "cpiChange3M"),
+cpiChange6M: summarizeAvailability(rows, "cpiChange6M"),
+coreCpiChange3M: summarizeAvailability(rows, "coreCpiChange3M"),
+coreCpiChange6M: summarizeAvailability(rows, "coreCpiChange6M"),
+nfciChange4W: summarizeAvailability(rows, "nfciChange4W"),
+nfciChange12W: summarizeAvailability(rows, "nfciChange12W"),
+real10YChange20D: summarizeAvailability(rows, "real10YChange20D"),
+real10YChange60D: summarizeAvailability(rows, "real10YChange60D"),
+fedFunds: summarizeAvailability(rows, "fedFunds"),
+treasury2Y: summarizeAvailability(rows, "treasury2Y"),
+treasury10Y: summarizeAvailability(rows, "treasury10Y"),
+treasury10Y2YSpread: summarizeAvailability(
 rows,
 "treasury10Y2YSpread",
 ),
-
-fedFundsChange20D:
-summarizeAvailability(
-rows,
-"fedFundsChange20D",
-),
-
-treasury2YChange20D:
-summarizeAvailability(
+fedFundsChange20D: summarizeAvailability(rows, "fedFundsChange20D"),
+treasury2YChange20D: summarizeAvailability(
 rows,
 "treasury2YChange20D",
 ),
-
-treasury10YChange20D:
-summarizeAvailability(
+treasury10YChange20D: summarizeAvailability(
 rows,
 "treasury10YChange20D",
 ),
-
-treasury10Y2YSpreadChange20D:
-summarizeAvailability(
+treasury10Y2YSpreadChange20D: summarizeAvailability(
 rows,
 "treasury10Y2YSpreadChange20D",
 ),
 };
 
-
 /*
-* =====================================================
 * SAMPLE DATES
-* =====================================================
 */
-
 const sampleDates = [
 marketAlignment.firstDate,
 "2011-10-03",
@@ -969,296 +619,188 @@ marketAlignment.firstDate,
 "2024-04-01",
 "2026-10-02",
 marketAlignment.lastDate,
-].filter(
-(date): date is string =>
-typeof date === "string",
-);
+].filter((date): date is string => typeof date === "string");
 
-const uniqueSampleDates = [
-...new Set(sampleDates),
-];
+const uniqueSampleDates = [...new Set(sampleDates)];
 
-const samples =
-uniqueSampleDates.map(
-(date) => ({
+const samples = uniqueSampleDates.map((date) => ({
 date,
-feature: findSample(
-rows,
-date,
-),
-}),
-);
-
+feature: findSample(rows, date),
+}));
 
 /*
-* =====================================================
 * EXISTING MACRO CHECKS
-* =====================================================
 */
-
-const checks =
-calculateChecks(
-rows,
-macroAlignment,
-);
-
+const checks = calculateChecks(rows, macroAlignment);
 
 /*
-* =====================================================
 * HISTORICAL FEATURE SET CHECKS
-* =====================================================
 */
-
 const historicalFeatureSetChecks = {
 marketFeatureCountMatchesAlignment:
-marketFeatureDataset.length ===
-marketAlignment.count,
+marketFeatureDataset.length === marketAlignment.count,
 
 macroFeatureCountMatchesAlignment:
-macroFeatureDataset.days.length ===
-macroAlignment.count,
+macroFeatureDataset.days.length === macroAlignment.count,
 
 outcomeCountMatchesMarketAlignment:
-outcomeDataset.length ===
-marketAlignment.count,
+outcomeDataset.length === marketAlignment.count,
 
-joinedFeatureSetNotEmpty:
-historicalFeatureSet.count > 0,
+breadthProviderNotEmpty: breadthData.count > 0,
 
-chronological:
-historicalFeatureSet
-.diagnostics
-.chronological,
+breadthChronological: breadthData.diagnostics.chronological,
+
+breadthCoverageAvailable:
+breadthData.diagnostics.breadth50AvailableCount > 0 &&
+breadthData.diagnostics.breadth200AvailableCount > 0,
+
+joinedFeatureSetNotEmpty: historicalFeatureSet.count > 0,
+
+chronological: historicalFeatureSet.diagnostics.chronological,
 
 noDuplicateMarketDates:
-historicalFeatureSet
-.diagnostics
-.duplicateMarketDates === 0,
+historicalFeatureSet.diagnostics.duplicateMarketDates === 0,
 
 noDuplicateMacroDates:
-historicalFeatureSet
-.diagnostics
-.duplicateMacroDates === 0,
+historicalFeatureSet.diagnostics.duplicateMacroDates === 0,
+
+noDuplicateBreadthDates:
+historicalFeatureSet.diagnostics.duplicateBreadthDates === 0,
 
 noDuplicateOutcomeDates:
-historicalFeatureSet
-.diagnostics
-.duplicateOutcomeDates === 0,
+historicalFeatureSet.diagnostics.duplicateOutcomeDates === 0,
 };
 
 const allChecks =
-checks.all &&
-Object.values(
-historicalFeatureSetChecks,
-).every(Boolean);
-
+checks.all && Object.values(historicalFeatureSetChecks).every(Boolean);
 
 /*
-* =====================================================
 * RESPONSE
-* =====================================================
 */
-
 const response = {
 ok: allChecks,
 
 source: {
-marketProvider:
-"Yahoo Finance",
-
-ratesProvider:
-"FRED",
-
-macroProvider:
-"FRED",
-
-macroMode:
-"revision-aware output_type=1",
+marketProvider: "Yahoo Finance",
+ratesProvider: "FRED",
+macroProvider: "FRED",
+breadthProvider: "Yahoo Finance",
+macroMode: "revision-aware output_type=1",
 },
 
-historicalStart:
-marketAlignment.firstDate,
-
-historicalEnd:
-marketAlignment.lastDate,
+historicalStart: marketAlignment.firstDate,
+historicalEnd: marketAlignment.lastDate,
 
 market: {
-count:
-marketAlignment.count,
-
-firstDate:
-marketAlignment.firstDate,
-
-lastDate:
-marketAlignment.lastDate,
+count: marketAlignment.count,
+firstDate: marketAlignment.firstDate,
+lastDate: marketAlignment.lastDate,
 },
 
 macroAlignment: {
-count:
-macroAlignment.count,
-
-firstDate:
-macroAlignment.firstDate,
-
-lastDate:
-macroAlignment.lastDate,
-
-fullyCoveredCount:
-macroAlignment
-.diagnostics
-.allSeriesAvailableCount,
-
+count: macroAlignment.count,
+firstDate: macroAlignment.firstDate,
+lastDate: macroAlignment.lastDate,
+fullyCoveredCount: macroAlignment.diagnostics.allSeriesAvailableCount,
 futureReleaseLeakage:
-macroAlignment
-.diagnostics
-.futureReleaseLeakageCount,
+macroAlignment.diagnostics.futureReleaseLeakageCount,
 },
 
 ratesAlignment: {
-count:
-ratesAlignment.days.length,
-
+count: ratesAlignment.days.length,
 firstDate:
 ratesAlignment.days.length > 0
 ? ratesAlignment.days[0].date
 : null,
-
 lastDate:
 ratesAlignment.days.length > 0
-? ratesAlignment.days[
-ratesAlignment.days.length - 1
-].date
+? ratesAlignment.days[ratesAlignment.days.length - 1].date
 : null,
 },
 
+breadth: {
+count: breadthData.count,
+firstDate: breadthData.firstDate,
+lastDate: breadthData.lastDate,
+universeSize: breadthData.universeSize,
+uniqueUniverseSize: breadthData.uniqueUniverseSize,
+diagnostics: breadthData.diagnostics,
+},
+
 features: {
-count:
-rows.length,
-
-firstDate:
-rows.length > 0
-? rows[0].date
-: null,
-
-lastDate:
-rows.length > 0
-? rows[rows.length - 1].date
-: null,
+count: rows.length,
+firstDate: rows.length > 0 ? rows[0].date : null,
+lastDate: rows.length > 0 ? rows[rows.length - 1].date : null,
 },
 
 featureAvailability,
 
 marketFeatures: {
-count:
-marketFeatureDataset.length,
-
+count: marketFeatureDataset.length,
 firstDate:
 marketFeatureDataset.length > 0
 ? marketFeatureDataset[0].date
 : null,
-
 lastDate:
 marketFeatureDataset.length > 0
-? marketFeatureDataset[
-marketFeatureDataset.length - 1
-].date
+? marketFeatureDataset[marketFeatureDataset.length - 1].date
 : null,
 },
 
 outcomes: {
-count:
-outcomeDataset.length,
-
+count: outcomeDataset.length,
 firstDate:
-outcomeDataset.length > 0
-? outcomeDataset[0].date
-: null,
-
+outcomeDataset.length > 0 ? outcomeDataset[0].date : null,
 lastDate:
 outcomeDataset.length > 0
-? outcomeDataset[
-outcomeDataset.length - 1
-].date
+? outcomeDataset[outcomeDataset.length - 1].date
 : null,
 },
 
 historicalFeatureSet: {
-count:
-historicalFeatureSet.count,
-
-firstDate:
-historicalFeatureSet.firstDate,
-
-lastDate:
-historicalFeatureSet.lastDate,
-
-diagnostics:
-historicalFeatureSet
-.diagnostics,
-
-checks:
-historicalFeatureSetChecks,
+count: historicalFeatureSet.count,
+firstDate: historicalFeatureSet.firstDate,
+lastDate: historicalFeatureSet.lastDate,
+diagnostics: historicalFeatureSet.diagnostics,
+checks: historicalFeatureSetChecks,
 },
-
-/*
-* ===================================================
-* HISTORICAL DISTRIBUTIONS
-*
-* Descriptive statistics only.
-* ===================================================
-*/
 
 historicalDistributions,
 
-/*
-* ===================================================
-* HISTORICAL CONDITIONAL OUTCOMES
-*
-* Thresholds are exposed separately so the test
-* output remains transparent and auditable.
-* ===================================================
-*/
-
 historicalConditionalOutcomes: {
-thresholds:
-historicalConditionalThresholds,
+methodology: {
+thresholdMethod: "Full-sample descriptive percentiles",
+intendedUse: "Retrospective exploratory analysis",
+predictiveUse:
+"Not validated; use walk-forward thresholds before predictive claims",
+breadthScale: "Ratios from 0 to 1",
+missingBreadthPolicy: "Missing breadth does not satisfy a condition",
+},
 
-results:
-historicalConditionalOutcomes,
+thresholds: historicalConditionalThresholds,
+thresholdSampleCounts: historicalThresholdSampleCounts,
+results: historicalConditionalOutcomes,
 },
 
 checks: {
-macro:
-checks,
-
-all:
-allChecks,
+macro: checks,
+all: allChecks,
 },
 
 samples,
 };
 
-return NextResponse.json(
-response,
-);
+return NextResponse.json(response);
 } catch (error) {
-console.error(
-"Historical macro features test failed:",
-error,
-);
+console.error("Historical macro features test failed:", error);
 
 return NextResponse.json(
 {
 ok: false,
-
-error:
-error instanceof Error
-? error.message
-: String(error),
+error: error instanceof Error ? error.message : String(error),
 },
-{
-status: 500,
-},
+{ status: 500 },
 );
 }
 }
+
