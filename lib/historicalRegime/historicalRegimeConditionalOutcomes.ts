@@ -13,7 +13,8 @@ export type HistoricalConditionalOperator =
 
 export type HistoricalConditionalFeaturePath =
 | `market.${keyof HistoricalRegimeFeatureSetDay["market"] & string}`
-| `macro.${keyof HistoricalRegimeFeatureSetDay["macro"] & string}`;
+| `macro.${keyof HistoricalRegimeFeatureSetDay["macro"] & string}`
+| `breadth.${keyof NonNullable<HistoricalRegimeFeatureSetDay["breadth"]> & string}`;
 
 export type HistoricalConditionalCondition = {
 id: string;
@@ -90,10 +91,23 @@ path: HistoricalConditionalFeaturePath,
 ): number | null {
 const [group, key] = path.split(".");
 
-const source =
-group === "market"
-? (day.market as unknown as NumericRecord)
-: (day.macro as unknown as NumericRecord);
+let source: NumericRecord | null = null;
+
+if (group === "market") {
+source = day.market as unknown as NumericRecord;
+} else if (group === "macro") {
+source = day.macro as unknown as NumericRecord;
+} else if (group === "breadth") {
+if (day.breadth === null) {
+return null;
+}
+
+source = day.breadth as unknown as NumericRecord;
+}
+
+if (source === null) {
+return null;
+}
 
 const value = source[key];
 
