@@ -4,7 +4,6 @@ HistoricalDivergenceFeatureDay,
 
 import type {
 HistoricalDivergenceForwardDataset,
-HistoricalDivergenceForwardObservation,
 } from "./historicalRegimeDivergenceForward";
 
 import type {
@@ -28,6 +27,9 @@ No optionsschein pricing.
 No optimization of thresholds from outcomes.
 
 Important:
+Controls require valid breadth information.
+Missing breadth is never interpreted as healthy breadth.
+
 Controls are descriptive and are NOT yet matched
 on volatility, long-term trend, or market regime.
 ===================================================== */
@@ -413,10 +415,7 @@ let unmatchedDivergenceStarts = 0;
 EVENT GROUP: EPISODE STARTS
 ================================================ */
 
-for (
-const observation of
-forward.observations
-) {
+for (const observation of forward.observations) {
 const day = divergenceMap.get(
 observation.date,
 );
@@ -458,28 +457,37 @@ market.outcome,
 /* ================================================
 CONTROL GROUP: NASDAQ UP, NO DIVERGENCE
 
-Excludes:
-- Current divergence-state days
-- All known divergence episode starts
+A valid control requires:
+- Positive Nasdaq 20D return
+- Not in the target divergence state
+- Not an episode start
+- Available raw breadth50
+- Available 20D breadth change
+- Sufficient data for state classification
 
-Controls can include other breadth regimes.
+Missing breadth must never be treated as
+evidence of a healthy market.
 ================================================ */
 
 for (const day of divergenceDays) {
 if (
 day.state20D ===
-"NASDAQ_UP_BREADTH_DOWN"
+"NASDAQ_UP_BREADTH_DOWN" ||
+day.state20D ===
+"INSUFFICIENT_DATA"
 ) {
+continue;
+}
+
+if (divergenceStartDates.has(day.date)) {
 continue;
 }
 
 if (
-divergenceStartDates.has(day.date)
+!valid(day.nasdaqReturn20D) ||
+!valid(day.rawBreadth50) ||
+!valid(day.breadth50Change20D)
 ) {
-continue;
-}
-
-if (!valid(day.nasdaqReturn20D)) {
 continue;
 }
 
