@@ -99,6 +99,17 @@ advanceDeclineRatio: number | null;
 // Cumulative net starts at 0 before the first eligible observation.
 // This is an unadjusted fixed-universe A/D line, not exchange A/D.
 adLine: number | null;
+// Cumulative sum of daily (advances - declines) / eligible assets.
+// Each day contributes within [-1, 1], reducing changing-universe effects.
+normalizedADLine: number | null;
+// Coverage against today's requested universe and successfully fetched series.
+// Both denominators are fixed across dates for transparent comparisons.
+breadthCoverageOfUniverse: number;
+breadthCoverageOfFetched: number;
+advanceDeclineCoverageOfUniverse: number;
+advanceDeclineCoverageOfFetched: number;
+highLowCoverageOfUniverse: number;
+highLowCoverageOfFetched: number;
 // Rolling 252-close extremes (including today's close), unique symbols.
 // Not official intraday 52-week highs/lows.
 highLowEligibleAssets: number;
@@ -130,6 +141,13 @@ rawBreadth20AvailableCount: number;
 rawBreadth100AvailableCount: number;
 advanceDeclineAvailableCount: number;
 highLowAvailableCount: number;
+normalizedADLineAvailableCount: number;
+minBreadthCoverageOfUniverse: number | null;
+maxBreadthCoverageOfUniverse: number | null;
+minAdvanceDeclineCoverageOfUniverse: number | null;
+maxAdvanceDeclineCoverageOfUniverse: number | null;
+minHighLowCoverageOfUniverse: number | null;
+maxHighLowCoverageOfUniverse: number | null;
 minAdvanceDeclineEligibleAssets: number | null;
 maxAdvanceDeclineEligibleAssets: number | null;
 minHighLowEligibleAssets: number | null;
@@ -405,6 +423,13 @@ rawBreadth20AvailableCount: 0,
 rawBreadth100AvailableCount: 0,
 advanceDeclineAvailableCount: 0,
 highLowAvailableCount: 0,
+normalizedADLineAvailableCount: 0,
+minBreadthCoverageOfUniverse: null as number | null,
+maxBreadthCoverageOfUniverse: null as number | null,
+minAdvanceDeclineCoverageOfUniverse: null as number | null,
+maxAdvanceDeclineCoverageOfUniverse: null as number | null,
+minHighLowCoverageOfUniverse: null as number | null,
+maxHighLowCoverageOfUniverse: null as number | null,
 minAdvanceDeclineEligibleAssets: null as number | null,
 maxAdvanceDeclineEligibleAssets: null as number | null,
 minHighLowEligibleAssets: null as number | null,
@@ -426,6 +451,7 @@ const days: HistoricalBreadthDay[] = [];
 let smoothedBreadth50: number | null = null;
 let smoothedBreadth200: number | null = null;
 let cumulativeAD = 0;
+let cumulativeNormalizedAD = 0;
 
 for (const date of dates) {
 const raw = rawHistory.get(date);
@@ -445,6 +471,12 @@ const declines = internals?.declines ?? 0;
 const unchanged = internals?.unchanged ?? 0;
 const advanceDeclineNet = eligibleAD > 0 ? advances - declines : null;
 if (advanceDeclineNet !== null) cumulativeAD += advanceDeclineNet;
+const advanceDeclineRatio = eligibleAD > 0
+? (advances - declines) / eligibleAD
+: null;
+if (advanceDeclineRatio !== null) {
+cumulativeNormalizedAD += advanceDeclineRatio;
+}
 const eligibleHL = internals?.highLowEligibleAssets ?? 0;
 const highs = internals?.newClosingHighs252D ?? 0;
 const lows = internals?.newClosingLows252D ?? 0;
@@ -461,8 +493,15 @@ above20Count: raw.above20Count, above100Count: raw.above100Count,
 advanceDeclineEligibleAssets: eligibleAD,
 advances, declines, unchanged,
 advanceDeclineNet,
-advanceDeclineRatio: eligibleAD > 0 ? (advances - declines) / eligibleAD : null,
+advanceDeclineRatio,
 adLine: advanceDeclineNet !== null ? cumulativeAD : null,
+normalizedADLine: advanceDeclineRatio !== null ? cumulativeNormalizedAD : null,
+breadthCoverageOfUniverse: raw.validAssets / universe.length,
+breadthCoverageOfFetched: raw.validAssets / (successfulSeries.length + duplicateAssetCount),
+advanceDeclineCoverageOfUniverse: eligibleAD / uniqueUniverse.length,
+advanceDeclineCoverageOfFetched: eligibleAD / successfulSeries.length,
+highLowCoverageOfUniverse: eligibleHL / uniqueUniverse.length,
+highLowCoverageOfFetched: eligibleHL / successfulSeries.length,
 highLowEligibleAssets: eligibleHL,
 newClosingHighs252D: highs,
 newClosingLows252D: lows,
@@ -494,6 +533,13 @@ rawBreadth20AvailableCount: days.filter(day => day.rawBreadth20 !== null).length
 rawBreadth100AvailableCount: days.filter(day => day.rawBreadth100 !== null).length,
 advanceDeclineAvailableCount: adEligibleCounts.length,
 highLowAvailableCount: hlEligibleCounts.length,
+normalizedADLineAvailableCount: days.filter(day => day.normalizedADLine !== null).length,
+minBreadthCoverageOfUniverse: minOrNull(days.map(day => day.breadthCoverageOfUniverse)),
+maxBreadthCoverageOfUniverse: maxOrNull(days.map(day => day.breadthCoverageOfUniverse)),
+minAdvanceDeclineCoverageOfUniverse: minOrNull(days.map(day => day.advanceDeclineCoverageOfUniverse)),
+maxAdvanceDeclineCoverageOfUniverse: maxOrNull(days.map(day => day.advanceDeclineCoverageOfUniverse)),
+minHighLowCoverageOfUniverse: minOrNull(days.map(day => day.highLowCoverageOfUniverse)),
+maxHighLowCoverageOfUniverse: maxOrNull(days.map(day => day.highLowCoverageOfUniverse)),
 minAdvanceDeclineEligibleAssets: minOrNull(adEligibleCounts),
 maxAdvanceDeclineEligibleAssets: maxOrNull(adEligibleCounts),
 minHighLowEligibleAssets: minOrNull(hlEligibleCounts),
