@@ -1,5 +1,3 @@
-// lib/aiResearch/aiResearchRunner.ts
-
 import { loadMarketHistory } from "@/lib/history/marketHistory";
 
 import { buildAIResearchContext } from "./aiResearchContext";
@@ -8,11 +6,18 @@ import { fetchExternalResearchSources } from "./aiResearchExternalSources";
 import { selectTopResearchSources } from "./aiResearchSourceRelevance";
 import { fetchCOTData } from "./aiResearchCOTProvider";
 
+import {
+loadAIResearchHistoricalEvidence,
+} from "./aiResearchHistoricalEvidenceService";
+
 import type {
 AIResearchResult,
 AIResearchTask,
 } from "./aiResearchTypes";
 
+import type {
+AIResearchHistoricalEvidence,
+} from "./aiResearchHistoricalEvidenceTypes";
 
 /* =====================================================
 INPUT
@@ -28,6 +33,89 @@ string;
 
 }
 
+/* =====================================================
+HISTORICAL EVIDENCE FALLBACK
+===================================================== */
+
+/*
+* Historical research is supplementary.
+*
+* A historical data failure must not prevent
+* the AI Research Agent from interpreting the
+* current market snapshot.
+*/
+
+function unavailableHistoricalEvidence(
+warning: string
+): AIResearchHistoricalEvidence {
+
+return {
+
+asOfDate: null,
+
+firstDate: null,
+
+lastDate: null,
+
+status: "NOT_AVAILABLE",
+
+currentStates: [],
+
+observations: [],
+
+diagnostics: {
+
+totalHistoricalDays: 0,
+
+totalObservations: 0,
+
+totalGroups: 0,
+
+matchedCurrentStates: 0,
+
+unmatchedCurrentStates: 0,
+
+forwardOutcomesUseFuturePrices: false,
+
+historicalFeaturesAvoidLookahead: false,
+
+predictiveEdgeValidated: false,
+
+warnings: [
+warning,
+],
+
+},
+
+};
+
+}
+
+/* =====================================================
+SAFE HISTORICAL EVIDENCE LOAD
+===================================================== */
+
+async function loadHistoricalEvidenceSafely():
+Promise<AIResearchHistoricalEvidence> {
+
+try {
+
+return await loadAIResearchHistoricalEvidence();
+
+} catch (error) {
+
+const message =
+error instanceof Error
+? error.message
+: "Unknown historical evidence error";
+
+return unavailableHistoricalEvidence(
+`Historical evidence unavailable: ${message}`
+);
+
+}
+
+}
 
 /* =====================================================
 RUN AI RESEARCH
@@ -40,13 +128,14 @@ input: RunAIResearchFromHistoryInput
 try {
 
 /* =================================================
-LOAD DATA IN PARALLEL
-================================================= */
+* LOAD DATA IN PARALLEL
+* ================================================= */
 
 const [
 history,
 externalSources,
 positioningResult,
+historicalEvidence,
 ] = await Promise.all([
 
 loadMarketHistory(),
@@ -58,12 +147,16 @@ input.task,
 
 fetchCOTData(),
 
+loadHistoricalEvidenceSafely(),
+
 ]);
 
+const historicalWarnings =
+historicalEvidence.diagnostics.warnings;
 
 /* =================================================
-HISTORY VALIDATION
-================================================= */
+* HISTORY VALIDATION
+* ================================================= */
 
 if (
 !Array.isArray(history) ||
@@ -98,6 +191,8 @@ warnings: [
 .diagnostics
 .warnings,
 
+...historicalWarnings,
+
 ],
 
 },
@@ -106,14 +201,12 @@ warnings: [
 
 }
 
-
 /* =================================================
-CURRENT SNAPSHOT
-================================================= */
+* CURRENT SNAPSHOT
+* ================================================= */
 
 const currentSnapshot =
 history[0];
-
 
 if (
 !currentSnapshot ||
@@ -148,6 +241,8 @@ warnings: [
 .diagnostics
 .warnings,
 
+...historicalWarnings,
+
 ],
 
 },
@@ -156,10 +251,9 @@ warnings: [
 
 }
 
-
 /* =================================================
-EXTERNAL RESEARCH SOURCES
-================================================= */
+* EXTERNAL RESEARCH SOURCES
+* ================================================= */
 
 const rankedSources =
 selectTopResearchSources(
@@ -172,10 +266,9 @@ input.task,
 
 );
 
-
 /* =================================================
-BUILD AI RESEARCH CONTEXT
-================================================= */
+* BUILD AI RESEARCH CONTEXT
+* ================================================= */
 
 const researchInput =
 buildAIResearchContext({
@@ -195,25 +288,32 @@ sources:
 rankedSources,
 
 positioning:
-positioningResult
-.data,
+positioningResult.data,
+
+/*
+* Historical evidence is supplied as a
+* separate research input.
+*
+* It is never merged into trusted recent
+* snapshot history.
+*/
+
+historicalEvidence,
 
 });
 
-
 /* =================================================
-RUN AI RESEARCH
-================================================= */
+* RUN AI RESEARCH
+* ================================================= */
 
 const result =
 runAIResearch(
 researchInput
 );
 
-
 /* =================================================
-DIAGNOSTICS
-================================================= */
+* DIAGNOSTICS
+* ================================================= */
 
 if (
 result.diagnostics
@@ -245,13 +345,13 @@ result
 .diagnostics
 .warnings,
 
+...historicalWarnings,
+
 ],
 
 };
 
-}
-
-else {
+} else {
 
 result.diagnostics = {
 
@@ -280,15 +380,15 @@ warnings: [
 .diagnostics
 .warnings,
 
+...historicalWarnings,
+
 ],
 
 };
 
 }
 
-
 return result;
-
 
 } catch (error) {
 
@@ -319,3 +419,4 @@ error instanceof Error
 }
 
 }
+
