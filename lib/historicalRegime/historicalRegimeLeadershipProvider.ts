@@ -7,7 +7,8 @@ Purpose:
 - RSP: S&P 500 Equal Weight ETF
 - SMH: Semiconductor ETF
 - Preserve actual trading dates
-- Do not alter existing historical market data
+- Preserve existing raw-close behavior
+- Provide adjusted-close data separately
 - No synthetic values
 - No forward filling
 - No scoring
@@ -17,6 +18,9 @@ Important:
 ETF price series are research proxies, not
 official equal-weight index histories or
 historical constituent-weight measurements.
+
+Adjusted ETF returns must not be treated as
+directly equivalent to price-index returns.
 ===================================================== */
 
 import type {
@@ -36,6 +40,10 @@ sp500EqualWeight: "RSP",
 semiconductors: "SMH",
 } as const;
 
+type LeadershipPriceMode =
+| "RAW_CLOSE"
+| "ADJUSTED_CLOSE";
+
 /* =====================================================
 TYPES
 ===================================================== */
@@ -53,6 +61,25 @@ firstAvailableDate: string | null;
 lastAvailableDate: string | null;
 chronological: boolean;
 };
+};
+
+export type HistoricalLeadershipAdjustedData =
+HistoricalLeadershipData & {
+priceMode: "ADJUSTED_CLOSE";
+
+diagnostics: HistoricalLeadershipData["diagnostics"] & {
+priceMode: "ADJUSTED_CLOSE";
+adjustedCloseMissingDays: {
+nasdaqEqualWeight: number;
+sp500EqualWeight: number;
+semiconductors: number;
+};
+};
+};
+
+type FetchedLeadershipSeries = {
+series: HistoricalMarketSeries;
+missingAdjustedCloseDays: number;
 };
 
 /* =====================================================
@@ -107,13 +134,33 @@ return valid.length > 0
 : null;
 }
 
+function isValidPrice(
+value: unknown,
+): value is number {
+return (
+typeof value === "number" &&
+Number.isFinite(value) &&
+value > 0
+);
+}
+
 /* =====================================================
 FETCH HISTORICAL SERIES
+
+RAW_CLOSE:
+- Uses Yahoo quote.close
+- Preserves existing provider behavior
+
+ADJUSTED_CLOSE:
+- Uses Yahoo adjclose
+- Never substitutes raw close for missing values
+- Missing adjusted values remain missing
 ===================================================== */
 
 async function fetchLeadershipSeries(
 symbol: string,
-): Promise<HistoricalMarketSeries> {
+priceMode: LeadershipPriceMode = "RAW_CLOSE",
+): Promise<FetchedLeadershipSeries> {
 try {
 const url =
 "https://query1.finance.yahoo.com/v8/finance/chart/" +
@@ -135,7 +182,10 @@ symbol,
 response.status,
 );
 
-return emptySeries(symbol);
+return {
+series: emptySeries(symbol),
+missingAdjustedCloseDays: 0,
+};
 }
 
 const data = await response.json();
@@ -148,33 +198,66 @@ console.error(
 symbol,
 );
 
-return emptySeries(symbol);
+return {
+series: emptySeries(symbol),
+missingAdjustedCloseDays: 0,
+};
 }
 
 const timestamps: number[] =
 result.timestamp ?? [];
 
-const closes: Array<number | null> =
+const rawCloses: Array<number | null> =
 result.indicators?.quote?.[0]?.close ?? [];
+
+const adjustedCloses: Array<number | null> =
+result.indicators?.adjclose?.[0]?.adjclose ?? [];
 
 const byDate =
 new Map<string, HistoricalPricePoint>();
 
+let missingAdjustedCloseDays = 0;
+
+/*
+* Keep the existing raw-close iteration length.
+*
+* Adjusted-close values are matched to the
+* same Yahoo timestamp index.
+*/
+
 const length = Math.min(
 timestamps.length,
-closes.length,
+rawCloses.length,
 );
 
 for (let index = 0; index < length; index++) {
 const timestamp = timestamps[index];
-const close = closes[index];
+const rawClose = rawCloses[index];
 
 if (
 !Number.isFinite(timestamp) ||
-typeof close !== "number" ||
-!Number.isFinite(close) ||
-close <= 0
+!isValidPrice(rawClose)
 ) {
+continue;
+}
+
+const adjustedClose =
+adjustedCloses[index];
+
+if (
+priceMode === "ADJUSTED_CLOSE" &&
+!isValidPrice(adjustedClose)
+) {
+missingAdjustedCloseDays++;
+continue;
+}
+
+const close =
+priceMode === "ADJUSTED_CLOSE"
+? adjustedClose
+: rawClose;
+
+if (!isValidPrice(close)) {
 continue;
 }
 
@@ -197,11 +280,15 @@ byDate.values(),
 );
 
 return {
+series: {
 symbol,
 points,
 count: points.length,
 firstDate: points[0]?.date ?? null,
 lastDate: points[points.length - 1]?.date ?? null,
+},
+
+missingAdjustedCloseDays,
 };
 } catch (error) {
 console.error(
@@ -210,51 +297,30 @@ symbol,
 error,
 );
 
-return emptySeries(symbol);
+return {
+series: emptySeries(symbol),
+missingAdjustedCloseDays: 0,
+};
 }
 }
 
 /* =====================================================
-LOAD LEADERSHIP DATA
+BUILD SHARED DIAGNOSTICS
 ===================================================== */
 
-export async function loadHistoricalRegimeLeadershipData():
-Promise<HistoricalLeadershipData> {
-const [
-nasdaqEqualWeight,
-sp500EqualWeight,
-semiconductors,
-] = await Promise.all([
-fetchLeadershipSeries(
-LEADERSHIP_SYMBOLS.nasdaqEqualWeight,
-),
-fetchLeadershipSeries(
-LEADERSHIP_SYMBOLS.sp500EqualWeight,
-),
-fetchLeadershipSeries(
-LEADERSHIP_SYMBOLS.semiconductors,
-),
-]);
-
-const series = [
-nasdaqEqualWeight,
-sp500EqualWeight,
-semiconductors,
-];
-
+function buildDiagnostics(
+series: HistoricalMarketSeries[],
+): HistoricalLeadershipData["diagnostics"] {
 const failedSeries = series
 .filter((item) => item.count === 0)
 .map((item) => item.symbol);
 
 return {
-nasdaqEqualWeight,
-sp500EqualWeight,
-semiconductors,
-
-diagnostics: {
 requestedSeries: series.length,
+
 successfulSeries:
 series.length - failedSeries.length,
+
 failedSeries,
 
 firstAvailableDate: earliestDate(
@@ -268,6 +334,130 @@ series.map((item) => item.lastDate),
 chronological: series.every(
 (item) => isChronological(item.points),
 ),
+};
+}
+
+/* =====================================================
+LOAD EXISTING RAW-CLOSE LEADERSHIP DATA
+
+Compatibility:
+- Same function name
+- Same return type
+- Same three market series
+- Same diagnostics structure
+===================================================== */
+
+export async function loadHistoricalRegimeLeadershipData():
+Promise<HistoricalLeadershipData> {
+const [
+nasdaqEqualWeightResult,
+sp500EqualWeightResult,
+semiconductorsResult,
+] = await Promise.all([
+fetchLeadershipSeries(
+LEADERSHIP_SYMBOLS.nasdaqEqualWeight,
+"RAW_CLOSE",
+),
+fetchLeadershipSeries(
+LEADERSHIP_SYMBOLS.sp500EqualWeight,
+"RAW_CLOSE",
+),
+fetchLeadershipSeries(
+LEADERSHIP_SYMBOLS.semiconductors,
+"RAW_CLOSE",
+),
+]);
+
+const nasdaqEqualWeight =
+nasdaqEqualWeightResult.series;
+
+const sp500EqualWeight =
+sp500EqualWeightResult.series;
+
+const semiconductors =
+semiconductorsResult.series;
+
+return {
+nasdaqEqualWeight,
+sp500EqualWeight,
+semiconductors,
+
+diagnostics: buildDiagnostics([
+nasdaqEqualWeight,
+sp500EqualWeight,
+semiconductors,
+]),
+};
+}
+
+/* =====================================================
+LOAD ADJUSTED-CLOSE LEADERSHIP DATA
+
+Research-only:
+- Separate from existing raw-close data
+- Uses only real Yahoo adjusted-close values
+- No fallback to raw close
+- Missing adjusted values are counted
+===================================================== */
+
+export async function loadHistoricalRegimeLeadershipAdjustedData():
+Promise<HistoricalLeadershipAdjustedData> {
+const [
+nasdaqEqualWeightResult,
+sp500EqualWeightResult,
+semiconductorsResult,
+] = await Promise.all([
+fetchLeadershipSeries(
+LEADERSHIP_SYMBOLS.nasdaqEqualWeight,
+"ADJUSTED_CLOSE",
+),
+fetchLeadershipSeries(
+LEADERSHIP_SYMBOLS.sp500EqualWeight,
+"ADJUSTED_CLOSE",
+),
+fetchLeadershipSeries(
+LEADERSHIP_SYMBOLS.semiconductors,
+"ADJUSTED_CLOSE",
+),
+]);
+
+const nasdaqEqualWeight =
+nasdaqEqualWeightResult.series;
+
+const sp500EqualWeight =
+sp500EqualWeightResult.series;
+
+const semiconductors =
+semiconductorsResult.series;
+
+const diagnostics = buildDiagnostics([
+nasdaqEqualWeight,
+sp500EqualWeight,
+semiconductors,
+]);
+
+return {
+priceMode: "ADJUSTED_CLOSE",
+
+nasdaqEqualWeight,
+sp500EqualWeight,
+semiconductors,
+
+diagnostics: {
+...diagnostics,
+
+priceMode: "ADJUSTED_CLOSE",
+
+adjustedCloseMissingDays: {
+nasdaqEqualWeight:
+nasdaqEqualWeightResult.missingAdjustedCloseDays,
+
+sp500EqualWeight:
+sp500EqualWeightResult.missingAdjustedCloseDays,
+
+semiconductors:
+semiconductorsResult.missingAdjustedCloseDays,
+},
 },
 };
 }
