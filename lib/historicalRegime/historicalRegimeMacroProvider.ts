@@ -21,7 +21,8 @@
 const FRED_API_BASE =
 "https://api.stlouisfed.org/fred";
 
-const HISTORICAL_MACRO_START = "2011-01-01";
+const HISTORICAL_MACRO_START =
+"2011-01-01";
 
 type FredObservationResponse = {
 observations?: Array<{
@@ -90,17 +91,20 @@ label: "Core CPI",
 {
 key: "nfci",
 seriesId: "NFCI",
-label: "Chicago Fed National Financial Conditions Index",
+label:
+"Chicago Fed National Financial Conditions Index",
 },
 {
 key: "real10Y",
 seriesId: "DFII10",
-label: "10-Year Treasury Inflation-Indexed Security",
+label:
+"10-Year Treasury Inflation-Indexed Security",
 },
 ];
 
 function getFredApiKey(): string {
-const apiKey = process.env.FRED_API_KEY;
+const apiKey =
+process.env.FRED_API_KEY;
 
 if (!apiKey) {
 throw new Error(
@@ -115,7 +119,9 @@ function buildFredUrl(
 path: string,
 params: Record<string, string>
 ): string {
-const url = new URL(`${FRED_API_BASE}/${path}`);
+const url = new URL(
+`${FRED_API_BASE}/${path}`
+);
 
 url.searchParams.set(
 "api_key",
@@ -127,8 +133,13 @@ url.searchParams.set(
 "json"
 );
 
-for (const [key, value] of Object.entries(params)) {
-url.searchParams.set(key, value);
+for (const [key, value] of Object.entries(
+params
+)) {
+url.searchParams.set(
+key,
+value
+);
 }
 
 return url.toString();
@@ -138,8 +149,13 @@ async function fetchFredJson<T>(
 path: string,
 params: Record<string, string>
 ): Promise<T> {
+const url = buildFredUrl(
+path,
+params
+);
+
 const response = await fetch(
-buildFredUrl(path, params),
+url,
 {
 headers: {
 Accept: "application/json",
@@ -149,8 +165,40 @@ cache: "no-store",
 );
 
 if (!response.ok) {
+let errorDetails =
+"No FRED error details available.";
+
+try {
+const errorBody =
+await response.json();
+
+if (
+errorBody &&
+typeof errorBody === "object"
+) {
+const body =
+errorBody as {
+error_code?: number;
+error_message?: string;
+};
+
+errorDetails =
+body.error_message ??
+JSON.stringify(errorBody);
+}
+} catch {
+try {
+errorDetails =
+await response.text();
+} catch {
+// Keep fallback error message.
+}
+}
+
 throw new Error(
-`FRED request failed: ${response.status} ${response.statusText}`
+`FRED request failed for ${path}: ` +
+`${response.status} ${response.statusText}. ` +
+`${errorDetails}`
 );
 }
 
@@ -167,12 +215,10 @@ await fetchFredJson<FredObservationResponse>(
 series_id: seriesId,
 observation_start:
 HISTORICAL_MACRO_START,
-observation_end: "9999-12-31",
-realtime_start:
-HISTORICAL_MACRO_START,
-realtime_end:
+observation_end:
 "9999-12-31",
-order_by: "observation_date",
+order_by:
+"observation_date",
 sort_order: "asc",
 limit: "100000",
 }
@@ -183,7 +229,9 @@ data.observations ?? [];
 
 return observations
 .map((observation) => {
-const date = observation.date ?? "";
+const date =
+observation.date ?? "";
+
 const value = Number(
 observation.value
 );
@@ -192,9 +240,11 @@ return {
 date,
 value,
 realtimeStart:
-observation.realtime_start ?? null,
+observation.realtime_start ??
+null,
 realtimeEnd:
-observation.realtime_end ?? null,
+observation.realtime_end ??
+null,
 };
 })
 .filter(
@@ -202,7 +252,9 @@ observation.realtime_end ?? null,
 /^\d{4}-\d{2}-\d{2}$/.test(
 observation.date
 ) &&
-Number.isFinite(observation.value)
+Number.isFinite(
+observation.value
+)
 )
 .sort((a, b) =>
 a.date.localeCompare(b.date)
@@ -231,7 +283,9 @@ return Array.from(
 new Set(
 (data.vintage_dates ?? []).filter(
 (date) =>
-/^\d{4}-\d{2}-\d{2}$/.test(date)
+/^\d{4}-\d{2}-\d{2}$/.test(
+date
+)
 )
 )
 ).sort((a, b) =>
@@ -275,7 +329,8 @@ series?.frequency ?? null,
 units:
 series?.units ?? null,
 seasonalAdjustment:
-series?.seasonal_adjustment ?? null,
+series?.seasonal_adjustment ??
+null,
 };
 }
 
