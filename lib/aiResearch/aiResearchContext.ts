@@ -1,5 +1,3 @@
-// lib/aiResearch/aiResearchContext.ts
-
 import type {
 AIResearchContext,
 AIResearchHistory,
@@ -13,6 +11,13 @@ import type {
 AIResearchCOTData,
 } from "./aiResearchCOTTypes";
 
+import type {
+AIResearchHistoricalEvidence,
+} from "./aiResearchHistoricalEvidenceTypes";
+
+/* =====================================================
+CONFIGURATION
+===================================================== */
 
 const MAX_HISTORY_SNAPSHOTS = 30;
 
@@ -46,12 +51,10 @@ const MAX_HISTORY_SNAPSHOTS = 30;
 const AI_RESEARCH_TRUSTED_HISTORY_START =
 "2026-09-16T00:00:00.000Z";
 
-
 const AI_RESEARCH_TRUSTED_HISTORY_START_MS =
 new Date(
 AI_RESEARCH_TRUSTED_HISTORY_START
 ).getTime();
-
 
 /* =====================================================
 INPUT
@@ -87,8 +90,29 @@ AIResearchSource[];
 positioning?:
 AIResearchCOTData;
 
-}
+/*
+* Historical market research evidence.
+*
+* Separate from recent trusted snapshot history.
+*
+* Includes historical forward-outcome statistics
+* and comparable current market states.
+*
+* This is research-only information.
+*
+* It must not modify:
+*
+* - current market snapshot
+* - Master Score
+* - Rotation-App engine signals
+* - execution states
+* - position sizing
+*/
 
+historicalEvidence?:
+AIResearchHistoricalEvidence;
+
+}
 
 /* =====================================================
 HELPERS
@@ -105,7 +129,6 @@ value !== null &&
 );
 
 }
-
 
 /* =====================================================
 TIMESTAMP
@@ -131,7 +154,6 @@ return null;
 
 }
 
-
 /* =====================================================
 TRUSTED HISTORY
 ===================================================== */
@@ -143,19 +165,16 @@ snapshot: AIResearchSnapshot
 const timestamp =
 getTimestamp(snapshot);
 
-
 if (!timestamp) {
 
 return false;
 
 }
 
-
 const timestampMs =
 new Date(
 timestamp
 ).getTime();
-
 
 if (
 !Number.isFinite(timestampMs)
@@ -165,14 +184,12 @@ return false;
 
 }
 
-
 return (
 timestampMs >=
 AI_RESEARCH_TRUSTED_HISTORY_START_MS
 );
 
 }
-
 
 /* =====================================================
 HISTORY SORT
@@ -191,7 +208,6 @@ getTimestamp(a);
 const timestampB =
 getTimestamp(b);
 
-
 if (
 !timestampA &&
 !timestampB
@@ -201,20 +217,17 @@ return 0;
 
 }
 
-
 if (!timestampA) {
 
 return -1;
 
 }
 
-
 if (!timestampB) {
 
 return 1;
 
 }
-
 
 return (
 new Date(timestampA).getTime() -
@@ -225,7 +238,6 @@ new Date(timestampB).getTime()
 );
 
 }
-
 
 /* =====================================================
 HISTORY SANITIZATION
@@ -242,7 +254,6 @@ isObject(snapshot) &&
 getTimestamp(snapshot) !== null
 );
 
-
 /*
 * AI Research deliberately ignores legacy snapshots
 * from before the trusted-history boundary.
@@ -258,19 +269,16 @@ snapshot
 )
 );
 
-
 const chronological =
 sortHistoryChronologically(
 trustedSnapshots
 );
-
 
 return chronological.slice(
 -MAX_HISTORY_SNAPSHOTS
 );
 
 }
-
 
 /* =====================================================
 BUILD CONTEXT
@@ -297,12 +305,13 @@ sources = [],
 
 positioning,
 
+historicalEvidence,
+
 } = input;
 
-
 /* ===================================================
-SNAPSHOT VALIDATION
-=================================================== */
+* SNAPSHOT VALIDATION
+* =================================================== */
 
 if (
 !isObject(snapshot)
@@ -314,10 +323,8 @@ throw new Error(
 
 }
 
-
 const snapshotTimestamp =
 getTimestamp(snapshot);
-
 
 if (
 !snapshotTimestamp
@@ -329,20 +336,26 @@ throw new Error(
 
 }
 
-
 /* ===================================================
-HISTORY
-=================================================== */
+* HISTORY
+* =================================================== */
 
 const sanitizedHistory =
 sanitizeHistory(
 history
 );
 
+/*
+* Historical research evidence is NOT added to
+* sanitizedHistory.
+*
+* The trusted snapshot history and the historical
+* research dataset are independent data sources.
+*/
 
 /* ===================================================
-CONTEXT META
-=================================================== */
+* CONTEXT META
+* =================================================== */
 
 const context:
 AIResearchContext = {
@@ -359,10 +372,9 @@ question,
 
 };
 
-
 /* ===================================================
-RETURN
-=================================================== */
+* RETURN
+* =================================================== */
 
 return {
 
@@ -389,6 +401,23 @@ positioning,
 }
 : {}),
 
+/*
+* Historical evidence remains a separate,
+* optional research input.
+*
+* The evidence is passed through unchanged.
+*
+* No historical statistics are recalculated
+* or interpreted at the context level.
+*/
+
+...(historicalEvidence
+? {
+historicalEvidence,
+}
+: {}),
+
 };
 
 }
+
