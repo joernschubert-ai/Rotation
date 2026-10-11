@@ -57,10 +57,9 @@ export function marketEngine(
     data?.historicalScenario === true &&
     data?.historicalScenarioInput?.historicalScenario === true;
 
-  const historicalInput =
-    isHistoricalScenario
-      ? data.historicalScenarioInput
-      : null;
+  const historicalInput = isHistoricalScenario
+    ? data.historicalScenarioInput
+    : null;
 
   /* =====================================================
   DRIVERS / STRUCTURE
@@ -118,11 +117,8 @@ export function marketEngine(
     return finiteValue(value) ?? fallback;
   }
 
-  /*
-   * System Heat uses -2..+2.
-   * Execution stress uses 0..10.
-   * Only the negative side contributes stress.
-   */
+  // Heat -2..0 maps to stress 10..0.
+  // Positive heat contributes no execution stress.
   function executionStress(heat: any): number {
     const value = finiteOr(heat, 0);
     return Math.max(0, Math.min(10, -value * 5));
@@ -230,7 +226,7 @@ export function marketEngine(
 
   /* =====================================================
   HISTORICAL COMPARISONS
-  Missing history remains undefined.
+  Missing values remain undefined.
   ===================================================== */
 
   const breadth20_5dAgo = getHistorySeriesValue(
@@ -495,12 +491,18 @@ export function marketEngine(
   });
 
   /* =====================================================
-  INTERNAL DIVERGENCE / GAMMA
+  INTERNAL DIVERGENCE
+
+  spxMomentum is the signed SPX 5D percentage change.
+  Do not pass the aggregate 0..100 price score here.
   ===================================================== */
 
   const internalDivergence = internalDivergenceEngine({
-    spxTrend: Number(breadthVelocity?.slopes?.spxSlope5d ?? 0),
-    spxMomentum: Number(priceMomentum?.score ?? 0),
+    spxTrend:
+      Number(breadthVelocity?.slopes?.spxSlope5d ?? 0),
+
+    spxMomentum:
+      finiteOr(priceMomentum?.spx?.momentum5D, 0),
 
     breadth20,
     breadth50,
@@ -528,6 +530,10 @@ export function marketEngine(
     vix,
     gammaExposure: Number(data.gammaExposure ?? 0)
   });
+
+  /* =====================================================
+  GAMMA
+  ===================================================== */
 
   const gamma = gammaEngine({
     gammaExposure: Number(data.gammaExposure ?? 0),
@@ -805,10 +811,6 @@ export function marketEngine(
 
   /* =====================================================
   SYSTEM HEAT — PRELIMINARY
-
-  Rotation Decay and final Fragility are not available
-  yet. Use existing structural results and fragilityPre.
-  Keep the explicit preliminary decay placeholder.
   ===================================================== */
 
   const systemHeatPre = systemHeatEngine({
@@ -819,11 +821,9 @@ export function marketEngine(
     breadthThrust,
     fragility: fragilityPre,
     rotationDecayScore: 0,
-
     breadth20,
     breadth50,
     vix,
-
     marketLiquidityScore: data.marketLiquidityScore,
     creditRatio: data.creditRatio,
     vixTermRatio: data.vixTermRatio,
@@ -877,9 +877,7 @@ export function marketEngine(
     regimeSignal: phase ?? "NEUTRAL",
     crashProbability: Number(crash?.probability ?? 0),
     dangerScore: Number(dangerZone?.score ?? 0),
-
     stressScore: executionStress(systemHeatPre?.value),
-
     rotationSignal: rotation?.signal ?? "neutral",
     rotationStrength: Number(rotation?.score ?? 0),
     breadth200,
@@ -1039,9 +1037,6 @@ export function marketEngine(
 
   /* =====================================================
   SYSTEM HEAT — FINAL
-
-  All required structural results are available here.
-  Preliminary upstream calculations are not rerun.
   ===================================================== */
 
   const systemHeat = systemHeatEngine({
@@ -1049,14 +1044,12 @@ export function marketEngine(
     breadth20,
     breadth50,
     vix,
-
     liquidity,
     participation,
     rotation,
     breadthThrust,
     fragility,
     rotationDecay,
-
     marketLiquidityScore: data.marketLiquidityScore,
     creditRatio: data.creditRatio,
     vixTermRatio: data.vixTermRatio,
@@ -1307,9 +1300,7 @@ export function marketEngine(
     regimeSignal: phase ?? "NEUTRAL",
     crashProbability: Number(crash?.probability ?? 0),
     dangerScore: Number(dangerZone?.score ?? 0),
-
     stressScore: executionStress(systemHeat?.value),
-
     rotationSignal: rotation?.signal ?? "neutral",
     rotationStrength: Number(rotation?.score ?? 0),
     breadth200,
