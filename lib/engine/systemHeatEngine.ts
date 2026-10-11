@@ -1,938 +1,608 @@
-// /lib/engine/systemHeat.ts
+// /lib/engine/systemHeatEngine.ts
 
 export function systemHeatEngine(data: any) {
+  /* =====================================================
+  INPUTS
+  ===================================================== */
+
+  const breadth50 = readNumber(
+    50,
+    data.breadth50
+  );
+
+  const breadth20 = readNumber(
+    50,
+    data.breadth20
+  );
+
+  const liquidityScore = readNumber(
+    50,
+    data.marketLiquidityScore,
+    data.liquidity?.score
+  );
+
+  /* =====================================================
+  INSTITUTIONAL QUALITY
+  ===================================================== */
+
+  const participationScore = readNumber(
+    50,
+    data.participationScore,
+    data.participation?.score
+  );
+
+  const breadthThrustScore = readNumber(
+    50,
+    data.breadthThrustScore,
+    data.breadthThrust?.score
+  );
+
+  const rotationScore = readNumber(
+    50,
+    data.rotationScore,
+    data.rotation?.score
+  );
+
+  const rotationDecayScore = readNumber(
+    0,
+    data.rotationDecayScore,
+    data.rotationDecay?.score
+  );
+
+  const fragilityScore = readNumber(
+    50,
+    data.fragilityScore,
+    data.fragility?.score
+  );
+
+  /* =====================================================
+  RISK INPUTS
+  ===================================================== */
+
+  const crashScore = readNumber(
+    0,
+    data.crash?.score
+  );
+
+  const crashProbability = readNumber(
+    0,
+    data.crash?.probability
+  );
+
+  /* =====================================================
+  MARKET DRIVERS
+  ===================================================== */
+
+  const vix = readPositive(
+    20,
+    data.vix
+  );
+
+  const credit = readNumber(
+    0.85,
+    data.creditRatio
+  );
+
+  /*
+   * Backend definition:
+   *
+   * vixTermRatio = VIX / VIX3M
+   *
+   * The backend returns zero when VIX3M is unavailable.
+   * A nonpositive ratio therefore receives the neutral
+   * fallback instead of being interpreted as supportive.
+   */
+
+  const vixTerm = readPositive(
+    1,
+    data.vixTermRatio
+  );
+
+  const gamma = readNumber(
+    0,
+    data.gammaExposure
+  );
 
-/* =====================================================
-INPUTS
-===================================================== */
+  /* =====================================================
+  BREADTH MOMENTUM
+  ===================================================== */
 
-const breadth50 =
-Number(data.breadth50 ?? 50);
+  const breadthMomentumRaw =
+    (breadth20 + breadth50) / 2;
 
-const breadth20 =
-Number(data.breadth20 ?? 50);
+  /* =====================================================
+  NORMALIZED COMPONENTS
+  ALL COMPONENTS USE -2 TO +2 SPACE
+  ===================================================== */
 
+  const momentum =
+    normalizeScore(breadthMomentumRaw);
 
-const liquidityScore =
-Number(
-data.marketLiquidityScore ??
-data.liquidity?.score ??
-50
-);
+  const breadth =
+    normalizeScore(breadth50);
 
+  const liquidity =
+    normalizeScore(liquidityScore);
 
-/* =====================================================
-INSTITUTIONAL QUALITY
-===================================================== */
+  const participation =
+    normalizeScore(participationScore);
 
-const participationScore =
-Number(
-data.participationScore ??
-data.participation?.score ??
-50
-);
+  const rotation =
+    normalizeScore(rotationScore);
 
+  const thrust =
+    normalizeScore(breadthThrustScore);
 
-const breadthThrustScore =
-Number(
-data.breadthThrustScore ??
-data.breadthThrust?.score ??
-50
-);
+  // Higher risk scores produce negative contributions.
 
+  const crashRisk =
+    normalizeScore(100 - crashScore);
 
-const rotationScore =
-Number(
-data.rotationScore ??
-data.rotation?.score ??
-50
-);
+  const fragility =
+    normalizeScore(100 - fragilityScore);
 
+  const rotationDecay =
+    normalizeScore(100 - rotationDecayScore);
 
-const rotationDecayScore =
-Number(
-data.rotationDecayScore ??
-data.rotationDecay?.score ??
-0
-);
+  /* =====================================================
+  VOLATILITY
+  ===================================================== */
 
+  const vixClamped = clamp(
+    vix,
+    10,
+    45
+  );
 
-const fragilityScore =
-Number(
-data.fragilityScore ??
-data.fragility?.score ??
-50
-);
-
-
-/* =====================================================
-RISK INPUTS
-===================================================== */
-
-const crashScore =
-Number(
-data.crash?.score ??
-0
-);
-
-
-const crashProbability =
-Number(
-data.crash?.probability ??
-0
-);
-
-
-/* =====================================================
-MARKET DRIVERS
-===================================================== */
-
-const vix =
-Number(
-data.vix ??
-20
-);
-
-
-const credit =
-Number(
-data.creditRatio ??
-0.85
-);
-
-
-const vixTerm =
-Number(
-data.vixTermRatio ??
-1
-);
-
-
-const gamma =
-Number(
-data.gammaExposure ??
-0
-);
-
-
-/* =====================================================
-BREADTH MOMENTUM
-===================================================== */
-
-const breadthMomentumRaw =
-(breadth20 + breadth50) / 2;
-
-
-/* =====================================================
-NORMALIZED COMPONENTS
-ALL COMPONENTS USE -2 TO +2 SPACE
-===================================================== */
-
-const momentum =
-normalizeScore(
-breadthMomentumRaw
-);
-
-
-const breadth =
-normalizeScore(
-breadth50
-);
-
-
-const liquidity =
-normalizeScore(
-liquidityScore
-);
-
-
-const participation =
-normalizeScore(
-participationScore
-);
-
-
-const rotation =
-normalizeScore(
-rotationScore
-);
-
-
-const thrust =
-normalizeScore(
-breadthThrustScore
-);
-
-
-/*
-High crash score = negative environment
-*/
-
-const crashRisk =
-normalizeScore(
-100 - crashScore
-);
-
-
-/*
-High fragility = negative environment
-*/
-
-const fragility =
-normalizeScore(
-100 - fragilityScore
-);
-
-
-/*
-Rotation decay is inverse.
-
-High decay = negative.
-*/
-
-const rotationDecay =
-normalizeScore(
-100 - rotationDecayScore
-);
-
-
-/* =====================================================
-VOLATILITY
-===================================================== */
-
-const vixClamped =
-clamp(
-vix,
-10,
-45
-);
-
-
-/*
-VIX 10 = very positive
-VIX 45 = very negative
-*/
-
-const volatility =
-clamp(
-2 -
-(
-(vixClamped - 10) /
-35
-) * 4,
--2,
-2
-);
-
-
-/* =====================================================
-CREDIT
-===================================================== */
-
-/*
-Assumption:
-
-creditRatio around:
-0.70 = weak
-0.85 = neutral
-1.00 = strong
-
-We deliberately normalize around 0.85.
-*/
-
-const creditScore =
-clamp(
-(
-credit - 0.85
-) * 8,
--2,
-2
-);
-
-
-/* =====================================================
-VIX TERM STRUCTURE
-===================================================== */
-
-let termScore = 0;
-
-
-/*
-Backwardation / stress
-*/
-
-if (
-vixTerm < 0.90
-) {
-
-termScore = -2;
-
+  const volatility = clamp(
+    2 - ((vixClamped - 10) / 35) * 4,
+    -2,
+    2
+  );
+
+  /* =====================================================
+  CREDIT
+
+  Existing normalization retained.
+  The underlying credit-ratio scale will be checked
+  separately during the adapter audit.
+  ===================================================== */
+
+  const creditScore = clamp(
+    (credit - 0.85) * 8,
+    -2,
+    2
+  );
+
+  /* =====================================================
+  VIX TERM STRUCTURE
+
+  Backend boundaries for VIX / VIX3M:
+
+  < 0.90       supportive
+  0.90–<1.05   neutral
+  1.05–<1.15   stress
+  >= 1.15      severe stress
+  ===================================================== */
+
+  let termScore = 0;
+
+  if (vixTerm >= 1.15) {
+    termScore = -2;
+  } else if (vixTerm >= 1.05) {
+    termScore = -1;
+  } else if (vixTerm < 0.90) {
+    termScore = 2;
+  }
+
+  const termStress =
+    vixTerm >= 1.05;
+
+  /* =====================================================
+  GAMMA
+  ===================================================== */
+
+  let gammaScore = 0;
+
+  if (gamma > 0) {
+    gammaScore = 1;
+  } else if (gamma < 0) {
+    gammaScore = -1;
+  }
+
+  /* =====================================================
+  BASE SYSTEM HEAT
+  Existing weights retained.
+  ===================================================== */
+
+  let heat =
+    momentum * 0.10 +
+    breadth * 0.10 +
+    liquidity * 0.12 +
+
+    participation * 0.18 +
+    rotation * 0.15 +
+    thrust * 0.08 +
+
+    crashRisk * 0.10 +
+    fragility * 0.08 +
+    rotationDecay * 0.05 +
+
+    volatility * 0.02 +
+    creditScore * 0.01 +
+    termScore * 0.005 +
+    gammaScore * 0.005;
+
+  /* =====================================================
+  STRUCTURAL QUALITY
+  ===================================================== */
+
+  const strongInstitutionalStructure =
+    participationScore >= 60 &&
+    rotationScore >= 55 &&
+    breadthThrustScore >= 55;
+
+  const weakInstitutionalStructure =
+    participationScore < 45 ||
+    rotationScore < 40;
+
+  const severeInstitutionalWeakness =
+    participationScore < 35 &&
+    rotationScore < 35 &&
+    breadthThrustScore < 40;
+
+  /* =====================================================
+  STRUCTURAL PENALTIES
+  ===================================================== */
+
+  if (severeInstitutionalWeakness) {
+    heat -= 0.35;
+  } else if (weakInstitutionalStructure) {
+    heat -= 0.18;
+  }
+
+  if (
+    breadth50 < 50 &&
+    participationScore < 50
+  ) {
+    heat -= 0.15;
+  }
+
+  if (rotationDecayScore >= 70) {
+    heat -= 0.18;
+  } else if (rotationDecayScore >= 55) {
+    heat -= 0.08;
+  }
+
+  /* =====================================================
+  LIQUIDITY QUALITY
+  ===================================================== */
+
+  const liquidityTrap =
+    liquidityScore >= 70 &&
+    (
+      participationScore < 45 ||
+      rotationScore < 40
+    );
+
+  if (liquidityTrap) {
+    heat -= 0.20;
+  }
+
+  if (
+    liquidityScore >= 70 &&
+    participationScore >= 60 &&
+    rotationScore >= 55
+  ) {
+    heat += 0.10;
+  }
+
+  /* =====================================================
+  VOLATILITY / GAMMA STRESS
+  ===================================================== */
+
+  const negativeGamma =
+    gamma < 0;
+
+  const doubleStress =
+    termStress &&
+    negativeGamma;
+
+  if (termStress) {
+    heat -= 0.15;
+  }
+
+  if (negativeGamma) {
+    heat -= 0.12;
+  }
+
+  if (doubleStress) {
+    heat -= 0.18;
+  }
+
+  /* =====================================================
+  CRASH OVERRIDE
+  Existing thresholds and caps retained.
+  ===================================================== */
+
+  if (crashScore >= 85) {
+    heat = Math.min(
+      heat,
+      -1.40
+    );
+  } else if (crashScore >= 75) {
+    heat = Math.min(
+      heat,
+      -0.90
+    );
+  } else if (crashProbability >= 70) {
+    heat = Math.min(
+      heat,
+      -0.60
+    );
+  }
+
+  const crashOverride =
+    crashScore >= 75 ||
+    crashProbability >= 70;
+
+  /* =====================================================
+  STRUCTURAL RISK CAP
+  ===================================================== */
+
+  const structuralCap =
+    participationScore < 45 &&
+    rotationScore < 45;
+
+  const severeStructuralCap =
+    participationScore < 35 ||
+    rotationScore < 30;
+
+  if (structuralCap) {
+    heat = Math.min(
+      heat,
+      0.25
+    );
+  }
+
+  if (severeStructuralCap) {
+    heat = Math.min(
+      heat,
+      0
+    );
+  }
+
+  /* =====================================================
+  FINAL CLAMP
+  ===================================================== */
+
+  heat = Number(
+    clamp(
+      heat,
+      -2,
+      2
+    ).toFixed(2)
+  );
+
+  /* =====================================================
+  ENVIRONMENT FLAGS
+  ===================================================== */
+
+  const bullishStructure =
+    heat >= 0.40 &&
+    participationScore >= 55 &&
+    rotationScore >= 50 &&
+    crashScore < 40;
+
+  const strongRiskOn =
+    heat >= 1.20 &&
+    participationScore >= 65 &&
+    rotationScore >= 60 &&
+    breadth50 >= 65 &&
+    crashScore < 30;
+
+  const structuralWarning =
+    heat <= -0.40 ||
+    weakInstitutionalStructure;
+
+  const riskOff =
+    heat <= -1.20 ||
+    crashScore >= 75;
+
+  /* =====================================================
+  LABEL
+  ===================================================== */
+
+  let label = "TRANSITION";
+  let state = "NEUTRAL";
+
+  if (strongRiskOn) {
+    label = "RISK ON";
+    state = "STRONG_BULLISH";
+  } else if (bullishStructure) {
+    label = "BULLISH";
+    state = "BULLISH";
+  } else if (riskOff) {
+    label = "RISK OFF";
+    state = "BEARISH";
+  } else if (structuralWarning) {
+    label = "RISK WARNING";
+    state = "DEFENSIVE";
+  }
+
+  /* =====================================================
+  RETURN
+  ===================================================== */
+
+  return {
+    value: heat,
+    label,
+    state,
+
+    components: {
+      momentum,
+      breadth,
+      liquidity,
+
+      participation,
+      rotation,
+      thrust,
+
+      crashRisk,
+      fragility,
+      rotationDecay,
+
+      volatility,
+
+      credit: creditScore,
+      term: termScore,
+      gamma: gammaScore
+    },
+
+    quality: {
+      strongInstitutionalStructure,
+      weakInstitutionalStructure,
+      severeInstitutionalWeakness,
+
+      bullishStructure,
+      strongRiskOn,
+      structuralWarning,
+      riskOff
+    },
+
+    control: {
+      crashOverride,
+      termStress,
+      negativeGamma,
+      doubleStress,
+
+      liquidityTrap,
+      structuralCap,
+      severeStructuralCap
+    },
+
+    inputs: {
+      breadth20,
+      breadth50,
+
+      liquidityScore,
+      participationScore,
+      breadthThrustScore,
+      rotationScore,
+      rotationDecayScore,
+      fragilityScore,
+
+      crashScore,
+      crashProbability,
+
+      vix,
+      credit,
+      vixTerm,
+      gamma
+    }
+  };
 }
-
-else if (
-vixTerm < 0.97
-) {
-
-termScore = -1;
-
-}
-
-else if (
-vixTerm > 1.10
-) {
-
-termScore = 1;
-
-}
-
-else if (
-vixTerm > 1.20
-) {
-
-termScore = 2;
-
-}
-
-
-/* =====================================================
-GAMMA
-===================================================== */
-
-let gammaScore = 0;
-
-
-if (
-gamma > 0
-) {
-
-gammaScore = 1;
-
-}
-
-else if (
-gamma < 0
-) {
-
-gammaScore = -1;
-
-}
-
-
-/* =====================================================
-BASE SYSTEM HEAT
-===================================================== */
-
-let heat =
-
-/* MARKET STRUCTURE */
-
-momentum * 0.10 +
-
-breadth * 0.10 +
-
-liquidity * 0.12 +
-
-
-/* INSTITUTIONAL QUALITY */
-
-participation * 0.18 +
-
-rotation * 0.15 +
-
-thrust * 0.08 +
-
-
-/* RISK */
-
-crashRisk * 0.10 +
-
-fragility * 0.08 +
-
-rotationDecay * 0.05 +
-
-
-/* SECONDARY MARKET CONDITIONS */
-
-volatility * 0.02 +
-
-creditScore * 0.01 +
-
-termScore * 0.005 +
-
-gammaScore * 0.005;
-
-
-/* =====================================================
-STRUCTURAL QUALITY
-===================================================== */
-
-const strongInstitutionalStructure =
-
-participationScore >= 60 &&
-
-rotationScore >= 55 &&
-
-breadthThrustScore >= 55;
-
-
-const weakInstitutionalStructure =
-
-participationScore < 45 ||
-
-rotationScore < 40;
-
-
-const severeInstitutionalWeakness =
-
-participationScore < 35 &&
-
-rotationScore < 35 &&
-
-breadthThrustScore < 40;
-
-
-/* =====================================================
-STRUCTURAL PENALTIES
-===================================================== */
-
-if (
-severeInstitutionalWeakness
-) {
-
-heat -= 0.35;
-
-}
-
-
-else if (
-weakInstitutionalStructure
-) {
-
-heat -= 0.18;
-
-}
-
-
-if (
-breadth50 < 50 &&
-participationScore < 50
-) {
-
-heat -= 0.15;
-
-}
-
-
-if (
-rotationDecayScore >= 70
-) {
-
-heat -= 0.18;
-
-}
-
-
-else if (
-rotationDecayScore >= 55
-) {
-
-heat -= 0.08;
-
-}
-
-
-/* =====================================================
-LIQUIDITY QUALITY
-===================================================== */
-
-/*
-High liquidity alone is NOT bullish.
-
-If participation/rotation are weak,
-liquidity can mask internal deterioration.
-*/
-
-if (
-
-liquidityScore >= 70 &&
-
-(
-participationScore < 45 ||
-rotationScore < 40
-)
-
-) {
-
-heat -= 0.20;
-
-}
-
-
-/*
-Genuine positive liquidity environment
-*/
-
-if (
-
-liquidityScore >= 70 &&
-
-participationScore >= 60 &&
-
-rotationScore >= 55
-
-) {
-
-heat += 0.10;
-
-}
-
-
-/* =====================================================
-VOLATILITY / GAMMA STRESS
-===================================================== */
-
-if (
-vixTerm < 0.95
-) {
-
-heat -= 0.15;
-
-}
-
-
-if (
-gamma < 0
-) {
-
-heat -= 0.12;
-
-}
-
-
-if (
-
-vixTerm < 0.95 &&
-
-gamma < 0
-
-) {
-
-heat -= 0.18;
-
-}
-
-
-/* =====================================================
-CRASH OVERRIDE
-===================================================== */
-
-if (
-crashScore >= 85
-) {
-
-heat =
-Math.min(
-heat,
--1.40
-);
-
-}
-
-
-else if (
-crashScore >= 75
-) {
-
-heat =
-Math.min(
-heat,
--0.90
-);
-
-}
-
-
-else if (
-crashProbability >= 70
-) {
-
-heat =
-Math.min(
-heat,
--0.60
-);
-
-}
-
-
-/* =====================================================
-STRUCTURAL RISK CAP
-
-Important:
-
-Weak participation + weak rotation
-must not produce a bullish System Heat
-just because liquidity/VIX look good.
-===================================================== */
-
-if (
-
-participationScore < 45 &&
-
-rotationScore < 45
-
-) {
-
-heat =
-Math.min(
-heat,
-0.25
-);
-
-}
-
-
-if (
-
-participationScore < 35 ||
-
-rotationScore < 30
-
-) {
-
-heat =
-Math.min(
-heat,
-0
-);
-
-}
-
-
-/* =====================================================
-FINAL CLAMP
-===================================================== */
-
-heat =
-clamp(
-heat,
--2,
-2
-);
-
-
-heat =
-Number(
-heat.toFixed(2)
-);
-
-
-/* =====================================================
-ENVIRONMENT FLAGS
-===================================================== */
-
-const bullishStructure =
-
-heat >= 0.40 &&
-
-participationScore >= 55 &&
-
-rotationScore >= 50 &&
-
-crashScore < 40;
-
-
-const strongRiskOn =
-
-heat >= 1.20 &&
-
-participationScore >= 65 &&
-
-rotationScore >= 60 &&
-
-breadth50 >= 65 &&
-
-crashScore < 30;
-
-
-const structuralWarning =
-
-heat <= -0.40 ||
-
-weakInstitutionalStructure;
-
-
-const riskOff =
-
-heat <= -1.20 ||
-
-crashScore >= 75;
-
-
-/* =====================================================
-LABEL
-===================================================== */
-
-let label =
-"TRANSITION";
-
-
-let state =
-"NEUTRAL";
-
-
-if (
-strongRiskOn
-) {
-
-label =
-"RISK ON";
-
-state =
-"STRONG_BULLISH";
-
-}
-
-
-else if (
-bullishStructure
-) {
-
-label =
-"BULLISH";
-
-state =
-"BULLISH";
-
-}
-
-
-else if (
-riskOff
-) {
-
-label =
-"RISK OFF";
-
-state =
-"BEARISH";
-
-}
-
-
-else if (
-structuralWarning
-) {
-
-label =
-"RISK WARNING";
-
-state =
-"DEFENSIVE";
-
-}
-
-
-else {
-
-label =
-"TRANSITION";
-
-state =
-"NEUTRAL";
-
-}
-
-
-/* =====================================================
-RETURN
-===================================================== */
-
-return {
-
-value:
-heat,
-
-label,
-
-state,
-
-
-/* =================================================
-COMPONENTS
-================================================= */
-
-components: {
-
-momentum,
-
-breadth,
-
-liquidity,
-
-participation,
-
-rotation,
-
-thrust,
-
-crashRisk,
-
-fragility,
-
-rotationDecay,
-
-volatility,
-
-credit:
-creditScore,
-
-term:
-termScore,
-
-gamma:
-gammaScore
-
-},
-
-
-/* =================================================
-QUALITY
-================================================= */
-
-quality: {
-
-strongInstitutionalStructure,
-
-weakInstitutionalStructure,
-
-severeInstitutionalWeakness,
-
-bullishStructure,
-
-strongRiskOn,
-
-structuralWarning,
-
-riskOff
-
-},
-
-
-/* =================================================
-CONTROL
-================================================= */
-
-control: {
-
-crashOverride:
-crashScore >= 75,
-
-termStress:
-vixTerm < 0.95,
-
-negativeGamma:
-gamma < 0,
-
-doubleStress:
-vixTerm < 0.95 &&
-gamma < 0,
-
-liquidityTrap:
-
-liquidityScore >= 70 &&
-
-(
-participationScore < 45 ||
-rotationScore < 40
-),
-
-structuralCap:
-
-participationScore < 45 &&
-rotationScore < 45,
-
-severeStructuralCap:
-
-participationScore < 35 ||
-rotationScore < 30
-
-},
-
-
-/* =================================================
-RAW INPUTS
-================================================= */
-
-inputs: {
-
-breadth20,
-
-breadth50,
-
-liquidityScore,
-
-participationScore,
-
-breadthThrustScore,
-
-rotationScore,
-
-rotationDecayScore,
-
-fragilityScore,
-
-crashScore,
-
-crashProbability,
-
-vix,
-
-credit,
-
-vixTerm,
-
-gamma
-
-}
-
-};
-
-}
-
 
 /* =====================================================
 HELPERS
 ===================================================== */
 
-function normalizeScore(
-value: number
-) {
+function finiteValue(value: any): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value)
+      ? value
+      : null;
+  }
 
-return clamp(
-(
-(value - 50) /
-50
-) * 2,
--2,
-2
-);
+  if (
+    typeof value === "string" &&
+    value.trim() !== ""
+  ) {
+    const parsed = Number(value);
 
+    return Number.isFinite(parsed)
+      ? parsed
+      : null;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    const candidates = [
+      value.value,
+      value.score,
+      value.current
+    ];
+
+    for (const candidate of candidates) {
+      if (
+        typeof candidate !== "number" &&
+        typeof candidate !== "string"
+      ) {
+        continue;
+      }
+
+      const parsed = finiteValue(candidate);
+
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
 }
 
+function readNumber(
+  fallback: number,
+  ...values: any[]
+): number {
+  for (const value of values) {
+    const parsed = finiteValue(value);
+
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+function readPositive(
+  fallback: number,
+  ...values: any[]
+): number {
+  for (const value of values) {
+    const parsed = finiteValue(value);
+
+    if (
+      parsed !== null &&
+      parsed > 0
+    ) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+function normalizeScore(value: number): number {
+  return clamp(
+    ((value - 50) / 50) * 2,
+    -2,
+    2
+  );
+}
 
 function clamp(
-value: number,
-min: number,
-max: number
-) {
-
-return Math.max(
-min,
-Math.min(
-max,
-value
-)
-);
-
+  value: number,
+  min: number,
+  max: number
+): number {
+  return Math.max(
+    min,
+    Math.min(max, value)
+  );
 }
