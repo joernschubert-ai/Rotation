@@ -1,47 +1,21 @@
 // /lib/engine/confidenceEngine.ts
 
-/* =====================================================
-NUMERIC HELPERS
-===================================================== */
-
 function finiteNumber(value: any): number | null {
   if (typeof value === "number") {
-    return Number.isFinite(value)
-      ? value
-      : null;
+    return Number.isFinite(value) ? value : null;
   }
 
-  if (
-    typeof value === "string" &&
-    value.trim() !== ""
-  ) {
+  if (typeof value === "string" && value.trim() !== "") {
     const parsed = Number(value);
-
-    return Number.isFinite(parsed)
-      ? parsed
-      : null;
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   return null;
 }
 
-function numberOr(
-  value: any,
-  fallback: number
-): number {
+function numberOr(value: any, fallback: number): number {
   return finiteNumber(value) ?? fallback;
 }
-
-/* =====================================================
-ENGINE
-
-This score measures risk confirmation.
-
-Higher score = stronger risk evidence.
-
-It is not a calibrated probability and not
-direction-neutral execution confidence.
-===================================================== */
 
 export function confidenceEngine(engine: any) {
   if (!engine) {
@@ -51,9 +25,13 @@ export function confidenceEngine(engine: any) {
     };
   }
 
-  /* ===================================================
-  CORE INPUT VALIDITY
-  =================================================== */
+  /*
+   * Risk-confirmation score:
+   * Higher values mean stronger risk evidence.
+   *
+   * This is not a calibrated probability or
+   * direction-neutral execution confidence.
+   */
 
   const rotationScore =
     finiteNumber(engine.rotation?.score ?? 0);
@@ -61,19 +39,12 @@ export function confidenceEngine(engine: any) {
   const structuralRisk =
     finiteNumber(engine.structuralRisk ?? 0);
 
-  if (
-    rotationScore === null ||
-    structuralRisk === null
-  ) {
+  if (rotationScore === null || structuralRisk === null) {
     return {
       state: "INVALID",
       score: 0
     };
   }
-
-  /* ===================================================
-  SAFE INPUTS
-  =================================================== */
 
   const crashProbability =
     numberOr(engine.crash?.probability, 0);
@@ -119,12 +90,9 @@ export function confidenceEngine(engine: any) {
   const riskOffRotation =
     signal === "RISK_OFF_ROTATION";
 
-  /* ===================================================
-  DIRECTIONAL CONFIRMATION
-
-  Current directional states take precedence.
-  Legacy confirmation requires bearish context.
-  =================================================== */
+  /* =====================================================
+  CONFIRMATION DIRECTION
+  ===================================================== */
 
   const bearishConfirmed =
     rotationConfirmState === "BEARISH_CONFIRMED" ||
@@ -176,14 +144,15 @@ export function confidenceEngine(engine: any) {
 
   let score = 0;
 
-  /* ===================================================
+  /* =====================================================
   PHASE STRUCTURE
 
-  Existing phase mapping retained.
-  Current phase names are checked separately.
-  =================================================== */
+  Current phase names plus legacy aliases.
+  Existing phase weights remain unchanged.
+  ===================================================== */
 
   switch (engine.phase) {
+    case "PHASE_1_EXPANSION":
     case "PHASE_1_EUPHORIA":
       score -= 5;
       break;
@@ -204,6 +173,7 @@ export function confidenceEngine(engine: any) {
       score += 65;
       break;
 
+    case "PHASE_6_ACCELERATION":
     case "PHASE_6_PANIC":
       score += 80;
       break;
@@ -213,9 +183,9 @@ export function confidenceEngine(engine: any) {
       break;
   }
 
-  /* ===================================================
+  /* =====================================================
   ROTATION
-  =================================================== */
+  ===================================================== */
 
   if (riskOffRotation) {
     score += 20;
@@ -230,21 +200,14 @@ export function confidenceEngine(engine: any) {
         : 10;
   }
 
-  /*
-   * High confirmation quality supports its direction.
-   * Bullish quality must not increase risk confirmation.
-   */
-
-  if (
-    bearishContext &&
-    rotationQuality >= 75
-  ) {
+  // Bullish confirmation quality must not add risk evidence.
+  if (bearishContext && rotationQuality >= 75) {
     score += 5;
   }
 
-  /* ===================================================
+  /* =====================================================
   CRASH ENGINE
-  =================================================== */
+  ===================================================== */
 
   if (crashProbability > 30) {
     score += 5;
@@ -262,9 +225,9 @@ export function confidenceEngine(engine: any) {
     score += 25;
   }
 
-  /* ===================================================
+  /* =====================================================
   STRUCTURAL RISK
-  =================================================== */
+  ===================================================== */
 
   if (structuralRisk > 45) {
     score += 5;
@@ -278,9 +241,9 @@ export function confidenceEngine(engine: any) {
     score += 15;
   }
 
-  /* ===================================================
+  /* =====================================================
   ROTATION DECAY
-  =================================================== */
+  ===================================================== */
 
   if (rotationDecayScore > 25) {
     score += 10;
@@ -294,9 +257,9 @@ export function confidenceEngine(engine: any) {
     score += 20;
   }
 
-  /* ===================================================
+  /* =====================================================
   FRAGILITY
-  =================================================== */
+  ===================================================== */
 
   if (fragilityScore > 60) {
     score += 10;
@@ -306,9 +269,9 @@ export function confidenceEngine(engine: any) {
     score += 15;
   }
 
-  /* ===================================================
+  /* =====================================================
   LIQUIDITY
-  =================================================== */
+  ===================================================== */
 
   if (liquidityScore < 45) {
     score += 10;
@@ -318,9 +281,9 @@ export function confidenceEngine(engine: any) {
     score += 15;
   }
 
-  /* ===================================================
+  /* =====================================================
   PARTICIPATION
-  =================================================== */
+  ===================================================== */
 
   if (participationScore < 55) {
     score += 5;
@@ -334,9 +297,9 @@ export function confidenceEngine(engine: any) {
     score += 15;
   }
 
-  /* ===================================================
+  /* =====================================================
   SQUEEZE / FALSE BREAK
-  =================================================== */
+  ===================================================== */
 
   if (squeezeRisk >= 70) {
     score += 10;
@@ -350,9 +313,9 @@ export function confidenceEngine(engine: any) {
     score += 15;
   }
 
-  /* ===================================================
+  /* =====================================================
   POSITIVE STRUCTURE OFFSETS
-  =================================================== */
+  ===================================================== */
 
   if (
     breadthThrust &&
@@ -362,11 +325,7 @@ export function confidenceEngine(engine: any) {
     score -= 10;
   }
 
-  /*
-   * Bearish confirmation quality is not a bullish
-   * structural offset.
-   */
-
+  // Bearish confirmation quality is not a positive offset.
   if (
     bullishContext &&
     rotationQuality >= 80 &&
@@ -376,21 +335,25 @@ export function confidenceEngine(engine: any) {
     score -= 10;
   }
 
-  /* ===================================================
-  CLAMP / STATE
-  =================================================== */
+  /* =====================================================
+  CLAMP
+  ===================================================== */
 
   score = Math.max(
     0,
     Math.min(100, Math.round(score))
   );
 
+  /* =====================================================
+  STATE / RETURN
+  ===================================================== */
+
   const state =
     score < 25
       ? "EARLY"
       : score < 55
-      ? "BUILDING"
-      : "CONFIRMED";
+        ? "BUILDING"
+        : "CONFIRMED";
 
   return {
     state,
