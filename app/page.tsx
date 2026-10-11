@@ -296,6 +296,23 @@ marketEngine(
 mappedWithHistory
 );
 
+/* ===================================================
+TEMPORÄRE DIAGNOSE: CONFIDENCE / EXECUTION STATE
+Nach Abschluss der Fehlersuche entfernen.
+=================================================== */
+
+console.log("TEMP CONFIDENCE / EXECUTION STATE CHECK", {
+confidence: e.confidence,
+executionState: e.executionState,
+executionStateConfidence: e.executionState?.confidence,
+executionStateConfidenceIsFinite:
+Number.isFinite(e.executionState?.confidence),
+internalDivergence: e.internalDivergence,
+executionStatePre: e.executionStatePre
+});
+
+/* ENDE TEMPORÄRE DIAGNOSE */
+
 
 /*
 * Diagnostics for the newly integrated
