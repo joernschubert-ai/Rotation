@@ -1,159 +1,307 @@
+// /lib/adapters/mapBackendToEngine.ts
+
+/* =====================================================
+NUMERIC HELPERS
+===================================================== */
+
+function finiteNumber(value: any): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value)
+      ? value
+      : null;
+  }
+
+  if (
+    typeof value === "string" &&
+    value.trim() !== ""
+  ) {
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : null;
+  }
+
+  return null;
+}
+
+function numberOr(
+  value: any,
+  fallback: number
+): number {
+  return finiteNumber(value) ?? fallback;
+}
+
+/* =====================================================
+ADAPTER
+===================================================== */
+
 export function mapBackendToEngine(data: any) {
-if (!data) return null;
+  if (!data) return null;
 
-/* ================= INDICES ================= */
+  const marketData = data.marketData ?? {};
 
-const indices = {
+  /* ===================================================
+  INSTRUMENT HELPERS
+  =================================================== */
 
-dow: {
-value:
-data.marketData?.["^DJI"]?.current ?? 0,
+  function instrument(symbol: string) {
+    const source = marketData[symbol] ?? {};
 
-change:
-data.marketData?.["^DJI"]?.change ?? 0,
+    return {
+      value: numberOr(source.current, 0),
+      change: numberOr(source.change, 0)
+    };
+  }
 
-priceMetrics:
-data.marketData?.["^DJI"] ?? {}
-},
+  function index(symbol: string) {
+    return {
+      ...instrument(symbol),
+      priceMetrics: marketData[symbol] ?? {}
+    };
+  }
 
-ndx: {
-value:
-data.marketData?.["^NDX"]?.current ?? 0,
+  /* ===================================================
+  INDICES
+  =================================================== */
 
-change:
-data.marketData?.["^NDX"]?.change ?? 0,
+  const indices = {
+    dow: index("^DJI"),
+    ndx: index("^NDX"),
+    spx: index("^GSPC"),
+    rut: index("^RUT")
+  };
 
-priceMetrics:
-data.marketData?.["^NDX"] ?? {}
-},
+  /* ===================================================
+  FUTURES
+  =================================================== */
 
-spx: {
-value:
-data.marketData?.["^GSPC"]?.current ?? 0,
+  const futures = {
+    ym: instrument("YM=F"),
+    nq: instrument("NQ=F"),
+    es: instrument("ES=F"),
+    rty: instrument("RTY=F")
+  };
 
-change:
-data.marketData?.["^GSPC"]?.change ?? 0,
+  /* ===================================================
+  RELATIVE STRENGTH
 
-priceMetrics:
-data.marketData?.["^GSPC"] ?? {}
-},
+  Backend relative-performance differences arrive
+  as decimals.
 
-rut: {
-value:
-data.marketData?.["^RUT"]?.current ?? 0,
+  Existing centered representation:
+  0.039 -> 1.039
+  =================================================== */
 
-change:
-data.marketData?.["^RUT"]?.change ?? 0,
+  function toRatio(value: any): number {
+    const delta = finiteNumber(value);
 
-priceMetrics:
-data.marketData?.["^RUT"] ?? {}
-}
+    if (delta === null) {
+      return 1;
+    }
 
-};
+    const ratio = 1 + delta;
 
+    return Number.isFinite(ratio)
+      ? ratio
+      : 1;
+  }
 
-/* ================= FUTURES ================= */
+  const details = data.rotationDetails ?? {};
 
-const futures = {
-ym: {
-value: data.marketData?.["YM=F"]?.current ?? 0,
-change: data.marketData?.["YM=F"]?.change ?? 0,
-},
-nq: {
-value: data.marketData?.["NQ=F"]?.current ?? 0,
-change: data.marketData?.["NQ=F"]?.change ?? 0,
-},
-es: {
-value: data.marketData?.["ES=F"]?.current ?? 0,
-change: data.marketData?.["ES=F"]?.change ?? 0,
-},
-rty: {
-value: data.marketData?.["RTY=F"]?.current ?? 0,
-change: data.marketData?.["RTY=F"]?.change ?? 0,
-},
-};
+  const rsSmall =
+    toRatio(details.rsSmall20);
 
-/* ================= ROTATION ================= */
+  const rsGrowth =
+    toRatio(details.rsGrowth20);
 
-function toRatio(x: any) {
-if (typeof x !== "number" || isNaN(x)) return 1;
-return 1 + x; // Backend liefert Dezimal (0.039 = 3.9%)
-}
+  /*
+   * concentrationDivergence is:
+   *
+   * RSP return minus SPY return,
+   * expressed in percentage points.
+   *
+   * Therefore divide by 100 here.
+   */
 
-const rsSmall = toRatio(data.rotationDetails?.rsSmall20);
-const rsGrowth = toRatio(data.rotationDetails?.rsGrowth20);
+  const concentrationDivergence = numberOr(
+    details.concentrationDivergence,
+    0
+  );
 
-/* 🔥 FIX: Equal vs Mega korrekt als Ratio */
-const concentrationDivergence = Number(
-data.rotationDetails?.concentrationDivergence ?? 0
-);
+  const rsEqual =
+    1 + concentrationDivergence / 100;
 
-const rsEqual = 1 + (concentrationDivergence / 100);
+  /* ===================================================
+  CONCENTRATION NORMALIZATION
 
-const rotation = {
-rsSmall,
-rsGrowth,
-rsEqual,
-signal: data.rotationSignal ?? "none",
-strength: data.rotationStrength ?? 0,
-};
+  Backend score:
+  discrete levels 0, 1, 2, 3.
 
-/* ================= 🔥 NEW: MARKET DRIVERS INPUT ================= */
+  Engine risk scale:
+  0..100.
 
-const moveIndex = Number(data.moveIndex ?? 0); // 🔥 vorher gefehlt
-const vixTermRatio = Number(data.vixTermRatio ?? 1); // 🔥 kritisch
-const volOfVolRatio = Number(data.volOfVolRatio ?? 1);
-const skewRatio = Number(data.optionsSkewRatio ?? 100);
+  Linear mapping:
+  0 -> 0
+  1 -> 33.333...
+  2 -> 66.666...
+  3 -> 100
 
-/* ================= RETURN ================= */
+  Normalize once at this boundary.
+  Do not normalize this value again in the engines.
+  =================================================== */
 
-return {
-rotation,
+  const rawConcentration =
+    finiteNumber(details.concentrationScore);
 
-/* 🔥 CORE INPUTS */
-marketLiquidityScore: Number(data.marketLiquidityScore ?? 0),
-gammaExposure: Number(data.gammaExposure ?? 0),
-creditRatio: Number(data.creditRatio ?? 0),
+  const concentrationAvailable =
+    rawConcentration !== null &&
+    Number.isInteger(rawConcentration) &&
+    rawConcentration >= 0 &&
+    rawConcentration <= 3;
 
-/* 🔥 NEW (wichtig für Heat + Crash) */
-moveIndex,
-vixTermRatio,
-volOfVolRatio,
-skewRatio,
+  const concentrationScoreRaw =
+    concentrationAvailable
+      ? rawConcentration
+      : null;
 
-/* ================= CRASH ================= */
+  const concentrationScore =
+    concentrationScoreRaw === null
+      ? 0
+      : (concentrationScoreRaw / 3) * 100;
 
-crash: {
-score: data.marketStressScore ?? 0,
-probability: data.crashProbability ?? 0,
-momentum: data.crashMomentum ?? 0,
-},
+  /* ===================================================
+  ROTATION
+  =================================================== */
 
-/* ================= BREADTH ================= */
+  const rotation = {
+    rsSmall,
+    rsGrowth,
+    rsEqual,
 
-breadth20: data.breadth20 ?? 0,
-breadth50: data.breadth50 ?? 0,
-breadth200: data.breadth200 ?? 0,
+    signal:
+      data.rotationSignal ?? "none",
 
-advanceDecline: data.advanceDecline ?? 0,
-advances: data.advances ?? 0,
-declines: data.declines ?? 0,
+    strength:
+      numberOr(data.rotationStrength, 0)
+  };
 
-newHighs: data.newHighs ?? 0,
-newLows: data.newLows ?? 0,
+  /* ===================================================
+  MARKET DRIVERS
 
-distributionScore: data.distributionScore ?? 0,
-concentrationScore: data.rotationDetails?.concentrationScore ?? 0,
+  Existing fallback values and ratio units retained.
+  =================================================== */
 
-correlationScore: data.correlationScore ?? 0,
+  const moveIndex =
+    numberOr(data.moveIndex, 0);
 
-liquidityVacuumScore: data.liquidityVacuumScore ?? 0,
+  const vixTermRatio =
+    numberOr(data.vixTermRatio, 1);
 
-marketData: data.marketData ?? {},
+  const volOfVolRatio =
+    numberOr(data.volOfVolRatio, 1);
 
-indices,
-futures,
-historyMetrics:
-data.historyMetrics ?? {},
-};
+  const skewRatio =
+    numberOr(data.optionsSkewRatio, 100);
+
+  /* ===================================================
+  RETURN
+  =================================================== */
+
+  return {
+    rotation,
+
+    /* CORE INPUTS */
+
+    marketLiquidityScore:
+      numberOr(data.marketLiquidityScore, 0),
+
+    gammaExposure:
+      numberOr(data.gammaExposure, 0),
+
+    creditRatio:
+      numberOr(data.creditRatio, 0),
+
+    /* MARKET DRIVERS */
+
+    moveIndex,
+    vixTermRatio,
+    volOfVolRatio,
+    skewRatio,
+
+    /* CRASH */
+
+    crash: {
+      score:
+        numberOr(data.marketStressScore, 0),
+
+      probability:
+        numberOr(data.crashProbability, 0),
+
+      momentum:
+        numberOr(data.crashMomentum, 0)
+    },
+
+    /* BREADTH */
+
+    breadth20:
+      numberOr(data.breadth20, 0),
+
+    breadth50:
+      numberOr(data.breadth50, 0),
+
+    breadth200:
+      numberOr(data.breadth200, 0),
+
+    /* ADVANCE / DECLINE */
+
+    advanceDecline:
+      numberOr(data.advanceDecline, 0),
+
+    advances:
+      numberOr(data.advances, 0),
+
+    declines:
+      numberOr(data.declines, 0),
+
+    /* HIGHS / LOWS */
+
+    newHighs:
+      numberOr(data.newHighs, 0),
+
+    newLows:
+      numberOr(data.newLows, 0),
+
+    /* DISTRIBUTION / CONCENTRATION */
+
+    distributionScore:
+      numberOr(data.distributionScore, 0),
+
+    concentrationScore,
+    concentrationScoreRaw,
+
+    concentrationMeta: {
+      sourceScale: "0..3",
+      targetScale: "0..100",
+      sourceAvailable: concentrationAvailable,
+      normalization: "raw / 3 * 100"
+    },
+
+    /* OTHER STRUCTURAL INPUTS */
+
+    correlationScore:
+      numberOr(data.correlationScore, 0),
+
+    liquidityVacuumScore:
+      numberOr(data.liquidityVacuumScore, 0),
+
+    /* MARKET REFERENCES */
+
+    marketData,
+    indices,
+    futures,
+
+    historyMetrics:
+      data.historyMetrics ?? {}
+  };
 }
