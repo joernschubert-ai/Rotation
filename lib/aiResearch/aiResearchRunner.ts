@@ -10,6 +10,10 @@ import {
 loadAIResearchHistoricalEvidence,
 } from "./aiResearchHistoricalEvidenceService";
 
+import {
+enrichAIResearchWithHistoricalEvidence,
+} from "./aiResearchHistoricalEvidenceReport";
+
 import type {
 AIResearchResult,
 AIResearchTask,
@@ -24,71 +28,38 @@ INPUT
 ===================================================== */
 
 export interface RunAIResearchFromHistoryInput {
-
-task:
-AIResearchTask;
-
-question?:
-string;
-
+task: AIResearchTask;
+question?: string;
 }
 
 /* =====================================================
 HISTORICAL EVIDENCE FALLBACK
 ===================================================== */
 
-/*
-* Historical research is supplementary.
-*
-* A historical data failure must not prevent
-* the AI Research Agent from interpreting the
-* current market snapshot.
-*/
-
 function unavailableHistoricalEvidence(
 warning: string
 ): AIResearchHistoricalEvidence {
 
 return {
-
 asOfDate: null,
-
 firstDate: null,
-
 lastDate: null,
-
 status: "NOT_AVAILABLE",
-
 currentStates: [],
-
 observations: [],
 
 diagnostics: {
-
 totalHistoricalDays: 0,
-
 totalObservations: 0,
-
 totalGroups: 0,
-
 matchedCurrentStates: 0,
-
 unmatchedCurrentStates: 0,
-
 forwardOutcomesUseFuturePrices: false,
-
 historicalFeaturesAvoidLookahead: false,
-
 predictiveEdgeValidated: false,
-
-warnings: [
-warning,
-],
-
+warnings: [warning],
 },
-
 };
-
 }
 
 /* =====================================================
@@ -99,11 +70,8 @@ async function loadHistoricalEvidenceSafely():
 Promise<AIResearchHistoricalEvidence> {
 
 try {
-
 return await loadAIResearchHistoricalEvidence();
-
 } catch (error) {
-
 const message =
 error instanceof Error
 ? error.message
@@ -112,9 +80,7 @@ error instanceof Error
 return unavailableHistoricalEvidence(
 `Historical evidence unavailable: ${message}`
 );
-
 }
-
 }
 
 /* =====================================================
@@ -137,22 +103,20 @@ externalSources,
 positioningResult,
 historicalEvidence,
 ] = await Promise.all([
-
 loadMarketHistory(),
 
 fetchExternalResearchSources({
-task:
-input.task,
+task: input.task,
 }),
 
 fetchCOTData(),
 
 loadHistoricalEvidenceSafely(),
-
 ]);
 
-const historicalWarnings =
-historicalEvidence.diagnostics.warnings;
+const historicalWarnings = [
+...historicalEvidence.diagnostics.warnings,
+];
 
 /* =================================================
 * HISTORY VALIDATION
@@ -162,93 +126,50 @@ if (
 !Array.isArray(history) ||
 history.length === 0
 ) {
-
 return {
-
-status:
-"INSUFFICIENT_DATA",
-
-report:
-null,
+status: "INSUFFICIENT_DATA",
+report: null,
 
 diagnostics: {
-
-historyCount:
-0,
-
-sourceCount:
-externalSources.sources.length,
+historyCount: 0,
+sourceCount: externalSources.sources.length,
 
 warnings: [
-
 "No persisted market history available.",
-
-...externalSources
-.diagnostics
-.warnings,
-
-...positioningResult
-.diagnostics
-.warnings,
-
+...externalSources.diagnostics.warnings,
+...positioningResult.diagnostics.warnings,
 ...historicalWarnings,
-
 ],
-
 },
-
 };
-
 }
 
 /* =================================================
 * CURRENT SNAPSHOT
 * ================================================= */
 
-const currentSnapshot =
-history[0];
+const currentSnapshot = history[0];
 
 if (
 !currentSnapshot ||
 typeof currentSnapshot !== "object"
 ) {
-
 return {
-
-status:
-"INSUFFICIENT_DATA",
-
-report:
-null,
+status: "INSUFFICIENT_DATA",
+report: null,
 
 diagnostics: {
-
-historyCount:
-history.length,
-
-sourceCount:
-externalSources.sources.length,
+historyCount: history.length,
+sourceCount: externalSources.sources.length,
 
 warnings: [
-
 "Latest market history entry is invalid.",
-
-...externalSources
-.diagnostics
-.warnings,
-
-...positioningResult
-.diagnostics
-.warnings,
-
+...externalSources.diagnostics.warnings,
+...positioningResult.diagnostics.warnings,
 ...historicalWarnings,
-
 ],
-
 },
-
 };
-
 }
 
 /* =================================================
@@ -257,13 +178,9 @@ warnings: [
 
 const rankedSources =
 selectTopResearchSources(
-
 externalSources.sources,
-
 input.task,
-
 12
-
 );
 
 /* =================================================
@@ -272,151 +189,87 @@ input.task,
 
 const researchInput =
 buildAIResearchContext({
-
-snapshot:
-currentSnapshot,
-
+snapshot: currentSnapshot,
 history,
-
-task:
-input.task,
-
-question:
-input.question,
-
-sources:
-rankedSources,
-
-positioning:
-positioningResult.data,
-
-/*
-* Historical evidence is supplied as a
-* separate research input.
-*
-* It is never merged into trusted recent
-* snapshot history.
-*/
-
+task: input.task,
+question: input.question,
+sources: rankedSources,
+positioning: positioningResult.data,
 historicalEvidence,
-
 });
 
 /* =================================================
 * RUN AI RESEARCH
 * ================================================= */
 
-const result =
-runAIResearch(
-researchInput
+const result = runAIResearch(researchInput);
+
+/* =================================================
+* HISTORICAL EVIDENCE REPORT ENRICHMENT
+* ================================================= */
+
+if (
+result.status === "SUCCESS" &&
+result.report
+) {
+result.report =
+enrichAIResearchWithHistoricalEvidence(
+result.report,
+historicalEvidence
 );
+}
 
 /* =================================================
 * DIAGNOSTICS
 * ================================================= */
 
-if (
-result.diagnostics
-) {
-
+if (result.diagnostics) {
 result.diagnostics = {
-
 ...result.diagnostics,
 
-historyCount:
-history.length,
-
-sourceCount:
-rankedSources.length,
+historyCount: history.length,
+sourceCount: rankedSources.length,
 
 warnings: [
-
-...(
-result
-.diagnostics
-.warnings ?? []
-),
-
-...externalSources
-.diagnostics
-.warnings,
-
-...positioningResult
-.diagnostics
-.warnings,
-
+...(result.diagnostics.warnings ?? []),
+...externalSources.diagnostics.warnings,
+...positioningResult.diagnostics.warnings,
 ...historicalWarnings,
-
 ],
-
 };
-
 } else {
-
 result.diagnostics = {
-
 snapshotTimestamp:
-
-typeof currentSnapshot.timestamp ===
-"string"
-
+typeof currentSnapshot.timestamp === "string"
 ? currentSnapshot.timestamp
-
 : undefined,
 
-historyCount:
-history.length,
-
-sourceCount:
-rankedSources.length,
+historyCount: history.length,
+sourceCount: rankedSources.length,
 
 warnings: [
-
-...externalSources
-.diagnostics
-.warnings,
-
-...positioningResult
-.diagnostics
-.warnings,
-
+...externalSources.diagnostics.warnings,
+...positioningResult.diagnostics.warnings,
 ...historicalWarnings,
-
 ],
-
 };
-
 }
 
 return result;
 
 } catch (error) {
-
 return {
-
-status:
-"RESEARCH_ERROR",
-
-report:
-null,
+status: "RESEARCH_ERROR",
+report: null,
 
 diagnostics: {
-
 warnings: [
-
 error instanceof Error
-
 ? error.message
-
 : "Unknown AI research error",
-
 ],
-
 },
-
 };
-
 }
-
 }
 
