@@ -144,19 +144,19 @@ export function marketEngine(
     Array.isArray(historyMetrics?.history)
       ? historyMetrics.history
       : Array.isArray(data.history)
-      ? data.history
-          .filter(
-            (snapshot: any) =>
-              snapshot &&
-              typeof snapshot.timestamp === "string" &&
-              Number.isFinite(Date.parse(snapshot.timestamp))
-          )
-          .slice()
-          .sort(
-            (a: any, b: any) =>
-              Date.parse(a.timestamp) - Date.parse(b.timestamp)
-          )
-      : [];
+        ? data.history
+            .filter(
+              (snapshot: any) =>
+                snapshot &&
+                typeof snapshot.timestamp === "string" &&
+                Number.isFinite(Date.parse(snapshot.timestamp))
+            )
+            .slice()
+            .sort(
+              (a: any, b: any) =>
+                Date.parse(a.timestamp) - Date.parse(b.timestamp)
+            )
+        : [];
 
   function getHistoryValue(
     offset: number,
@@ -351,8 +351,8 @@ export function marketEngine(
         score > 1
           ? "BULLISH_DIVERGENCE"
           : score < -1
-          ? "BEARISH_DIVERGENCE"
-          : "NONE"
+            ? "BEARISH_DIVERGENCE"
+            : "NONE"
     };
   })();
 
@@ -534,13 +534,55 @@ export function marketEngine(
   });
 
   /* =====================================================
+  PERSISTENCE HISTORY
+  ===================================================== */
+
+  function persistenceHistory(metrics: any) {
+    const snapshots = Array.isArray(metrics?.history)
+      ? metrics.history
+      : metrics === historyMetrics
+        ? history
+        : [];
+
+    return {
+      breadth50History:
+        Array.isArray(metrics?.breadth50History)
+          ? metrics.breadth50History
+          : [],
+
+      breadth200History:
+        Array.isArray(metrics?.breadth200History)
+          ? metrics.breadth200History
+          : [],
+
+      participationHistory:
+        Array.isArray(metrics?.participationHistory)
+          ? metrics.participationHistory
+          : [],
+
+      rotationDecayHistory:
+        Array.isArray(metrics?.rotationDecayHistory)
+          ? metrics.rotationDecayHistory
+          : [],
+
+      internalDivergenceHistory:
+        Array.isArray(metrics?.internalDivergenceHistory)
+          ? metrics.internalDivergenceHistory
+          : snapshots.map(
+              (snapshot: any) =>
+                finiteValue(snapshot?.internalDivergence?.score)
+            )
+    };
+  }
+
+  /* =====================================================
   REGIME PERSISTENCE — PRE PHASE
   ===================================================== */
 
   const regimePersistencePre = regimePersistenceEngine({
     breadth50,
     breadth200,
-    participationScore: 50,
+    participationScore: finiteOr(participation?.score, 50),
     rotationDecayScore: 0,
     dangerScore: 0,
     fragilityScore: Number(fragilityPre?.score ?? 50),
@@ -564,7 +606,10 @@ export function marketEngine(
     rotationDecayHistory:
       Array.isArray(historyMetrics?.rotationDecayHistory)
         ? historyMetrics.rotationDecayHistory
-        : []
+        : [],
+
+    internalDivergenceHistory:
+      persistenceHistory(historyMetrics).internalDivergenceHistory
   });
 
   /* =====================================================
@@ -732,8 +777,8 @@ export function marketEngine(
           historicalInput.regimeSync.score <= 35
             ? "BREAKDOWN"
             : historicalInput.regimeSync.score >= 65
-            ? "SYNCHRONIZED"
-            : "TRANSITION"
+              ? "SYNCHRONIZED"
+              : "TRANSITION"
       }
     : null;
 
@@ -1066,8 +1111,17 @@ export function marketEngine(
     marketQuality
   });
 
-  const regimePersistence =
-    regimePersistenceEngine(historyMetrics);
+  const regimePersistence = regimePersistenceEngine({
+    ...persistenceHistory(historyMetrics),
+    breadth50,
+    breadth200,
+    participationScore: finiteOr(participation?.score, 50),
+    rotationDecayScore: finiteOr(rotationDecay?.score, 0),
+    dangerScore: finiteOr(dangerZone?.score, 0),
+    fragilityScore: finiteOr(fragility?.score, 50),
+    internalDivergenceScore: finiteOr(internalDivergence?.score, 0),
+    phase
+  });
 
   /* =====================================================
   FINAL PUT TIMING
@@ -1166,7 +1220,7 @@ export function marketEngine(
     : putTiming;
 
   /* =====================================================
-  HISTORICAL MARKET QUALITY
+  HISTORICAL MARKET QUALITY / PERSISTENCE
   ===================================================== */
 
   const masterMarketQuality = isHistoricalScenario
@@ -1190,7 +1244,17 @@ export function marketEngine(
     : phaseConfirmation;
 
   const masterRegimePersistence = isHistoricalScenario
-    ? regimePersistenceEngine(historicalInput.historyMetrics)
+    ? regimePersistenceEngine({
+        ...persistenceHistory(historicalInput.historyMetrics),
+        breadth50,
+        breadth200,
+        participationScore: finiteOr(masterParticipation?.score, 50),
+        rotationDecayScore: finiteOr(masterRotationDecay?.score, 0),
+        dangerScore: finiteOr(dangerZone?.score, 0),
+        fragilityScore: finiteOr(masterFragility?.score, 50),
+        internalDivergenceScore: finiteOr(phaseInternalDivergence?.score, 0),
+        phase
+      })
     : regimePersistence;
 
   /* =====================================================
@@ -1364,22 +1428,22 @@ export function marketEngine(
       (rotation.score ?? 0) > 60
         ? "BULLISH"
         : (rotation.score ?? 0) < 40
-        ? "BEARISH"
-        : "NEUTRAL",
+          ? "BEARISH"
+          : "NEUTRAL",
 
     crowding:
       structure?.breadth?.b50?.value > 85
         ? "CROWDED_LONG"
         : structure?.breadth?.b50?.value < 30
-        ? "CROWDED_SHORT"
-        : "BALANCED",
+          ? "CROWDED_SHORT"
+          : "BALANCED",
 
     state:
       earlyWarning?.active
         ? "FRAGILE"
         : crash?.probability > 40
-        ? "RISK"
-        : "STABLE",
+          ? "RISK"
+          : "STABLE",
 
     score: Math.round(
       Number(rotation?.score ?? 50) * 0.5 +
