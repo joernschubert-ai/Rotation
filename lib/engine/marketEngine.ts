@@ -376,7 +376,6 @@ export function marketEngine(
   const fragilityPre = fragilityEngine({
     history,
     historyMetrics,
-
     crash: {
       probability: Number(
         data.crash?.probability ??
@@ -384,7 +383,6 @@ export function marketEngine(
         0
       )
     },
-
     breadth50,
     breadth200,
     gammaExposure: Number(data.gammaExposure ?? 0),
@@ -467,25 +465,20 @@ export function marketEngine(
 
   const breadthVelocity = breadthVelocityEngine({
     structure,
-
     breadth20:
       finiteValue(structure?.breadth?.b20) ?? undefined,
     breadth20_5dAgo,
-
     breadth50:
       finiteValue(structure?.breadth?.b50) ?? undefined,
     breadth50_5dAgo,
     breadth50_10dAgo,
-
     breadth200:
       finiteValue(structure?.breadth?.b200) ?? undefined,
     breadth200_10dAgo,
     breadth200_20dAgo,
-
     advanceDecline:
       finiteValue(structure?.advanceDecline) ?? undefined,
     advanceDecline_5dAgo,
-
     spx: spxCurrent,
     spx5dAgo
   });
@@ -500,33 +493,26 @@ export function marketEngine(
   const internalDivergence = internalDivergenceEngine({
     spxTrend:
       Number(breadthVelocity?.slopes?.spxSlope5d ?? 0),
-
     spxMomentum:
       finiteOr(priceMomentum?.spx?.momentum5D, 0),
-
     breadth20,
     breadth50,
     breadth200,
-
     breadth20Slope5d:
       Number(breadthVelocity?.slopes?.b20Slope5d ?? 0),
     breadth50Slope5d:
       Number(breadthVelocity?.slopes?.b50Slope5d ?? 0),
     breadth200Slope10d:
       Number(breadthVelocity?.slopes?.b200Slope10d ?? 0),
-
     adLine: Number(structure?.advanceDecline?.value ?? 0),
     adSlope5d: Number(breadthVelocity?.slopes?.adSlope5d ?? 0),
-
     rsEqual: Number(rotationBase?.rsEqual ?? 1),
     rsSmall: Number(rotationBase?.rsSmall ?? 1),
     rsGrowth: Number(rotationBase?.rsGrowth ?? 1),
-
     participationScore: Number(participation?.score ?? 50),
     rotationScore: Number(rotationBase?.score ?? 50),
     concentrationScore: Number(data.concentrationScore ?? 50),
     liquidityScore: Number(liquidity?.score ?? 50),
-
     vix,
     gammaExposure: Number(data.gammaExposure ?? 0)
   });
@@ -771,6 +757,8 @@ export function marketEngine(
   ===================================================== */
 
   const phaseData = marketPhaseEngine({
+    breadthVelocity,
+    vix,
     crash: phaseCrash,
     rotation: phaseRotation,
     putTiming: phasePutTiming,
