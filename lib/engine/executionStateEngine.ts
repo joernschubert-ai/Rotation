@@ -1,3 +1,39 @@
+// /lib/engine/executionStateEngine.ts
+
+function finiteOr(
+  value: unknown,
+  fallback: number
+): number {
+  if (
+    typeof value !== "number" &&
+    typeof value !== "string"
+  ) {
+    return fallback;
+  }
+
+  if (
+    typeof value === "string" &&
+    value.trim() === ""
+  ) {
+    return fallback;
+  }
+
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric)
+    ? numeric
+    : fallback;
+}
+
+function booleanOr(
+  value: unknown,
+  fallback: boolean
+): boolean {
+  return typeof value === "boolean"
+    ? value
+    : fallback;
+}
+
 export interface ExecutionStateInput {
   regimeSignal?: string;
 
@@ -39,11 +75,10 @@ export interface ExecutionStateInput {
   /*
    * Optional contextual input.
    *
-   * IMPORTANT:
    * masterScore is intentionally NOT used to determine
-   * the primary market regime. This avoids a circular
-   * dependency:
+   * the primary market regime.
    *
+   * This avoids:
    * executionState -> master -> executionState
    */
   masterScore?: number;
@@ -89,9 +124,7 @@ export interface ExecutionStateOutput {
     | "EXTREME";
 
   confidence: number;
-
   regimeAlignment: boolean;
-
   summary: string;
 }
 
@@ -141,21 +174,36 @@ export function executionStateEngine(
 
   /* =====================================================
   SAFE REGIME
+
+  Accept both regime labels and current phase names.
+  Mapping matches marketPhaseEngine.regimeState.
   ===================================================== */
 
-  const regimeSignal =
+  const sourceRegimeSignal =
     typeof rawRegimeSignal === "string"
       ? rawRegimeSignal
       : "NEUTRAL";
+
+  const phaseRegimes: Record<string, string> = {
+    PHASE_1_EXPANSION: "RISK_ON",
+    PHASE_2_WARNING: "LATE_EXPANSION",
+    PHASE_3_DISTRIBUTION: "TRANSITION",
+    PHASE_4_RISK: "FRAGILE",
+    PHASE_5_BREAKDOWN: "RISK_OFF",
+    PHASE_6_ACCELERATION: "CRISIS",
+    PHASE_7_CAPITULATION: "CAPITULATION"
+  };
+
+  const regimeSignal =
+    phaseRegimes[sourceRegimeSignal] ??
+    sourceRegimeSignal;
 
   /* =====================================================
   INTERNAL DIVERGENCE
   ===================================================== */
 
   const divergenceSeverity =
-    Number(
-      internalDivergence?.score ?? 0
-    );
+    finiteOr(internalDivergence?.score, 0);
 
   const internalState =
     internalDivergence?.state ?? "NONE";
@@ -166,26 +214,42 @@ export function executionStateEngine(
   const participationCollapse =
     internalDivergence?.participationCollapse ?? false;
 
-  const internalNarrowLeadership =
-    internalDivergence?.narrowLeadership ?? false;
+  const internalNarrowLeadership = booleanOr(
+    internalDivergence?.signals?.narrowLeadership,
+    booleanOr(
+      internalDivergence?.narrowLeadership,
+      false
+    )
+  );
 
   /* =====================================================
   REGIME PERSISTENCE
+
+  Preserve explicit legacy booleans.
+  Otherwise read the current producer contract.
+
+  No inferred aliases for persistentRisk,
+  failedRecovery or bounceLikelyTemporary.
   ===================================================== */
 
   const persistenceScore =
-    Number(
-      regimePersistence?.score ?? 50
-    );
+    finiteOr(regimePersistence?.score, 50);
 
   const persistenceState =
     regimePersistence?.state ?? "NEUTRAL";
 
-  const persistentWeakness =
-    regimePersistence?.persistentWeakness ?? false;
+  const persistentWeakness = booleanOr(
+    regimePersistence?.persistentWeakness,
+    booleanOr(
+      regimePersistence?.bearishPersistence,
+      false
+    )
+  );
 
-  const persistentDistribution =
-    regimePersistence?.persistentDistribution ?? false;
+  const persistentDistribution = booleanOr(
+    regimePersistence?.persistentDistribution,
+    persistenceState === "STRUCTURAL_DISTRIBUTION"
+  );
 
   const persistentRisk =
     regimePersistence?.persistentRisk ?? false;
@@ -196,10 +260,10 @@ export function executionStateEngine(
   const bounceLikelyTemporary =
     regimePersistence?.bounceLikelyTemporary ?? false;
 
-  const recoveryConfidence =
-    Number(
-      regimePersistence?.recoveryConfidence ?? 50
-    );
+  const recoveryConfidence = finiteOr(
+    regimePersistence?.recoveryConfidence,
+    finiteOr(regimePersistence?.recoveryQuality, 50)
+  );
 
   /* =====================================================
   DIVERGENCE CLASSIFICATION
@@ -228,7 +292,7 @@ export function executionStateEngine(
     participationScore < 58;
 
   /* =====================================================
-  ROTATIONAL COMPRESSION
+  ROTATIONAL COMPRESSION / EXPANSION EXHAUSTION
   ===================================================== */
 
   const rotationalCompression =
@@ -236,10 +300,6 @@ export function executionStateEngine(
     rotationDecayScore < 65 &&
     participationScore < 58 &&
     breadth50 > 52;
-
-  /* =====================================================
-  EXPANSION EXHAUSTION
-  ===================================================== */
 
   const expansionExhaustion =
     breadth50 > 68 &&
@@ -289,19 +349,8 @@ export function executionStateEngine(
   /* =====================================================
   DEFENSIVE TRANSITION
 
-  IMPORTANT:
+  Derived from independent structural/risk inputs.
   No masterScore dependency.
-
-  This prevents:
-
-  executionState
-  ↓
-  master
-  ↓
-  executionState
-
-  Instead the transition is derived from
-  independent structural/risk information.
   ===================================================== */
 
   const defensiveTransition =
@@ -354,12 +403,8 @@ export function executionStateEngine(
   /* =====================================================
   INTERNAL BREAKDOWN
 
-  Important distinction:
-
-  weak internals + low crash probability
-  does NOT automatically mean market crash.
-
-  It means internal deterioration.
+  Weak internals with low crash probability represent
+  internal deterioration, not automatically a market crash.
   ===================================================== */
 
   const internalBreakdown =
@@ -375,17 +420,13 @@ export function executionStateEngine(
     crashProbability < 30;
 
   /* =====================================================
-  PERSISTENT DISTRIBUTION
+  PERSISTENT DISTRIBUTION / FRAGILE REGIME
   ===================================================== */
 
   const persistentDistributionRegime =
     persistentDistribution &&
     rotationDecayScore >= 38 &&
     participationScore < 58;
-
-  /* =====================================================
-  FRAGILE REGIME
-  ===================================================== */
 
   const fragileRegime =
     (
@@ -396,19 +437,10 @@ export function executionStateEngine(
     bounceLikelyTemporary;
 
   /* =====================================================
-  CRISIS / BREAKDOWN / FRAGILE
+  RISK STATE
   ===================================================== */
 
-  let riskState:
-    | "STABLE"
-    | "FRAGILE"
-    | "INTERNAL_BREAKDOWN"
-    | "BREAKDOWN"
-    | "CRISIS";
-
-  /* =====================================================
-  CRISIS
-  ===================================================== */
+  let riskState: ExecutionStateOutput["riskState"];
 
   if (
     crashProbability >= 70 ||
@@ -428,25 +460,13 @@ export function executionStateEngine(
     )
   ) {
     riskState = "CRISIS";
-  }
-
-  /* =====================================================
-  INTERNAL BREAKDOWN
-  ===================================================== */
-
-  else if (
+  } else if (
     internalBreakdown &&
     rotationDecayScore >= 50 &&
     fragilityScore < 70
   ) {
     riskState = "INTERNAL_BREAKDOWN";
-  }
-
-  /* =====================================================
-  BREAKDOWN
-  ===================================================== */
-
-  else if (
+  } else if (
     (
       crashProbability >= 40 &&
       breadth50 < 45
@@ -468,13 +488,7 @@ export function executionStateEngine(
     )
   ) {
     riskState = "BREAKDOWN";
-  }
-
-  /* =====================================================
-  FRAGILE
-  ===================================================== */
-
-  else if (
+  } else if (
     fragileRegime ||
     crashProbability >= 30 ||
     dangerScore >= 45 ||
@@ -490,23 +504,12 @@ export function executionStateEngine(
     bounceLikelyTemporary
   ) {
     riskState = "FRAGILE";
-  }
-
-  /* =====================================================
-  STABLE
-  ===================================================== */
-
-  else {
+  } else {
     riskState = "STABLE";
   }
 
   /* =====================================================
   HARD RISK STATE
-
-  Centralized because the following MARKET MODE
-  branches are evaluated after the hard-risk branch.
-  This also prevents TypeScript control-flow
-  narrowing errors.
   ===================================================== */
 
   const hardRiskOff =
@@ -535,43 +538,20 @@ export function executionStateEngine(
 
   /* =====================================================
   MARKET MODE
+
+  Existing branch priority retained.
   ===================================================== */
 
-  let marketMode:
-    | "RISK_ON"
-    | "RISK_OFF"
-    | "TRANSITION"
-    | "DEFENSIVE_TRANSITION"
-    | "AI_EXPANSION"
-    | "ROTATIONAL_STRESS"
-    | "INTERNAL_DISTRIBUTION"
-    | "VOLATILE_EXPANSION"
-    | "LATE_CYCLE_MELTUP";
-
-  /* =====================================================
-  1. HARD RISK OFF
-  ===================================================== */
+  let marketMode: ExecutionStateOutput["marketMode"];
 
   if (hardRiskOff) {
     marketMode = "RISK_OFF";
-  }
-
-  /* =====================================================
-  2. DEFENSIVE TRANSITION
-  ===================================================== */
-
-  else if (
+  } else if (
     defensiveTransition &&
     !hardRiskOff
   ) {
     marketMode = "DEFENSIVE_TRANSITION";
-  }
-
-  /* =====================================================
-  3. INTERNAL DISTRIBUTION
-  ===================================================== */
-
-  else if (
+  } else if (
     institutionalDistribution ||
     expansionExhaustion ||
     hiddenDistribution ||
@@ -588,24 +568,12 @@ export function executionStateEngine(
     )
   ) {
     marketMode = "INTERNAL_DISTRIBUTION";
-  }
-
-  /* =====================================================
-  4. ROTATIONAL STRESS
-  ===================================================== */
-
-  else if (
+  } else if (
     rotationalCompression ||
     persistentWeakness
   ) {
     marketMode = "ROTATIONAL_STRESS";
-  }
-
-  /* =====================================================
-  5. AI EXPANSION
-  ===================================================== */
-
-  else if (
+  } else if (
     aiLeadershipFragility &&
     !hardRiskOff &&
     liquidityScore >= 60 &&
@@ -613,58 +581,28 @@ export function executionStateEngine(
     !institutionalDistribution
   ) {
     marketMode = "AI_EXPANSION";
-  }
-
-  /* =====================================================
-  6. LATE CYCLE MELT-UP
-  ===================================================== */
-
-  else if (
+  } else if (
     lateCycleMeltup &&
     !hardRiskOff
   ) {
     marketMode = "LATE_CYCLE_MELTUP";
-  }
-
-  /* =====================================================
-  7. VOLATILE EXPANSION
-  ===================================================== */
-
-  else if (
+  } else if (
     volatileExpansion &&
     !hardRiskOff
   ) {
     marketMode = "VOLATILE_EXPANSION";
-  }
-
-  /* =====================================================
-  8. HEALTHY RISK ON
-  ===================================================== */
-
-  else if (
+  } else if (
     regimeSignal.includes("RISK_ON") &&
     riskState === "STABLE" &&
     healthyExpansion
   ) {
     marketMode = "RISK_ON";
-  }
-
-  /* =====================================================
-  9. RISK OFF SIGNAL
-  ===================================================== */
-
-  else if (
+  } else if (
     regimeSignal.includes("RISK_OFF") &&
     riskState !== "STABLE"
   ) {
     marketMode = "RISK_OFF";
-  }
-
-  /* =====================================================
-  10. TRANSITION
-  ===================================================== */
-
-  else {
+  } else {
     marketMode = "TRANSITION";
   }
 
@@ -672,16 +610,14 @@ export function executionStateEngine(
   TACTICAL BIAS
   ===================================================== */
 
-  let tacticalBias:
-    | "LONG_SMALL_CAPS"
-    | "LONG_TECH"
-    | "DEFENSIVE"
-    | "SHORT_INDEX"
-    | "NEUTRAL";
+  let tacticalBias: ExecutionStateOutput["tacticalBias"];
 
   if (
     marketMode === "RISK_ON" &&
-    rotationSignal === "strong_risk_on" &&
+    (
+      rotationSignal === "RISK_ON" ||
+      rotationSignal === "strong_risk_on"
+    ) &&
     rotationStrength >= 72 &&
     participationScore >= 65 &&
     liquidityScore >= 60 &&
@@ -692,30 +628,22 @@ export function executionStateEngine(
     !persistentDistribution
   ) {
     tacticalBias = "LONG_SMALL_CAPS";
-  }
-
-  else if (
+  } else if (
     marketMode === "RISK_ON" ||
     marketMode === "AI_EXPANSION" ||
     marketMode === "LATE_CYCLE_MELTUP"
   ) {
     tacticalBias = "LONG_TECH";
-  }
-
-  else if (riskState === "CRISIS") {
+  } else if (riskState === "CRISIS") {
     tacticalBias = "SHORT_INDEX";
-  }
-
-  else if (
+  } else if (
     marketMode === "RISK_OFF" ||
     marketMode === "DEFENSIVE_TRANSITION" ||
     marketMode === "INTERNAL_DISTRIBUTION" ||
     riskState === "INTERNAL_BREAKDOWN"
   ) {
     tacticalBias = "DEFENSIVE";
-  }
-
-  else {
+  } else {
     tacticalBias = "NEUTRAL";
   }
 
@@ -723,18 +651,9 @@ export function executionStateEngine(
   EXECUTION MODE
   ===================================================== */
 
-  let executionMode:
-    | "ADD_ON_PULLBACKS"
-    | "BUILD_POSITION"
-    | "REDUCE_RISK"
-    | "DEFENSIVE"
-    | "WAIT";
+  let executionMode: ExecutionStateOutput["executionMode"];
 
-  /* =====================================================
-  INSTITUTIONAL CONDITIONS
-  ===================================================== */
-
-  const institutionalConditions = (
+  const institutionalConditions =
     (
       marketMode === "RISK_ON" ||
       marketMode === "AI_EXPANSION"
@@ -759,18 +678,11 @@ export function executionStateEngine(
     divergenceSeverity < 25 &&
     recoveryConfidence >= 70 &&
     riskState === "STABLE" &&
-    confidence >= 72
-  );
+    confidence >= 72;
 
   if (institutionalConditions) {
     executionMode = "ADD_ON_PULLBACKS";
-  }
-
-  /* =====================================================
-  BUILD POSITION
-  ===================================================== */
-
-  else if (
+  } else if (
     (
       marketMode === "RISK_ON" ||
       marketMode === "AI_EXPANSION" ||
@@ -788,37 +700,19 @@ export function executionStateEngine(
     riskState !== "CRISIS"
   ) {
     executionMode = "BUILD_POSITION";
-  }
-
-  /* =====================================================
-  DEFENSIVE
-  ===================================================== */
-
-  else if (
+  } else if (
     riskState === "CRISIS" ||
     marketMode === "RISK_OFF"
   ) {
     executionMode = "DEFENSIVE";
-  }
-
-  /* =====================================================
-  REDUCE RISK
-  ===================================================== */
-
-  else if (
+  } else if (
     riskState === "BREAKDOWN" ||
     riskState === "INTERNAL_BREAKDOWN" ||
     marketMode === "INTERNAL_DISTRIBUTION" ||
     marketMode === "DEFENSIVE_TRANSITION"
   ) {
     executionMode = "REDUCE_RISK";
-  }
-
-  /* =====================================================
-  WAIT
-  ===================================================== */
-
-  else {
+  } else {
     executionMode = "WAIT";
   }
 
@@ -826,11 +720,7 @@ export function executionStateEngine(
   URGENCY
   ===================================================== */
 
-  let urgency:
-    | "LOW"
-    | "MEDIUM"
-    | "HIGH"
-    | "EXTREME";
+  let urgency: ExecutionStateOutput["urgency"];
 
   if (
     dangerScore >= 85 ||
@@ -843,9 +733,7 @@ export function executionStateEngine(
     )
   ) {
     urgency = "EXTREME";
-  }
-
-  else if (
+  } else if (
     dangerScore >= 70 ||
     rotationDecayScore >= 55 ||
     divergenceSeverity >= 50 ||
@@ -856,9 +744,7 @@ export function executionStateEngine(
     riskState === "INTERNAL_BREAKDOWN"
   ) {
     urgency = "HIGH";
-  }
-
-  else if (
+  } else if (
     dangerScore >= 50 ||
     rotationDecayScore >= 24 ||
     structuralWeakness ||
@@ -867,9 +753,7 @@ export function executionStateEngine(
     failedRecovery
   ) {
     urgency = "MEDIUM";
-  }
-
-  else {
+  } else {
     urgency = "LOW";
   }
 
@@ -877,7 +761,7 @@ export function executionStateEngine(
   REGIME ALIGNMENT
   ===================================================== */
 
-  const regimeAlignment = (
+  const regimeAlignment =
     regimeSyncScore >= 70 &&
     breadth50 > 60 &&
     breadth200 > 54 &&
@@ -893,131 +777,53 @@ export function executionStateEngine(
     !persistentDistribution &&
     !persistentRisk &&
     recoveryConfidence >= 60 &&
-    riskState === "STABLE"
-  );
+    riskState === "STABLE";
 
   /* =====================================================
   CONFIDENCE
+
+  Existing adjustments retained.
+  Caller-side confidence semantics require separate review.
   ===================================================== */
 
-  let finalConfidence =
-    Number(confidence ?? 50);
+  let finalConfidence = finiteOr(confidence, 50);
 
-  if (regimeAlignment) {
-    finalConfidence += 10;
-  }
+  if (regimeAlignment) finalConfidence += 10;
+  if (marketMode === "AI_EXPANSION") finalConfidence += 4;
+  if (marketMode === "LATE_CYCLE_MELTUP") finalConfidence -= 6;
+  if (marketMode === "ROTATIONAL_STRESS") finalConfidence -= 8;
+  if (marketMode === "DEFENSIVE_TRANSITION") finalConfidence -= 12;
+  if (marketMode === "INTERNAL_DISTRIBUTION") finalConfidence -= 10;
+  if (marketMode === "VOLATILE_EXPANSION") finalConfidence -= 4;
 
-  if (marketMode === "AI_EXPANSION") {
-    finalConfidence += 4;
-  }
+  if (riskState === "CRISIS") finalConfidence -= 30;
+  if (riskState === "BREAKDOWN") finalConfidence -= 20;
+  if (riskState === "INTERNAL_BREAKDOWN") finalConfidence -= 14;
 
-  if (marketMode === "LATE_CYCLE_MELTUP") {
-    finalConfidence -= 6;
-  }
+  if (rotationDecayScore >= 50) finalConfidence -= 15;
+  if (rotationDecayScore >= 70) finalConfidence -= 20;
+  if (fragilityScore >= 70) finalConfidence -= 15;
+  if (liquidityScore < 40) finalConfidence -= 10;
+  if (participationScore < 45) finalConfidence -= 12;
+  if (gammaExposure < 0) finalConfidence -= 10;
 
-  if (marketMode === "ROTATIONAL_STRESS") {
-    finalConfidence -= 8;
-  }
+  if (effectiveNarrowLeadership) finalConfidence -= 12;
+  if (bullishDivergence) finalConfidence += 4;
+  if (bearishDivergence) finalConfidence -= 10;
+  if (hiddenDistribution) finalConfidence -= 12;
+  if (institutionalDistribution) finalConfidence -= 18;
 
-  if (marketMode === "DEFENSIVE_TRANSITION") {
-    finalConfidence -= 12;
-  }
+  if (persistentWeakness) finalConfidence -= 14;
+  if (persistentDistribution) finalConfidence -= 16;
+  if (persistentRisk) finalConfidence -= 12;
+  if (failedRecovery) finalConfidence -= 10;
+  if (bounceLikelyTemporary) finalConfidence -= 8;
 
-  if (marketMode === "INTERNAL_DISTRIBUTION") {
-    finalConfidence -= 10;
-  }
-
-  if (marketMode === "VOLATILE_EXPANSION") {
-    finalConfidence -= 4;
-  }
-
-  if (riskState === "CRISIS") {
-    finalConfidence -= 30;
-  }
-
-  if (riskState === "BREAKDOWN") {
-    finalConfidence -= 20;
-  }
-
-  if (riskState === "INTERNAL_BREAKDOWN") {
-    finalConfidence -= 14;
-  }
-
-  if (rotationDecayScore >= 50) {
-    finalConfidence -= 15;
-  }
-
-  if (rotationDecayScore >= 70) {
-    finalConfidence -= 20;
-  }
-
-  if (fragilityScore >= 70) {
-    finalConfidence -= 15;
-  }
-
-  if (liquidityScore < 40) {
-    finalConfidence -= 10;
-  }
-
-  if (participationScore < 45) {
-    finalConfidence -= 12;
-  }
-
-  if (gammaExposure < 0) {
-    finalConfidence -= 10;
-  }
-
-  if (effectiveNarrowLeadership) {
-    finalConfidence -= 12;
-  }
-
-  if (bullishDivergence) {
-    finalConfidence += 4;
-  }
-
-  if (bearishDivergence) {
-    finalConfidence -= 10;
-  }
-
-  if (hiddenDistribution) {
-    finalConfidence -= 12;
-  }
-
-  if (institutionalDistribution) {
-    finalConfidence -= 18;
-  }
-
-  if (persistentWeakness) {
-    finalConfidence -= 14;
-  }
-
-  if (persistentDistribution) {
-    finalConfidence -= 16;
-  }
-
-  if (persistentRisk) {
-    finalConfidence -= 12;
-  }
-
-  if (failedRecovery) {
-    finalConfidence -= 10;
-  }
-
-  if (bounceLikelyTemporary) {
-    finalConfidence -= 8;
-  }
-
-  finalConfidence -=
-    Math.round(
-      divergenceSeverity * 0.22
-    );
+  finalConfidence -= Math.round(divergenceSeverity * 0.22);
 
   finalConfidence = Math.max(
     0,
-    Math.min(
-      100,
-      Math.round(finalConfidence)
-    )
+    Math.min(100, Math.round(finalConfidence))
   );
 
   /* =====================================================
@@ -1028,93 +834,72 @@ export function executionStateEngine(
     `${marketMode} | ${tacticalBias} | ${riskState}`;
 
   if (marketMode === "DEFENSIVE_TRANSITION") {
-    summary +=
-      " | Defensive institutional transition";
+    summary += " | Defensive institutional transition";
   }
 
   if (aiLeadershipFragility) {
-    summary +=
-      " | AI leadership fragility";
+    summary += " | AI leadership fragility";
   }
 
   if (rotationalCompression) {
-    summary +=
-      " | Rotational compression";
+    summary += " | Rotational compression";
   }
 
   if (expansionExhaustion) {
-    summary +=
-      " | Expansion exhaustion";
+    summary += " | Expansion exhaustion";
   }
 
   if (volatileExpansion) {
-    summary +=
-      " | Volatile expansion";
+    summary += " | Volatile expansion";
   }
 
   if (lateCycleMeltup) {
-    summary +=
-      " | Late-cycle melt-up";
+    summary += " | Late-cycle melt-up";
   }
 
   if (institutionalDistribution) {
-    summary +=
-      " | Institutional distribution";
+    summary += " | Institutional distribution";
   }
 
   if (internalBreakdown) {
-    summary +=
-      " | Internal breakdown";
+    summary += " | Internal breakdown";
   }
 
   if (hiddenDistribution) {
-    summary +=
-      " | Hidden distribution";
+    summary += " | Hidden distribution";
   }
 
   if (persistentWeakness) {
-    summary +=
-      " | Persistent weakness";
+    summary += " | Persistent weakness";
   }
 
   if (persistentDistribution) {
-    summary +=
-      " | Persistent institutional distribution";
+    summary += " | Persistent institutional distribution";
   }
 
   if (persistentRisk) {
-    summary +=
-      " | Persistent risk";
+    summary += " | Persistent risk";
   }
 
   if (failedRecovery) {
-    summary +=
-      " | Failed recovery rally";
+    summary += " | Failed recovery rally";
   }
 
   if (bounceLikelyTemporary) {
-    summary +=
-      " | Bounce likely temporary";
+    summary += " | Bounce likely temporary";
   }
 
   if (effectiveNarrowLeadership) {
-    summary +=
-      " | Narrow leadership";
+    summary += " | Narrow leadership";
   }
 
   if (bearishDivergence) {
-    summary +=
-      " | Bearish divergence";
+    summary += " | Bearish divergence";
   }
 
   if (bullishDivergence) {
-    summary +=
-      " | Bullish divergence";
+    summary += " | Bullish divergence";
   }
-
-  /* =====================================================
-  RETURN
-  ===================================================== */
 
   return {
     marketMode,
@@ -1122,10 +907,7 @@ export function executionStateEngine(
     riskState,
     executionMode,
     urgency,
-
-    confidence:
-      finalConfidence,
-
+    confidence: finalConfidence,
     regimeAlignment,
     summary
   };
