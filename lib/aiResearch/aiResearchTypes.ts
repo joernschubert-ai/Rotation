@@ -55,32 +55,8 @@ export type NullableNumber =
 RESEARCH INPUT
 ===================================================== */
 
-/*
-* The complete persisted market snapshot.
-*
-* We deliberately keep this open.
-*
-* createMarketSnapshot() already contains a large,
-* evolving diagnostic structure. The AI layer should
-* not duplicate that structure and thereby create a
-* second incompatible schema.
-*/
-
 export type AIResearchSnapshot =
 Record<string, unknown>;
-
-/*
-* Historical snapshots.
-*
-* History is supplied separately from the current
-* snapshot because the agent needs to distinguish:
-*
-* CURRENT STATE
-*
-* from
-*
-* REGIME DEVELOPMENT.
-*/
 
 export type AIResearchHistory =
 AIResearchSnapshot[];
@@ -88,13 +64,6 @@ AIResearchSnapshot[];
 /* =====================================================
 RESEARCH CONTEXT
 ===================================================== */
-
-/*
-* Context describing why the research was requested.
-*
-* This allows the same agent to support different
-* research tasks without changing the market engine.
-*/
 
 export type AIResearchTask =
 | "DAILY_MARKET_REVIEW"
@@ -106,102 +75,22 @@ export type AIResearchTask =
 | "FORWARD_TEST_REVIEW";
 
 export interface AIResearchContext {
-
-/*
-* Type of analysis requested.
-*/
-
-task:
-AIResearchTask;
-
-/*
-* ISO timestamp when the research request was created.
-*/
-
-requestedAt:
-string;
-
-/*
-* Optional human question or research instruction.
-*/
-
-question?:
-string;
-
+task: AIResearchTask;
+requestedAt: string;
+question?: string;
 }
 
 /* =====================================================
 EXTERNAL RESEARCH
 ===================================================== */
 
-/*
-* External information is deliberately separated from
-* the quantitative Rotation-App snapshot.
-*
-* This layer contains attributable external sources:
-*
-* - market news
-* - central-bank information
-* - macroeconomic releases
-* - semiconductor / AI news
-* - Nasdaq-specific news
-* - Russell / small-cap news
-* - volatility information
-* - relevant analyst / market commentary
-*
-* Structured positioning data such as COT does NOT
-* belong here.
-*/
-
 export interface AIResearchSource {
-
-/*
-* Human-readable source title.
-*/
-
-title:
-string;
-
-/*
-* Source URL.
-*/
-
-url:
-string;
-
-/*
-* Publisher or originating organization.
-*/
-
-publisher?:
-string;
-
-/*
-* Publication timestamp if available.
-*/
-
-publishedAt?:
-string;
-
-/*
-* Short extracted text or summary.
-*
-* This is NOT intended to store entire articles.
-*/
-
-summary?:
-string;
-
-/*
-* Source relevance from 0..100.
-*
-* This is an internal research relevance measure,
-* not a quality rating of the publisher.
-*/
-
-relevance?:
-number;
-
+title: string;
+url: string;
+publisher?: string;
+publishedAt?: string;
+summary?: string;
+relevance?: number;
 }
 
 /* =====================================================
@@ -209,86 +98,26 @@ AI RESEARCH INPUT
 ===================================================== */
 
 export interface AIResearchInput {
+snapshot: AIResearchSnapshot;
+history: AIResearchHistory;
+context: AIResearchContext;
+
+sources?: AIResearchSource[];
 
 /*
-* Current immutable Rotation-App snapshot.
+* Structured COT positioning.
 */
-
-snapshot:
-AIResearchSnapshot;
+positioning?: AIResearchCOTData;
 
 /*
-* Historical snapshots available to the agent.
+* Historical market-state research.
+*
+* Separate from recent persisted snapshot history.
+*
+* Descriptive evidence only:
+* no validated predictive or trading edge.
 */
-
-history:
-AIResearchHistory;
-
-/*
-* Description of the research task.
-*/
-
-context:
-AIResearchContext;
-
-/*
-* External sources are optional.
-*
-* These remain attributable research documents/news.
-*/
-
-sources?:
-AIResearchSource[];
-
-/*
-* Structured positioning data.
-*
-* COT is deliberately separate from sources because
-* it is not an article or qualitative news document.
-*
-* The AI Research Agent may use this information
-* as an additional evidence class, but COT does not
-* modify the underlying market engine.
-*/
-
-positioning?:
-AIResearchCOTData;
-
-/* ===================================================
-* HISTORICAL RESEARCH EVIDENCE
-* ===================================================
-*
-* Historical research is kept separate from
-* trusted recent snapshot history.
-*
-* It contains previously calculated historical
-* market-state comparisons and forward outcomes.
-*
-* Examples:
-*
-* - Price trend / VIX research
-* - Market breadth
-* - Internal divergence
-* - Nasdaq / Russell rotation
-* - Market leadership
-* - Macro regime research
-*
-* IMPORTANT:
-*
-* Historical evidence does NOT:
-*
-* - modify the current snapshot
-* - modify the Master Score
-* - overwrite engine signals
-* - modify execution states
-* - establish a trading edge automatically
-*
-* This input is optional during integration.
-*/
-
-historicalEvidence?:
-AIResearchHistoricalEvidence;
-
+historicalEvidence?: AIResearchHistoricalEvidence;
 }
 
 /* =====================================================
@@ -302,54 +131,14 @@ export type AIRegimeBias =
 | "CRISIS";
 
 export interface AIRegimeAssessment {
-
-/*
-* Independent research interpretation of the
-* current market regime.
-*/
-
-bias:
-AIRegimeBias;
-
-/*
-* Confidence in the interpretation.
-*
-* This is NOT the Master Score confidence.
-*/
-
-confidence:
-number;
-
-/*
-* Short explanation.
-*/
-
-summary:
-string;
-
+bias: AIRegimeBias;
+confidence: number;
+summary: string;
 }
 
 /* =====================================================
 EVIDENCE SYNTHESIS
 ===================================================== */
-
-/*
-* Evidence synthesis is the central research layer
-* between the Rotation-App and the final AI thesis.
-*
-* It does NOT recalculate engine scores.
-*
-* Instead it asks:
-*
-* - Does the evidence support the structural thesis?
-* - Does it contradict the structural thesis?
-* - Is the evidence neutral / unresolved?
-* - Is there enough information to judge?
-*
-* This is especially important for situations where
-* market internals deteriorate while index price
-* remains strong.
-*/
 
 export type AIResearchEvidenceState =
 | "SUPPORTS"
@@ -358,25 +147,11 @@ export type AIResearchEvidenceState =
 | "UNRESOLVED"
 | "NOT_AVAILABLE";
 
-/*
-* Strength describes the importance of an evidence
-* block for the current research thesis.
-*
-* It is deliberately categorical rather than another
-* synthetic market score.
-*/
-
 export type AIResearchEvidenceStrength =
 | "LOW"
 | "MODERATE"
 | "HIGH"
 | "VERY_HIGH";
-
-/*
-* Evidence categories are kept explicit so that the
-* research layer can later be audited and forward
-* tested independently.
-*/
 
 export type AIResearchEvidenceCategory =
 | "STRUCTURE"
@@ -388,72 +163,17 @@ export type AIResearchEvidenceCategory =
 | "EXTERNAL";
 
 export interface AIResearchEvidenceBlock {
-
-/*
-* Evidence class.
-*/
-
-category:
-AIResearchEvidenceCategory;
-
-/*
-* Whether this evidence supports or contradicts
-* the current structural research thesis.
-*/
-
-state:
-AIResearchEvidenceState;
-
-/*
-* Importance of the evidence.
-*/
-
-strength:
-AIResearchEvidenceStrength;
-
-/*
-* Confidence in this evidence interpretation.
-*
-* Range: 0..100.
-*/
-
-confidence:
-number;
-
-/*
-* Human-readable explanation.
-*/
-
-summary:
-string;
-
-/*
-* Concrete facts used for this assessment.
-*
-* Examples:
-*
-* - "NASDAQ 20D return +5.25%"
-* - "Fragility score 100"
-* - "Distribution persisted for 118 days"
-*
-* These should remain descriptive and auditable.
-*/
-
-evidence:
-string[];
-
+category: AIResearchEvidenceCategory;
+state: AIResearchEvidenceState;
+strength: AIResearchEvidenceStrength;
+confidence: number;
+summary: string;
+evidence: string[];
 }
 
 /* =====================================================
 STRUCTURAL BIAS
 ===================================================== */
-
-/*
-* Structural bias describes the direction suggested
-* by the combined structural market evidence.
-*
-* This is NOT a trade instruction.
-*/
 
 export type AIResearchStructuralBias =
 | "BULLISH"
@@ -464,23 +184,6 @@ export type AIResearchStructuralBias =
 /* =====================================================
 CONFIRMATION
 ===================================================== */
-
-/*
-* Confirmation answers a different question from
-* structural bias.
-*
-* Example:
-*
-* Structural bias:
-* BEARISH
-*
-* Confirmation:
-* PARTIAL
-*
-* This allows the research layer to recognize a
-* structurally weak market without falsely claiming
-* that price has already confirmed the thesis.
-*/
 
 export type AIResearchConfirmationLevel =
 | "NONE"
@@ -493,21 +196,6 @@ export type AIResearchConfirmationLevel =
 CONTRADICTION
 ===================================================== */
 
-/*
-* Contradiction represents meaningful evidence working
-* against the current structural thesis.
-*
-* Example:
-*
-* - weak internals
-* - but strongly rising NASDAQ
-* - neutral liquidity
-* - elevated false-break risk
-*
-* may produce substantial contradiction even when the
-* structural bias remains bearish.
-*/
-
 export type AIResearchContradictionLevel =
 | "NONE"
 | "LOW"
@@ -518,40 +206,6 @@ export type AIResearchContradictionLevel =
 /* =====================================================
 ENTRY MATURITY
 ===================================================== */
-
-/*
-* Entry maturity is a RESEARCH concept.
-*
-* It describes how developed an opportunity appears
-* based on the available evidence.
-*
-* It is NOT the Rotation-App execution state and must
-* not modify putTiming, tradeStack or positionSizing.
-*
-* IMMATURE
-* Structural evidence is insufficient.
-*
-* DEVELOPING
-* A thesis is forming but important confirmation is
-* still missing.
-*
-* EARLY
-* Structural evidence is meaningful and an
-* anticyclical opportunity may be developing, but
-* confirmation remains incomplete.
-*
-* CONFIRMING
-* Price / liquidity / rotation / positioning are
-* increasingly confirming the structural thesis.
-*
-* MATURE
-* The thesis is broadly confirmed.
-*
-* EXHAUSTED
-* The expected move may already be substantially
-* developed, reducing the attractiveness of a new
-* entry.
-*/
 
 export type AIResearchEntryMaturity =
 | "IMMATURE"
@@ -564,19 +218,6 @@ export type AIResearchEntryMaturity =
 /* =====================================================
 RESEARCH OPPORTUNITY STATE
 ===================================================== */
-
-/*
-* Opportunity state translates evidence maturity into
-* an auditable research state.
-*
-* IMPORTANT:
-*
-* These states do NOT constitute orders or automatic
-* trading instructions.
-*
-* They intentionally remain independent from the
-* Rotation-App execution engine.
-*/
 
 export type AIResearchOpportunityState =
 | "WAIT"
@@ -593,22 +234,6 @@ export type AIResearchOpportunityState =
 TENSION / PERSISTENCE
 ===================================================== */
 
-/*
-* Tension describes disagreement between market price
-* and underlying structural evidence.
-*
-* A typical defensive example:
-*
-* PRICE:
-* strong / rising
-*
-* INTERNALS:
-* deteriorating
-*
-* This can be especially useful for identifying early
-* anticyclical opportunities.
-*/
-
 export type AIResearchTensionState =
 | "NONE"
 | "BUILDING"
@@ -617,166 +242,31 @@ export type AIResearchTensionState =
 | "EXTREME";
 
 export interface AIResearchTensionAssessment {
-
-/*
-* Current qualitative tension state.
-*/
-
-state:
-AIResearchTensionState;
-
-/*
-* Estimated age of the observed tension in available
-* history.
-*
-* This is optional because insufficient historical
-* observations may prevent a reliable calculation.
-*/
-
-ageSnapshots?:
-number;
-
-/*
-* Approximate trading-day age if it can be derived
-* reliably from timestamps / daily history.
-*/
-
-ageTradingDays?:
-number;
-
-/*
-* Confidence that the tension is actually present.
-*/
-
-confidence:
-number;
-
-/*
-* Human-readable explanation.
-*/
-
-summary:
-string;
-
+state: AIResearchTensionState;
+ageSnapshots?: number;
+ageTradingDays?: number;
+confidence: number;
+summary: string;
 }
 
 /* =====================================================
 EVIDENCE / OPPORTUNITY ASSESSMENT
 ===================================================== */
 
-/*
-* This structure is the main bridge between raw
-* Rotation-App facts and the final AI research thesis.
-*
-* It intentionally separates:
-*
-* STRUCTURAL DIRECTION
-*
-* from
-*
-* CONFIRMATION
-*
-* from
-*
-* CONTRADICTION
-*
-* from
-*
-* ENTRY MATURITY.
-*
-* This prevents:
-*
-* "high risk"
-*
-* from automatically becoming:
-*
-* "good PUT entry".
-*/
-
 export interface AIResearchEvidenceAssessment {
-
-/*
-* Direction suggested by structural evidence.
-*/
-
-structuralBias:
-AIResearchStructuralBias;
-
-/*
-* Degree to which independent evidence confirms the
-* structural thesis.
-*/
-
-confirmation:
-AIResearchConfirmationLevel;
-
-/*
-* Degree of meaningful evidence working against the
-* structural thesis.
-*/
-
-contradiction:
-AIResearchContradictionLevel;
-
-/*
-* Development stage of the potential opportunity.
-*/
-
-entryMaturity:
-AIResearchEntryMaturity;
-
-/*
-* Research-only opportunity state.
-*/
-
-opportunityState:
-AIResearchOpportunityState;
-
-/*
-* Price-vs-structure tension assessment.
-*/
-
-tension:
-AIResearchTensionAssessment;
-
-/*
-* Individual evidence classes.
-*
-* This makes the final research conclusion auditable.
-*/
-
-evidence:
-AIResearchEvidenceBlock[];
-
-/*
-* Concise explanation of why the combined assessment
-* received its current state.
-*/
-
-summary:
-string;
-
+structuralBias: AIResearchStructuralBias;
+confirmation: AIResearchConfirmationLevel;
+contradiction: AIResearchContradictionLevel;
+entryMaturity: AIResearchEntryMaturity;
+opportunityState: AIResearchOpportunityState;
+tension: AIResearchTensionAssessment;
+evidence: AIResearchEvidenceBlock[];
+summary: string;
 }
 
 /* =====================================================
 DIVERGENCE
 ===================================================== */
-
-/*
-* A core purpose of the Research Agent is to detect
-* contradictions between:
-*
-* PRICE
-* INTERNALS
-* ROTATION
-* LIQUIDITY
-* FRAGILITY
-* REGIME
-*
-* These observations are especially important for the
-* Rotation-App because a strong index can coexist with
-* deteriorating internals.
-*/
 
 export type AIDivergenceType =
 | "PRICE_VS_INTERNALS"
@@ -790,31 +280,10 @@ export type AIDivergenceType =
 | "OTHER";
 
 export interface AIDivergence {
-
-type:
-AIDivergenceType;
-
-/*
-* Human-readable observation.
-*/
-
-observation:
-string;
-
-/*
-* Why this divergence matters.
-*/
-
-significance:
-string;
-
-/*
-* Confidence that the divergence is actually present.
-*/
-
-confidence:
-number;
-
+type: AIDivergenceType;
+observation: string;
+significance: string;
+confidence: number;
 }
 
 /* =====================================================
@@ -822,35 +291,10 @@ RESEARCH THESIS
 ===================================================== */
 
 export interface AIResearchThesis {
-
-/*
-* Main interpretation.
-*/
-
-statement:
-string;
-
-/*
-* Evidence supporting the thesis.
-*/
-
-supportingEvidence:
-string[];
-
-/*
-* Evidence that contradicts the thesis.
-*/
-
-counterEvidence:
-string[];
-
-/*
-* What would invalidate the thesis.
-*/
-
-invalidationConditions:
-string[];
-
+statement: string;
+supportingEvidence: string[];
+counterEvidence: string[];
+invalidationConditions: string[];
 }
 
 /* =====================================================
@@ -858,53 +302,18 @@ RISK ASSESSMENT
 ===================================================== */
 
 export interface AIResearchRisk {
-
-/*
-* Identified risk.
-*/
-
-risk:
-string;
-
-/*
-* Why the risk matters.
-*/
-
-explanation:
-string;
-
-/*
-* Whether the risk is directly supported by
-* quantitative snapshot data, historical data,
-* external information, or a combination.
-*
-* Structured COT positioning currently remains part
-* of COMBINED evidence so that existing interfaces
-* remain backwards compatible.
-*/
-
+risk: string;
+explanation: string;
 evidenceType:
 | "SNAPSHOT"
 | "HISTORY"
 | "EXTERNAL"
 | "COMBINED";
-
 }
 
 /* =====================================================
 FORWARD-TESTABLE CLAIM
 ===================================================== */
-
-/*
-* This is an important architectural component.
-*
-* We eventually want to determine whether the AI Agent
-* produces useful analysis or merely plausible prose.
-*
-* Therefore important forward-looking statements should
-* be represented explicitly and later evaluated against
-* future market observations.
-*/
 
 export type AIForecastDirection =
 | "UP"
@@ -913,52 +322,12 @@ export type AIForecastDirection =
 | "UNKNOWN";
 
 export interface AIForwardTestClaim {
-
-/*
-* What the agent believes may happen.
-*/
-
-claim:
-string;
-
-/*
-* Directional expectation.
-*/
-
-expectedDirection:
-AIForecastDirection;
-
-/*
-* Optional horizon in trading days.
-*/
-
-horizonDays?:
-number;
-
-/*
-* What observable condition would confirm the claim.
-*/
-
-confirmationCondition?:
-string;
-
-/*
-* What would invalidate the claim.
-*/
-
-invalidationCondition?:
-string;
-
-/*
-* Confidence in the claim.
-*
-* This is the AI's own confidence and must remain
-* separate from Master Score / engine confidence.
-*/
-
-confidence:
-number;
-
+claim: string;
+expectedDirection: AIForecastDirection;
+horizonDays?: number;
+confirmationCondition?: string;
+invalidationCondition?: string;
+confidence: number;
 }
 
 /* =====================================================
@@ -966,83 +335,51 @@ RESEARCH REPORT
 ===================================================== */
 
 export interface AIResearchReport {
+generatedAt: string;
+task: AIResearchTask;
 
-/*
-* Metadata
-*/
+regime: AIRegimeAssessment;
 
-generatedAt:
-string;
+evidenceAssessment?: AIResearchEvidenceAssessment;
 
-task:
-AIResearchTask;
+thesis: AIResearchThesis;
 
-/*
-* Current regime interpretation.
-*/
+divergences: AIDivergence[];
 
-regime:
-AIRegimeAssessment;
+risks: AIResearchRisk[];
 
-/*
-* Evidence synthesis / opportunity assessment.
+forwardTestClaims: AIForwardTestClaim[];
+
+sources: AIResearchSource[];
+
+summary: string;
+
+/* =================================================
+* HISTORICAL EVIDENCE OUTPUT
+* =================================================
 *
-* Optional during migration so that the existing
-* AI Research Engine remains compatible until the
-* new synthesis logic is implemented.
+* Structured historical market-state comparisons
+* made available to the research dashboard.
 *
-* Once the engine produces this structure reliably,
-* this can later be made mandatory.
-*/
-
-evidenceAssessment?:
-AIResearchEvidenceAssessment;
-
-/*
-* Main research thesis.
-*/
-
-thesis:
-AIResearchThesis;
-
-/*
-* Detected contradictions / divergences.
-*/
-
-divergences:
-AIDivergence[];
-
-/*
-* Important risks.
-*/
-
-risks:
-AIResearchRisk[];
-
-/*
-* Explicit forward-testable claims.
-*/
-
-forwardTestClaims:
-AIForwardTestClaim[];
-
-/*
-* External sources used by the agent.
-*/
-
-sources:
-AIResearchSource[];
-
-/*
-* Final textual summary.
+* This is separate from the seven evidence layers.
 *
-* This is deliberately textual and does NOT represent
-* a trading instruction.
+* It must NOT independently increase:
+*
+* - research confirmation
+* - structural bias confidence
+* - Master Score
+* - execution maturity
+* - position sizing
+*
+* Historical forward returns describe underlying
+* index performance, NOT Optionsschein returns.
+*
+* No predictive edge is assumed.
+*
+* Optional for backward compatibility.
 */
 
-summary:
-string;
-
+historicalEvidence?: AIResearchHistoricalEvidence;
 }
 
 /* =====================================================
@@ -1055,35 +392,15 @@ export type AIResearchStatus =
 | "RESEARCH_ERROR";
 
 export interface AIResearchResult {
+status: AIResearchStatus;
 
-status:
-AIResearchStatus;
-
-report:
-AIResearchReport | null;
-
-/*
-* Technical diagnostics.
-*
-* These are useful during development but should not
-* be exposed as trading signals.
-*/
+report: AIResearchReport | null;
 
 diagnostics?: {
-
-snapshotTimestamp?:
-string;
-
-historyCount?:
-number;
-
-sourceCount?:
-number;
-
-warnings?:
-string[];
-
+snapshotTimestamp?: string;
+historyCount?: number;
+sourceCount?: number;
+warnings?: string[];
 };
-
 }
 
