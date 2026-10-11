@@ -54,6 +54,7 @@ export interface ExecutionStateInput {
 
   regimeSyncScore?: number;
   regimeSyncState?: string;
+  regimeSyncAligned?: boolean;
 
   confidence?: number;
 
@@ -151,6 +152,7 @@ export function executionStateEngine(
 
     regimeSyncScore = 50,
     regimeSyncState = "TRANSITION",
+    regimeSyncAligned,
 
     confidence = 50,
 
@@ -658,7 +660,10 @@ export function executionStateEngine(
       marketMode === "RISK_ON" ||
       marketMode === "AI_EXPANSION"
     ) &&
-    regimeSyncState === "ALIGNED" &&
+    booleanOr(
+      regimeSyncAligned,
+      regimeSyncState === "ALIGNED"
+    ) &&
     breadth200 > 64 &&
     breadth50 > 70 &&
     liquidityScore > 65 &&
