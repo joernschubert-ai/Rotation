@@ -316,11 +316,16 @@ return `${value > 0 ? "+" : ""}${formatted}%`;
 }
 
 /*
-* Historical positiveRate and negativeRate are
-* expected to be fractions from 0 to 1.
+* Historical positiveRate and negativeRate
+* are supplied as percentages from 0 to 100.
 *
-* We do not infer the scale from the magnitude,
-* because doing so would be ambiguous.
+* The historical forward research calculates
+* these rates as:
+*
+* (matching observations / valid observations) * 100
+*
+* Therefore no additional multiplication by
+* 100 is required in the frontend.
 */
 
 function formatRate(
@@ -331,12 +336,12 @@ value === null ||
 value === undefined ||
 !Number.isFinite(value) ||
 value < 0 ||
-value > 1
+value > 100
 ) {
 return "—";
 }
 
-return `${(value * 100).toLocaleString(
+return `${value.toLocaleString(
 "de-DE",
 {
 maximumFractionDigits: 1,
