@@ -7,25 +7,113 @@ dangerZone: any;
 phase: string;
 };
 
-export default function RegimeRibbonPanel({
-executionState,
-regimeSync,
-dangerZone,
-phase
-}: Props) {
-if (!executionState) return null;
+/* =====================================================
+REGIME RIBBON PANEL
 
-/* ======================================================
-PHASE COLORS
+Purpose:
+- Compact display of existing engine states
+- No score recalculation
+- No artificial confidence fallback
+- No modification of trading decisions
+- Preserve original engine semantics
+===================================================== */
 
-PHASE-FARBE = STRUKTURELLES MARKTRISIKO
+/* =====================================================
+SAFE HELPERS
+===================================================== */
 
-Unterstützt sowohl alte als auch aktuelle
-marketPhaseEngine States.
-====================================================== */
+function safeText(
+value: unknown,
+fallback = "N/A"
+): string {
+if (
+typeof value === "string" &&
+value.trim().length > 0
+) {
+return value;
+}
 
-function getPhaseColor(phaseValue: string) {
-const value = String(phaseValue ?? "").toUpperCase();
+if (
+typeof value === "number" &&
+Number.isFinite(value)
+) {
+return String(value);
+}
+
+return fallback;
+}
+
+function safeConfidence(
+value: unknown
+): number | null {
+if (
+value === null ||
+value === undefined ||
+value === ""
+) {
+return null;
+}
+
+if (
+typeof value !== "number" &&
+typeof value !== "string"
+) {
+return null;
+}
+
+const parsed = Number(value);
+
+if (
+!Number.isFinite(parsed) ||
+parsed < 0 ||
+parsed > 100
+) {
+return null;
+}
+
+return parsed;
+}
+
+function safeBoolean(
+value: unknown
+): boolean | null {
+if (typeof value === "boolean") {
+return value;
+}
+
+if (value === 1 || value === "1") {
+return true;
+}
+
+if (value === 0 || value === "0") {
+return false;
+}
+
+if (typeof value === "string") {
+const normalized =
+value.trim().toLowerCase();
+
+if (normalized === "true") {
+return true;
+}
+
+if (normalized === "false") {
+return false;
+}
+}
+
+return null;
+}
+
+/* =====================================================
+COLORS
+===================================================== */
+
+function getPhaseColor(
+phaseValue: string
+): string {
+const value =
+safeText(phaseValue, "").toUpperCase();
 
 if (
 value === "PHASE_1" ||
@@ -79,15 +167,10 @@ return "#7f1d1d";
 return "#666";
 }
 
-
-/* ======================================================
-MARKET MODE
-====================================================== */
-
-function getModeColor(mode: string) {
-const value = String(mode ?? "").toUpperCase();
-
-switch (value) {
+function getModeColor(
+mode: string
+): string {
+switch (mode.toUpperCase()) {
 case "RISK_ON":
 return "#52c41a";
 
@@ -103,15 +186,10 @@ return "#888";
 }
 }
 
-
-/* ======================================================
-RISK STATE
-====================================================== */
-
-function getRiskColor(risk: string) {
-const value = String(risk ?? "").toUpperCase();
-
-switch (value) {
+function getRiskColor(
+risk: string
+): string {
+switch (risk.toUpperCase()) {
 case "STABLE":
 return "#52c41a";
 
@@ -129,15 +207,10 @@ return "#666";
 }
 }
 
-
-/* ======================================================
-DANGER ZONE
-====================================================== */
-
-function getDangerColor(level: string) {
-const value = String(level ?? "").toUpperCase();
-
-switch (value) {
+function getDangerColor(
+level: string
+): string {
+switch (level.toUpperCase()) {
 case "LOW":
 return "#52c41a";
 
@@ -155,18 +228,10 @@ return "#666";
 }
 }
 
-
-/* ======================================================
-REGIME SYNCHRONISATION
-
-BREAKDOWN war vorher nicht berücksichtigt
-und fiel deshalb auf Grau zurück.
-====================================================== */
-
-function getSyncColor(state: string) {
-const value = String(state ?? "").toUpperCase();
-
-switch (value) {
+function getSyncColor(
+state: string
+): string {
+switch (state.toUpperCase()) {
 case "ALIGNED":
 return "#52c41a";
 
@@ -190,20 +255,10 @@ return "#666";
 }
 }
 
-
-/* ======================================================
-TACTICAL BIAS
-
-Unterstützt die aktuelle Engine-Semantik:
-- BULLISH / LONG_INDEX = Grün
-- BEARISH / SHORT_INDEX = Rot
-- NEUTRAL = Grau
-====================================================== */
-
-function getBiasColor(bias: string) {
-const value = String(bias ?? "").toUpperCase();
-
-switch (value) {
+function getBiasColor(
+bias: string
+): string {
+switch (bias.toUpperCase()) {
 case "BULLISH":
 case "LONG":
 case "LONG_INDEX":
@@ -214,24 +269,15 @@ case "SHORT":
 case "SHORT_INDEX":
 return "#ff4d4f";
 
-case "NEUTRAL":
-case "WAIT":
-return "#aaa";
-
 default:
 return "#aaa";
 }
 }
 
-
-/* ======================================================
-URGENCY
-====================================================== */
-
-function getUrgencyColor(urgency: string) {
-const value = String(urgency ?? "").toUpperCase();
-
-switch (value) {
+function getUrgencyColor(
+urgency: string
+): string {
+switch (urgency.toUpperCase()) {
 case "EXTREME":
 return "#ff4d4f";
 
@@ -249,56 +295,19 @@ return "#aaa";
 }
 }
 
+/* =====================================================
+SMALL DISPLAY BLOCK
+===================================================== */
 
-/* ======================================================
-DATA
-====================================================== */
-
-const phaseColor = getPhaseColor(phase);
-
-const modeColor = getModeColor(
-executionState?.marketMode
-);
-
-const riskColor = getRiskColor(
-executionState?.riskState
-);
-
-const syncColor = getSyncColor(
-regimeSync?.state
-);
-
-const dangerColor = getDangerColor(
-dangerZone?.level
-);
-
-const biasColor = getBiasColor(
-executionState?.tacticalBias
-);
-
-const urgencyColor = getUrgencyColor(
-executionState?.urgency
-);
-
-const confidence =
-Number(executionState?.confidence ?? 0);
-
-const regimeAlignment =
-Boolean(
-executionState?.regimeAlignment ??
-regimeSync?.aligned
-);
-
-
-/* ======================================================
-BLOCK
-====================================================== */
-
-function block(
-label: string,
-value: string,
-color: string
-) {
+function RibbonBlock({
+label,
+value,
+color,
+}: {
+label: string;
+value: string;
+color: string;
+}) {
 return (
 <div
 style={{
@@ -308,7 +317,7 @@ background: "#111",
 textAlign: "center",
 minHeight: "72px",
 borderRadius: "6px",
-minWidth: 0
+minWidth: 0,
 }}
 >
 <div
@@ -317,7 +326,7 @@ fontSize: "10px",
 color: "#666",
 marginBottom: "6px",
 letterSpacing: "0.5px",
-whiteSpace: "nowrap"
+whiteSpace: "nowrap",
 }}
 >
 {label}
@@ -329,7 +338,7 @@ color,
 fontWeight: "bold",
 fontSize: "14px",
 lineHeight: 1.2,
-overflowWrap: "anywhere"
+overflowWrap: "anywhere",
 }}
 >
 {value}
@@ -338,20 +347,117 @@ overflowWrap: "anywhere"
 );
 }
 
+/* =====================================================
+MAIN PANEL
+===================================================== */
 
-/* ======================================================
-SUMMARY
-====================================================== */
+export default function RegimeRibbonPanel({
+executionState,
+regimeSync,
+dangerZone,
+phase,
+}: Props) {
+if (!executionState) {
+return null;
+}
+
+const phaseValue =
+safeText(phase, "UNKNOWN");
+
+const marketMode =
+safeText(
+executionState.marketMode,
+"UNKNOWN"
+);
+
+const riskState =
+safeText(executionState.riskState);
+
+const syncState =
+safeText(regimeSync?.state);
+
+const dangerLevel =
+safeText(dangerZone?.level);
+
+const executionMode =
+safeText(
+executionState.executionMode,
+"WAIT"
+);
+
+const tacticalBias =
+safeText(
+executionState.tacticalBias,
+"NEUTRAL"
+);
+
+const urgency =
+safeText(
+executionState.urgency,
+"N/A"
+);
+
+/*
+* Display only the confidence supplied
+* by the execution engine.
+*
+* Do not substitute phase, rotation,
+* or AI Research confidence.
+*/
+const confidence =
+safeConfidence(
+executionState.confidence
+);
+
+const confidenceText =
+confidence === null
+? "—"
+: `${confidence.toLocaleString("de-DE", {
+maximumFractionDigits: 1,
+})}%`;
+
+/*
+* Alignment may originate from either
+* executionState or regimeSync.
+*
+* Explicit false must be preserved.
+* Unknown must not become false
+* or a fabricated confirmation.
+*/
+const executionAlignment =
+safeBoolean(
+executionState.regimeAlignment
+);
+
+const syncAlignment =
+safeBoolean(
+regimeSync?.aligned
+);
+
+const regimeAlignment =
+executionAlignment ?? syncAlignment;
+
+const alignmentText =
+regimeAlignment === true
+? "CONFIRMED"
+: regimeAlignment === false
+? "UNSTABLE"
+: "UNKNOWN";
+
+const alignmentColor =
+regimeAlignment === true
+? "#52c41a"
+: regimeAlignment === false
+? "#ff4d4f"
+: "#888";
+
+const phaseColor =
+getPhaseColor(phaseValue);
 
 const summary =
-`${executionState?.marketMode ?? "UNKNOWN"} | ` +
-`${executionState?.tacticalBias ?? "NEUTRAL"} | ` +
-`${executionState?.executionMode ?? "WAIT"}`;
-
-
-/* ======================================================
-RENDER
-====================================================== */
+`${marketMode} | ` +
+`${tacticalBias} | ` +
+`${executionMode}`;
 
 return (
 <div
@@ -362,13 +468,10 @@ padding: "16px",
 marginBottom: "16px",
 borderRadius: "8px",
 width: "100%",
-boxSizing: "border-box"
+boxSizing: "border-box",
 }}
 >
-
-{/* ==================================================
-HEADER
-================================================== */}
+{/* HEADER */}
 
 <div
 style={{
@@ -377,7 +480,7 @@ display: "flex",
 justifyContent: "space-between",
 alignItems: "center",
 gap: "12px",
-flexWrap: "wrap"
+flexWrap: "wrap",
 }}
 >
 <div
@@ -385,7 +488,7 @@ style={{
 color: "#999",
 fontSize: "13px",
 fontWeight: "bold",
-letterSpacing: "0.5px"
+letterSpacing: "0.5px",
 }}
 >
 REGIME COMMAND CENTER
@@ -393,19 +496,20 @@ REGIME COMMAND CENTER
 
 <div
 style={{
-color: phaseColor,
+color:
+confidence === null
+? "#888"
+: phaseColor,
 fontSize: "12px",
-fontWeight: "bold"
+fontWeight: "bold",
 }}
 >
-Confidence: {confidence}%
+Execution Confidence:{" "}
+{confidenceText}
 </div>
 </div>
 
-
-{/* ==================================================
-SUMMARY
-================================================== */}
+{/* SUMMARY */}
 
 <div
 style={{
@@ -418,20 +522,13 @@ fontWeight: "bold",
 textAlign: "center",
 fontSize: "14px",
 borderRadius: "6px",
-overflowWrap: "anywhere"
+overflowWrap: "anywhere",
 }}
 >
 {summary}
 </div>
 
-
-{/* ==================================================
-GRID
-
-Automatisch responsive:
-Desktop = mehrere Spalten
-Mobile = Blöcke umbrechen
-================================================== */}
+{/* STATE GRID */}
 
 <div
 style={{
@@ -439,52 +536,47 @@ display: "grid",
 gridTemplateColumns:
 "repeat(auto-fit, minmax(120px, 1fr))",
 gap: "10px",
-width: "100%"
+width: "100%",
 }}
 >
+<RibbonBlock
+label="PHASE"
+value={phaseValue}
+color={phaseColor}
+/>
 
-{block(
-"PHASE",
-phase ?? "UNKNOWN",
-phaseColor
-)}
+<RibbonBlock
+label="MODE"
+value={marketMode}
+color={getModeColor(marketMode)}
+/>
 
-{block(
-"MODE",
-executionState?.marketMode ?? "N/A",
-modeColor
-)}
+<RibbonBlock
+label="RISK"
+value={riskState}
+color={getRiskColor(riskState)}
+/>
 
-{block(
-"RISK",
-executionState?.riskState ?? "N/A",
-riskColor
-)}
+<RibbonBlock
+label="REGIME SYNC"
+value={syncState}
+color={getSyncColor(syncState)}
+/>
 
-{block(
-"REGIME SYNC",
-regimeSync?.state ?? "N/A",
-syncColor
-)}
+<RibbonBlock
+label="DANGER"
+value={dangerLevel}
+color={getDangerColor(dangerLevel)}
+/>
 
-{block(
-"DANGER",
-dangerZone?.level ?? "N/A",
-dangerColor
-)}
-
-{block(
-"EXECUTION",
-executionState?.executionMode ?? "N/A",
-"#40a9ff"
-)}
-
+<RibbonBlock
+label="EXECUTION"
+value={executionMode}
+color="#40a9ff"
+/>
 </div>
 
-
-{/* ==================================================
-FOOTER
-================================================== */}
+{/* FOOTER */}
 
 <div
 style={{
@@ -497,55 +589,46 @@ alignItems: "center",
 gap: "12px",
 flexWrap: "wrap",
 fontSize: "11px",
-color: "#666"
+color: "#666",
 }}
 >
-
 <div>
 Bias:{" "}
 <span
 style={{
-color: biasColor,
-fontWeight: "bold"
+color: getBiasColor(tacticalBias),
+fontWeight: "bold",
 }}
 >
-{executionState?.tacticalBias ?? "NEUTRAL"}
+{tacticalBias}
 </span>
 </div>
-
 
 <div>
 Urgency:{" "}
 <span
 style={{
-color: urgencyColor,
-fontWeight: "bold"
+color: getUrgencyColor(urgency),
+fontWeight: "bold",
 }}
 >
-{executionState?.urgency ?? "LOW"}
+{urgency}
 </span>
 </div>
-
 
 <div>
 Alignment:{" "}
 <span
 style={{
-color:
-regimeAlignment
-? "#52c41a"
-: "#ff4d4f",
-fontWeight: "bold"
+color: alignmentColor,
+fontWeight: "bold",
 }}
 >
-{regimeAlignment
-? "CONFIRMED"
-: "UNSTABLE"}
+{alignmentText}
 </span>
 </div>
-
 </div>
-
 </div>
 );
 }
+
