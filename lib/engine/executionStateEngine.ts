@@ -56,6 +56,12 @@ export interface ExecutionStateInput {
   regimeSyncState?: string;
   regimeSyncAligned?: boolean;
 
+  /*
+   * Deprecated compatibility input.
+   *
+   * Risk-confirmation confidence must not determine
+   * execution quality. This field is intentionally ignored.
+   */
   confidence?: number;
 
   rotationDecayScore?: number;
@@ -124,7 +130,12 @@ export interface ExecutionStateOutput {
     | "HIGH"
     | "EXTREME";
 
-  confidence: number;
+  /*
+   * No global execution percentage is calculated.
+   * null means unavailable, not measured zero quality.
+   */
+  confidence: null;
+
   regimeAlignment: boolean;
   summary: string;
 }
@@ -153,8 +164,6 @@ export function executionStateEngine(
     regimeSyncScore = 50,
     regimeSyncState = "TRANSITION",
     regimeSyncAligned,
-
-    confidence = 50,
 
     rotationDecayScore = 0,
     fragilityScore = 50,
@@ -651,6 +660,9 @@ export function executionStateEngine(
 
   /* =====================================================
   EXECUTION MODE
+
+  Execution is determined by the existing structural
+  conditions. Risk-confirmation confidence is not a gate.
   ===================================================== */
 
   let executionMode: ExecutionStateOutput["executionMode"];
@@ -682,8 +694,7 @@ export function executionStateEngine(
     !bounceLikelyTemporary &&
     divergenceSeverity < 25 &&
     recoveryConfidence >= 70 &&
-    riskState === "STABLE" &&
-    confidence >= 72;
+    riskState === "STABLE";
 
   if (institutionalConditions) {
     executionMode = "ADD_ON_PULLBACKS";
@@ -785,53 +796,6 @@ export function executionStateEngine(
     riskState === "STABLE";
 
   /* =====================================================
-  CONFIDENCE
-
-  Existing adjustments retained.
-  Caller-side confidence semantics require separate review.
-  ===================================================== */
-
-  let finalConfidence = finiteOr(confidence, 50);
-
-  if (regimeAlignment) finalConfidence += 10;
-  if (marketMode === "AI_EXPANSION") finalConfidence += 4;
-  if (marketMode === "LATE_CYCLE_MELTUP") finalConfidence -= 6;
-  if (marketMode === "ROTATIONAL_STRESS") finalConfidence -= 8;
-  if (marketMode === "DEFENSIVE_TRANSITION") finalConfidence -= 12;
-  if (marketMode === "INTERNAL_DISTRIBUTION") finalConfidence -= 10;
-  if (marketMode === "VOLATILE_EXPANSION") finalConfidence -= 4;
-
-  if (riskState === "CRISIS") finalConfidence -= 30;
-  if (riskState === "BREAKDOWN") finalConfidence -= 20;
-  if (riskState === "INTERNAL_BREAKDOWN") finalConfidence -= 14;
-
-  if (rotationDecayScore >= 50) finalConfidence -= 15;
-  if (rotationDecayScore >= 70) finalConfidence -= 20;
-  if (fragilityScore >= 70) finalConfidence -= 15;
-  if (liquidityScore < 40) finalConfidence -= 10;
-  if (participationScore < 45) finalConfidence -= 12;
-  if (gammaExposure < 0) finalConfidence -= 10;
-
-  if (effectiveNarrowLeadership) finalConfidence -= 12;
-  if (bullishDivergence) finalConfidence += 4;
-  if (bearishDivergence) finalConfidence -= 10;
-  if (hiddenDistribution) finalConfidence -= 12;
-  if (institutionalDistribution) finalConfidence -= 18;
-
-  if (persistentWeakness) finalConfidence -= 14;
-  if (persistentDistribution) finalConfidence -= 16;
-  if (persistentRisk) finalConfidence -= 12;
-  if (failedRecovery) finalConfidence -= 10;
-  if (bounceLikelyTemporary) finalConfidence -= 8;
-
-  finalConfidence -= Math.round(divergenceSeverity * 0.22);
-
-  finalConfidence = Math.max(
-    0,
-    Math.min(100, Math.round(finalConfidence))
-  );
-
-  /* =====================================================
   SUMMARY
   ===================================================== */
 
@@ -912,7 +876,7 @@ export function executionStateEngine(
     riskState,
     executionMode,
     urgency,
-    confidence: finalConfidence,
+    confidence: null,
     regimeAlignment,
     summary
   };
