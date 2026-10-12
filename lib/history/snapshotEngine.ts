@@ -273,11 +273,7 @@ export function createMarketSnapshot({
       marketStructure: structure.marketStructure,
     },
 
-    /* ROTATION
-     * Preserve the current engine output, including flags,
-     * institutional participation, history inputs and metrics.
-     * Legacy fields remain available when produced.
-     */
+    /* ROTATION */
 
     rotation: {
       ...rotation,
@@ -314,9 +310,7 @@ export function createMarketSnapshot({
       internalDivergence: rotationDecay.internalDivergence,
     },
 
-    /* ROTATION CONFIRMATION
-     * Includes quality and all other fields actually produced.
-     */
+    /* ROTATION CONFIRMATION */
 
     rotationConfirm: {
       ...rotationConfirm,
@@ -329,11 +323,7 @@ export function createMarketSnapshot({
       falseBreakRisk: rotationConfirm.falseBreakRisk,
     },
 
-    /* BREADTH VELOCITY
-     * Keep native signals/slopes and expose the previous
-     * flat field names for compatibility.
-     * A false flag or zero slope remains a valid value.
-     */
+    /* BREADTH VELOCITY */
 
     breadthVelocity: {
       ...breadthVelocity,
@@ -401,11 +391,7 @@ export function createMarketSnapshot({
         "0=low deterioration | 100=severe deterioration",
     },
 
-    /* INTERNAL DIVERGENCE
-     * Includes active, textual severity, signals,
-     * summary and metrics from the current engine.
-     * The numeric risk measure remains score.
-     */
+    /* INTERNAL DIVERGENCE */
 
     internalDivergence: {
       ...internalDivergence,
@@ -522,9 +508,13 @@ export function createMarketSnapshot({
       state: squeeze.state,
     },
 
-    /* FRAGILITY */
+    /* FRAGILITY
+     * Preserve components, metrics and native diagnostics.
+     */
 
     fragility: {
+      ...fragility,
+
       score: fragility.score,
       state: fragility.state,
       trend: fragility.trend,
@@ -571,10 +561,7 @@ export function createMarketSnapshot({
       reasons: earlyWarning.reasons,
     },
 
-    /* REGIME PERSISTENCE
-     * Preserve the actual engine fields, including any
-     * persistence/recovery flags it produces.
-     */
+    /* REGIME PERSISTENCE */
 
     regimePersistence: {
       ...persistence,
@@ -606,6 +593,8 @@ export function createMarketSnapshot({
 
       ndx: priceMomentum.ndx
         ? {
+            ...priceMomentum.ndx,
+
             score: priceMomentum.ndx.score,
             acceleration: priceMomentum.ndx.acceleration,
             direction: priceMomentum.ndx.direction,
@@ -616,6 +605,8 @@ export function createMarketSnapshot({
     /* NASDAQ / PUT / CALL */
 
     putTiming: {
+      ...putTiming,
+
       decision: putTiming.decision,
       timing: putTiming.timing,
       execution: putTiming.execution,
@@ -642,9 +633,13 @@ export function createMarketSnapshot({
       confidence: russell.confidence,
     },
 
-    /* REGIME SYNC */
+    /* REGIME SYNC
+     * Preserve aligned and native diagnostics.
+     */
 
     regimeSync: {
+      ...regimeSync,
+
       score: regimeSync.score,
       state: regimeSync.state,
       signal: regimeSync.signal,
@@ -652,9 +647,7 @@ export function createMarketSnapshot({
     },
 
     /* EXECUTION
-     * Preserve confidence, urgency, regimeAlignment
-     * and summary exactly as produced.
-     * Confidence is not substituted for a legacy score.
+     * null confidence is preserved as null.
      */
 
     executionState: {
@@ -736,6 +729,8 @@ export function createMarketSnapshot({
     /* EDGE / SIGNAL */
 
     edgeState: {
+      ...edgeState,
+
       score: edgeState.score,
       state: edgeState.state,
       direction: edgeState.direction,
@@ -758,9 +753,8 @@ export function createMarketSnapshot({
     },
 
     /* HISTORY
-     * Store selected metrics only.
-     * Do not embed history.history or historical series
-     * inside each new snapshot.
+     * Selected metrics only.
+     * Never embed history.history or historical series.
      */
 
     historyMetrics: {
@@ -818,10 +812,7 @@ export function createMarketSnapshot({
       state: engine.driversCore?.state,
     },
 
-    /* SYSTEM HEAT
-     * Persist components, quality, control and inputs
-     * for diagnosing the calculated environment.
-     */
+    /* SYSTEM HEAT */
 
     systemHeat: {
       ...(engine.systemHeat ?? {}),
