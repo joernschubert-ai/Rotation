@@ -7,10 +7,6 @@ export function createMarketSnapshot({
   map: any;
   engine: any;
 }) {
-  /* =====================================================
-  BASE OBJECTS
-  ===================================================== */
-
   const structure = engine.structure ?? {};
   const breadth = structure.breadth ?? {};
   const highsLows = structure.highsLows ?? {};
@@ -75,10 +71,6 @@ export function createMarketSnapshot({
 
     return value;
   }
-
-  /* =====================================================
-  MARKET DATA REFERENCES
-  ===================================================== */
 
   const mapIndices = map?.indices ?? {};
   const mapFutures = map?.futures ?? {};
@@ -161,10 +153,6 @@ export function createMarketSnapshot({
       null,
   };
 
-  /* =====================================================
-  SNAPSHOT
-  ===================================================== */
-
   return {
     timestamp: new Date().toISOString(),
 
@@ -176,6 +164,8 @@ export function createMarketSnapshot({
     },
 
     master: {
+      ...master,
+
       score: master.score,
       mode: master.mode,
       regime: master.regime,
@@ -183,6 +173,7 @@ export function createMarketSnapshot({
 
       components: master.components
         ? {
+            ...master.components,
             crash: master.components.crash,
             rotation: master.components.rotation,
             timing: master.components.timing,
@@ -202,6 +193,7 @@ export function createMarketSnapshot({
 
       meta: master.meta
         ? {
+            ...master.meta,
             scoreType: master.meta.scoreType,
             scoreInterpretation: master.meta.scoreInterpretation,
             callThreshold: master.meta.callThreshold,
@@ -392,6 +384,8 @@ export function createMarketSnapshot({
     },
 
     participation: {
+      ...participation,
+
       score: participation.score,
       state: participation.state,
       breadth: participation.breadth,
@@ -553,7 +547,6 @@ export function createMarketSnapshot({
       ndx: priceMomentum.ndx
         ? {
             ...priceMomentum.ndx,
-
             score: priceMomentum.ndx.score,
             acceleration: priceMomentum.ndx.acceleration,
             direction: priceMomentum.ndx.direction,
@@ -622,6 +615,12 @@ export function createMarketSnapshot({
     },
 
     tradeStack: {
+      type: tradeStack.type,
+      strength: tradeStack.strength,
+      driver: tradeStack.driver,
+      primaryFlow: tradeStack.primaryFlow,
+      meta: tradeStack.meta,
+      history: tradeStack.history,
       decision: tradeStack.decision,
       state: tradeStack.state,
 
@@ -695,13 +694,8 @@ export function createMarketSnapshot({
       confidence: superSignal.confidence,
     },
 
-    /* =================================================
-    HISTORY
-
-    Selected scalar metrics and quality metadata only.
-    Do not embed history.history or historical series.
-    ================================================= */
-
+    // Persist selected history metrics.
+    // Do not embed historical snapshots or historical series.
     historyMetrics: {
       breadthTrend: history.breadthTrend,
       breadthAcceleration: history.breadthAcceleration,
