@@ -630,6 +630,15 @@ export function marketEngine(
   ===================================================== */
 
   const putTimingTemp = putTimingEngine({
+    structure,
+    breadth20,
+    breadth50,
+    breadth200,
+    fragility: fragilityPre,
+    vix,
+    participation,
+    liquidity,
+    breadthThrust,
     phase: "TEMP",
     rotation,
     crash,
@@ -1100,6 +1109,12 @@ export function marketEngine(
   ===================================================== */
 
   const putTiming = putTimingEngine({
+    structure,
+    breadth20,
+    breadth50,
+    breadth200,
+    fragility,
+    vix,
     phase, phaseData, rotation, rotationConfirm, crash,
     earlyWarning, historyMetrics, priceMomentum,
     participation, liquidity, dangerZone, marketDrivers,
