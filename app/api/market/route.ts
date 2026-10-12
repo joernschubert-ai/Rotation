@@ -126,49 +126,77 @@ return aReturn - bReturn;
 /* ================= CREDIT SPREAD ================= */
 
 async function calculateCreditSpread(fetchETF: any) {
+  function positivePrice(value: unknown): number | null {
+    if (typeof value !== "number" && typeof value !== "string") return null;
+    if (typeof value === "string" && value.trim() === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
 
-const [hyg, ief] = await Promise.all([
-fetchETF("HYG"),
-fetchETF("IEF")
-]);
+  function unavailable(reason: string) {
+    return {
+      creditSignal: "neutral",
+      creditRatio: null,
+      creditRatioMA50: null,
+      creditRatioToMA50: null,
+      creditDistancePct: null,
+      creditDataQuality: {
+        available: false,
+        reason,
+        ratioDefinition: "HYG / IEF",
+        normalizedDefinition: "(HYG / IEF) / MA50(HYG / IEF)",
+        timeOrder: "OLDEST_FIRST_REQUIRED",
+        alignmentBasis: "POSITIONAL_EQUAL_LENGTH",
+        dateAlignmentVerified: false
+      }
+    };
+  }
 
-if (hyg.length < 60 || ief.length < 60) {
-return {
-creditSignal: "neutral",
-creditRatio: 0
-};
-}
+  const [hyg, ief] = await Promise.all([fetchETF("HYG"), fetchETF("IEF")]);
+  if (!Array.isArray(hyg) || !Array.isArray(ief)) return unavailable("ETF_HISTORY_NOT_ARRAY");
+  if (hyg.length < 60 || ief.length < 60) return unavailable("INSUFFICIENT_HISTORY");
+  if (hyg.length !== ief.length) return unavailable("HISTORY_LENGTH_MISMATCH");
 
-/* Ratio berechnen */
+  // Preserve the current positional contract. Date pairing requires dated bars.
+  // Missing observations must not shorten or shift this 50-observation window.
+  const last50: number[] = [];
+  for (let i = hyg.length - 50; i < hyg.length; i++) {
+    const hygPrice = positivePrice(hyg[i]);
+    const iefPrice = positivePrice(ief[i]);
+    if (hygPrice === null || iefPrice === null) return unavailable("INVALID_PRICE_IN_MA50_WINDOW");
+    const ratio = hygPrice / iefPrice;
+    if (!Number.isFinite(ratio) || ratio <= 0) return unavailable("INVALID_RATIO_IN_MA50_WINDOW");
+    last50.push(ratio);
+  }
 
-const ratio = hyg.map((v: number, i: number) => {
-
-if(!ief[i]) return v;
-
-return v / ief[i];
-
-});
-
-/* 50 MA */
-
-const last50 = ratio.slice(-50);
-const ma50 =
-last50.reduce((a: number, b: number) => a + b, 0) / 50;
-
-const lastRatio = ratio[ratio.length - 1];
-
-/* Signal */
-
-let creditSignal = "neutral";
-
-if (lastRatio > ma50) creditSignal = "risk_on";
-if (lastRatio < ma50) creditSignal = "risk_off";
-
-return {
-creditSignal,
-creditRatio: lastRatio
-};
-
+  const ma50 = last50.reduce((sum, ratio) => sum + ratio / 50, 0);
+  const lastRatio = last50[last50.length - 1];
+  const tolerance = Number.EPSILON * 64 * Math.max(Math.abs(lastRatio), Math.abs(ma50));
+  const ratioToMA50 = Math.abs(lastRatio - ma50) <= tolerance ? 1 : lastRatio / ma50;
+  const distancePct = (ratioToMA50 - 1) * 100;
+  if (!Number.isFinite(ma50) || ma50 <= 0 || !Number.isFinite(ratioToMA50) || !Number.isFinite(distancePct)) {
+    return unavailable("INVALID_NORMALIZED_RATIO");
+  }
+  let creditSignal = "neutral";
+  if (ratioToMA50 > 1) creditSignal = "risk_on";
+  if (ratioToMA50 < 1) creditSignal = "risk_off";
+  return {
+    creditSignal,
+    // Preserve the raw ratio; do not silently replace its semantics.
+    creditRatio: lastRatio,
+    creditRatioMA50: ma50,
+    creditRatioToMA50: ratioToMA50,
+    creditDistancePct: distancePct,
+    creditDataQuality: {
+      available: true,
+      reason: null,
+      ratioDefinition: "HYG / IEF",
+      normalizedDefinition: "(HYG / IEF) / MA50(HYG / IEF)",
+      timeOrder: "OLDEST_FIRST_REQUIRED",
+      alignmentBasis: "POSITIONAL_EQUAL_LENGTH",
+      dateAlignmentVerified: false
+    }
+  };
 }
 
 /* ================= GEOPOLITICAL / SYSTEMIC SHOCK ENGINE ================= */
@@ -4156,6 +4184,10 @@ profitAction,
 
 creditSignal: creditData.creditSignal,
 creditRatio: creditData.creditRatio,
+creditRatioMA50: creditData.creditRatioMA50,
+creditRatioToMA50: creditData.creditRatioToMA50,
+creditDistancePct: creditData.creditDistancePct,
+creditDataQuality: creditData.creditDataQuality,
 
 liquidityVacuumScore: liquidityVacuum.score,
 liquidityVacuumRegime: liquidityVacuum.regime,
