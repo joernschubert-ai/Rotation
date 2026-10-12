@@ -80,15 +80,11 @@ export interface HistoryMetrics {
   lowestRotation: number;
 
   /*
-   * Chronological daily observations:
+   * Complete chronological daily history:
    * oldest first, newest last.
    */
   history: any[];
 
-  /*
-   * Missing series values remain null.
-   * Zero remains a valid measurement.
-   */
   breadth20History: Array<number | null>;
   breadth50History: Array<number | null>;
   breadth200History: Array<number | null>;
@@ -117,6 +113,15 @@ export interface HistoryMetrics {
     timeBasis: "LATEST_PER_NEW_YORK_DATE";
   };
 }
+
+/* =====================================================
+CURRENT PERSISTENCE WINDOW
+
+Same definition as regimePersistenceEngine:
+twenty observed daily intervals, twenty-one observations.
+===================================================== */
+
+const PERSISTENCE_OBSERVATIONS = 21;
 
 /* =====================================================
 NUMERIC EXTRACTION
@@ -313,8 +318,7 @@ function clamp(
 
 /*
  * Numeric compatibility outputs use zero when endpoints
- * are unavailable. This does not establish a measured
- * flat trend; inspect dataQuality and the nullable series.
+ * are unavailable. This is not a measured flat trend.
  */
 function difference(
   current: number | null,
@@ -353,10 +357,8 @@ const dateFormatter = new Intl.DateTimeFormat(
 HISTORY ENGINE
 
 One observation per New York calendar date.
-5D / 20D mean five / twenty observed daily intervals.
+5D / 20D mean observed daily intervals.
 Missing dates are not invented.
-
-This function does not modify stored snapshots.
 ===================================================== */
 
 export function historyEngine(
@@ -404,7 +406,16 @@ export function historyEngine(
     }
   }
 
+  // Complete archive, newest first.
   const daily = Array.from(perDate.values());
+
+  // Current regime/statistics window, newest first.
+  const recent = daily.slice(
+    0,
+    PERSISTENCE_OBSERVATIONS
+  );
+
+  // Complete exported history, oldest first.
   const chronological = [...daily].reverse();
 
   const newest = daily[0];
@@ -433,7 +444,7 @@ export function historyEngine(
   const values = (
     reader: (s: any) => number | null
   ) =>
-    daily
+    recent
       .map(reader)
       .filter((n): n is number => n !== null);
 
@@ -457,7 +468,7 @@ export function historyEngine(
     reader: (s: any) => number | null,
     predicate: (n: number) => boolean
   ) =>
-    daily.filter(s => {
+    recent.filter(s => {
       const n = reader(s);
       return n !== null && predicate(n);
     }).length;
@@ -548,10 +559,6 @@ export function historyEngine(
   const rutMomentum5D = priceReturn(rutNewest, rutMid);
   const rutMomentum20D = priceReturn(rutNewest, rutOldest);
 
-  /*
-   * Apply the existing Nasdaq convention consistently:
-   * short return minus one quarter of the medium return.
-   */
   const ndxAcceleration =
     ndxNewest !== null &&
     ndxMid !== null &&
@@ -627,7 +634,10 @@ export function historyEngine(
       : "NEUTRAL";
 
   /* ===================================================
-  CURRENT PHASE / DISTRIBUTION STREAKS
+  CURRENT CONSECUTIVE STREAKS
+
+  These retain the complete observed streak.
+  They are not counts of scattered historical events.
   =================================================== */
 
   let daysInPhase = 0;
@@ -654,11 +664,7 @@ export function historyEngine(
   }
 
   /* ===================================================
-  HISTORICAL COUNTERS
-
-  These currently cover the entire supplied history.
-  Their use for current regime classification requires
-  the separate persistence-window review.
+  CURRENT WINDOW COUNTERS
   =================================================== */
 
   const breadthWeakDays = count(
@@ -681,7 +687,7 @@ export function historyEngine(
     readers.fragility, n => n > 60
   );
 
-  const distributionDays = daily.filter(
+  const distributionDays = recent.filter(
     isDistribution
   ).length;
 
@@ -693,7 +699,7 @@ export function historyEngine(
     readers.edge, n => n < 40
   );
 
-  const executionPersistence = daily.filter(s => {
+  const executionPersistence = recent.filter(s => {
     const risk = s?.executionState?.riskState;
 
     if (typeof risk === "string") {
@@ -713,7 +719,7 @@ export function historyEngine(
   }).length;
 
   /* ===================================================
-  AVERAGES / PRESSURE
+  CURRENT WINDOW AVERAGES / PRESSURE
   =================================================== */
 
   const averageBreadth = average(readers.breadth50);
@@ -786,8 +792,19 @@ export function historyEngine(
       ? "TRANSITION"
       : "EXPANSION";
 
-  const breadthValues = values(readers.breadth50);
-  const rotationValues = values(readers.rotation);
+  /* ===================================================
+  ARCHIVE EXTREMES
+
+  These continue to describe the complete history.
+  =================================================== */
+
+  const breadthValues = daily
+    .map(readers.breadth50)
+    .filter((n): n is number => n !== null);
+
+  const rotationValues = daily
+    .map(readers.rotation)
+    .filter((n): n is number => n !== null);
 
   /* ===================================================
   RETURN
