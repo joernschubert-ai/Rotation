@@ -19,37 +19,29 @@ export function createMarketSnapshot({
   const rotation = engine.rotation ?? {};
   const rotationDecay = engine.rotationDecay ?? {};
   const rotationConfirm = engine.rotationConfirm ?? {};
-
   const crash = engine.crash ?? {};
   const phase = engine.phaseData ?? {};
   const persistence = engine.regimePersistence ?? {};
-
   const participation = engine.participation ?? {};
   const liquidity = engine.liquidity ?? {};
   const fragility = engine.fragility ?? {};
   const breadthThrust = engine.breadthThrust ?? {};
   const breadthVelocity = engine.breadthVelocity ?? {};
   const internalDivergence = engine.internalDivergence ?? {};
-
   const gamma = engine.gamma ?? {};
   const squeeze = engine.squeeze ?? {};
-
   const earlyWarning = engine.earlyWarning ?? {};
   const marketQuality = engine.marketQuality ?? {};
   const regimeSync = engine.regimeSync ?? {};
-
   const executionState = engine.executionState ?? {};
   const dangerZone = engine.dangerZone ?? {};
-
   const priceMomentum = engine.priceMomentum ?? {};
   const putTiming = engine.putTiming ?? {};
   const russell = engine.russell ?? {};
   const nasdaqCall = engine.nasdaqCall ?? {};
-
   const master = engine.master ?? {};
   const tradeStack = engine.tradeStack ?? {};
   const edgeState = engine.edgeState ?? {};
-
   const signal = engine.signal ?? {};
   const superSignal = engine.superSignal ?? {};
 
@@ -68,7 +60,6 @@ export function createMarketSnapshot({
     ) {
       return value.value;
     }
-
     return value;
   }
 
@@ -165,7 +156,6 @@ export function createMarketSnapshot({
 
     master: {
       ...master,
-
       score: master.score,
       mode: master.mode,
       regime: master.regime,
@@ -241,7 +231,6 @@ export function createMarketSnapshot({
         b50: extractValue(breadth.b50),
         b200: extractValue(breadth.b200),
       },
-
       health: extractValue(structure.health),
       advanceDecline: extractValue(structure.advanceDecline),
 
@@ -256,19 +245,15 @@ export function createMarketSnapshot({
 
     rotation: {
       ...rotation,
-
       score: rotation.score,
       signal: rotation.signal,
       regime: rotation.regime,
       state: rotation.state,
-
       rsSmall: rotation.rsSmall,
       rsGrowth: rotation.rsGrowth,
       rsEqual: rotation.rsEqual,
-
       smallCapLeadership: rotation.smallCapLeadership,
       growthLeadership: rotation.growthLeadership,
-
       confidence: rotation.confidence,
       timing: rotation.timing,
       phase: rotation.phase,
@@ -277,7 +262,6 @@ export function createMarketSnapshot({
 
     rotationDecay: {
       ...rotationDecay,
-
       score: rotationDecay.score,
       state: rotationDecay.state,
       trend: rotationDecay.trend,
@@ -289,7 +273,6 @@ export function createMarketSnapshot({
 
     rotationConfirm: {
       ...rotationConfirm,
-
       state: rotationConfirm.state,
       score: rotationConfirm.score,
       confidence: rotationConfirm.confidence,
@@ -300,7 +283,6 @@ export function createMarketSnapshot({
 
     breadthVelocity: {
       ...breadthVelocity,
-
       score: breadthVelocity.score,
       state: breadthVelocity.state,
 
@@ -366,12 +348,10 @@ export function createMarketSnapshot({
 
     internalDivergence: {
       ...internalDivergence,
-
       score: internalDivergence.score,
       state: internalDivergence.state,
       signal: internalDivergence.signal,
       confidence: internalDivergence.confidence,
-
       breadthDivergence: internalDivergence.breadthDivergence,
       participationDivergence:
         internalDivergence.participationDivergence,
@@ -385,7 +365,6 @@ export function createMarketSnapshot({
 
     participation: {
       ...participation,
-
       score: participation.score,
       state: participation.state,
       breadth: participation.breadth,
@@ -418,6 +397,7 @@ export function createMarketSnapshot({
     },
 
     liquidity: {
+      ...liquidity,
       score: liquidity.score,
       state: liquidity.state,
       trend: liquidity.trend,
@@ -456,6 +436,7 @@ export function createMarketSnapshot({
     },
 
     squeeze: {
+      ...squeeze,
       score: squeeze.score,
       risk: squeeze.risk,
       instability: squeeze.instability,
@@ -473,7 +454,6 @@ export function createMarketSnapshot({
 
     fragility: {
       ...fragility,
-
       score: fragility.score,
       state: fragility.state,
       trend: fragility.trend,
@@ -493,7 +473,6 @@ export function createMarketSnapshot({
 
     marketQuality: {
       ...marketQuality,
-
       score: marketQuality.score,
       state: marketQuality.state,
       trend: marketQuality.trend,
@@ -508,19 +487,16 @@ export function createMarketSnapshot({
 
     earlyWarning: {
       active: earlyWarning.active,
-
       score:
         typeof earlyWarning.score === "object"
           ? earlyWarning.score?.value
           : earlyWarning.score,
-
       state: earlyWarning.state,
       reasons: earlyWarning.reasons,
     },
 
     regimePersistence: {
       ...persistence,
-
       score: persistence.score,
       state: persistence.state,
       bearishPersistence: persistence.bearishPersistence,
@@ -536,7 +512,6 @@ export function createMarketSnapshot({
 
     priceMomentum: {
       ...priceMomentum,
-
       score: priceMomentum.score,
       direction: priceMomentum.direction,
       trend: priceMomentum.trend,
@@ -556,7 +531,6 @@ export function createMarketSnapshot({
 
     putTiming: {
       ...putTiming,
-
       decision: putTiming.decision,
       timing: putTiming.timing,
       execution: putTiming.execution,
@@ -585,7 +559,6 @@ export function createMarketSnapshot({
 
     regimeSync: {
       ...regimeSync,
-
       score: regimeSync.score,
       state: regimeSync.state,
       signal: regimeSync.signal,
@@ -594,15 +567,12 @@ export function createMarketSnapshot({
 
     executionState: {
       ...executionState,
-
       state: executionState.state,
       signal: executionState.signal,
       score: executionState.score,
-
       executionMode:
         executionState.executionMode ??
         executionState.mode,
-
       riskState: executionState.riskState,
       tacticalBias: executionState.tacticalBias,
       marketMode: executionState.marketMode,
@@ -638,13 +608,10 @@ export function createMarketSnapshot({
       direction: positionSizing.direction,
       mode: positionSizing.mode,
       activeInstruments: positionSizing.activeInstruments,
-
       primary: positionSizing.primary,
-
       nasdaqPut: positionSizing.nasdaqPut,
       nasdaqCall: positionSizing.nasdaqCall,
       russellCall: positionSizing.russellCall,
-
       flows: positionSizing.flows,
       activeFlows: positionSizing.activeFlows,
 
@@ -672,7 +639,6 @@ export function createMarketSnapshot({
 
     edgeState: {
       ...edgeState,
-
       score: edgeState.score,
       state: edgeState.state,
       direction: edgeState.direction,
@@ -694,21 +660,17 @@ export function createMarketSnapshot({
       confidence: superSignal.confidence,
     },
 
-    // Persist selected history metrics.
-    // Do not embed historical snapshots or historical series.
+    // Selected metrics only; no nested historical snapshots or series.
     historyMetrics: {
       breadthTrend: history.breadthTrend,
       breadthAcceleration: history.breadthAcceleration,
-
       participationTrend: history.participationTrend,
       participationDecay: history.participationDecay,
       leadershipTrend: history.leadershipTrend,
       leadershipDecay: history.leadershipDecay,
-
       rotationTrend: history.rotationTrend,
       liquidityTrend: history.liquidityTrend,
       fragilityTrend: history.fragilityTrend,
-
       relativeBreadthWeakness: history.relativeBreadthWeakness,
       crashTrend: history.crashTrend,
 
@@ -730,38 +692,31 @@ export function createMarketSnapshot({
       priceMomentumScore: history.priceMomentumScore,
       priceTrend: history.priceTrend,
       persistenceScore: history.persistenceScore,
-
       phasePersistence: history.phasePersistence,
       regimePersistence: history.regimePersistence,
       daysInPhase: history.daysInPhase,
-
       breadthWeakDays: history.breadthWeakDays,
       participationWeakDays: history.participationWeakDays,
       rotationWeakDays: history.rotationWeakDays,
       liquidityWeakDays: history.liquidityWeakDays,
       fragilityHighDays: history.fragilityHighDays,
-
       distributionDays: history.distributionDays,
       institutionalPressure: history.institutionalPressure,
       marketCharacter: history.marketCharacter,
-
       prolongedBearRegime: history.prolongedBearRegime,
       persistentDistribution: history.persistentDistribution,
       acceleratingWeakness: history.acceleratingWeakness,
-
       rotationPersistence: history.rotationPersistence,
       liquidityPersistence: history.liquidityPersistence,
       fragilityPersistence: history.fragilityPersistence,
       dangerPersistence: history.dangerPersistence,
       executionPersistence: history.executionPersistence,
       edgePersistence: history.edgePersistence,
-
       averageBreadth: history.averageBreadth,
       averageParticipation: history.averageParticipation,
       averageRotation: history.averageRotation,
       averageLiquidity: history.averageLiquidity,
       averageFragility: history.averageFragility,
-
       dataQuality: history.dataQuality,
     },
 
@@ -779,7 +734,6 @@ export function createMarketSnapshot({
 
     systemHeat: {
       ...(engine.systemHeat ?? {}),
-
       score: engine.systemHeat?.score,
       value: engine.systemHeat?.value,
       state: engine.systemHeat?.state,
