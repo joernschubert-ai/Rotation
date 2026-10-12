@@ -48,6 +48,10 @@ export function marketEngine(
   data: any,
   options: { skipHistoricalReplay?: boolean } = {}
 ) {
+  /* =====================================================
+  HISTORICAL SCENARIO MODE
+  ===================================================== */
+
   const isHistoricalScenario =
     data?.historicalScenario === true &&
     data?.historicalScenarioInput?.historicalScenario === true;
@@ -56,18 +60,28 @@ export function marketEngine(
     ? data.historicalScenarioInput
     : null;
 
+  /* =====================================================
+  DRIVERS / STRUCTURE
+  ===================================================== */
+
   const driversCore = driversEngine(data);
   const marketDrivers = marketDriversEngine(data);
   const structure = structureEngine(data);
+
+  /* =====================================================
+  NUMERIC HELPERS
+  ===================================================== */
 
   function finiteValue(value: any): number | null {
     if (typeof value === "number") {
       return Number.isFinite(value) ? value : null;
     }
+
     if (typeof value === "string" && value.trim() !== "") {
       const parsed = Number(value);
       return Number.isFinite(parsed) ? parsed : null;
     }
+
     if (
       value &&
       typeof value === "object" &&
@@ -75,15 +89,20 @@ export function marketEngine(
     ) {
       for (const key of ["value", "current", "score"]) {
         const candidate = value[key];
+
         if (
           typeof candidate === "number" ||
           typeof candidate === "string"
         ) {
           const parsed = finiteValue(candidate);
-          if (parsed !== null) return parsed;
+
+          if (parsed !== null) {
+            return parsed;
+          }
         }
       }
     }
+
     return null;
   }
 
@@ -91,24 +110,41 @@ export function marketEngine(
     return finiteValue(value) ?? fallback;
   }
 
+  // Heat -2..0 maps to stress 10..0.
+  // Positive heat contributes no execution stress.
   function executionStress(heat: any): number {
-    return Math.max(
-      0,
-      Math.min(10, -finiteOr(heat, 0) * 5)
-    );
+    const value = finiteOr(heat, 0);
+    return Math.max(0, Math.min(10, -value * 5));
   }
+
+  /* =====================================================
+  CLEAN INPUT
+  ===================================================== */
 
   const breadth20 = finiteOr(structure?.breadth?.b20, 50);
   const breadth50 = finiteOr(structure?.breadth?.b50, 50);
   const breadth200 = finiteOr(structure?.breadth?.b200, 50);
   const vix = finiteOr(data.marketData?.["^VIX"], 20);
+  const creditInput = {
+    creditRatio: data.creditRatio,
+    creditRatioMA50: data.creditRatioMA50,
+    creditRatioToMA50: data.creditRatioToMA50,
+    creditDistancePct: data.creditDistancePct,
+    creditSignal: data.creditSignal,
+    creditDataQuality: data.creditDataQuality
+  };
 
-  const historyMetrics =
-    data.historyMetrics ?? historyEngine(data.history ?? []);
+  const historyMetrics = data.historyMetrics ?? historyEngine(data.history ?? []);
 
-  const history = Array.isArray(historyMetrics?.history)
-    ? historyMetrics.history
-    : historyEngine(data.history ?? []).history;
+  /* =====================================================
+  HISTORY ACCESS
+  Oldest observation first, newest last.
+  ===================================================== */
+
+  const history =
+    Array.isArray(historyMetrics?.history)
+      ? historyMetrics.history
+      : historyEngine(data.history ?? []).history;
 
   function getHistoryValue(
     offset: number,
@@ -118,21 +154,32 @@ export function marketEngine(
     if (!Array.isArray(history) || history.length <= offset) {
       return fallback;
     }
+
     const snapshot = history[history.length - 1 - offset];
-    if (!snapshot) return fallback;
+
+    if (!snapshot) {
+      return fallback;
+    }
 
     for (const path of paths) {
       let value = snapshot;
+
       for (const part of path.split(".")) {
         if (value === null || value === undefined) {
           value = undefined;
           break;
         }
+
         value = value[part];
       }
+
       const numeric = finiteValue(value);
-      if (numeric !== null) return numeric;
+
+      if (numeric !== null) {
+        return numeric;
+      }
     }
+
     return fallback;
   }
 
@@ -144,66 +191,94 @@ export function marketEngine(
   ): number | undefined {
     for (const name of seriesNames) {
       const series = historyMetrics?.[name];
+
       if (Array.isArray(series) && series.length > offset) {
         const value = finiteValue(
           series[series.length - 1 - offset]
         );
-        if (value !== null) return value;
+
+        if (value !== null) {
+          return value;
+        }
       }
     }
+
     return getHistoryValue(offset, paths, fallback);
   }
 
+  /* =====================================================
+  HISTORICAL COMPARISONS
+  Missing values remain undefined.
+  ===================================================== */
+
   const breadth20_5dAgo = getHistorySeriesValue(
-    ["breadth20History"], 5,
+    ["breadth20History"],
+    5,
     [
-      "breadth20", "breadth.b20",
-      "structure.breadth.b20.value", "structure.breadth.b20"
+      "breadth20",
+      "breadth.b20",
+      "structure.breadth.b20.value",
+      "structure.breadth.b20"
     ],
     undefined
   );
 
   const breadth50_5dAgo = getHistorySeriesValue(
-    ["breadth50History"], 5,
+    ["breadth50History"],
+    5,
     [
-      "breadth50", "breadth.b50",
-      "structure.breadth.b50.value", "structure.breadth.b50"
+      "breadth50",
+      "breadth.b50",
+      "structure.breadth.b50.value",
+      "structure.breadth.b50"
     ],
     undefined
   );
 
   const breadth50_10dAgo = getHistorySeriesValue(
-    ["breadth50History"], 10,
+    ["breadth50History"],
+    10,
     [
-      "breadth50", "breadth.b50",
-      "structure.breadth.b50.value", "structure.breadth.b50"
+      "breadth50",
+      "breadth.b50",
+      "structure.breadth.b50.value",
+      "structure.breadth.b50"
     ],
     undefined
   );
 
   const breadth200_10dAgo = getHistorySeriesValue(
-    ["breadth200History"], 10,
+    ["breadth200History"],
+    10,
     [
-      "breadth200", "breadth.b200",
-      "structure.breadth.b200.value", "structure.breadth.b200"
+      "breadth200",
+      "breadth.b200",
+      "structure.breadth.b200.value",
+      "structure.breadth.b200"
     ],
     undefined
   );
 
   const breadth200_20dAgo = getHistorySeriesValue(
-    ["breadth200History"], 20,
+    ["breadth200History"],
+    20,
     [
-      "breadth200", "breadth.b200",
-      "structure.breadth.b200.value", "structure.breadth.b200"
+      "breadth200",
+      "breadth.b200",
+      "structure.breadth.b200.value",
+      "structure.breadth.b200"
     ],
     undefined
   );
 
   const advanceDecline_5dAgo = getHistorySeriesValue(
-    ["advanceDeclineHistory", "adHistory"], 5,
+    ["advanceDeclineHistory", "adHistory"],
+    5,
     [
-      "advanceDecline", "ad",
-      "structure.advanceDecline.value", "structure.advanceDecline"
+      "advanceDecline",
+      "ad",
+      "structure.advanceDecline.value",
+      "structure.advanceDecline"
     ],
     undefined
   );
@@ -216,13 +291,22 @@ export function marketEngine(
     0;
 
   const spx5dAgo = getHistorySeriesValue(
-    ["spxHistory", "SPXHistory"], 5,
+    ["spxHistory", "SPXHistory"],
+    5,
     [
-      "spx", "SPX", "indices.spx",
-      "indices.sp500", "indices.SPX", "structure.spx.value"
+      "spx",
+      "SPX",
+      "indices.spx",
+      "indices.sp500",
+      "indices.SPX",
+      "structure.spx.value"
     ],
     undefined
   );
+
+  /* =====================================================
+  PRICE MOMENTUM / LEGACY DIVERGENCE
+  ===================================================== */
 
   const priceMomentumPre = priceMomentumEngine({
     historyMetrics,
@@ -232,23 +316,32 @@ export function marketEngine(
   const divergence = (() => {
     const breadth = finiteValue(structure?.breadth?.b50);
     const ad = finiteValue(structure?.advanceDecline);
+
     let score = 0;
+
     if (breadth !== null && ad !== null) {
       if (breadth > 80 && ad < 0) score -= 2;
       if (breadth < 40 && ad > 0) score += 2;
     }
+
     return {
       score,
-      state: score > 1
-        ? "BULLISH_DIVERGENCE"
-        : score < -1 ? "BEARISH_DIVERGENCE" : "NONE"
+      state:
+        score > 1
+          ? "BULLISH_DIVERGENCE"
+          : score < -1
+            ? "BEARISH_DIVERGENCE"
+            : "NONE"
     };
   })();
 
-  // Preliminary liquidity has no future participation/rotation input.
+  /* =====================================================
+  LIQUIDITY / PRELIMINARY FRAGILITY
+  ===================================================== */
+
   const liquidityPre = liquidityEngine({
     marketLiquidityScore: data.marketLiquidityScore,
-    creditRatio: data.creditRatio,
+    ...creditInput,
     gammaExposure: data.gammaExposure,
     vixTermRatio: data.vixTermRatio,
     volOfVolRatio: data.volOfVolRatio,
@@ -264,7 +357,9 @@ export function marketEngine(
     historyMetrics,
     crash: {
       probability: Number(
-        data.crash?.probability ?? data.crashProbability ?? 0
+        data.crash?.probability ??
+        data.crashProbability ??
+        0
       )
     },
     breadth50,
@@ -278,6 +373,10 @@ export function marketEngine(
     structure
   });
 
+  /* =====================================================
+  SQUEEZE / ROTATION BASE
+  ===================================================== */
+
   const squeezePre = squeezeEngine({
     gammaExposure: data.gammaExposure,
     vix: finiteValue(data.marketData?.["^VIX"]) ?? undefined,
@@ -285,7 +384,7 @@ export function marketEngine(
     breadth50: finiteValue(structure?.breadth?.b50) ?? undefined,
     breadth200: finiteValue(structure?.breadth?.b200) ?? undefined,
     vixTermRatio: data.vixTermRatio,
-    creditRatio: data.creditRatio,
+    ...creditInput,
     marketLiquidityScore: data.marketLiquidityScore,
     putCallRatio: data.putCallRatio,
     shortInterest: data.shortInterest,
@@ -308,10 +407,13 @@ export function marketEngine(
     breadthAcceleration: historyMetrics?.breadthAcceleration ?? 0,
     participationDecay: historyMetrics?.participationDecay ?? 0,
     leadershipDecay: historyMetrics?.leadershipDecay ?? 0,
-    relativeBreadthWeakness:
-      historyMetrics?.relativeBreadthWeakness ?? 0,
+    relativeBreadthWeakness: historyMetrics?.relativeBreadthWeakness ?? 0,
     structure
   });
+
+  /* =====================================================
+  PARTICIPATION / BREADTH THRUST
+  ===================================================== */
 
   const participation = participationEngine({
     historyMetrics,
@@ -329,12 +431,12 @@ export function marketEngine(
     rotationScore: Number(rotationBase?.score ?? 50)
   });
 
-  // Use the available participation and rotation-base context once.
+  // Final liquidity uses the available participation/rotation-base context.
   // Final rotation, decay and fragility must not feed back into this pass.
   const liquidity = liquidityEngine({
     historyMetrics,
     marketLiquidityScore: data.marketLiquidityScore,
-    creditRatio: data.creditRatio,
+    ...creditInput,
     gammaExposure: data.gammaExposure,
     vixTermRatio: data.vixTermRatio,
     volOfVolRatio: data.volOfVolRatio,
@@ -357,7 +459,7 @@ export function marketEngine(
     breadth50: finiteValue(structure?.breadth?.b50) ?? undefined,
     breadth200: finiteValue(structure?.breadth?.b200) ?? undefined,
     vixTermRatio: data.vixTermRatio,
-    creditRatio: data.creditRatio,
+    ...creditInput,
     marketLiquidityScore: data.marketLiquidityScore,
     putCallRatio: data.putCallRatio,
     shortInterest: data.shortInterest,
@@ -373,7 +475,10 @@ export function marketEngine(
   });
 
   const breadthThrust = breadthThrustEngine({
-    breadth20, breadth50, breadth200, structure,
+    breadth20,
+    breadth50,
+    breadth200,
+    structure,
     advanceDecline: finiteOr(structure?.advanceDecline, 0),
     rsEqual: rotationBase?.rsEqual,
     rsSmall: rotationBase?.rsSmall,
@@ -382,6 +487,10 @@ export function marketEngine(
     concentrationScore: Number(data.concentrationScore ?? 50),
     divergenceState: divergence.state
   });
+
+  /* =====================================================
+  BREADTH VELOCITY
+  ===================================================== */
 
   const breadthVelocity = breadthVelocityEngine({
     structure,
@@ -400,10 +509,19 @@ export function marketEngine(
     spx5dAgo
   });
 
+  /* =====================================================
+  INTERNAL DIVERGENCE
+
+  spxMomentum is the signed SPX 5D percentage change.
+  Do not pass the aggregate 0..100 price score here.
+  ===================================================== */
+
   const internalDivergence = internalDivergenceEngine({
     spxTrend: Number(breadthVelocity?.slopes?.spxSlope5d ?? 0),
     spxMomentum: finiteOr(priceMomentumPre?.spx?.momentum5D, 0),
-    breadth20, breadth50, breadth200,
+    breadth20,
+    breadth50,
+    breadth200,
     breadth20Slope5d:
       Number(breadthVelocity?.slopes?.b20Slope5d ?? 0),
     breadth50Slope5d:
@@ -423,6 +541,10 @@ export function marketEngine(
     gammaExposure: Number(data.gammaExposure ?? 0)
   });
 
+  /* =====================================================
+  GAMMA
+  ===================================================== */
+
   const gamma = gammaEngine({
     gammaExposure: Number(data.gammaExposure ?? 0),
     vix,
@@ -435,21 +557,34 @@ export function marketEngine(
     participationScore: Number(participation?.score ?? 50)
   });
 
+  /* =====================================================
+  PERSISTENCE HISTORY
+  ===================================================== */
+
   function persistenceHistory(metrics: any) {
     const snapshots = Array.isArray(metrics?.history)
       ? metrics.history
-      : metrics === historyMetrics ? history : [];
+      : metrics === historyMetrics
+        ? history
+        : [];
+
     return {
-      breadth50History: Array.isArray(metrics?.breadth50History)
-        ? metrics.breadth50History : [],
-      breadth200History: Array.isArray(metrics?.breadth200History)
-        ? metrics.breadth200History : [],
+      breadth50History:
+        Array.isArray(metrics?.breadth50History)
+          ? metrics.breadth50History
+          : [],
+      breadth200History:
+        Array.isArray(metrics?.breadth200History)
+          ? metrics.breadth200History
+          : [],
       participationHistory:
         Array.isArray(metrics?.participationHistory)
-          ? metrics.participationHistory : [],
+          ? metrics.participationHistory
+          : [],
       rotationDecayHistory:
         Array.isArray(metrics?.rotationDecayHistory)
-          ? metrics.rotationDecayHistory : [],
+          ? metrics.rotationDecayHistory
+          : [],
       internalDivergenceHistory:
         Array.isArray(metrics?.internalDivergenceHistory)
           ? metrics.internalDivergenceHistory
@@ -459,6 +594,10 @@ export function marketEngine(
             )
     };
   }
+
+  /* =====================================================
+  REGIME PERSISTENCE — PRE PHASE
+  ===================================================== */
 
   const regimePersistencePre = regimePersistenceEngine({
     breadth50,
@@ -470,33 +609,43 @@ export function marketEngine(
     internalDivergenceScore: Number(internalDivergence?.score ?? 0),
     breadth50History:
       Array.isArray(historyMetrics?.breadth50History)
-        ? historyMetrics.breadth50History : [],
+        ? historyMetrics.breadth50History
+        : [],
     breadth200History:
       Array.isArray(historyMetrics?.breadth200History)
-        ? historyMetrics.breadth200History : [],
+        ? historyMetrics.breadth200History
+        : [],
     participationHistory:
       Array.isArray(historyMetrics?.participationHistory)
-        ? historyMetrics.participationHistory : [],
+        ? historyMetrics.participationHistory
+        : [],
     rotationDecayHistory:
       Array.isArray(historyMetrics?.rotationDecayHistory)
-        ? historyMetrics.rotationDecayHistory : [],
+        ? historyMetrics.rotationDecayHistory
+        : [],
     internalDivergenceHistory:
       persistenceHistory(historyMetrics).internalDivergenceHistory
   });
+
+  /* =====================================================
+  ROTATION / CRASH / EARLY WARNING
+  ===================================================== */
 
   const rotation = rotationEngine({
     ...data.rotation,
     concentrationScore: Number(data.concentrationScore ?? 0),
     futuresVsCash: Number(data.futuresVsCash ?? 0),
     marketData: data.marketData ?? {},
-    liquidity, fragility: fragilityPre, squeeze,
-    participation, breadthThrust,
+    liquidity,
+    fragility: fragilityPre,
+    squeeze,
+    participation,
+    breadthThrust,
     breadthTrend: historyMetrics?.breadthTrend ?? 0,
     breadthAcceleration: historyMetrics?.breadthAcceleration ?? 0,
     participationDecay: historyMetrics?.participationDecay ?? 0,
     leadershipDecay: historyMetrics?.leadershipDecay ?? 0,
-    relativeBreadthWeakness:
-      historyMetrics?.relativeBreadthWeakness ?? 0,
+    relativeBreadthWeakness: historyMetrics?.relativeBreadthWeakness ?? 0,
     structure
   });
 
@@ -506,7 +655,9 @@ export function marketEngine(
     vix,
     vixTermRatio: Number(data.vixTermRatio ?? 1),
     moveIndex: Number(
-      data.moveIndex ?? data.marketDrivers?.raw?.move ?? 0
+      data.moveIndex ??
+      data.marketDrivers?.raw?.move ??
+      0
     ),
     volOfVolRatio: Number(data.volOfVolRatio ?? 1),
     gammaExposure: Number(data.gammaExposure ?? 0),
@@ -519,12 +670,25 @@ export function marketEngine(
     historyMetrics
   });
 
+  /* =====================================================
+  TEMP PUT / RUSSELL
+  ===================================================== */
+
   const putTimingTemp = putTimingEngine({
-    structure, breadth20, breadth50, breadth200,
-    fragility: fragilityPre, vix,
-    participation, liquidity, breadthThrust,
+    structure,
+    breadth20,
+    breadth50,
+    breadth200,
+    fragility: fragilityPre,
+    vix,
+    participation,
+    liquidity,
+    breadthThrust,
     phase: "TEMP",
-    rotation, crash, earlyWarning, historyMetrics,
+    rotation,
+    crash,
+    earlyWarning,
+    historyMetrics,
     priceMomentum: priceMomentumPre
   });
 
@@ -539,6 +703,10 @@ export function marketEngine(
     vix,
     historyMetrics
   });
+
+  /* =====================================================
+  HISTORICAL PHASE INPUTS
+  ===================================================== */
 
   const phaseCrash = isHistoricalScenario
     ? {
@@ -589,22 +757,30 @@ export function marketEngine(
   const phaseRotationDecay = isHistoricalScenario
     ? {
         ...rotationDecayEngine({
-          historyMetrics, rotation, structure, crash,
-          earlyWarning, liquidity, fragility: fragilityPre,
-          squeeze, participation, breadthThrust,
-          regimeSync: {}, executionState: {},
-          breadth50, breadth200, vix,
+          historyMetrics,
+          rotation,
+          structure,
+          crash,
+          earlyWarning,
+          liquidity,
+          fragility: fragilityPre,
+          squeeze,
+          participation,
+          breadthThrust,
+          regimeSync: {},
+          executionState: {},
+          breadth50,
+          breadth200,
+          vix,
           concentrationScore: Number(data.concentrationScore ?? 0),
           gammaExposure: Number(data.gammaExposure ?? 0),
-          creditRatio: Number(data.creditRatio ?? 1),
-          marketLiquidityScore:
-            Number(data.marketLiquidityScore ?? 50),
+          ...creditInput,
+          marketLiquidityScore: Number(data.marketLiquidityScore ?? 50),
           breadthTrend: historyMetrics?.breadthTrend,
           breadthAcceleration: historyMetrics?.breadthAcceleration,
           participationDecay: historyMetrics?.participationDecay,
           leadershipDecay: historyMetrics?.leadershipDecay,
-          relativeBreadthWeakness:
-            historyMetrics?.relativeBreadthWeakness
+          relativeBreadthWeakness: historyMetrics?.relativeBreadthWeakness
         }),
         score: Number(historicalInput.rotationDecay.score)
       }
@@ -621,10 +797,12 @@ export function marketEngine(
   const phaseRegimeSync = isHistoricalScenario
     ? {
         score: Number(historicalInput.regimeSync.score),
-        state: historicalInput.regimeSync.score <= 35
-          ? "BREAKDOWN"
-          : historicalInput.regimeSync.score >= 65
-            ? "SYNCHRONIZED" : "TRANSITION"
+        state:
+          historicalInput.regimeSync.score <= 35
+            ? "BREAKDOWN"
+            : historicalInput.regimeSync.score >= 65
+              ? "SYNCHRONIZED"
+              : "TRANSITION"
       }
     : null;
 
@@ -643,8 +821,13 @@ export function marketEngine(
     ? phaseRotationDecay
     : { score: 0 };
 
+  /* =====================================================
+  PHASE
+  ===================================================== */
+
   const phaseData = marketPhaseEngine({
-    breadthVelocity, vix,
+    breadthVelocity,
+    vix,
     crash: phaseCrash,
     rotation: phaseRotation,
     putTiming: phasePutTiming,
@@ -665,31 +848,63 @@ export function marketEngine(
   });
 
   const phase = phaseData.phase;
-  const regime = { label: phase, score: phaseCrash.score };
-  const phaseStage = { phase, phaseData };
+
+  const regime = {
+    label: phase,
+    score: phaseCrash.score
+  };
+
+  const phaseStage = {
+    phase,
+    phaseData
+  };
+
+  /* =====================================================
+  SYSTEM HEAT — PRELIMINARY
+  ===================================================== */
 
   const systemHeatPre = systemHeatEngine({
-    crash, liquidity, participation, rotation, breadthThrust,
+    crash,
+    liquidity,
+    participation,
+    rotation,
+    breadthThrust,
     fragility: fragilityPre,
     rotationDecayScore: 0,
-    breadth20, breadth50, vix,
+    breadth20,
+    breadth50,
+    vix,
     marketLiquidityScore: data.marketLiquidityScore,
-    creditRatio: data.creditRatio,
+    ...creditInput,
     vixTermRatio: data.vixTermRatio,
     gammaExposure: data.gammaExposure
   });
 
+  /* =====================================================
+  REGIME SYNC — PRE
+  ===================================================== */
+
   const regimeSyncPre = regimeSyncEngine({
-    internalDivergence, phase, crash, rotation, structure,
-    earlyWarning, vix,
+    internalDivergence,
+    phase,
+    crash,
+    rotation,
+    structure,
+    earlyWarning,
+    vix,
     gammaExposure: Number(data.gammaExposure ?? 0),
     liquidityScore: Number(liquidity?.score ?? 50),
-    creditRatio: Number(data.creditRatio ?? 1),
-    breadth50, breadth200,
+    ...creditInput,
+    breadth50,
+    breadth200,
     fragility: fragilityPre,
     participation,
     breadthThrust
   });
+
+  /* =====================================================
+  DANGER ZONE
+  ===================================================== */
 
   const dangerZone = dangerZoneEngine({
     crashProbability: Number(crash?.probability ?? 0),
@@ -700,10 +915,14 @@ export function marketEngine(
     correlationScore: Number(data.correlationScore ?? 0),
     gammaExposure: Number(data.gammaExposure ?? 0),
     volOfVolRatio: Number(data.volOfVolRatio ?? 1),
-    creditRatio: Number(data.creditRatio ?? 1),
+    ...creditInput,
     vix,
     history: historyMetrics
   });
+
+  /* =====================================================
+  EXECUTION STATE — PRE
+  ===================================================== */
 
   const executionStatePre = executionStateEngine({
     regimeSignal: phase ?? "NEUTRAL",
@@ -712,7 +931,8 @@ export function marketEngine(
     stressScore: executionStress(systemHeatPre?.value),
     rotationSignal: rotation?.signal ?? "neutral",
     rotationStrength: Number(rotation?.score ?? 0),
-    breadth200, breadth50,
+    breadth200,
+    breadth50,
     gammaExposure: Number(data.gammaExposure ?? 0),
     liquidityScore: Number(liquidity?.score ?? 50),
     volatilityState: vix > 25 ? "HIGH_VOL" : "NORMAL",
@@ -731,16 +951,29 @@ export function marketEngine(
     masterScore: Number(data.masterScore ?? 50)
   });
 
+  /* =====================================================
+  ROTATION DECAY
+  ===================================================== */
+
   const rotationDecay = rotationDecayEngine({
-    historyMetrics, rotation, structure, crash, earlyWarning,
-    liquidity, fragility: fragilityPre,
-    squeeze, participation, breadthThrust,
+    historyMetrics,
+    rotation,
+    structure,
+    crash,
+    earlyWarning,
+    liquidity,
+    fragility: fragilityPre,
+    squeeze,
+    participation,
+    breadthThrust,
     regimeSync: regimeSyncPre,
     executionState: executionStatePre,
-    breadth50, breadth200, vix,
+    breadth50,
+    breadth200,
+    vix,
     concentrationScore: Number(data.concentrationScore ?? 0),
     gammaExposure: Number(data.gammaExposure ?? 0),
-    creditRatio: Number(data.creditRatio ?? 1),
+    ...creditInput,
     marketLiquidityScore: Number(data.marketLiquidityScore ?? 50),
     breadthTrend: historyMetrics?.breadthTrend,
     breadthAcceleration: historyMetrics?.breadthAcceleration,
@@ -749,16 +982,28 @@ export function marketEngine(
     relativeBreadthWeakness: historyMetrics?.relativeBreadthWeakness
   });
 
+  /* =====================================================
+  ROTATION CONFIRM / RUSSELL
+  ===================================================== */
+
   const rotationConfirm = rotationConfirmEngine({
-    rotation, structure, crash, earlyWarning,
+    rotation,
+    structure,
+    crash,
+    earlyWarning,
     drivers: marketDrivers,
     positioning: {},
     volatility: { vix },
     executionState: executionStatePre,
     regimeSync: regimeSyncPre,
-    liquidity, fragility: fragilityPre,
-    squeeze, participation, breadthThrust,
-    rotationDecay, historyMetrics, gamma
+    liquidity,
+    fragility: fragilityPre,
+    squeeze,
+    participation,
+    breadthThrust,
+    rotationDecay,
+    historyMetrics,
+    gamma
   });
 
   const russell = russellEngine({
@@ -767,28 +1012,53 @@ export function marketEngine(
     breadth50,
     breadth200,
     concentrationScore: Number(data.concentrationScore ?? 0),
-    phase, crash, vix, historyMetrics,
-    rotationDecay, rotationConfirm, participation,
+    phase,
+    crash,
+    vix,
+    historyMetrics,
+    rotationDecay,
+    rotationConfirm,
+    participation,
     internalDivergence,
     priceMomentum: priceMomentumPre,
     gamma
   });
 
+  /* =====================================================
+  PHASE CONFIRMATION / MARKET QUALITY
+  ===================================================== */
+
   const phaseConfirmation = phaseConfirmationEngine({
-    phase, phaseData, rotation, crash, earlyWarning,
-    participation, breadthThrust, liquidity,
+    phase,
+    phaseData,
+    rotation,
+    crash,
+    earlyWarning,
+    participation,
+    breadthThrust,
+    liquidity,
     fragility: fragilityPre,
     rotationDecay,
     historyMetrics
   });
 
   const marketQuality = marketQualityEngine({
-    structure, participation, rotation, breadthThrust,
-    rotationDecay, liquidity, fragility: fragilityPre,
-    phaseConfirmation, internalDivergence,
+    structure,
+    participation,
+    rotation,
+    breadthThrust,
+    rotationDecay,
+    liquidity,
+    fragility: fragilityPre,
+    phaseConfirmation,
+    internalDivergence,
     regimeSync: regimeSyncPre,
     concentrationScore: Number(data.concentrationScore ?? 50)
   });
+
+  /* =====================================================
+  FRAGILITY — FINAL
+  ===================================================== */
 
   const fragility = fragilityEngine({
     history,
@@ -814,29 +1084,63 @@ export function marketEngine(
     marketQuality
   });
 
+  /* Final structure context is available only after final fragility.
+   * Early consumers retain the independent preliminary price result.
+   * Price scores and momentum use the same inputs in both passes.
+   */
   const priceMomentum = priceMomentumEngine({
     historyMetrics,
     indices: data.indices ?? {},
-    structure, participation, rotation, liquidity, fragility
+    structure,
+    participation,
+    rotation,
+    liquidity,
+    fragility
   });
 
+  /* =====================================================
+  SYSTEM HEAT — FINAL
+  ===================================================== */
+
   const systemHeat = systemHeatEngine({
-    crash, breadth20, breadth50, vix, liquidity, participation,
-    rotation, breadthThrust, fragility, rotationDecay,
+    crash,
+    breadth20,
+    breadth50,
+    vix,
+    liquidity,
+    participation,
+    rotation,
+    breadthThrust,
+    fragility,
+    rotationDecay,
     marketLiquidityScore: data.marketLiquidityScore,
-    creditRatio: data.creditRatio,
+    ...creditInput,
     vixTermRatio: data.vixTermRatio,
     gammaExposure: data.gammaExposure
   });
 
+  /* =====================================================
+  REGIME SYNC / PERSISTENCE — FINAL
+  ===================================================== */
+
   const regimeSync = regimeSyncEngine({
-    internalDivergence, rotationDecay,
-    phase, crash, rotation, structure, earlyWarning, vix,
+    internalDivergence,
+    rotationDecay,
+    phase,
+    crash,
+    rotation,
+    structure,
+    earlyWarning,
+    vix,
     gammaExposure: Number(data.gammaExposure ?? 0),
     liquidityScore: Number(liquidity?.score ?? 50),
-    creditRatio: Number(data.creditRatio ?? 1),
-    breadth50, breadth200,
-    fragility, participation, breadthThrust, marketQuality
+    ...creditInput,
+    breadth50,
+    breadth200,
+    fragility,
+    participation,
+    breadthThrust,
+    marketQuality
   });
 
   const regimePersistence = regimePersistenceEngine({
@@ -851,23 +1155,47 @@ export function marketEngine(
     phase
   });
 
+  /* =====================================================
+  FINAL PUT TIMING
+  ===================================================== */
+
   const putTiming = putTimingEngine({
-    structure, breadth20, breadth50, breadth200,
-    fragility, vix, phase, phaseData, rotation, rotationConfirm,
-    crash, earlyWarning, historyMetrics, priceMomentum,
+    structure,
+    breadth20,
+    breadth50,
+    breadth200,
+    fragility,
+    vix,
+    phase, phaseData, rotation, rotationConfirm, crash,
+    earlyWarning, historyMetrics, priceMomentum,
     participation, liquidity, dangerZone, marketDrivers,
     regimeSync, breadthThrust, marketQuality, rotationDecay,
     regimePersistence, gamma
   });
 
+  /* Risk confirmation uses the completed risk components.
+   * It is consumed by the decision layer, not Execution State.
+   * Retain the existing phase/scenario crash and rotation sources.
+   * Do not invent a structuralRisk alias from fragility.score.
+   */
   const confidence = confidenceEngine({
     ...data,
     phase,
     crash: phaseCrash,
     rotation: phaseRotation,
-    rotationDecay, fragility, liquidity, participation,
-    squeeze, breadthThrust, regimeSync, rotationConfirm
+    rotationDecay,
+    fragility,
+    liquidity,
+    participation,
+    squeeze,
+    breadthThrust,
+    regimeSync,
+    rotationConfirm
   });
+
+  /* =====================================================
+  MASTER INPUT NORMALIZATION
+  ===================================================== */
 
   const masterCrash = isHistoricalScenario
     ? {
@@ -936,6 +1264,10 @@ export function marketEngine(
       }
     : putTiming;
 
+  /* =====================================================
+  HISTORICAL MARKET QUALITY / PERSISTENCE
+  ===================================================== */
+
   const masterMarketQuality = isHistoricalScenario
     ? marketQualityEngine({
         structure,
@@ -965,11 +1297,14 @@ export function marketEngine(
         rotationDecayScore: finiteOr(masterRotationDecay?.score, 0),
         dangerScore: finiteOr(dangerZone?.score, 0),
         fragilityScore: finiteOr(masterFragility?.score, 50),
-        internalDivergenceScore:
-          finiteOr(phaseInternalDivergence?.score, 0),
+        internalDivergenceScore: finiteOr(phaseInternalDivergence?.score, 0),
         phase
       })
     : regimePersistence;
+
+  /* =====================================================
+  MASTER DIAGNOSTICS
+  ===================================================== */
 
   const masterDiagnostics = {
     crash: masterCrash?.score,
@@ -977,7 +1312,9 @@ export function marketEngine(
     rotation: masterRotation?.score,
     putTiming: masterPutTiming?.score,
     russell:
-      russell?.confidence ?? russell?.score?.value ?? russell?.score,
+      russell?.confidence ??
+      russell?.score?.value ??
+      russell?.score,
     participation: masterParticipation?.score,
     breadthThrust: masterBreadthThrust?.score,
     liquidity: masterLiquidity?.score,
@@ -1008,6 +1345,10 @@ export function marketEngine(
     );
   }
 
+  /* =====================================================
+  MASTER
+  ===================================================== */
+
   const master = masterScoreEngine({
     breadthVelocity,
     dangerZone,
@@ -1015,7 +1356,9 @@ export function marketEngine(
     crash: masterCrash,
     rotation: masterRotation,
     putTiming: masterPutTiming,
-    russell, phaseData, structure,
+    russell,
+    phaseData,
+    structure,
     participation: masterParticipation,
     breadthThrust: masterBreadthThrust,
     liquidity: masterLiquidity,
@@ -1024,7 +1367,9 @@ export function marketEngine(
     rotationDecay: masterRotationDecay,
     phaseConfirmation: masterPhaseConfirmation,
     regimeSync: masterRegimeSync,
-    phaseStage, historyMetrics, priceMomentum,
+    phaseStage,
+    historyMetrics,
+    priceMomentum,
     regimePersistence: masterRegimePersistence,
     gamma
   });
@@ -1045,6 +1390,10 @@ export function marketEngine(
     );
   }
 
+  /* =====================================================
+  EXECUTION STATE — FINAL
+  ===================================================== */
+
   const executionState = executionStateEngine({
     regimeSignal: phase ?? "NEUTRAL",
     crashProbability: Number(crash?.probability ?? 0),
@@ -1052,7 +1401,8 @@ export function marketEngine(
     stressScore: executionStress(systemHeat?.value),
     rotationSignal: rotation?.signal ?? "neutral",
     rotationStrength: Number(rotation?.score ?? 0),
-    breadth200, breadth50,
+    breadth200,
+    breadth50,
     gammaExposure: Number(data.gammaExposure ?? 0),
     liquidityScore: Number(liquidity?.score ?? 50),
     volatilityState: vix > 25 ? "HIGH_VOL" : "NORMAL",
@@ -1071,13 +1421,17 @@ export function marketEngine(
     masterScore: Number(master?.score ?? 50)
   });
 
+  /* =====================================================
+  EDGE / NASDAQ CALL
+  ===================================================== */
+
   const edgeState = edgeStateEngine({
-    liquidity, vix, rotation, russell, structure, earlyWarning,
-    crash, master, marketQuality, rotationDecay, rotationConfirm,
-    participation, divergence, priceMomentum, executionState,
-    regimeSync, dangerZone,
-    marketData: data.marketData ?? {},
-    gamma
+    liquidity,
+    vix,
+    rotation, russell, structure, earlyWarning, crash, master,
+    marketQuality, rotationDecay, rotationConfirm, participation,
+    divergence, priceMomentum, executionState, regimeSync,
+    dangerZone, marketData: data.marketData ?? {}, gamma
   });
 
   const nasdaqCall = nasdaqEngine({
@@ -1088,16 +1442,29 @@ export function marketEngine(
     master, gamma
   });
 
+  /* =====================================================
+  POSITIONING
+  ===================================================== */
+
   const positioning = {
-    bias: (rotation.score ?? 0) > 60
-      ? "BULLISH"
-      : (rotation.score ?? 0) < 40 ? "BEARISH" : "NEUTRAL",
-    crowding: breadth50 > 85
-      ? "CROWDED_LONG"
-      : breadth50 < 30 ? "CROWDED_SHORT" : "BALANCED",
-    state: earlyWarning?.active
-      ? "FRAGILE"
-      : crash?.probability > 40 ? "RISK" : "STABLE",
+    bias:
+      (rotation.score ?? 0) > 60
+        ? "BULLISH"
+        : (rotation.score ?? 0) < 40
+          ? "BEARISH"
+          : "NEUTRAL",
+    crowding:
+      breadth50 > 85
+        ? "CROWDED_LONG"
+        : breadth50 < 30
+          ? "CROWDED_SHORT"
+          : "BALANCED",
+    state:
+      earlyWarning?.active
+        ? "FRAGILE"
+        : crash?.probability > 40
+          ? "RISK"
+          : "STABLE",
     score: Math.round(
       Number(rotation?.score ?? 50) * 0.5 +
       finiteOr(structure?.health, 0) * 0.3 -
@@ -1105,12 +1472,20 @@ export function marketEngine(
     )
   };
 
+  /* =====================================================
+  TRADE STACK
+  ===================================================== */
+
   const tradeStack = tradeStackEngine({
     phase, putTiming, nasdaqCall, russell, priceMomentum,
     edgeState, master, marketQuality, phaseConfirmation,
     rotationConfirm, rotationDecay, executionState, regimeSync,
     historyMetrics, regimePersistence, gamma
   });
+
+  /* =====================================================
+  POSITION STATE — PRE / SIZING
+  ===================================================== */
 
   const statePre = data.positionState ?? null;
   const currentPositionSize = Number(statePre?.size ?? 0);
@@ -1134,6 +1509,10 @@ export function marketEngine(
     historyMetrics, priceMomentum, regimePersistence, gamma
   });
 
+  /* =====================================================
+  EXIT / POSITION STATE — FINAL
+  ===================================================== */
+
   const exit = exitEngine({
     position: { size: currentPositionSize },
     crash, vix, breadth50,
@@ -1149,6 +1528,10 @@ export function marketEngine(
     pnl: Number(data.pnl ?? 0)
   });
 
+  /* =====================================================
+  POSITION / DECISION
+  ===================================================== */
+
   const position = positionEngine({
     pnl: Number(data.pnl ?? 0),
     phase,
@@ -1161,6 +1544,10 @@ export function marketEngine(
     earlyWarning, master, positioning, edgeState,
     rotation, rotationConfirm, executionState
   });
+
+  /* =====================================================
+  SIGNAL / SUPER SIGNAL
+  ===================================================== */
 
   const signalResult = signalEngine({
     phase, phaseConfirmation, crash, putTiming, rotation,
@@ -1184,6 +1571,10 @@ export function marketEngine(
     marketQuality, regimePersistence
   });
 
+  /* =====================================================
+  EXECUTION / RISK / REPLAY
+  ===================================================== */
+
   const execution = executionEngine({
     superSignal, marketQuality, vix, breadth20, breadth50,
     crash, phase, executionState, dangerZone, regimeSync,
@@ -1191,11 +1582,19 @@ export function marketEngine(
     squeeze, participation, gamma
   });
 
-  const risk = riskLoopEngine({ sizing, exit, state });
+  const risk = riskLoopEngine({
+    sizing,
+    exit,
+    state
+  });
 
   const replay = options.skipHistoricalReplay
     ? null
     : historicalReplay();
+
+  /* =====================================================
+  RETURN
+  ===================================================== */
 
   return {
     crash,
