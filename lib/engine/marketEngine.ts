@@ -1338,6 +1338,8 @@ export function marketEngine(
   ===================================================== */
 
   const edgeState = edgeStateEngine({
+    liquidity,
+    vix,
     rotation, russell, structure, earlyWarning, crash, master,
     marketQuality, rotationDecay, rotationConfirm, participation,
     divergence, priceMomentum, executionState, regimeSync,
