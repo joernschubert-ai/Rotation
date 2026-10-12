@@ -17,10 +17,12 @@ export interface HistoryMetrics {
   spxPriceTrend: number;
   spxMomentum5D: number;
   spxMomentum20D: number;
+  spxAcceleration: number;
 
   rutPriceTrend: number;
   rutMomentum5D: number;
   rutMomentum20D: number;
+  rutAcceleration: number;
 
   priceMomentumScore: number;
 
@@ -33,23 +35,18 @@ export interface HistoryMetrics {
 
   leadershipTrend: number;
   leadershipDecay: number;
-
   relativeBreadthWeakness: number;
-
   crashTrend: number;
 
   persistenceScore: number;
   phasePersistence: number;
-
   daysInPhase: number;
 
   breadthWeakDays: number;
   participationWeakDays: number;
   rotationWeakDays: number;
-
   liquidityWeakDays: number;
   fragilityHighDays: number;
-
   distributionDays: number;
 
   institutionalPressure: number;
@@ -57,7 +54,6 @@ export interface HistoryMetrics {
   rotationPersistence: number;
   liquidityPersistence: number;
   fragilityPersistence: number;
-
   dangerPersistence: number;
   executionPersistence: number;
   edgePersistence: number;
@@ -80,30 +76,22 @@ export interface HistoryMetrics {
 
   highestBreadth: number;
   lowestBreadth: number;
-
   highestRotation: number;
   lowestRotation: number;
 
   /*
-   * Chronological daily observations.
-   *
-   * Oldest first.
-   * Newest last.
-   *
-   * This matches the historical access convention
-   * currently used by marketEngine.
+   * Chronological daily observations:
+   * oldest first, newest last.
    */
   history: any[];
 
   /*
-   * Missing values remain null.
-   *
-   * Consumers must not convert null to zero.
+   * Missing series values remain null.
+   * Zero remains a valid measurement.
    */
   breadth20History: Array<number | null>;
   breadth50History: Array<number | null>;
   breadth200History: Array<number | null>;
-
   advanceDeclineHistory: Array<number | null>;
 
   participationHistory: Array<number | null>;
@@ -132,9 +120,6 @@ export interface HistoryMetrics {
 
 /* =====================================================
 NUMERIC EXTRACTION
-
-Missing values remain null internally.
-Zero is a valid measurement.
 ===================================================== */
 
 function numeric(value: any): number | null {
@@ -177,10 +162,6 @@ function numeric(value: any): number | null {
   return null;
 }
 
-/* =====================================================
-NESTED FIELD ACCESS
-===================================================== */
-
 function read(
   snapshot: any,
   paths: string[]
@@ -211,59 +192,32 @@ function positive(
 
 /* =====================================================
 SNAPSHOT READERS
-
-Supports the persisted snapshot format
-and selected legacy field names.
 ===================================================== */
 
 const readers = {
   breadth20: (s: any) =>
-    read(s, [
-      "structure.breadth.b20",
-      "breadth20"
-    ]),
+    read(s, ["structure.breadth.b20", "breadth20"]),
 
   breadth50: (s: any) =>
-    read(s, [
-      "structure.breadth.b50",
-      "breadth50"
-    ]),
+    read(s, ["structure.breadth.b50", "breadth50"]),
 
   breadth200: (s: any) =>
-    read(s, [
-      "structure.breadth.b200",
-      "breadth200"
-    ]),
+    read(s, ["structure.breadth.b200", "breadth200"]),
 
   ad: (s: any) =>
-    read(s, [
-      "structure.advanceDecline",
-      "advanceDecline"
-    ]),
+    read(s, ["structure.advanceDecline", "advanceDecline"]),
 
   participation: (s: any) =>
-    read(s, [
-      "participation.score",
-      "participationScore"
-    ]),
+    read(s, ["participation.score", "participationScore"]),
 
   rotation: (s: any) =>
-    read(s, [
-      "rotation.score",
-      "rotationScore"
-    ]),
+    read(s, ["rotation.score", "rotationScore"]),
 
   liquidity: (s: any) =>
-    read(s, [
-      "liquidity.score",
-      "liquidityScore"
-    ]),
+    read(s, ["liquidity.score", "liquidityScore"]),
 
   fragility: (s: any) =>
-    read(s, [
-      "fragility.score",
-      "fragilityScore"
-    ]),
+    read(s, ["fragility.score", "fragilityScore"]),
 
   leadership: (s: any) =>
     read(s, [
@@ -272,19 +226,13 @@ const readers = {
     ]),
 
   crash: (s: any) =>
-    read(s, [
-      "crash.probability",
-      "crashProbability"
-    ]),
+    read(s, ["crash.probability", "crashProbability"]),
 
   master: (s: any) =>
     read(s, ["master.score"]),
 
   highs: (s: any) =>
-    read(s, [
-      "structure.highsLows.highs",
-      "newHighs"
-    ]),
+    read(s, ["structure.highsLows.highs", "newHighs"]),
 
   danger: (s: any) =>
     read(s, ["dangerZone.score"]),
@@ -293,37 +241,28 @@ const readers = {
     read(s, ["edgeState.score"]),
 
   decay: (s: any) =>
-    read(s, [
-      "rotationDecay.score",
-      "rotationDecayScore"
-    ]),
+    read(s, ["rotationDecay.score", "rotationDecayScore"]),
 
   ndx: (s: any) =>
-    positive(
-      read(s, [
-        "indices.ndx",
-        "indices.nasdaq",
-        "indices.NASDAQ"
-      ])
-    ),
+    positive(read(s, [
+      "indices.ndx",
+      "indices.nasdaq",
+      "indices.NASDAQ"
+    ])),
 
   spx: (s: any) =>
-    positive(
-      read(s, [
-        "indices.spx",
-        "indices.sp500",
-        "indices.SP500"
-      ])
-    ),
+    positive(read(s, [
+      "indices.spx",
+      "indices.sp500",
+      "indices.SP500"
+    ])),
 
   rut: (s: any) =>
-    positive(
-      read(s, [
-        "indices.rut",
-        "indices.russell",
-        "indices.RUSSELL"
-      ])
-    )
+    positive(read(s, [
+      "indices.rut",
+      "indices.russell",
+      "indices.RUSSELL"
+    ]))
 };
 
 /* =====================================================
@@ -369,12 +308,14 @@ function clamp(
   min = 0,
   max = 100
 ): number {
-  return Math.max(
-    min,
-    Math.min(max, value)
-  );
+  return Math.max(min, Math.min(max, value));
 }
 
+/*
+ * Numeric compatibility outputs use zero when endpoints
+ * are unavailable. This does not establish a measured
+ * flat trend; inspect dataQuality and the nullable series.
+ */
 function difference(
   current: number | null,
   old: number | null
@@ -398,10 +339,6 @@ function priceReturn(
     : 0;
 }
 
-/* =====================================================
-DAILY OBSERVATION DATE
-===================================================== */
-
 const dateFormatter = new Intl.DateTimeFormat(
   "en-CA",
   {
@@ -416,29 +353,16 @@ const dateFormatter = new Intl.DateTimeFormat(
 HISTORY ENGINE
 
 One observation per New York calendar date.
-
-This is not an exchange calendar.
+5D / 20D mean five / twenty observed daily intervals.
 Missing dates are not invented.
 
-5D / 20D mean five / twenty observed daily intervals.
-They do not guarantee five / twenty trading sessions.
-
-Weekend snapshots are retained because the backend
-does not currently provide a market-session date.
-
-Stored intraday snapshots are not modified or deleted.
+This function does not modify stored snapshots.
 ===================================================== */
 
 export function historyEngine(
   history: any[]
 ): HistoryMetrics {
-  /* ===================================================
-  VALIDATE / SORT
-  =================================================== */
-
-  const raw = Array.isArray(history)
-    ? history
-    : [];
+  const raw = Array.isArray(history) ? history : [];
 
   const valid = raw
     .flatMap((snapshot: any) => {
@@ -454,7 +378,8 @@ export function historyEngine(
 
       if (
         typeof timestamp !== "string" ||
-        timestamp.trim() === ""
+        timestamp.trim() === "" ||
+        !/(Z|[+-]\d{2}:\d{2})$/i.test(timestamp)
       ) {
         return [];
       }
@@ -465,13 +390,7 @@ export function historyEngine(
         ? [{ snapshot, time }]
         : [];
     })
-    .sort(
-      (a, b) => b.time - a.time
-    );
-
-  /* ===================================================
-  LAST SNAPSHOT PER OBSERVED DATE
-  =================================================== */
+    .sort((a, b) => b.time - a.time);
 
   const perDate = new Map<string, any>();
 
@@ -485,17 +404,7 @@ export function historyEngine(
     }
   }
 
-  const daily = Array.from(
-    perDate.values()
-  );
-
-  /*
-   * Internal calculation order:
-   * newest first.
-   *
-   * Exported history / series:
-   * oldest first.
-   */
+  const daily = Array.from(perDate.values());
   const chronological = [...daily].reverse();
 
   const newest = daily[0];
@@ -506,14 +415,12 @@ export function historyEngine(
   const has20 = daily.length >= 21;
 
   /* ===================================================
-  DATA QUALITY / STATISTICS HELPERS
+  DATA QUALITY / STATISTICS
   =================================================== */
 
   const missingValues: Record<string, number> = {};
 
-  for (
-    const [name, reader] of Object.entries(readers)
-  ) {
+  for (const [name, reader] of Object.entries(readers)) {
     missingValues[name] = daily.filter(
       s => reader(s) === null
     ).length;
@@ -528,9 +435,7 @@ export function historyEngine(
   ) =>
     daily
       .map(reader)
-      .filter(
-        (n): n is number => n !== null
-      );
+      .filter((n): n is number => n !== null);
 
   const average = (
     reader: (s: any) => number | null,
@@ -541,10 +446,8 @@ export function historyEngine(
     return list.length
       ? Math.round(
           (
-            list.reduce(
-              (a, b) => a + b,
-              0
-            ) / list.length
+            list.reduce((a, b) => a + b, 0) /
+            list.length
           ) * 10
         ) / 10
       : fallback;
@@ -556,7 +459,6 @@ export function historyEngine(
   ) =>
     daily.filter(s => {
       const n = reader(s);
-
       return n !== null && predicate(n);
     }).length;
 
@@ -570,12 +472,8 @@ export function historyEngine(
   );
 
   /*
-   * Compatibility:
-   *
-   * This field retains the original meaning:
-   * short-window breadth change.
-   *
-   * It is not a mathematical second derivative.
+   * Compatibility: short-window breadth change,
+   * not a mathematical second derivative.
    */
   const breadthAcceleration = difference(
     readers.breadth50(newest),
@@ -587,12 +485,7 @@ export function historyEngine(
     readers.participation(oldest)
   );
 
-  /*
-   * Participation decay retains its original definition.
-   *
-   * It measures the decline in new highs.
-   * Positive = deterioration.
-   */
+  // Original definition: decline in new highs.
   const participationDecay = difference(
     readers.highs(oldest),
     readers.highs(newest)
@@ -603,9 +496,6 @@ export function historyEngine(
     readers.leadership(oldest)
   );
 
-  /*
-   * Positive leadership decay = deterioration.
-   */
   const leadershipDecay = -leadershipTrend;
 
   const rotationTrend = difference(
@@ -634,7 +524,7 @@ export function historyEngine(
   );
 
   /* ===================================================
-  INDEX PRICES
+  INDEX MOMENTUM / ACCELERATION
   =================================================== */
 
   const ndxNewest = readers.ndx(newest);
@@ -649,36 +539,19 @@ export function historyEngine(
   const rutMid = readers.rut(mid);
   const rutOldest = readers.rut(oldest);
 
-  const ndxMomentum5D = priceReturn(
-    ndxNewest,
-    ndxMid
-  );
+  const ndxMomentum5D = priceReturn(ndxNewest, ndxMid);
+  const ndxMomentum20D = priceReturn(ndxNewest, ndxOldest);
 
-  const ndxMomentum20D = priceReturn(
-    ndxNewest,
-    ndxOldest
-  );
+  const spxMomentum5D = priceReturn(spxNewest, spxMid);
+  const spxMomentum20D = priceReturn(spxNewest, spxOldest);
 
-  const spxMomentum5D = priceReturn(
-    spxNewest,
-    spxMid
-  );
+  const rutMomentum5D = priceReturn(rutNewest, rutMid);
+  const rutMomentum20D = priceReturn(rutNewest, rutOldest);
 
-  const spxMomentum20D = priceReturn(
-    spxNewest,
-    spxOldest
-  );
-
-  const rutMomentum5D = priceReturn(
-    rutNewest,
-    rutMid
-  );
-
-  const rutMomentum20D = priceReturn(
-    rutNewest,
-    rutOldest
-  );
-
+  /*
+   * Apply the existing Nasdaq convention consistently:
+   * short return minus one quarter of the medium return.
+   */
   const ndxAcceleration =
     ndxNewest !== null &&
     ndxMid !== null &&
@@ -686,56 +559,47 @@ export function historyEngine(
       ? ndxMomentum5D - ndxMomentum20D / 4
       : 0;
 
-  /* ===================================================
-  PRICE MOMENTUM
+  const spxAcceleration =
+    spxNewest !== null &&
+    spxMid !== null &&
+    spxOldest !== null
+      ? spxMomentum5D - spxMomentum20D / 4
+      : 0;
 
-  Existing weights and thresholds are retained.
-  Each contribution requires its own valid endpoints.
+  const rutAcceleration =
+    rutNewest !== null &&
+    rutMid !== null &&
+    rutOldest !== null
+      ? rutMomentum5D - rutMomentum20D / 4
+      : 0;
+
+  /* ===================================================
+  PRICE MOMENTUM SCORE
   =================================================== */
 
   let priceMomentumScore = 50;
 
-  if (
-    ndxNewest !== null &&
-    ndxMid !== null
-  ) {
+  if (ndxNewest !== null && ndxMid !== null) {
     priceMomentumScore += clamp(
-      ndxMomentum5D * 2,
-      -20,
-      20
+      ndxMomentum5D * 2, -20, 20
     );
   }
 
-  if (
-    ndxNewest !== null &&
-    ndxOldest !== null
-  ) {
+  if (ndxNewest !== null && ndxOldest !== null) {
     priceMomentumScore += clamp(
-      ndxMomentum20D,
-      -15,
-      15
+      ndxMomentum20D, -15, 15
     );
   }
 
-  if (
-    spxNewest !== null &&
-    spxMid !== null
-  ) {
+  if (spxNewest !== null && spxMid !== null) {
     priceMomentumScore += clamp(
-      spxMomentum5D,
-      -10,
-      10
+      spxMomentum5D, -10, 10
     );
   }
 
-  if (
-    rutNewest !== null &&
-    rutMid !== null
-  ) {
+  if (rutNewest !== null && rutMid !== null) {
     priceMomentumScore += clamp(
-      rutMomentum5D,
-      -5,
-      5
+      rutMomentum5D, -5, 5
     );
   }
 
@@ -752,43 +616,32 @@ export function historyEngine(
   );
 
   const priceTrend: HistoryMetrics["priceTrend"] =
-    priceMomentumScore >= 75 &&
-    ndxMomentum5D >= 5
+    priceMomentumScore >= 75 && ndxMomentum5D >= 5
       ? "STRONG_BULLISH"
       : priceMomentumScore >= 60
       ? "BULLISH"
-      : priceMomentumScore <= 25 &&
-        ndxMomentum5D <= -5
+      : priceMomentumScore <= 25 && ndxMomentum5D <= -5
       ? "STRONG_BEARISH"
       : priceMomentumScore <= 40
       ? "BEARISH"
       : "NEUTRAL";
 
   /* ===================================================
-  CURRENT PHASE STREAK
-
-  Counts observed dates, not raw snapshots.
+  CURRENT PHASE / DISTRIBUTION STREAKS
   =================================================== */
 
   let daysInPhase = 0;
-
   const newestPhase = phaseOf(newest);
 
   if (newestPhase) {
     for (const snapshot of daily) {
-      if (
-        phaseOf(snapshot) !== newestPhase
-      ) {
+      if (phaseOf(snapshot) !== newestPhase) {
         break;
       }
 
       daysInPhase++;
     }
   }
-
-  /* ===================================================
-  CURRENT DISTRIBUTION STREAK
-  =================================================== */
 
   let currentDistributionStreak = 0;
 
@@ -801,34 +654,31 @@ export function historyEngine(
   }
 
   /* ===================================================
-  WEAKNESS COUNTERS
+  HISTORICAL COUNTERS
 
-  Missing values are not counted as weak measurements.
+  These currently cover the entire supplied history.
+  Their use for current regime classification requires
+  the separate persistence-window review.
   =================================================== */
 
   const breadthWeakDays = count(
-    readers.breadth50,
-    n => n < 55
+    readers.breadth50, n => n < 55
   );
 
   const participationWeakDays = count(
-    readers.participation,
-    n => n < 60
+    readers.participation, n => n < 60
   );
 
   const rotationWeakDays = count(
-    readers.rotation,
-    n => n < 60
+    readers.rotation, n => n < 60
   );
 
   const liquidityWeakDays = count(
-    readers.liquidity,
-    n => n < 55
+    readers.liquidity, n => n < 55
   );
 
   const fragilityHighDays = count(
-    readers.fragility,
-    n => n > 60
+    readers.fragility, n => n > 60
   );
 
   const distributionDays = daily.filter(
@@ -836,75 +686,41 @@ export function historyEngine(
   ).length;
 
   const dangerPersistence = count(
-    readers.danger,
-    n => n > 60
+    readers.danger, n => n > 60
   );
 
   const edgePersistence = count(
-    readers.edge,
-    n => n < 40
+    readers.edge, n => n < 40
   );
 
-  /*
-   * Current ExecutionStateOutput has no numeric score.
-   *
-   * Use its explicit risk classification.
-   * Retain support for legacy snapshots with a score.
-   *
-   * Execution confidence is not a risk-score substitute.
-   */
-  const executionPersistence = daily.filter(
-    s => {
-      const risk =
-        s?.executionState?.riskState;
+  const executionPersistence = daily.filter(s => {
+    const risk = s?.executionState?.riskState;
 
-      if (typeof risk === "string") {
-        return [
-          "FRAGILE",
-          "INTERNAL_BREAKDOWN",
-          "BREAKDOWN",
-          "CRISIS"
-        ].includes(risk);
-      }
-
-      const legacy = read(
-        s,
-        ["executionState.score"]
-      );
-
-      return legacy !== null && legacy < 40;
+    if (typeof risk === "string") {
+      return [
+        "FRAGILE",
+        "INTERNAL_BREAKDOWN",
+        "BREAKDOWN",
+        "CRISIS"
+      ].includes(risk);
     }
-  ).length;
+
+    const legacy = read(
+      s, ["executionState.score"]
+    );
+
+    return legacy !== null && legacy < 40;
+  }).length;
 
   /* ===================================================
-  AVERAGES
+  AVERAGES / PRESSURE
   =================================================== */
 
-  const averageBreadth = average(
-    readers.breadth50
-  );
-
-  const averageParticipation = average(
-    readers.participation
-  );
-
-  const averageRotation = average(
-    readers.rotation
-  );
-
-  const averageLiquidity = average(
-    readers.liquidity
-  );
-
-  const averageFragility = average(
-    readers.fragility
-  );
-
-  /* ===================================================
-  INSTITUTIONAL PRESSURE
-
-  Existing weights and caps are retained.
-  =================================================== */
+  const averageBreadth = average(readers.breadth50);
+  const averageParticipation = average(readers.participation);
+  const averageRotation = average(readers.rotation);
+  const averageLiquidity = average(readers.liquidity);
+  const averageFragility = average(readers.fragility);
 
   const institutionalPressure = clamp(
     Math.round(
@@ -917,18 +733,9 @@ export function historyEngine(
     )
   );
 
-  /* ===================================================
-  WEAKNESS ACCELERATION
-  =================================================== */
-
-  const currentFragility =
-    readers.fragility(newest);
-
-  const currentLiquidity =
-    readers.liquidity(newest);
-
-  const currentParticipation =
-    readers.participation(newest);
+  const currentFragility = readers.fragility(newest);
+  const currentLiquidity = readers.liquidity(newest);
+  const currentParticipation = readers.participation(newest);
 
   const acceleratingWeakness =
     (
@@ -948,10 +755,6 @@ export function historyEngine(
       currentLiquidity < 40 &&
       currentParticipation < 50
     );
-
-  /* ===================================================
-  DISTRIBUTION / MARKET CHARACTER
-  =================================================== */
 
   const persistentDistribution =
     distributionDays >= 7 ||
@@ -974,27 +777,17 @@ export function historyEngine(
       )
     );
 
-  const marketCharacter:
-    HistoryMetrics["marketCharacter"] =
-      prolongedBearRegime
-        ? "BEAR"
-        : persistentDistribution
-        ? "DISTRIBUTION"
-        : institutionalPressure > 35
-        ? "TRANSITION"
-        : "EXPANSION";
+  const marketCharacter: HistoryMetrics["marketCharacter"] =
+    prolongedBearRegime
+      ? "BEAR"
+      : persistentDistribution
+      ? "DISTRIBUTION"
+      : institutionalPressure > 35
+      ? "TRANSITION"
+      : "EXPANSION";
 
-  /* ===================================================
-  EXTREMES
-  =================================================== */
-
-  const breadthValues = values(
-    readers.breadth50
-  );
-
-  const rotationValues = values(
-    readers.rotation
-  );
+  const breadthValues = values(readers.breadth50);
+  const rotationValues = values(readers.rotation);
 
   /* ===================================================
   RETURN
@@ -1003,10 +796,8 @@ export function historyEngine(
   return {
     breadthTrend,
     breadthAcceleration,
-
     participationTrend,
     participationDecay,
-
     rotationTrend,
     liquidityTrend,
     fragilityTrend,
@@ -1019,23 +810,22 @@ export function historyEngine(
     spxPriceTrend: spxMomentum20D,
     spxMomentum5D,
     spxMomentum20D,
+    spxAcceleration,
 
     rutPriceTrend: rutMomentum20D,
     rutMomentum5D,
     rutMomentum20D,
+    rutAcceleration,
 
     priceMomentumScore,
     priceTrend,
 
     leadershipTrend,
     leadershipDecay,
-
     relativeBreadthWeakness,
-
     crashTrend,
 
-    persistenceScore:
-      readers.master(newest) ?? 0,
+    persistenceScore: readers.master(newest) ?? 0,
 
     phasePersistence: daysInPhase,
     daysInPhase,
@@ -1043,12 +833,9 @@ export function historyEngine(
     breadthWeakDays,
     participationWeakDays,
     rotationWeakDays,
-
     liquidityWeakDays,
     fragilityHighDays,
-
     distributionDays,
-
     institutionalPressure,
 
     rotationPersistence:
@@ -1071,7 +858,6 @@ export function historyEngine(
     acceleratingWeakness,
     persistentDistribution,
     prolongedBearRegime,
-
     marketCharacter,
 
     averageBreadth,
@@ -1102,55 +888,33 @@ export function historyEngine(
 
     history: chronological,
 
-    breadth20History:
-      series(readers.breadth20),
+    breadth20History: series(readers.breadth20),
+    breadth50History: series(readers.breadth50),
+    breadth200History: series(readers.breadth200),
+    advanceDeclineHistory: series(readers.ad),
 
-    breadth50History:
-      series(readers.breadth50),
+    participationHistory: series(readers.participation),
+    rotationDecayHistory: series(readers.decay),
 
-    breadth200History:
-      series(readers.breadth200),
-
-    advanceDeclineHistory:
-      series(readers.ad),
-
-    participationHistory:
-      series(readers.participation),
-
-    rotationDecayHistory:
-      series(readers.decay),
-
-    spxHistory:
-      series(readers.spx),
-
-    ndxHistory:
-      series(readers.ndx),
-
-    rutHistory:
-      series(readers.rut),
+    spxHistory: series(readers.spx),
+    ndxHistory: series(readers.ndx),
+    rutHistory: series(readers.rut),
 
     dataQuality: {
       rawSnapshots: raw.length,
-
       validSnapshots: valid.length,
-
-      invalidSnapshots:
-        raw.length - valid.length,
-
-      dailyObservations:
-        daily.length,
+      invalidSnapshots: raw.length - valid.length,
+      dailyObservations: daily.length,
 
       collapsedIntradaySnapshots:
         valid.length - daily.length,
 
       has5ObservationWindow: has5,
-
       has20ObservationWindow: has20,
 
       missingValues,
 
-      timeBasis:
-        "LATEST_PER_NEW_YORK_DATE"
+      timeBasis: "LATEST_PER_NEW_YORK_DATE"
     }
   };
 }
