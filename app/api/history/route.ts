@@ -1,54 +1,89 @@
 import { NextResponse } from "next/server";
 
 import {
-saveMarketSnapshot,
-loadMarketHistory
+  saveMarketSnapshot,
+  loadMarketHistory
 } from "@/lib/history/marketHistory";
 
+/* =====================================================
+SAVE SNAPSHOT
+===================================================== */
+
 export async function POST(req: Request) {
-try {
+  let body: any;
 
-const body = await req.json();
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Invalid JSON"
+      },
+      { status: 400 }
+    );
+  }
 
-if (!body?.snapshot) {
-return NextResponse.json({
-ok: false,
-error: "No snapshot"
-});
+  const snapshot = body?.snapshot;
+
+  if (
+    !snapshot ||
+    typeof snapshot !== "object" ||
+    Array.isArray(snapshot)
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Missing or invalid snapshot"
+      },
+      { status: 400 }
+    );
+  }
+
+  const timestamp = snapshot.timestamp;
+
+  if (
+    typeof timestamp !== "string" ||
+    !/(Z|[+-]\d{2}:\d{2})$/i.test(timestamp) ||
+    !Number.isFinite(Date.parse(timestamp))
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Snapshot requires a valid timestamp with timezone"
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    await saveMarketSnapshot(snapshot);
+
+    return NextResponse.json({
+      ok: true
+    });
+  } catch (error) {
+    console.error(
+      "History POST error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Snapshot save failed"
+      },
+      { status: 500 }
+    );
+  }
 }
 
-await saveMarketSnapshot(
-body.snapshot
-);
-
-return NextResponse.json({
-ok: true
-});
-
-} catch (e) {
-
-console.error(
-"History POST error:",
-e
-);
-
-return NextResponse.json({
-ok: false
-});
-}
-}
+/* =====================================================
+LOAD HISTORY
+===================================================== */
 
 export async function GET() {
+  const history = await loadMarketHistory();
 
-const history =
-await loadMarketHistory();
-
-console.log(
-"HISTORY LENGTH",
-history.length
-);
-
-return NextResponse.json(
-history
-);
+  return NextResponse.json(history);
 }
