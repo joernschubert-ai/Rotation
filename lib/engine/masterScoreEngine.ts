@@ -1,1802 +1,1090 @@
 // /lib/engine/masterScoreEngine.ts
 
-export function masterScoreEngine(engine: any) {
-
-/* =====================================================
-MASTER SCORE SEMANTICS
-===================================================== */
-
 /*
-* IMPORTANT:
-*
-* The Master Score is a RISK SCORE.
-*
-* 0 = strong constructive / CALL environment
-* 50 = neutral / transition
-* 100 = strong defensive / PUT environment
-*
-* Therefore:
-*
-* LOW SCORE -> GREEN -> CALL
-* HIGH SCORE -> RED -> PUT
-*
-* ALL component scores use exactly the same semantic:
-*
-* LOW = constructive / CALL
-* HIGH = risk / PUT
-*
-* There is NO mixed constructive/risk interpretation
-* inside the returned Master Score object.
-*/
-
-
-/* =====================================================
-INPUT
-===================================================== */
-
-const crash = engine.crash ?? {};
-const rotation = engine.rotation ?? {};
-const putTiming = engine.putTiming ?? {};
-const russell = engine.russell ?? {};
-const phaseData = engine.phaseData ?? {};
-const participation = engine.participation ?? {};
-const breadthThrust = engine.breadthThrust ?? {};
-const liquidity = engine.liquidity ?? {};
-const fragility = engine.fragility ?? {};
-const rotationDecay = engine.rotationDecay ?? {};
-const regimeSync = engine.regimeSync ?? {};
-const breadthVelocity = engine.breadthVelocity ?? {};
-const regimePersistence = engine.regimePersistence ?? {};
-const marketQuality = engine.marketQuality ?? {};
-const historyMetrics = engine.historyMetrics ?? {};
-const dangerZone = engine.dangerZone ?? {};
-const executionState = engine.executionState ?? {};
-const phaseConfirmation = engine.phaseConfirmation ?? {};
-const priceMomentum = engine.priceMomentum ?? {};
-
-
-/* =====================================================
-SAFE VALUES
-===================================================== */
-
-const crashScore =
-Number(crash?.score ?? 0);
-
-const crashProbability =
-Number(crash?.probability ?? 0);
-
-const rotationScore =
-Number(rotation?.score ?? 50);
-
-const russellScore =
-Number(
-russell?.confidence ??
-russell?.score?.value ??
-50
-);
-
-const russellBlocked =
-russell?.state === "BLOCKED" ||
-russell?.decision === "NO_TRADE" ||
-russell?.action === "NO_TRADE";
-
-const timingRaw =
-Number(
-putTiming?.score?.value ??
-putTiming?.score ??
-0
-);
-
-const phase =
-phaseData?.phase ??
-"PHASE_1_EXPANSION";
-
-const phaseConfidence =
-Number(
-phaseConfirmation?.confidence ?? 50
-);
-
-const phaseConfirmed =
-Boolean(
-phaseConfirmation?.confirmed ?? false
-);
-
-const participationScore =
-Number(
-participation?.score ?? 50
-);
-
-const thrustScore =
-Number(
-breadthThrust?.score ?? 50
-);
-
-const liquidityScore =
-Number(
-liquidity?.score ?? 50
-);
-
-const fragilityScore =
-Number(
-fragility?.score ?? 50
-);
-
-const rotationDecayScore =
-Number(
-rotationDecay?.score ?? 0
-);
-
-const marketQualityScore =
-Number(
-marketQuality?.score ?? 50
-);
-
-const breadthVelocityScore =
-Number(
-breadthVelocity?.score ?? 50
-);
-
-const regimeSyncScore =
-Number(
-regimeSync?.score ?? 50
-);
-
-const dangerScore =
-Number(
-dangerZone?.score ?? 0
-);
-
-
-/* =====================================================
-PHASE FLAGS
-===================================================== */
-
-const distributionPhase =
-phase === "PHASE_3_DISTRIBUTION";
-
-const crashPhase =
-phase === "PHASE_5_BREAKDOWN" ||
-phase === "PHASE_6_ACCELERATION" ||
-phase === "PHASE_7_CAPITULATION";
-
-
-/* =====================================================
-REGIME PERSISTENCE
-===================================================== */
-
-const persistenceScore =
-Number(
-regimePersistence?.score ?? 0
-);
-
-const distributionRisk =
-Number(
-regimePersistence?.distributionRisk ?? 0
-);
-
-const falseRecoveryRisk =
-Number(
-regimePersistence?.falseRecoveryRisk ?? 0
-);
-
-const marketFatigue =
-Number(
-regimePersistence?.marketFatigue ?? 0
-);
-
-const bearishPersistence =
-Boolean(
-regimePersistence?.bearishPersistence ?? false
-);
-
-const bullishPersistence =
-Boolean(
-regimePersistence?.bullishPersistence ?? false
-);
-
-const persistenceTrend =
-regimePersistence?.trend ??
-"STABLE";
-
-
-/* =====================================================
-PRICE MOMENTUM
-===================================================== */
-
-const priceMomentumScore =
-Number(
-priceMomentum?.score ?? 50
-);
-
-const priceMomentumTrend =
-priceMomentum?.trend ??
-priceMomentum?.direction ??
-"NEUTRAL";
-
-const priceMomentumAcceleration =
-Number(
-priceMomentum?.acceleration ?? 0
-);
-
-
-/* =====================================================
-HISTORY
-===================================================== */
-
-const {
-phasePersistence = 0,
-
-daysInPhase = 0,
-
-participationDecay = 0,
-
-breadthTrend = 0,
-
-breadthAcceleration = 0,
-
-leadershipDecay = 0,
-
-crashTrend = 0,
-
-relativeBreadthWeakness = 0,
-
-institutionalPressure = 0,
-
-marketCharacter = "EXPANSION",
-
-averageBreadth = 50,
-averageParticipation = 50,
-averageRotation = 50,
-averageLiquidity = 50,
-averageFragility = 50,
-
-acceleratingWeakness = false,
-
-regimePersistence: regimePersistenceHistory = 0,
-
-persistentDistribution:
-historyPersistentDistribution = false,
-
-prolongedBearRegime = false
-
-} = historyMetrics;
-
-
-/* =====================================================
-EXECUTION
-===================================================== */
-
-const riskState =
-executionState?.riskState ??
-"NORMAL";
-
-const executionMode =
-executionState?.executionMode ??
-"NORMAL";
-
-const marketMode =
-executionState?.marketMode ??
-"RISK_ON";
-
-
-/* =====================================================
-NORMALIZATION
-===================================================== */
+ * Master Score:
+ * LOW = constructive / CALL
+ * HIGH = defensive / PUT
+ *
+ * Structural risk score.
+ * Not a probability or entry-timing score.
+ */
+
+function numeric(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (
+    typeof value === "string" &&
+    value.trim() !== ""
+  ) {
+    const n = Number(value);
+
+    return Number.isFinite(n) ? n : null;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    const object = value as Record<string, unknown>;
+
+    for (const key of ["value", "score", "current"]) {
+      const candidate = object[key];
+
+      if (
+        typeof candidate === "number" ||
+        typeof candidate === "string"
+      ) {
+        const n = numeric(candidate);
+
+        if (n !== null) {
+          return n;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function first(...values: unknown[]): number | null {
+  for (const value of values) {
+    const n = numeric(value);
+
+    if (n !== null) {
+      return n;
+    }
+  }
+
+  return null;
+}
+
+function num(
+  value: unknown,
+  fallback = 0
+): number {
+  return numeric(value) ?? fallback;
+}
 
 function clamp(
-value: number,
-min = 0,
-max = 100
-) {
-
-return Math.max(
-min,
-Math.min(
-max,
-value
-)
-);
-
+  value: number,
+  min = 0,
+  max = 100
+): number {
+  return Math.max(min, Math.min(max, value));
 }
-
-
-function riskFromConstructive(
-value: number
-) {
-
-return 100 - clamp(value);
-
-}
-
 
 function weightedAverage(
-values: Array<{
-value: number;
-weight: number;
-}>
-) {
+  values: Array<{
+    value: number;
+    weight: number;
+  }>
+): number {
+  let numerator = 0;
+  let denominator = 0;
+
+  for (const item of values) {
+    if (
+      !Number.isFinite(item.value) ||
+      !Number.isFinite(item.weight) ||
+      item.weight <= 0
+    ) {
+      continue;
+    }
+
+    numerator += clamp(item.value) * item.weight;
+    denominator += item.weight;
+  }
+
+  return denominator > 0
+    ? numerator / denominator
+    : 50;
+}
+
+export function masterScoreEngine(engine: any) {
+  /* =====================================================
+  INPUT
+  ===================================================== */
+
+  const input = engine ?? {};
+
+  const crash = input.crash ?? {};
+  const rotation = input.rotation ?? {};
+  const putTiming = input.putTiming ?? {};
+  const russell = input.russell ?? {};
+  const phaseData = input.phaseData ?? {};
+  const participation = input.participation ?? {};
+  const breadthThrust = input.breadthThrust ?? {};
+  const liquidity = input.liquidity ?? {};
+  const fragility = input.fragility ?? {};
+  const rotationDecay = input.rotationDecay ?? {};
+  const regimeSync = input.regimeSync ?? {};
+  const breadthVelocity = input.breadthVelocity ?? {};
+  const regimePersistence = input.regimePersistence ?? {};
+  const marketQuality = input.marketQuality ?? {};
+  const historyMetrics = input.historyMetrics ?? {};
+  const dangerZone = input.dangerZone ?? {};
+  const executionState = input.executionState ?? {};
+  const phaseConfirmation = input.phaseConfirmation ?? {};
+  const priceMomentum = input.priceMomentum ?? {};
+
+  /* =====================================================
+  SAFE COMPONENT INPUTS
+
+  Missing values use neutral risk for numeric compatibility.
+  They remain explicitly marked as unavailable.
+  ===================================================== */
+
+  const raw = {
+    crashScore: numeric(crash.score),
+    crashProbability: numeric(crash.probability),
+    rotation: numeric(rotation.score),
+    participation: numeric(participation.score),
+    breadthThrust: numeric(breadthThrust.score),
+    liquidity: numeric(liquidity.score),
+    fragility: numeric(fragility.score),
+    rotationDecay: numeric(rotationDecay.score),
+    marketQuality: numeric(marketQuality.score),
+    breadthVelocity: numeric(breadthVelocity.score),
+    regimeSync: numeric(regimeSync.score),
+    dangerZone: numeric(dangerZone.score),
+    priceMomentum: numeric(priceMomentum.score)
+  };
+
+  const missingInputs = Object.entries(raw)
+    .filter(([, value]) => value === null)
+    .map(([name]) => name);
+
+  const crashScore = clamp(raw.crashScore ?? 50);
+  const crashProbability = clamp(raw.crashProbability ?? 50);
+  const rotationScore = clamp(raw.rotation ?? 50);
+  const participationScore = clamp(raw.participation ?? 50);
+  const thrustScore = clamp(raw.breadthThrust ?? 50);
+  const liquidityScore = clamp(raw.liquidity ?? 50);
+  const fragilityScore = clamp(raw.fragility ?? 50);
+  const rotationDecayScore = clamp(raw.rotationDecay ?? 50);
+  const marketQualityScore = clamp(raw.marketQuality ?? 50);
+  const breadthVelocityScore = clamp(raw.breadthVelocity ?? 50);
+  const regimeSyncScore = clamp(raw.regimeSync ?? 50);
+  const dangerScore = clamp(raw.dangerZone ?? 50);
+  const priceMomentumScore = clamp(raw.priceMomentum ?? 50);
+
+  const russellScore = clamp(
+    first(russell.confidence, russell.score) ?? 50
+  );
+
+  const russellBlocked =
+    russell.state === "BLOCKED" ||
+    russell.decision === "NO_TRADE" ||
+    russell.action === "NO_TRADE";
 
-let numerator = 0;
-let denominator = 0;
+  /* =====================================================
+  TIMING / PHASE
+  ===================================================== */
 
-for (const item of values) {
+  const timingRaw = num(putTiming.score);
 
-const value =
-clamp(
-Number(item.value)
-);
+  const declaredTimingMax = first(
+    putTiming.maxScore,
+    putTiming.score?.max
+  );
 
-const weight =
-Math.max(
-0,
-Number(item.weight)
-);
+  const timingMax =
+    declaredTimingMax !== null &&
+    declaredTimingMax > 0
+      ? declaredTimingMax
+      : 24;
 
-numerator +=
-value * weight;
+  const timingRiskScore = clamp(
+    timingRaw / timingMax * 100
+  );
 
-denominator +=
-weight;
+  const phase =
+    typeof phaseData.phase === "string"
+      ? phaseData.phase
+      : "UNKNOWN";
 
-}
-
-if (
-denominator <= 0
-) {
-
-return 50;
-
-}
-
-return numerator / denominator;
-
-}
-
-
-/* =====================================================
-TIMING NORMALIZATION
-===================================================== */
-
-const timingRisk =
-clamp(
-(timingRaw / 24) * 100
-);
-
-
-/* =====================================================
-RISK COMPONENTS
-===================================================== */
-
-const crashRisk =
-weightedAverage([
-{
-value: crashScore,
-weight: 0.50
-},
-{
-value: crashProbability,
-weight: 0.50
-}
-]);
-
-
-const rotationRisk =
-riskFromConstructive(
-rotationScore
-);
-
-
-const timingRiskScore =
-timingRisk;
-
-
-const russellRisk =
-riskFromConstructive(
-russellScore
-);
-
-
-const participationRisk =
-riskFromConstructive(
-participationScore
-);
-
-
-const thrustRisk =
-riskFromConstructive(
-thrustScore
-);
-
-
-const breadthVelocityRisk =
-clamp(
-breadthVelocityScore
-);
-
-
-const liquidityRisk =
-riskFromConstructive(
-liquidityScore
-);
-
-
-const fragilityRisk =
-clamp(
-fragilityScore
-);
-
-
-const rotationDecayRisk =
-clamp(
-rotationDecayScore
-);
-
-
-const marketQualityRisk =
-riskFromConstructive(
-marketQualityScore
-);
-
-
-const regimeSyncRisk =
-riskFromConstructive(
-regimeSyncScore
-);
-
-
-const dangerRisk =
-clamp(
-dangerScore
-);
-
-
-const priceMomentumRisk =
-riskFromConstructive(
-priceMomentumScore
-);
-
-
-/* =====================================================
-HISTORICAL RISK
-===================================================== */
-
-const historicalBreadth =
-clamp(
-Number(averageBreadth)
-);
-
-const historicalParticipation =
-clamp(
-Number(averageParticipation)
-);
-
-const historicalRotation =
-clamp(
-Number(averageRotation)
-);
-
-const historicalLiquidity =
-clamp(
-Number(averageLiquidity)
-);
-
-const historicalFragility =
-clamp(
-Number(averageFragility)
-);
-
-
-const historicalBreadthRisk =
-riskFromConstructive(
-historicalBreadth
-);
-
-const historicalParticipationRisk =
-riskFromConstructive(
-historicalParticipation
-);
-
-const historicalRotationRisk =
-riskFromConstructive(
-historicalRotation
-);
-
-const historicalLiquidityRisk =
-riskFromConstructive(
-historicalLiquidity
-);
-
-const historicalFragilityRisk =
-historicalFragility;
-
-
-const historicalRisk =
-weightedAverage([
-{
-value: historicalBreadthRisk,
-weight: 0.20
-},
-{
-value: historicalParticipationRisk,
-weight: 0.20
-},
-{
-value: historicalRotationRisk,
-weight: 0.15
-},
-{
-value: historicalLiquidityRisk,
-weight: 0.20
-},
-{
-value: historicalFragilityRisk,
-weight: 0.25
-}
-]);
-
-
-/* =====================================================
-STRUCTURAL RISK
-===================================================== */
-
-const structuralRisk =
-weightedAverage([
-{
-value: marketQualityRisk,
-weight: 0.30
-},
-{
-value: participationRisk,
-weight: 0.20
-},
-{
-value: breadthVelocityRisk,
-weight: 0.15
-},
-{
-value: rotationDecayRisk,
-weight: 0.15
-},
-{
-value: fragilityRisk,
-weight: 0.20
-}
-]);
-
-
-/* =====================================================
-CURRENT MARKET RISK
-===================================================== */
-
-const currentMarketRisk =
-weightedAverage([
-{
-value: rotationRisk,
-weight: 0.12
-},
-{
-value: participationRisk,
-weight: 0.12
-},
-{
-value: thrustRisk,
-weight: 0.08
-},
-{
-value: breadthVelocityRisk,
-weight: 0.08
-},
-{
-value: liquidityRisk,
-weight: 0.10
-},
-{
-value: fragilityRisk,
-weight: 0.14
-},
-{
-value: rotationDecayRisk,
-weight: 0.08
-},
-{
-value: marketQualityRisk,
-weight: 0.16
-},
-{
-value: priceMomentumRisk,
-weight: 0.05
-},
-{
-value: regimeSyncRisk,
-weight: 0.04
-},
-{
-value: dangerRisk,
-weight: 0.03
-}
-]);
-
-
-/* =====================================================
-BASE MASTER RISK
-===================================================== */
-
-let score =
-weightedAverage([
-{
-value: currentMarketRisk,
-weight: 0.70
-},
-{
-value: structuralRisk,
-weight: 0.20
-},
-{
-value: historicalRisk,
-weight: 0.05
-},
-{
-value: crashRisk,
-weight: 0.05
-}
-]);
-
-
-/* =====================================================
-PHASE ADJUSTMENT
-===================================================== */
-
-let phaseAdjustment = 0;
-
-switch (phase) {
-
-case "PHASE_1_EXPANSION":
-
-phaseAdjustment = -4;
-
-break;
-
-case "PHASE_2_WARNING":
-
-phaseAdjustment = +2;
-
-break;
-
-case "PHASE_3_DISTRIBUTION":
-
-phaseAdjustment = +4;
-
-break;
-
-case "PHASE_4_RISK":
-
-phaseAdjustment = +5;
-
-break;
-
-case "PHASE_5_BREAKDOWN":
-
-phaseAdjustment = +8;
-
-break;
-
-case "PHASE_6_ACCELERATION":
-
-phaseAdjustment = +10;
-
-break;
-
-case "PHASE_7_CAPITULATION":
-
-phaseAdjustment = +5;
-
-break;
-
-default:
-
-phaseAdjustment = 0;
-
-}
-
-
-if (
-phaseConfirmed &&
-phaseConfidence >= 70
-) {
-
-phaseAdjustment *= 1.15;
-
-}
-
-else if (
-!phaseConfirmed &&
-phaseConfidence < 40
-) {
-
-score =
-50 +
-(score - 50) * 0.75;
-
-}
-
-score +=
-phaseAdjustment;
-
-
-/* =====================================================
-REGIME PERSISTENCE OVERLAY
-===================================================== */
-
-let persistenceAdjustment = 0;
-
-persistenceAdjustment +=
-clamp(
-distributionRisk
-) * 0.06;
-
-persistenceAdjustment +=
-clamp(
-falseRecoveryRisk
-) * 0.05;
-
-persistenceAdjustment +=
-clamp(
-marketFatigue
-) * 0.03;
-
-
-if (
-bearishPersistence
-) {
-
-persistenceAdjustment += 4;
-
-}
-
-if (
-historyPersistentDistribution
-) {
-
-persistenceAdjustment += 2;
-
-}
-
-if (
-prolongedBearRegime
-) {
-
-persistenceAdjustment += 2;
-
-}
-
-if (
-bullishPersistence &&
-persistenceTrend === "IMPROVING"
-) {
-
-persistenceAdjustment -= 3;
-
-}
-
-
-persistenceAdjustment =
-clamp(
-persistenceAdjustment,
--5,
-8
-);
-
-score +=
-persistenceAdjustment;
-
-
-/* =====================================================
-STRUCTURAL WARNING ADJUSTMENTS
-===================================================== */
-
-let warningAdjustment = 0;
-
-const deterioratingBreadth =
-Number(breadthTrend) <= -2;
-
-const acceleratingBreadthDecay =
-Number(breadthAcceleration) <= -1;
-
-const leadershipConcentration =
-Number(leadershipDecay) <= -2;
-
-const risingCrashRisk =
-Number(crashTrend) >= 3;
-
-const broadParticipationFailure =
-Number(relativeBreadthWeakness) > 10;
-
-const prolongedBearHistory =
-Boolean(prolongedBearRegime);
-
-
-if (
-deterioratingBreadth
-) {
-
-warningAdjustment += 1;
-
-}
-
-if (
-acceleratingBreadthDecay
-) {
-
-warningAdjustment += 1;
-
-}
-
-if (
-leadershipConcentration
-) {
-
-warningAdjustment += 1;
-
-}
-
-if (
-risingCrashRisk
-) {
-
-warningAdjustment += 1;
-
-}
-
-if (
-broadParticipationFailure
-) {
-
-warningAdjustment += 1;
-
-}
-
-if (
-prolongedBearHistory &&
-Number(institutionalPressure) > 70
-) {
-
-warningAdjustment += 1;
-
-}
-
-
-warningAdjustment =
-clamp(
-warningAdjustment,
-0,
-6
-);
-
-score +=
-warningAdjustment;
-
-
-/* =====================================================
-EXECUTION ADJUSTMENT
-===================================================== */
-
-let executionAdjustment = 0;
-
-if (
-marketMode === "RISK_OFF"
-) {
-
-executionAdjustment += 2;
-
-}
-
-if (
-riskState === "BREAKDOWN"
-) {
-
-executionAdjustment += 3;
-
-}
-
-if (
-executionMode === "REDUCE_RISK"
-) {
-
-executionAdjustment += 2;
-
-}
-
-
-executionAdjustment =
-clamp(
-executionAdjustment,
-0,
-6
-);
-
-score +=
-executionAdjustment;
-
-
-/* =====================================================
-P3 DISTRIBUTION RISK CAP
-===================================================== */
-
-/*
-* PHASE_3 is a transition / distribution regime.
-*
-* IMPORTANT:
-*
-* The historical P3 cap has been removed from the
-* LIVE Master Score.
-*
-* The previous cap:
-*
-* score = Math.min(score, 64)
-*
-* made the live score unable to show any movement
-* above 64 while PHASE_3_DISTRIBUTION was active.
-*
-* Historical replay classification must not hard-cap
-* the live Master Risk value.
-*
-* The underlying component values remain unchanged.
-*/
-
-if (
-distributionPhase &&
-!crashPhase
-) {
-
-/*
-* Intentionally no score cap.
-*
-* P3 may now produce values below OR above 64.
-* The existing P3 PUT confirmation threshold of 75
-* remains unchanged.
-*/
-
-}
-
-
-/* =====================================================
-FINAL SCORE
-===================================================== */
-
-score =
-Math.max(
-0,
-Math.min(
-100,
-Math.round(score)
-)
-);
-
-
-/* =====================================================
-MASTER SIGNAL
-===================================================== */
-
-let signal:
-| "CALL"
-| "NEUTRAL"
-| "PUT";
-
-let color:
-| "GREEN"
-| "YELLOW"
-| "RED";
-
-
-const putThreshold =
-distributionPhase
-? 75
-: 65;
-
-const neutralUpperThreshold =
-putThreshold - 1;
-
-
-if (
-score <= 35
-) {
-
-signal = "CALL";
-color = "GREEN";
-
-}
-
-else if (
-score >= putThreshold
-) {
-
-signal = "PUT";
-color = "RED";
-
-}
-
-else {
-
-signal = "NEUTRAL";
-color = "YELLOW";
-
-}
-
-
-/*
-* Distribution phase must remain NEUTRAL until
-* the risk score reaches the higher confirmation
-* threshold.
-*/
-
-if (
-distributionPhase &&
-score < putThreshold
-) {
-
-signal = "NEUTRAL";
-color = "YELLOW";
-
-}
-
-
-/* =====================================================
-SIGNAL STRENGTH
-===================================================== */
-
-let signalStrength = 0;
-
-if (
-signal === "CALL"
-) {
-
-signalStrength =
-Math.round(
-((35 - score) / 35) * 100
-);
-
-}
-
-else if (
-signal === "PUT"
-) {
-
-signalStrength =
-Math.round(
-((score - putThreshold) /
-(100 - putThreshold)) * 100
-);
-
-}
-
-else {
-
-signalStrength =
-Math.round(
-100 -
-(
-Math.abs(score - 50) * 2
-)
-);
-
-}
-
-signalStrength =
-clamp(
-signalStrength
-);
-
-
-/* =====================================================
-STRUCTURAL FLAGS
-===================================================== */
-
-const weakInternals = (
-
-participationScore < 50 ||
-
-breadthVelocityScore > 55 ||
-
-marketQualityScore < 45 ||
-
-rotationDecayScore > 45 ||
-
-daysInPhase >= 10 ||
-
-institutionalPressure > 65 ||
-
-averageBreadth < 55 ||
-
-averageParticipation < 55 ||
-
-averageLiquidity < 50 ||
-
-averageFragility > 60 ||
-
-participationDecay > 15 ||
-
-deterioratingBreadth ||
-
-acceleratingBreadthDecay ||
-
-leadershipConcentration ||
-
-broadParticipationFailure ||
-
-prolongedBearRegime ||
-
-bearishPersistence
-
-);
-
-
-/* =====================================================
-LEADERSHIP
-===================================================== */
-
-const narrowLeadership = (
-
-Number(rotation?.rsGrowth ?? 1) > 1.03 &&
-
-Number(rotation?.rsSmall ?? 1) < 0.995 &&
-
-Number(rotation?.rsEqual ?? 1) < 0.995
-
-);
-
+  const phaseConfidence = clamp(
+    num(phaseConfirmation.confidence, 50)
+  );
 
-/* =====================================================
-DEFENSIVE EVIDENCE
-===================================================== */
+  const phaseConfirmed =
+    phaseConfirmation.confirmed === true;
 
-let defensiveEvidenceCount = 0;
+  const distributionPhase =
+    phase === "PHASE_3_DISTRIBUTION";
 
-if (
-participationScore < 50
-) {
+  const crashPhase = [
+    "PHASE_5_BREAKDOWN",
+    "PHASE_6_ACCELERATION",
+    "PHASE_7_CAPITULATION"
+  ].includes(phase);
 
-defensiveEvidenceCount++;
+  /* =====================================================
+  PERSISTENCE / PRICE
+  ===================================================== */
 
-}
-
-if (
-breadthVelocityScore > 55
-) {
-
-defensiveEvidenceCount++;
-
-}
-
-if (
-marketQualityScore < 45
-) {
-
-defensiveEvidenceCount++;
-
-}
-
-if (
-rotationDecayScore > 55
-) {
-
-defensiveEvidenceCount++;
-
-}
-
-if (
-fragilityScore >= 68
-) {
-
-defensiveEvidenceCount++;
-
-}
-
-if (
-regimeSyncScore < 45
-) {
-
-defensiveEvidenceCount++;
-
-}
-
-if (
-internalDivergenceScore(engine) >= 60
-) {
-
-defensiveEvidenceCount++;
-
-}
-
-if (
-russellBlocked
-) {
-
-defensiveEvidenceCount++;
-
-}
-
-const defensiveStructuralConfirmation =
-score >= 65 &&
-defensiveEvidenceCount >= 3;
-
-
-/* =====================================================
-MODE
-===================================================== */
-
-let mode:
-| "LONG"
-| "NEUTRAL"
-| "RISK"
-| "CRASH";
-
-mode = "LONG";
-
-
-if (
-distributionPhase
-) {
-
-mode = "NEUTRAL";
-
-}
-
-if (
-phase === "PHASE_4_RISK"
-) {
-
-mode = "RISK";
-
-}
-
-if (
-crashPhase
-) {
-
-mode = "CRASH";
-
-}
-
-
-if (
-defensiveStructuralConfirmation &&
-!distributionPhase &&
-!crashPhase
-) {
-
-mode = "RISK";
-
-}
-
-
-const strongDefensive =
-score >= 75 &&
-defensiveEvidenceCount >= 4 &&
-!distributionPhase &&
-!crashPhase;
-
-
-if (
-strongDefensive
-) {
-
-mode = "RISK";
-
-}
-
-
-if (
-prolongedBearRegime &&
-broadParticipationFailure &&
-!distributionPhase &&
-!crashPhase
-) {
-
-mode = "RISK";
-
-}
-
-
-if (
-acceleratingBreadthDecay &&
-risingCrashRisk &&
-!distributionPhase &&
-!crashPhase
-) {
-
-mode = "RISK";
-
-}
-
-
-if (
-bearishPersistence &&
-distributionRisk >= 60 &&
-mode === "LONG" &&
-!distributionPhase &&
-!crashPhase
-) {
-
-mode = "RISK";
-
-}
-
-
-/* =====================================================
-EXECUTION OVERRIDE
-===================================================== */
-
-const executionOverride = (
-
-marketMode === "RISK_OFF" ||
-
-riskState === "BREAKDOWN" ||
-
-executionMode === "REDUCE_RISK"
-
-);
-
-
-if (
-executionOverride &&
-mode === "LONG"
-) {
-
-mode = "RISK";
-
-}
-
-
-/* =====================================================
-NARROW LEADERSHIP
-===================================================== */
-
-if (
-narrowLeadership &&
-weakInternals &&
-phase !== "PHASE_1_EXPANSION" &&
-mode === "LONG"
-) {
-
-mode = "NEUTRAL";
-
-}
-
-
-/* =====================================================
-FINAL MODE INVARIANTS
-===================================================== */
-
-/*
-* Crash phases can NEVER be downgraded.
-*/
-
-if (
-crashPhase
-) {
-
-mode = "CRASH";
-
-}
-
-
-/*
-* Distribution phase is always transitional.
-*/
-
-if (
-distributionPhase
-) {
-
-mode = "NEUTRAL";
-
-}
-
-
-/* =====================================================
-NET EXPOSURE
-===================================================== */
-
-let netExposure = 0;
-
-switch (mode) {
-
-case "LONG":
-
-netExposure = 40;
-
-break;
-
-case "NEUTRAL":
-
-netExposure = 0;
+  const persistenceScore =
+    clamp(num(regimePersistence.score));
 
-break;
+  const distributionRisk =
+    clamp(num(regimePersistence.distributionRisk));
 
-case "RISK":
+  const falseRecoveryRisk =
+    clamp(num(regimePersistence.falseRecoveryRisk));
 
-netExposure = -40;
+  const marketFatigue =
+    clamp(num(regimePersistence.marketFatigue));
 
-break;
+  const bearishPersistence =
+    regimePersistence.bearishPersistence === true;
 
-case "CRASH":
+  const bullishPersistence =
+    regimePersistence.bullishPersistence === true;
 
-netExposure = -85;
+  const persistenceTrend =
+    regimePersistence.trend ?? "STABLE";
 
-break;
+  const priceMomentumTrend =
+    priceMomentum.trend ??
+    priceMomentum.direction ??
+    "NEUTRAL";
 
-}
-
-
-/* =====================================================
-REGIME
-===================================================== */
-
-let regime:
-| "LONG"
-| "TRANSITION"
-| "RISK"
-| "CRASH";
-
-regime = "LONG";
-
-
-if (
-distributionPhase
-) {
-
-regime = "TRANSITION";
-
-}
-
-if (
-mode === "RISK"
-) {
-
-regime = "RISK";
-
-}
-
-if (
-mode === "CRASH"
-) {
-
-regime = "CRASH";
-
-}
-
-
-/* =====================================================
-SUMMARY
-===================================================== */
-
-let summary =
-"Neutral institutional market quality";
-
-
-if (
-signal === "CALL"
-) {
-
-summary =
-"Constructive market regime | CALL bias";
-
-}
-
-if (
-signal === "NEUTRAL"
-) {
-
-summary =
-"Balanced market regime | NEUTRAL bias";
-
-}
-
-if (
-signal === "PUT"
-) {
-
-summary =
-"Defensive market regime | PUT bias";
-
-}
-
-if (
-mode === "CRASH"
-) {
-
-summary +=
-" | Crash regime active";
-
-}
-
-if (
-bearishPersistence
-) {
-
-summary +=
-" | Persistent weakness";
-
-}
-
-if (
-falseRecoveryRisk >= 50
-) {
-
-summary +=
-" | False recovery risk elevated";
-
-}
-
-
-/* =====================================================
-RETURN
-===================================================== */
-
-return {
-
-score,
-
-signal,
-
-color,
-
-signalStrength,
-
-mode,
-
-netExposure,
-
-regime,
-
-summary,
+  const priceMomentumAcceleration =
+    num(priceMomentum.acceleration);
 
+  /* =====================================================
+  HISTORY
+  ===================================================== */
 
-meta: {
+  const phasePersistence =
+    num(historyMetrics.phasePersistence);
 
-scoreType:
-"RISK",
+  const daysInPhase =
+    num(historyMetrics.daysInPhase);
 
-scoreInterpretation:
-"LOW=CALL | HIGH=PUT",
+  const participationDecay =
+    num(historyMetrics.participationDecay);
 
-callThreshold:
-35,
+  const breadthTrend =
+    num(historyMetrics.breadthTrend);
 
-neutralLowerThreshold:
-36,
+  const breadthAcceleration =
+    num(historyMetrics.breadthAcceleration);
 
-neutralUpperThreshold,
-
-putThreshold,
-
-phaseConfirmed,
-phaseConfidence,
-
-riskState,
-marketMode,
-executionMode,
-
-phase,
-distributionPhase,
-crashPhase,
-
-priceMomentumScore,
-priceMomentumTrend,
-priceMomentumAcceleration,
-
-weakInternals,
-narrowLeadership,
-
-defensiveEvidenceCount,
-defensiveStructuralConfirmation,
-
-rotationDecayScore,
-marketQualityScore,
-participationScore,
-breadthVelocityScore,
-
-phasePersistence,
-participationDecay,
-
-breadthTrend,
-breadthAcceleration,
-
-leadershipDecay,
-crashTrend,
-
-relativeBreadthWeakness,
-
-daysInPhase,
-
-institutionalPressure,
-
-marketCharacter,
-
-averageBreadth,
-averageParticipation,
-averageRotation,
-averageLiquidity,
-averageFragility,
-
-regimePersistenceHistory,
-
-deterioratingBreadth,
-acceleratingBreadthDecay,
-
-leadershipConcentration,
-risingCrashRisk,
-
-broadParticipationFailure,
-prolongedBearRegime,
-
-persistenceScore,
-distributionRisk,
-falseRecoveryRisk,
-marketFatigue,
-
-bearishPersistence,
-bullishPersistence,
-persistenceTrend,
-
-phaseAdjustment,
-
-persistenceAdjustment,
-
-warningAdjustment,
-
-executionAdjustment,
-
-currentQuality:
-Math.round(
-currentMarketRisk
-),
-
-structuralQuality:
-Math.round(
-structuralRisk
-),
-
-historicalQuality:
-Math.round(
-historicalRisk
-),
-
-crashRisk:
-Math.round(
-crashRisk
-),
-
-timingRisk:
-Math.round(
-timingRiskScore
-)
-
-},
-
-
-components: {
-
-crash:
-Math.round(
-crashRisk
-),
-
-rotation:
-Math.round(
-rotationRisk
-),
-
-priceMomentum:
-Math.round(
-priceMomentumRisk
-),
-
-timing:
-Math.round(
-timingRiskScore
-),
-
-russell:
-Math.round(
-russellRisk
-),
-
-participation:
-Math.round(
-participationRisk
-),
-
-breadthThrust:
-Math.round(
-thrustRisk
-),
-
-breadthVelocity:
-Math.round(
-breadthVelocityRisk
-),
-
-rotationDecay:
-Math.round(
-rotationDecayRisk
-),
-
-liquidity:
-Math.round(
-liquidityRisk
-),
-
-marketQuality:
-Math.round(
-marketQualityRisk
-),
-
-fragility:
-Math.round(
-fragilityRisk
-),
-
-regimeSync:
-Math.round(
-regimeSyncRisk
-),
-
-dangerZone:
-Math.round(
-dangerRisk
-),
-
-regimePersistence:
-Math.round(
-clamp(
-persistenceScore
-)
-),
-
-distributionRisk:
-Math.round(
-clamp(
-distributionRisk
-)
-),
-
-falseRecoveryRisk:
-Math.round(
-clamp(
-falseRecoveryRisk
-)
-),
-
-marketFatigue:
-Math.round(
-clamp(
-marketFatigue
-)
-)
-
-}
-
-};
-
-}
+  const leadershipDecay =
+    num(historyMetrics.leadershipDecay);
 
+  const crashTrend =
+    num(historyMetrics.crashTrend);
 
-/* =====================================================
-HELPER
-===================================================== */
+  const relativeBreadthWeakness =
+    num(historyMetrics.relativeBreadthWeakness);
 
-/*
-* Internal divergence is optional in the Master Score
-* input but can be used as defensive evidence.
-*/
+  const institutionalPressure =
+    num(historyMetrics.institutionalPressure);
 
-function internalDivergenceScore(
-engine: any
-) {
+  const marketCharacter =
+    historyMetrics.marketCharacter ?? "UNKNOWN";
 
-return Number(
-engine?.internalDivergence?.score ?? 0
-);
+  const averageBreadth =
+    clamp(num(historyMetrics.averageBreadth, 50));
+
+  const averageParticipation =
+    clamp(num(historyMetrics.averageParticipation, 50));
+
+  const averageRotation =
+    clamp(num(historyMetrics.averageRotation, 50));
 
+  const averageLiquidity =
+    clamp(num(historyMetrics.averageLiquidity, 50));
+
+  const averageFragility =
+    clamp(num(historyMetrics.averageFragility, 50));
+
+  const regimePersistenceHistory =
+    num(historyMetrics.regimePersistence);
+
+  const historyPersistentDistribution =
+    historyMetrics.persistentDistribution === true;
+
+  const prolongedBearRegime =
+    historyMetrics.prolongedBearRegime === true;
+
+  /* =====================================================
+  OPTIONAL EXECUTION CONTEXT
+  ===================================================== */
+
+  const riskState =
+    executionState.riskState ?? "UNKNOWN";
+
+  const executionMode =
+    executionState.executionMode ?? "UNKNOWN";
+
+  const marketMode =
+    executionState.marketMode ?? "UNKNOWN";
+
+  const inverse = (value: number) =>
+    100 - clamp(value);
+
+  /* =====================================================
+  NORMALIZED RISK COMPONENTS
+  ===================================================== */
+
+  const crashRisk = weightedAverage([
+    { value: crashScore, weight: 0.50 },
+    { value: crashProbability, weight: 0.50 }
+  ]);
+
+  const rotationRisk = inverse(rotationScore);
+  const russellRisk = inverse(russellScore);
+  const participationRisk = inverse(participationScore);
+  const thrustRisk = inverse(thrustScore);
+  const breadthVelocityRisk = breadthVelocityScore;
+  const liquidityRisk = inverse(liquidityScore);
+  const fragilityRisk = fragilityScore;
+  const rotationDecayRisk = rotationDecayScore;
+  const marketQualityRisk = inverse(marketQualityScore);
+  const regimeSyncRisk = inverse(regimeSyncScore);
+  const dangerRisk = dangerScore;
+  const priceMomentumRisk = inverse(priceMomentumScore);
+
+  /* =====================================================
+  RISK AGGREGATES
+
+  Existing weights retained.
+  Correlated components are not independent evidence.
+  ===================================================== */
+
+  const historicalRisk = weightedAverage([
+    { value: inverse(averageBreadth), weight: 0.20 },
+    { value: inverse(averageParticipation), weight: 0.20 },
+    { value: inverse(averageRotation), weight: 0.15 },
+    { value: inverse(averageLiquidity), weight: 0.20 },
+    { value: averageFragility, weight: 0.25 }
+  ]);
+
+  const structuralRisk = weightedAverage([
+    { value: marketQualityRisk, weight: 0.30 },
+    { value: participationRisk, weight: 0.20 },
+    { value: breadthVelocityRisk, weight: 0.15 },
+    { value: rotationDecayRisk, weight: 0.15 },
+    { value: fragilityRisk, weight: 0.20 }
+  ]);
+
+  const currentMarketRisk = weightedAverage([
+    { value: rotationRisk, weight: 0.12 },
+    { value: participationRisk, weight: 0.12 },
+    { value: thrustRisk, weight: 0.08 },
+    { value: breadthVelocityRisk, weight: 0.08 },
+    { value: liquidityRisk, weight: 0.10 },
+    { value: fragilityRisk, weight: 0.14 },
+    { value: rotationDecayRisk, weight: 0.08 },
+    { value: marketQualityRisk, weight: 0.16 },
+    { value: priceMomentumRisk, weight: 0.05 },
+    { value: regimeSyncRisk, weight: 0.04 },
+    { value: dangerRisk, weight: 0.03 }
+  ]);
+
+  const baseRisk = weightedAverage([
+    { value: currentMarketRisk, weight: 0.70 },
+    { value: structuralRisk, weight: 0.20 },
+    { value: historicalRisk, weight: 0.05 },
+    { value: crashRisk, weight: 0.05 }
+  ]);
+
+  let score = baseRisk;
+
+  /* =====================================================
+  PHASE ADJUSTMENT
+  ===================================================== */
+
+  const phaseAdjustments: Record<string, number> = {
+    PHASE_1_EXPANSION: -4,
+    PHASE_2_WARNING: 2,
+    PHASE_3_DISTRIBUTION: 4,
+    PHASE_4_RISK: 5,
+    PHASE_5_BREAKDOWN: 8,
+    PHASE_6_ACCELERATION: 10,
+    PHASE_7_CAPITULATION: 5
+  };
+
+  let phaseAdjustment =
+    phaseAdjustments[phase] ?? 0;
+
+  if (
+    phaseConfirmed &&
+    phaseConfidence >= 70
+  ) {
+    phaseAdjustment *= 1.15;
+  } else if (
+    !phaseConfirmed &&
+    phaseConfidence < 40
+  ) {
+    score = 50 + (score - 50) * 0.75;
+  }
+
+  const preOverlayRisk = score;
+
+  score += phaseAdjustment;
+
+  /* =====================================================
+  PERSISTENCE OVERLAY
+  ===================================================== */
+
+  let persistenceAdjustment =
+    distributionRisk * 0.06 +
+    falseRecoveryRisk * 0.05 +
+    marketFatigue * 0.03;
+
+  if (bearishPersistence) {
+    persistenceAdjustment += 4;
+  }
+
+  if (historyPersistentDistribution) {
+    persistenceAdjustment += 2;
+  }
+
+  if (prolongedBearRegime) {
+    persistenceAdjustment += 2;
+  }
+
+  if (
+    bullishPersistence &&
+    persistenceTrend === "IMPROVING"
+  ) {
+    persistenceAdjustment -= 3;
+  }
+
+  persistenceAdjustment = clamp(
+    persistenceAdjustment,
+    -5,
+    8
+  );
+
+  score += persistenceAdjustment;
+
+  /* =====================================================
+  STRUCTURAL WARNINGS
+  ===================================================== */
+
+  const deterioratingBreadth =
+    breadthTrend <= -2;
+
+  const acceleratingBreadthDecay =
+    breadthAcceleration <= -1;
+
+  /*
+   * historyEngine:
+   * positive leadership decay = deterioration.
+   */
+  const leadershipConcentration =
+    leadershipDecay >= 2;
+
+  const risingCrashRisk =
+    crashTrend >= 3;
+
+  /*
+   * Existing convention retained.
+   * Its calibration is separate from numeric validation.
+   */
+  const broadParticipationFailure =
+    relativeBreadthWeakness > 10;
+
+  const warningAdjustment = clamp(
+    Number(deterioratingBreadth) +
+    Number(acceleratingBreadthDecay) +
+    Number(leadershipConcentration) +
+    Number(risingCrashRisk) +
+    Number(broadParticipationFailure) +
+    Number(
+      prolongedBearRegime &&
+      institutionalPressure > 70
+    ),
+    0,
+    6
+  );
+
+  score += warningAdjustment;
+
+  /* =====================================================
+  OPTIONAL EXECUTION OVERLAY
+  ===================================================== */
+
+  let executionAdjustment = 0;
+
+  if (marketMode === "RISK_OFF") {
+    executionAdjustment += 2;
+  }
+
+  if (riskState === "BREAKDOWN") {
+    executionAdjustment += 3;
+  }
+
+  if (executionMode === "REDUCE_RISK") {
+    executionAdjustment += 2;
+  }
+
+  executionAdjustment = clamp(
+    executionAdjustment,
+    0,
+    6
+  );
+
+  score += executionAdjustment;
+
+  const unclampedScore = score;
+
+  score = clamp(Math.round(score));
+
+  /* =====================================================
+  SIGNAL
+
+  No artificial score cap in distribution phase.
+  Distribution retains its higher PUT threshold.
+  ===================================================== */
+
+  const putThreshold =
+    distributionPhase ? 75 : 65;
+
+  const callAllowed =
+    !distributionPhase &&
+    !crashPhase &&
+    missingInputs.length === 0 &&
+    phase !== "UNKNOWN";
+
+  let signal: "CALL" | "NEUTRAL" | "PUT";
+
+  if (score >= putThreshold) {
+    signal = "PUT";
+  } else if (
+    score <= 35 &&
+    callAllowed
+  ) {
+    signal = "CALL";
+  } else {
+    signal = "NEUTRAL";
+  }
+
+  const color =
+    signal === "CALL"
+      ? "GREEN"
+      : signal === "PUT"
+      ? "RED"
+      : "YELLOW";
+
+  const neutralUpperThreshold =
+    putThreshold - 1;
+
+  const signalStrength = clamp(
+    Math.round(
+      signal === "CALL"
+        ? (35 - score) / 35 * 100
+        : signal === "PUT"
+        ? (score - putThreshold) /
+          (100 - putThreshold) * 100
+        : 100 - Math.abs(score - 50) * 2
+    )
+  );
+
+  /* =====================================================
+  STRUCTURAL FLAGS
+  ===================================================== */
+
+  function historicalMeasurement(
+    field: string,
+    source: string
+  ): boolean {
+    if (numeric(historyMetrics[field]) === null) {
+      return false;
+    }
+
+    const quality = historyMetrics.dataQuality;
+
+    if (!quality) {
+      return true;
+    }
+
+    const observations =
+      numeric(quality.dailyObservations);
+
+    const missing =
+      numeric(quality.missingValues?.[source]);
+
+    return (
+      observations !== null &&
+      missing !== null &&
+      observations > 0 &&
+      missing < observations
+    );
+  }
+
+  /*
+   * Phase age alone does not establish weakness.
+   * Unknown measurements must not count as evidence.
+   */
+  const weakInternals =
+    (
+      raw.participation !== null &&
+      participationScore < 50
+    ) ||
+    (
+      raw.breadthVelocity !== null &&
+      breadthVelocityScore > 55
+    ) ||
+    (
+      raw.marketQuality !== null &&
+      marketQualityScore < 45
+    ) ||
+    (
+      raw.rotationDecay !== null &&
+      rotationDecayScore > 45
+    ) ||
+    institutionalPressure > 65 ||
+    (
+      historicalMeasurement("averageBreadth", "breadth50") &&
+      averageBreadth < 55
+    ) ||
+    (
+      historicalMeasurement("averageParticipation", "participation") &&
+      averageParticipation < 55
+    ) ||
+    (
+      historicalMeasurement("averageLiquidity", "liquidity") &&
+      averageLiquidity < 50
+    ) ||
+    (
+      historicalMeasurement("averageFragility", "fragility") &&
+      averageFragility > 60
+    ) ||
+    participationDecay > 15 ||
+    deterioratingBreadth ||
+    acceleratingBreadthDecay ||
+    leadershipConcentration ||
+    broadParticipationFailure ||
+    prolongedBearRegime ||
+    bearishPersistence;
+
+  const narrowLeadership =
+    num(rotation.rsGrowth, 1) > 1.03 &&
+    num(rotation.rsSmall, 1) < 0.995 &&
+    num(rotation.rsEqual, 1) < 0.995;
+
+  /* =====================================================
+  DEFENSIVE EVIDENCE
+
+  Count of model conditions, not independent confirmations.
+  ===================================================== */
+
+  const defensiveEvidenceCount = [
+    raw.participation !== null &&
+      participationScore < 50,
+
+    raw.breadthVelocity !== null &&
+      breadthVelocityScore > 55,
+
+    raw.marketQuality !== null &&
+      marketQualityScore < 45,
+
+    raw.rotationDecay !== null &&
+      rotationDecayScore > 55,
+
+    raw.fragility !== null &&
+      fragilityScore >= 68,
+
+    raw.regimeSync !== null &&
+      regimeSyncScore < 45,
+
+    num(input.internalDivergence?.score) >= 60,
+
+    russellBlocked
+  ].filter(Boolean).length;
+
+  const defensiveStructuralConfirmation =
+    score >= 65 &&
+    defensiveEvidenceCount >= 3;
+
+  /* =====================================================
+  MODE
+  ===================================================== */
+
+  let mode: "LONG" | "NEUTRAL" | "RISK" | "CRASH" =
+    signal === "CALL"
+      ? "LONG"
+      : signal === "PUT"
+      ? "RISK"
+      : "NEUTRAL";
+
+  if (phase === "PHASE_4_RISK") {
+    mode = "RISK";
+  }
+
+  if (
+    defensiveStructuralConfirmation &&
+    !distributionPhase &&
+    !crashPhase
+  ) {
+    mode = "RISK";
+  }
+
+  const strongDefensive =
+    score >= 75 &&
+    defensiveEvidenceCount >= 4 &&
+    !distributionPhase &&
+    !crashPhase;
+
+  if (strongDefensive) {
+    mode = "RISK";
+  }
+
+  if (
+    prolongedBearRegime &&
+    broadParticipationFailure &&
+    !distributionPhase &&
+    !crashPhase
+  ) {
+    mode = "RISK";
+  }
+
+  if (
+    acceleratingBreadthDecay &&
+    risingCrashRisk &&
+    !distributionPhase &&
+    !crashPhase
+  ) {
+    mode = "RISK";
+  }
+
+  if (
+    bearishPersistence &&
+    distributionRisk >= 60 &&
+    mode === "LONG" &&
+    !distributionPhase &&
+    !crashPhase
+  ) {
+    mode = "RISK";
+  }
+
+  const executionOverride =
+    marketMode === "RISK_OFF" ||
+    riskState === "BREAKDOWN" ||
+    executionMode === "REDUCE_RISK";
+
+  if (
+    executionOverride &&
+    mode === "LONG"
+  ) {
+    mode = "RISK";
+  }
+
+  if (
+    narrowLeadership &&
+    weakInternals &&
+    phase !== "PHASE_1_EXPANSION" &&
+    mode === "LONG"
+  ) {
+    mode = "NEUTRAL";
+  }
+
+  /* Phase invariants */
+
+  if (crashPhase) {
+    mode = "CRASH";
+  }
+
+  if (distributionPhase) {
+    mode = "NEUTRAL";
+  }
+
+  /* =====================================================
+  REGIME CONTEXT
+
+  This exposure is not executable portfolio sizing.
+  Actual instrument sizing remains a separate layer.
+  ===================================================== */
+
+  const netExposure =
+    mode === "LONG"
+      ? 40
+      : mode === "RISK"
+      ? -40
+      : mode === "CRASH"
+      ? -85
+      : 0;
+
+  const regime =
+    mode === "LONG"
+      ? "LONG"
+      : mode === "RISK"
+      ? "RISK"
+      : mode === "CRASH"
+      ? "CRASH"
+      : "TRANSITION";
+
+  let summary =
+    signal === "CALL"
+      ? "Constructive market regime | CALL bias"
+      : signal === "PUT"
+      ? "Defensive market regime | PUT bias"
+      : "Balanced market regime | NEUTRAL bias";
+
+  if (mode === "CRASH") {
+    summary += " | Crash regime active";
+  }
+
+  if (bearishPersistence) {
+    summary += " | Persistent weakness";
+  }
+
+  if (falseRecoveryRisk >= 50) {
+    summary += " | False recovery risk elevated";
+  }
+
+  if (missingInputs.length) {
+    summary += " | Incomplete component inputs";
+  }
+
+  /* =====================================================
+  EFFECTIVE BASE WEIGHTS
+
+  Algebraic expansion of the existing nested weights.
+  Before phase damping and additive overlays.
+  ===================================================== */
+
+  const baseWeights = {
+    rotation: 0.084,
+    participation: 0.124,
+    breadthThrust: 0.056,
+    breadthVelocity: 0.086,
+    liquidity: 0.070,
+    fragility: 0.138,
+    rotationDecay: 0.086,
+    marketQuality: 0.172,
+    priceMomentum: 0.035,
+    regimeSync: 0.028,
+    dangerZone: 0.021,
+    historicalRisk: 0.050,
+    crashRisk: 0.050
+  };
+
+  const baseContributions = {
+    rotation:
+      rotationRisk * baseWeights.rotation,
+
+    participation:
+      participationRisk * baseWeights.participation,
+
+    breadthThrust:
+      thrustRisk * baseWeights.breadthThrust,
+
+    breadthVelocity:
+      breadthVelocityRisk * baseWeights.breadthVelocity,
+
+    liquidity:
+      liquidityRisk * baseWeights.liquidity,
+
+    fragility:
+      fragilityRisk * baseWeights.fragility,
+
+    rotationDecay:
+      rotationDecayRisk * baseWeights.rotationDecay,
+
+    marketQuality:
+      marketQualityRisk * baseWeights.marketQuality,
+
+    priceMomentum:
+      priceMomentumRisk * baseWeights.priceMomentum,
+
+    regimeSync:
+      regimeSyncRisk * baseWeights.regimeSync,
+
+    dangerZone:
+      dangerRisk * baseWeights.dangerZone,
+
+    historicalRisk:
+      historicalRisk * baseWeights.historicalRisk,
+
+    crashRisk:
+      crashRisk * baseWeights.crashRisk
+  };
+
+  /* =====================================================
+  RETURN
+  ===================================================== */
+
+  return {
+    score,
+    signal,
+    color,
+    signalStrength,
+    mode,
+    netExposure,
+    regime,
+    summary,
+
+    meta: {
+      scoreType: "RISK",
+      scoreInterpretation: "LOW=CALL | HIGH=PUT",
+
+      callThreshold: 35,
+      callAllowed,
+
+      neutralLowerThreshold:
+        callAllowed ? 36 : 0,
+
+      neutralUpperThreshold,
+      putThreshold,
+
+      phaseConfirmed,
+      phaseConfidence,
+
+      riskState,
+      marketMode,
+      executionMode,
+
+      phase,
+      distributionPhase,
+      crashPhase,
+
+      priceMomentumScore,
+      priceMomentumTrend,
+      priceMomentumAcceleration,
+
+      weakInternals,
+      narrowLeadership,
+
+      defensiveEvidenceCount,
+      defensiveStructuralConfirmation,
+      defensiveEvidenceIsIndependent: false,
+
+      rotationDecayScore,
+      marketQualityScore,
+      participationScore,
+      breadthVelocityScore,
+
+      phasePersistence,
+      participationDecay,
+      breadthTrend,
+      breadthAcceleration,
+      leadershipDecay,
+      crashTrend,
+      relativeBreadthWeakness,
+      daysInPhase,
+      institutionalPressure,
+      marketCharacter,
+
+      averageBreadth,
+      averageParticipation,
+      averageRotation,
+      averageLiquidity,
+      averageFragility,
+
+      regimePersistenceHistory,
+
+      deterioratingBreadth,
+      acceleratingBreadthDecay,
+      leadershipConcentration,
+      risingCrashRisk,
+      broadParticipationFailure,
+      prolongedBearRegime,
+
+      persistenceScore,
+      distributionRisk,
+      falseRecoveryRisk,
+      marketFatigue,
+      bearishPersistence,
+      bullishPersistence,
+      persistenceTrend,
+
+      phaseAdjustment,
+      persistenceAdjustment,
+      warningAdjustment,
+      executionAdjustment,
+
+      /*
+       * Legacy names retained.
+       * These values describe risk, not constructive quality.
+       */
+      currentQuality:
+        Math.round(currentMarketRisk),
+
+      structuralQuality:
+        Math.round(structuralRisk),
+
+      historicalQuality:
+        Math.round(historicalRisk),
+
+      currentRisk:
+        Math.round(currentMarketRisk),
+
+      structuralRisk:
+        Math.round(structuralRisk),
+
+      historicalRisk:
+        Math.round(historicalRisk),
+
+      legacyQualityFieldsAreRisk: true,
+
+      crashRisk:
+        Math.round(crashRisk),
+
+      timingRisk:
+        Math.round(timingRiskScore),
+
+      exposureMeaning:
+        "REGIME_CONTEXT_NOT_EXECUTABLE_POSITION_SIZE"
+    },
+
+    components: {
+      crash: Math.round(crashRisk),
+      rotation: Math.round(rotationRisk),
+      priceMomentum: Math.round(priceMomentumRisk),
+      timing: Math.round(timingRiskScore),
+      russell: Math.round(russellRisk),
+      participation: Math.round(participationRisk),
+      breadthThrust: Math.round(thrustRisk),
+      breadthVelocity: Math.round(breadthVelocityRisk),
+      rotationDecay: Math.round(rotationDecayRisk),
+      liquidity: Math.round(liquidityRisk),
+      marketQuality: Math.round(marketQualityRisk),
+      fragility: Math.round(fragilityRisk),
+      regimeSync: Math.round(regimeSyncRisk),
+      dangerZone: Math.round(dangerRisk),
+      regimePersistence: Math.round(persistenceScore),
+      distributionRisk: Math.round(distributionRisk),
+      falseRecoveryRisk: Math.round(falseRecoveryRisk),
+      marketFatigue: Math.round(marketFatigue)
+    },
+
+    diagnostics: {
+      baseRisk,
+      preOverlayRisk,
+
+      phaseAdjustment,
+      persistenceAdjustment,
+      warningAdjustment,
+      executionAdjustment,
+
+      unclampedScore,
+
+      saturated:
+        unclampedScore < 0 ||
+        unclampedScore > 100,
+
+      baseWeights,
+      baseContributions,
+
+      timingAndRussellDirectScoreWeight: 0,
+      weightsCalibratedByThisAudit: false
+    },
+
+    dataQuality: {
+      complete: missingInputs.length === 0,
+      missingInputs,
+      fallbackRisk: 50,
+      missingInputsAreNotMeasuredNeutral: true
+    }
+  };
 }
