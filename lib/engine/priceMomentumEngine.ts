@@ -1,1026 +1,576 @@
 /* =====================================================
 PRICE MOMENTUM ENGINE
-=====================================================
 
-Purpose:
---------
-Detect price-driven market moves BEFORE the slower
-structural engines fully confirm a regime change.
+Price direction and momentum.
+Does not decide CALL / PUT.
 
-Important:
------------
-This engine does NOT decide CALL / PUT.
-
-It provides:
-- price momentum
-- short-term momentum
-- acceleration
-- trend
-- direction
-- strength
-- price/structure context
-
-The engine is deliberately fast-reacting.
-
-Structural engines answer:
-"Is the market healthy?"
-
-This engine answers:
-"What is price doing RIGHT NOW?"
-
+Structure context requires all five structural inputs.
+Missing structure is reported as UNKNOWN.
 ===================================================== */
 
 export type PriceTrend =
-| "STRONG_BULLISH"
-| "BULLISH"
-| "NEUTRAL"
-| "BEARISH"
-| "STRONG_BEARISH";
+  | "STRONG_BULLISH"
+  | "BULLISH"
+  | "NEUTRAL"
+  | "BEARISH"
+  | "STRONG_BEARISH";
 
 export type PriceDirection =
-| "UP"
-| "DOWN"
-| "FLAT";
+  | "UP"
+  | "DOWN"
+  | "FLAT";
 
 export type PriceMomentumState =
-| "STRONG_BULLISH"
-| "BULLISH"
-| "BULLISH_COOLING"
-| "NEUTRAL"
-| "BEARISH_BUILDING"
-| "BEARISH"
-| "STRONG_BEARISH";
+  | "STRONG_BULLISH"
+  | "BULLISH"
+  | "BULLISH_COOLING"
+  | "NEUTRAL"
+  | "BEARISH_BUILDING"
+  | "BEARISH"
+  | "STRONG_BEARISH";
 
 export type PriceStructureAlignment =
-| "CONFIRMED_BULLISH"
-| "BULLISH"
-| "CONFLICT"
-| "BEARISH"
-| "CONFIRMED_BEARISH";
-
+  | "CONFIRMED_BULLISH"
+  | "BULLISH"
+  | "NEUTRAL"
+  | "CONFLICT"
+  | "BEARISH"
+  | "CONFIRMED_BEARISH";
 
 /* =====================================================
 INPUT
 ===================================================== */
 
 export interface PriceMomentumInput {
+  historyMetrics?: any;
 
-historyMetrics?: any;
+  indices?: {
+    ndx?: {
+      value?: number;
+      change?: number;
+    };
 
-indices?: {
+    spx?: {
+      value?: number;
+      change?: number;
+    };
 
-ndx?: {
-value?: number;
-change?: number;
-};
+    rut?: {
+      value?: number;
+      change?: number;
+    };
+  };
 
-spx?: {
-value?: number;
-change?: number;
-};
-
-rut?: {
-value?: number;
-change?: number;
-};
-
-};
-
-rotation?: any;
-
-structure?: any;
-
-participation?: any;
-
-breadthThrust?: any;
-
-liquidity?: any;
-
-fragility?: any;
-
-crash?: any;
-
+  rotation?: any;
+  structure?: any;
+  participation?: any;
+  breadthThrust?: any;
+  liquidity?: any;
+  fragility?: any;
+  crash?: any;
 }
-
 
 /* =====================================================
 OUTPUT
 ===================================================== */
 
-export interface PriceMomentumResult {
+interface IndexMomentum {
+  value: number;
 
-/* ================= PRICE ================= */
+  momentum5D: number;
+  momentum20D: number;
+  acceleration: number;
 
-ndx: {
-value: number;
-
-momentum5D: number;
-momentum20D: number;
-
-acceleration: number;
-
-trend: PriceTrend;
-direction: PriceDirection;
-
-score: number;
-};
-
-spx: {
-value: number;
-
-momentum5D: number;
-momentum20D: number;
-
-acceleration: number;
-
-trend: PriceTrend;
-direction: PriceDirection;
-
-score: number;
-};
-
-rut: {
-value: number;
-
-momentum5D: number;
-momentum20D: number;
-
-acceleration: number;
-
-trend: PriceTrend;
-direction: PriceDirection;
-
-score: number;
-};
-
-
-/* ================= AGGREGATE ================= */
-
-momentum5D: number;
-
-momentum20D: number;
-
-acceleration: number;
-
-score: number;
-
-trend: PriceTrend;
-
-direction: PriceDirection;
-
-state: PriceMomentumState;
-
-
-/* ================= STRUCTURE ================= */
-
-structureScore: number;
-
-structureAlignment:
-| PriceStructureAlignment
-| "UNKNOWN";
-
-
-/* ================= TRADE CONTEXT ================= */
-
-earlyBullish:
-boolean;
-
-earlyBearish:
-boolean;
-
-bullishImpulse:
-boolean;
-
-bearishImpulse:
-boolean;
-
-cooling:
-boolean;
-
-accelerating:
-boolean;
-
-decelerating:
-boolean;
-
-priceLeadingStructure:
-boolean;
-
-structureLeadingPrice:
-boolean;
-
-conflict:
-boolean;
-
-summary: string;
-
+  trend: PriceTrend;
+  direction: PriceDirection;
+  score: number;
 }
 
+export interface PriceMomentumResult {
+  ndx: IndexMomentum;
+  spx: IndexMomentum;
+  rut: IndexMomentum;
+
+  momentum5D: number;
+  momentum20D: number;
+  acceleration: number;
+
+  score: number;
+  trend: PriceTrend;
+  direction: PriceDirection;
+  state: PriceMomentumState;
+
+  structureScore: number;
+
+  structureAlignment:
+    | PriceStructureAlignment
+    | "UNKNOWN";
+
+  earlyBullish: boolean;
+  earlyBearish: boolean;
+
+  bullishImpulse: boolean;
+  bearishImpulse: boolean;
+
+  cooling: boolean;
+  accelerating: boolean;
+  decelerating: boolean;
+
+  priceLeadingStructure: boolean;
+  structureLeadingPrice: boolean;
+
+  conflict: boolean;
+  summary: string;
+}
 
 /* =====================================================
-HELPERS
+SAFE NUMERIC EXTRACTION
 ===================================================== */
+
+function numeric(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value)
+      ? value
+      : null;
+  }
+
+  if (
+    typeof value === "string" &&
+    value.trim() !== ""
+  ) {
+    const n = Number(value);
+
+    return Number.isFinite(n)
+      ? n
+      : null;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    const object = value as Record<string, unknown>;
+
+    for (const key of ["value", "score", "current"]) {
+      const candidate = object[key];
+
+      if (
+        typeof candidate === "number" ||
+        typeof candidate === "string"
+      ) {
+        const n = numeric(candidate);
+
+        if (n !== null) {
+          return n;
+        }
+      }
+    }
+  }
+
+  return null;
+}
 
 function num(
-value: any,
-fallback = 0
+  value: unknown,
+  fallback = 0
 ): number {
-
-const n = Number(value);
-
-return Number.isFinite(n)
-? n
-: fallback;
+  return numeric(value) ?? fallback;
 }
-
-
-/* =====================================================
-CLAMP
-===================================================== */
 
 function clamp(
-value: number,
-min: number,
-max: number
+  value: number,
+  min: number,
+  max: number
 ): number {
-
-return Math.max(
-min,
-Math.min(max, value)
-);
-
+  return Math.max(min, Math.min(max, value));
 }
 
-
 /* =====================================================
-NORMALIZE MOMENTUM
+PRICE SCORE
 ===================================================== */
-
-/*
-Momentum is percentage.
-
-Example:
-
-+10% -> strongly bullish
-+5% -> bullish
-+1% -> neutral/slightly bullish
-0% -> neutral
--5% -> bearish
--10% -> strongly bearish
-
-The thresholds deliberately avoid reacting to
-normal daily noise.
-*/
 
 function momentumScore(
-momentum5D: number,
-momentum20D: number
+  short: number,
+  medium: number
 ): number {
-
-const shortScore =
-clamp(
-momentum5D * 5,
--50,
-50
-);
-
-const mediumScore =
-clamp(
-momentum20D * 3,
--50,
-50
-);
-
-return Math.round(
-clamp(
-50 +
-shortScore * 0.55 +
-mediumScore * 0.45,
-0,
-100
-)
-);
-
+  return Math.round(
+    clamp(
+      50 +
+      clamp(short * 5, -50, 50) * 0.55 +
+      clamp(medium * 3, -50, 50) * 0.45,
+      0,
+      100
+    )
+  );
 }
 
+function classifyTrend(score: number): PriceTrend {
+  if (score >= 75) return "STRONG_BULLISH";
+  if (score >= 60) return "BULLISH";
+  if (score <= 25) return "STRONG_BEARISH";
+  if (score <= 40) return "BEARISH";
 
-/* =====================================================
-TREND CLASSIFICATION
-===================================================== */
-
-function classifyTrend(
-score: number
-): PriceTrend {
-
-if (score >= 75)
-return "STRONG_BULLISH";
-
-if (score >= 60)
-return "BULLISH";
-
-if (score <= 25)
-return "STRONG_BEARISH";
-
-if (score <= 40)
-return "BEARISH";
-
-return "NEUTRAL";
-
+  return "NEUTRAL";
 }
-
-
-/* =====================================================
-DIRECTION
-===================================================== */
 
 function direction(
-momentum5D: number,
-momentum20D: number
+  short: number,
+  medium: number
 ): PriceDirection {
+  const combined =
+    short * 0.6 +
+    medium * 0.4;
 
-const combined =
-momentum5D * 0.6 +
-momentum20D * 0.4;
+  if (combined > 0.5) return "UP";
+  if (combined < -0.5) return "DOWN";
 
-if (combined > 0.5)
-return "UP";
-
-if (combined < -0.5)
-return "DOWN";
-
-return "FLAT";
-
+  return "FLAT";
 }
 
-
 /* =====================================================
-STRUCTURE SCORE
+STRUCTURE
+
+Retain the existing score weights.
+Only classify alignment when all inputs are available.
+
+The numeric fallback score remains compatible;
+UNKNOWN prevents treating it as measured structure.
 ===================================================== */
 
-function getStructureScore(
-input: PriceMomentumInput
-): number {
+function getStructure(input: PriceMomentumInput) {
+  const values = [
+    numeric(input.structure?.breadth?.b50),
+    numeric(input.participation?.score),
+    numeric(input.rotation?.score),
+    numeric(input.liquidity?.score),
+    numeric(input.fragility?.score)
+  ];
 
-const breadth =
-num(
-input.structure?.breadth?.b50?.value,
-50
-);
+  const available = values.every(
+    value => value !== null
+  );
 
-const participation =
-num(
-input.participation?.score,
-50
-);
+  const [
+    breadth,
+    participation,
+    rotation,
+    liquidity,
+    fragility
+  ] = values.map(
+    value => clamp(value ?? 50, 0, 100)
+  );
 
-const rotation =
-num(
-input.rotation?.score,
-50
-);
+  const score = Math.round(
+    clamp(
+      breadth * 0.30 +
+      participation * 0.25 +
+      rotation * 0.20 +
+      liquidity * 0.10 +
+      (100 - fragility) * 0.15,
+      0,
+      100
+    )
+  );
 
-const liquidity =
-num(
-input.liquidity?.score,
-50
-);
-
-const fragility =
-num(
-input.fragility?.score,
-50
-);
-
-/*
-Fragility is inverse.
-
-80 fragility is bad.
-20 fragility is good.
-*/
-
-const fragilityHealth =
-100 - fragility;
-
-const score =
-breadth * 0.30 +
-participation * 0.25 +
-rotation * 0.20 +
-liquidity * 0.10 +
-fragilityHealth * 0.15;
-
-return Math.round(
-clamp(score, 0, 100)
-);
-
+  return {
+    score,
+    available
+  };
 }
-
-
-/* =====================================================
-STRUCTURE ALIGNMENT
-===================================================== */
 
 function classifyAlignment(
-priceScore: number,
-structureScore: number
+  price: number,
+  structure: number
 ): PriceStructureAlignment {
+  const priceBull = price >= 60;
+  const priceBear = price <= 40;
 
-const priceBull =
-priceScore >= 60;
+  const structureBull = structure >= 60;
+  const structureBear = structure <= 40;
 
-const priceBear =
-priceScore <= 40;
+  if (priceBull && structureBull) {
+    return "CONFIRMED_BULLISH";
+  }
 
-const structureBull =
-structureScore >= 60;
+  if (priceBear && structureBear) {
+    return "CONFIRMED_BEARISH";
+  }
 
-const structureBear =
-structureScore <= 40;
+  if (
+    (priceBull && structureBear) ||
+    (priceBear && structureBull)
+  ) {
+    return "CONFLICT";
+  }
 
+  if (priceBull) return "BULLISH";
+  if (priceBear) return "BEARISH";
 
-if (
-priceBull &&
-structureBull
-) {
-
-return "CONFIRMED_BULLISH";
-
+  return "NEUTRAL";
 }
-
-
-if (
-priceBear &&
-structureBear
-) {
-
-return "CONFIRMED_BEARISH";
-
-}
-
-
-if (
-priceBull &&
-!structureBear
-) {
-
-return "BULLISH";
-
-}
-
-
-if (
-priceBear &&
-!structureBull
-) {
-
-return "BEARISH";
-
-}
-
-
-return "CONFLICT";
-
-}
-
 
 /* =====================================================
 MOMENTUM STATE
 ===================================================== */
 
 function classifyState(
-score: number,
-momentum5D: number,
-momentum20D: number,
-acceleration: number
+  score: number,
+  short: number,
+  medium: number,
+  acceleration: number
 ): PriceMomentumState {
+  if (
+    short >= 3 &&
+    medium >= 5 &&
+    acceleration >= 0
+  ) {
+    return "STRONG_BULLISH";
+  }
 
-/*
-Strong immediate upside.
+  if (
+    medium >= 4 &&
+    short >= 0 &&
+    acceleration < 0
+  ) {
+    return "BULLISH_COOLING";
+  }
 
-This is the important fast signal.
-*/
+  if (score >= 65) {
+    return "BULLISH";
+  }
 
-if (
-momentum5D >= 3 &&
-momentum20D >= 5 &&
-acceleration >= 0
-) {
+  if (
+    short <= -3 &&
+    medium <= -4 &&
+    acceleration <= 0
+  ) {
+    return "STRONG_BEARISH";
+  }
 
-return "STRONG_BULLISH";
+  if (
+    medium <= -4 &&
+    short <= 0 &&
+    acceleration > 0
+  ) {
+    return "BEARISH_BUILDING";
+  }
 
+  if (score <= 35) {
+    return "BEARISH";
+  }
+
+  return "NEUTRAL";
 }
-
-
-/*
-Strong trend but short-term cooling.
-
-Example:
-+5% 20D
-+1% 5D
-negative acceleration
-
-This is still bullish.
-*/
-
-if (
-momentum20D >= 4 &&
-momentum5D >= 0 &&
-acceleration < 0
-) {
-
-return "BULLISH_COOLING";
-
-}
-
-
-if (
-score >= 65
-) {
-
-return "BULLISH";
-
-}
-
-
-/*
-Fast downside acceleration.
-*/
-
-if (
-momentum5D <= -3 &&
-momentum20D <= -4 &&
-acceleration <= 0
-) {
-
-return "STRONG_BEARISH";
-
-}
-
-
-/*
-Medium-term bearish but short-term
-downside is still developing.
-*/
-
-if (
-momentum20D <= -4 &&
-momentum5D <= 0 &&
-acceleration > 0
-) {
-
-return "BEARISH_BUILDING";
-
-}
-
-
-if (
-score <= 35
-) {
-
-return "BEARISH";
-
-}
-
-
-return "NEUTRAL";
-
-}
-
-
-/* =====================================================
-SUMMARY
-===================================================== */
-
-function buildSummary(
-state: PriceMomentumState,
-alignment: PriceStructureAlignment | "UNKNOWN",
-momentum5D: number,
-momentum20D: number,
-acceleration: number
-): string {
-
-const short =
-`${momentum5D >= 0 ? "+" : ""}${momentum5D.toFixed(2)}% 5D`;
-
-const medium =
-`${momentum20D >= 0 ? "+" : ""}${momentum20D.toFixed(2)}% 20D`;
-
-const accel =
-`${acceleration >= 0 ? "+" : ""}${acceleration.toFixed(2)}`;
-
-return (
-`PRICE ${state} | ` +
-`${short} | ` +
-`${medium} | ` +
-`ACC ${accel} | ` +
-`STRUCTURE ${alignment}`
-);
-
-}
-
 
 /* =====================================================
 ENGINE
 ===================================================== */
 
 export function priceMomentumEngine(
-input: PriceMomentumInput
+  input: PriceMomentumInput
 ): PriceMomentumResult {
-
-
-/* ===================================================
-INDEX DATA
-=================================================== */
-
-const ndxValue =
-num(
-input.indices?.ndx?.value,
-0
-);
-
-const spxValue =
-num(
-input.indices?.spx?.value,
-0
-);
-
-const rutValue =
-num(
-input.indices?.rut?.value,
-0
-);
-
-
-/* ===================================================
-HISTORY METRICS
-=================================================== */
-
-const history =
-input.historyMetrics ?? {};
-
-
-const ndxMomentum5D =
-num(
-history.ndxMomentum5D,
-0
-);
-
-const ndxMomentum20D =
-num(
-history.ndxMomentum20D,
-0
-);
-
-const ndxAcceleration =
-num(
-history.ndxAcceleration,
-0
-);
-
-
-const spxMomentum5D =
-num(
-history.spxMomentum5D,
-0
-);
-
-const spxMomentum20D =
-num(
-history.spxMomentum20D,
-0
-);
-
-const spxAcceleration =
-num(
-history.spxAcceleration,
-0
-);
-
-
-const rutMomentum5D =
-num(
-history.rutMomentum5D,
-0
-);
-
-const rutMomentum20D =
-num(
-history.rutMomentum20D,
-0
-);
-
-const rutAcceleration =
-num(
-history.rutAcceleration,
-0
-);
-
-
-/* ===================================================
-INDIVIDUAL SCORES
-=================================================== */
-
-const ndxScore =
-momentumScore(
-ndxMomentum5D,
-ndxMomentum20D
-);
-
-const spxScore =
-momentumScore(
-spxMomentum5D,
-spxMomentum20D
-);
-
-const rutScore =
-momentumScore(
-rutMomentum5D,
-rutMomentum20D
-);
-
-
-/* ===================================================
-AGGREGATE PRICE MOMENTUM
-=================================================== */
-
-/*
-NASDAQ gets the largest weight because this is
-the primary instrument of the rotation strategy.
-
-Russell gets second-largest weight because it is
-the rotation counterpart.
-
-SPX provides broad market confirmation.
-*/
-
-const momentum5D =
-ndxMomentum5D * 0.50 +
-rutMomentum5D * 0.30 +
-spxMomentum5D * 0.20;
-
-
-const momentum20D =
-ndxMomentum20D * 0.50 +
-rutMomentum20D * 0.30 +
-spxMomentum20D * 0.20;
-
-
-const acceleration =
-ndxAcceleration * 0.50 +
-rutAcceleration * 0.30 +
-spxAcceleration * 0.20;
-
-
-const score =
-Math.round(
-clamp(
-momentumScore(
-momentum5D,
-momentum20D
-),
-0,
-100
-)
-);
-
-
-const trend =
-classifyTrend(score);
-
-
-const dir =
-direction(
-momentum5D,
-momentum20D
-);
-
-
-const state =
-classifyState(
-score,
-momentum5D,
-momentum20D,
-acceleration
-);
-
-
-/* ===================================================
-STRUCTURE
-=================================================== */
-
-const structureScore =
-getStructureScore(input);
-
-
-const structureAlignment =
-classifyAlignment(
-score,
-structureScore
-);
-
-
-/* ===================================================
-CONTEXT FLAGS
-=================================================== */
-
-const earlyBullish =
-momentum5D >= 1 &&
-momentum20D >= 2 &&
-acceleration >= -0.5;
-
-
-const earlyBearish =
-momentum5D <= -1 &&
-momentum20D <= -2 &&
-acceleration <= 0.5;
-
-
-const bullishImpulse =
-momentum5D >= 3 &&
-acceleration >= 0.5;
-
-
-const bearishImpulse =
-momentum5D <= -3 &&
-acceleration <= -0.5;
-
-
-const cooling =
-momentum20D > 2 &&
-momentum5D < momentum20D * 0.35 &&
-acceleration < 0;
-
-
-const accelerating =
-acceleration >= 0.5;
-
-
-const decelerating =
-acceleration <= -0.5;
-
-
-const priceLeadingStructure =
-(
-score >= 60 &&
-structureScore < 55
-);
-
-
-const structureLeadingPrice =
-(
-structureScore >= 60 &&
-score < 55
-);
-
-
-const conflict =
-structureAlignment === "CONFLICT";
-
-
-/* ===================================================
-SUMMARY
-=================================================== */
-
-const summary =
-buildSummary(
-state,
-structureAlignment,
-momentum5D,
-momentum20D,
-acceleration
-);
-
-
-/* ===================================================
-RETURN
-=================================================== */
-
-return {
-
-ndx: {
-
-value: ndxValue,
-
-momentum5D:
-ndxMomentum5D,
-
-momentum20D:
-ndxMomentum20D,
-
-acceleration:
-ndxAcceleration,
-
-trend:
-classifyTrend(ndxScore),
-
-direction:
-direction(
-ndxMomentum5D,
-ndxMomentum20D
-),
-
-score:
-ndxScore
-
-},
-
-
-spx: {
-
-value: spxValue,
-
-momentum5D:
-spxMomentum5D,
-
-momentum20D:
-spxMomentum20D,
-
-acceleration:
-spxAcceleration,
-
-trend:
-classifyTrend(spxScore),
-
-direction:
-direction(
-spxMomentum5D,
-spxMomentum20D
-),
-
-score:
-spxScore
-
-},
-
-
-rut: {
-
-value: rutValue,
-
-momentum5D:
-rutMomentum5D,
-
-momentum20D:
-rutMomentum20D,
-
-acceleration:
-rutAcceleration,
-
-trend:
-classifyTrend(rutScore),
-
-direction:
-direction(
-rutMomentum5D,
-rutMomentum20D
-),
-
-score:
-rutScore
-
-},
-
-
-momentum5D,
-
-momentum20D,
-
-acceleration,
-
-score,
-
-trend,
-
-direction:
-dir,
-
-state,
-
-structureScore,
-
-structureAlignment,
-
-earlyBullish,
-
-earlyBearish,
-
-bullishImpulse,
-
-bearishImpulse,
-
-cooling,
-
-accelerating,
-
-decelerating,
-
-priceLeadingStructure,
-
-structureLeadingPrice,
-
-conflict,
-
-summary
-
-};
-
+  const safeInput = input ?? {};
+  const history = safeInput.historyMetrics ?? {};
+
+  /*
+   * Existing numeric compatibility:
+   * missing price metrics use zero.
+   * This does not prove an observed flat market.
+   */
+  function index(
+    name: "ndx" | "spx" | "rut"
+  ): IndexMomentum {
+    const short = num(
+      history[`${name}Momentum5D`]
+    );
+
+    const medium = num(
+      history[`${name}Momentum20D`]
+    );
+
+    const acceleration = num(
+      history[`${name}Acceleration`]
+    );
+
+    const score = momentumScore(
+      short,
+      medium
+    );
+
+    return {
+      value: num(
+        safeInput.indices?.[name]?.value
+      ),
+
+      momentum5D: short,
+      momentum20D: medium,
+      acceleration,
+
+      score,
+      trend: classifyTrend(score),
+      direction: direction(short, medium)
+    };
+  }
+
+  const ndx = index("ndx");
+  const spx = index("spx");
+  const rut = index("rut");
+
+  /* ===================================================
+  AGGREGATE — ORIGINAL WEIGHTS
+  =================================================== */
+
+  const momentum5D =
+    ndx.momentum5D * 0.50 +
+    rut.momentum5D * 0.30 +
+    spx.momentum5D * 0.20;
+
+  const momentum20D =
+    ndx.momentum20D * 0.50 +
+    rut.momentum20D * 0.30 +
+    spx.momentum20D * 0.20;
+
+  const acceleration =
+    ndx.acceleration * 0.50 +
+    rut.acceleration * 0.30 +
+    spx.acceleration * 0.20;
+
+  const score = momentumScore(
+    momentum5D,
+    momentum20D
+  );
+
+  const trend = classifyTrend(score);
+
+  const dir = direction(
+    momentum5D,
+    momentum20D
+  );
+
+  const state = classifyState(
+    score,
+    momentum5D,
+    momentum20D,
+    acceleration
+  );
+
+  /* ===================================================
+  STRUCTURE CONTEXT
+  =================================================== */
+
+  const structure = getStructure(safeInput);
+  const structureScore = structure.score;
+
+  const structureAlignment:
+    PriceMomentumResult["structureAlignment"] =
+      structure.available
+        ? classifyAlignment(score, structureScore)
+        : "UNKNOWN";
+
+  /* ===================================================
+  CONTEXT FLAGS
+  =================================================== */
+
+  const earlyBullish =
+    momentum5D >= 1 &&
+    momentum20D >= 2 &&
+    acceleration >= -0.5;
+
+  const earlyBearish =
+    momentum5D <= -1 &&
+    momentum20D <= -2 &&
+    acceleration <= 0.5;
+
+  const bullishImpulse =
+    momentum5D >= 3 &&
+    acceleration >= 0.5;
+
+  const bearishImpulse =
+    momentum5D <= -3 &&
+    acceleration <= -0.5;
+
+  const cooling =
+    momentum20D > 2 &&
+    momentum5D < momentum20D * 0.35 &&
+    acceleration < 0;
+
+  const accelerating =
+    acceleration >= 0.5;
+
+  const decelerating =
+    acceleration <= -0.5;
+
+  const priceLeadingStructure =
+    structure.available &&
+    score >= 60 &&
+    structureScore < 55;
+
+  const structureLeadingPrice =
+    structure.available &&
+    structureScore >= 60 &&
+    score < 55;
+
+  const conflict =
+    structureAlignment === "CONFLICT";
+
+  /* ===================================================
+  SUMMARY
+  =================================================== */
+
+  const shortText =
+    `${momentum5D >= 0 ? "+" : ""}` +
+    `${momentum5D.toFixed(2)}% 5D`;
+
+  const mediumText =
+    `${momentum20D >= 0 ? "+" : ""}` +
+    `${momentum20D.toFixed(2)}% 20D`;
+
+  const accelerationText =
+    `${acceleration >= 0 ? "+" : ""}` +
+    `${acceleration.toFixed(2)}`;
+
+  const summary =
+    `PRICE ${state} | ` +
+    `${shortText} | ` +
+    `${mediumText} | ` +
+    `ACC ${accelerationText} | ` +
+    `STRUCTURE ${structureAlignment}`;
+
+  /* ===================================================
+  RETURN
+  =================================================== */
+
+  return {
+    ndx,
+    spx,
+    rut,
+
+    momentum5D,
+    momentum20D,
+    acceleration,
+
+    score,
+    trend,
+    direction: dir,
+    state,
+
+    structureScore,
+    structureAlignment,
+
+    earlyBullish,
+    earlyBearish,
+    bullishImpulse,
+    bearishImpulse,
+
+    cooling,
+    accelerating,
+    decelerating,
+
+    priceLeadingStructure,
+    structureLeadingPrice,
+
+    conflict,
+    summary
+  };
 }
