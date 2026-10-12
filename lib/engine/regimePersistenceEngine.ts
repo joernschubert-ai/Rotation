@@ -9,9 +9,14 @@ export interface RegimePersistenceEngineInput {
 
   dangerScore?: number;
   fragilityScore?: number;
-
   internalDivergenceScore?: number;
 
+  /*
+   * Expected order:
+   * oldest observation first, newest last.
+   *
+   * Preserve missing observations as null.
+   */
   breadth50History?: Array<number | null>;
   breadth200History?: Array<number | null>;
 
@@ -24,15 +29,10 @@ export interface RegimePersistenceEngineInput {
 }
 
 export interface RegimePersistenceEngineOutput {
-  /* =====================================================
-  LEGACY / COMPATIBILITY
-  ===================================================== */
-
   persistentWeaknessDays: number;
 
   persistentBreadthDecay: boolean;
   persistentParticipationFailure: boolean;
-
   persistentRotationStress: boolean;
   persistentInternalDivergence: boolean;
 
@@ -53,10 +53,6 @@ export interface RegimePersistenceEngineOutput {
     divergenceDays: number;
   };
 
-  /* =====================================================
-  REGIME PERSISTENCE MODEL
-  ===================================================== */
-
   score: number;
 
   bearishPersistence: boolean;
@@ -67,6 +63,11 @@ export interface RegimePersistenceEngineOutput {
     | "STABLE"
     | "DETERIORATING";
 
+  /*
+   * Legacy compatibility:
+   * maximum weakness count in the current window,
+   * not the duration of a consecutive regime.
+   */
   regimeAge: number;
 
   distributionRisk: number;
@@ -75,6 +76,17 @@ export interface RegimePersistenceEngineOutput {
   trendStability: number;
   marketFatigue: number;
 }
+
+/* =====================================================
+CURRENT PERSISTENCE WINDOW
+
+Twenty observed daily intervals require
+twenty-one observations.
+
+Archive length must not determine current persistence.
+===================================================== */
+
+const PERSISTENCE_OBSERVATIONS = 21;
 
 /* =====================================================
 HELPERS
@@ -117,17 +129,23 @@ function safeNumber(
 function historyArray(
   value: unknown
 ): Array<number | null> {
+  /*
+   * Slice before extraction.
+   * Missing observations retain their original positions.
+   * Do not fill the window with older valid measurements.
+   */
   return Array.isArray(value)
-    ? value.map(finiteNumber)
+    ? value
+        .slice(-PERSISTENCE_OBSERVATIONS)
+        .map(finiteNumber)
     : [];
 }
 
 /* =====================================================
-COUNT HISTORY
+COUNTS
 
-Counts measured weak observations in the supplied window.
-These counts are not consecutive-day streaks.
-Missing observations do not count as measured weakness.
+Measured observations in the current window.
+These are not consecutive-day streaks.
 ===================================================== */
 
 function countBelow(
@@ -172,11 +190,8 @@ function calculateTrend(
 ): PersistenceTrend {
   /*
    * Compare two complete three-observation windows.
-   *
-   * Missing observations must not shorten or shift
-   * the comparison windows.
+   * Missing values must not shift these windows.
    */
-
   if (history.length < 6) {
     return "STABLE";
   }
@@ -211,16 +226,12 @@ function calculateTrend(
 }
 
 /* =====================================================
-REGIME PERSISTENCE ENGINE
+ENGINE
 ===================================================== */
 
 export function regimePersistenceEngine(
   input: RegimePersistenceEngineInput
 ): RegimePersistenceEngineOutput {
-  /* =====================================================
-  INPUT
-  ===================================================== */
-
   const breadth50 =
     safeNumber(input.breadth50, 50);
 
@@ -242,11 +253,9 @@ export function regimePersistenceEngine(
   const internalDivergenceScore =
     safeNumber(input.internalDivergenceScore, 0);
 
-  /* =====================================================
-  HISTORY
-
-  Expected order: oldest observation first, newest last.
-  ===================================================== */
+  /* ===================================================
+  BOUNDED HISTORY
+  =================================================== */
 
   const breadth50History =
     historyArray(input.breadth50History);
@@ -266,9 +275,9 @@ export function regimePersistenceEngine(
   const phase =
     input.phase ?? "PHASE_1_EXPANSION";
 
-  /* =====================================================
-  HISTORY COUNTS
-  ===================================================== */
+  /* ===================================================
+  COUNTS
+  =================================================== */
 
   const breadthWeakDays = Math.max(
     countBelow(breadth50History, 55),
@@ -281,25 +290,17 @@ export function regimePersistenceEngine(
   const rotationStressDays =
     countAbove(rotationDecayHistory, 40);
 
-  /*
-   * Only actual divergence observations establish
-   * divergence persistence.
-   *
-   * A live score can indicate current divergence,
-   * but cannot prove five historical observations.
-   */
-
   const measuredDivergenceDays =
     countAtLeast(internalDivergenceHistory, 50);
 
+  /*
+   * A live score establishes current divergence,
+   * but cannot establish historical persistence alone.
+   */
   const divergenceDays =
     internalDivergenceScore >= 50
       ? Math.max(1, measuredDivergenceDays)
       : 0;
-
-  /* =====================================================
-  PERSISTENCE FLAGS
-  ===================================================== */
 
   const persistentBreadthDecay =
     breadthWeakDays >= 8;
@@ -320,9 +321,9 @@ export function regimePersistenceEngine(
     rotationStressDays
   );
 
-  /* =====================================================
-  LIVE WEAKNESS COMPONENTS
-  ===================================================== */
+  /* ===================================================
+  LIVE COMPONENTS
+  =================================================== */
 
   const breadthWeakness = clamp(
     (55 - breadth50) * 1.3 +
@@ -341,20 +342,12 @@ export function regimePersistenceEngine(
   const fragilityStress =
     clamp(fragilityScore);
 
-  /* =====================================================
-  PERSISTENCE COMPONENT
-  ===================================================== */
-
   const historicalPersistence = clamp(
     breadthWeakDays * 2 +
     participationWeakDays * 2 +
     rotationStressDays * 1.5 +
     divergenceDays * 1.5
   );
-
-  /* =====================================================
-  REGIME AGE
-  ===================================================== */
 
   const regimeAge = Math.max(
     breadthWeakDays,
@@ -363,12 +356,9 @@ export function regimePersistenceEngine(
     divergenceDays
   );
 
-  /* =====================================================
+  /* ===================================================
   TREND
-
-  Higher breadth / participation is better.
-  Higher rotation decay is worse.
-  ===================================================== */
+  =================================================== */
 
   const breadthTrend =
     calculateTrend(breadth50History);
@@ -385,26 +375,24 @@ export function regimePersistenceEngine(
     rotationTrend
   ];
 
-  const deterioratingSignals =
-    trends.filter(
-      value => value === "DETERIORATING"
-    ).length;
+  const deterioratingSignals = trends.filter(
+    value => value === "DETERIORATING"
+  ).length;
 
-  const improvingSignals =
-    trends.filter(
-      value => value === "IMPROVING"
-    ).length;
+  const improvingSignals = trends.filter(
+    value => value === "IMPROVING"
+  ).length;
 
   const trend: PersistenceTrend =
     deterioratingSignals >= 2
       ? "DETERIORATING"
       : improvingSignals >= 2
-        ? "IMPROVING"
-        : "STABLE";
+      ? "IMPROVING"
+      : "STABLE";
 
-  /* =====================================================
-  TREND STABILITY
-  ===================================================== */
+  /* ===================================================
+  STABILITY / FATIGUE
+  =================================================== */
 
   const trendStability = clamp(
     50 +
@@ -413,10 +401,6 @@ export function regimePersistenceEngine(
     (trend === "IMPROVING" ? -10 : 0)
   );
 
-  /* =====================================================
-  MARKET FATIGUE
-  ===================================================== */
-
   const marketFatigue = clamp(
     persistentWeaknessDays * 2 +
     breadthWeakness * 0.5 +
@@ -424,9 +408,9 @@ export function regimePersistenceEngine(
     rotationStress * 0.3
   );
 
-  /* =====================================================
+  /* ===================================================
   DISTRIBUTION RISK
-  ===================================================== */
+  =================================================== */
 
   let distributionRisk =
     breadthWeakness * 0.25 +
@@ -454,45 +438,26 @@ export function regimePersistenceEngine(
 
   distributionRisk = clamp(distributionRisk);
 
-  /* =====================================================
+  /* ===================================================
   RECOVERY QUALITY
-  ===================================================== */
+  =================================================== */
 
   let recoveryQuality = 50;
 
-  if (trend === "IMPROVING") {
-    recoveryQuality += 20;
-  }
+  if (trend === "IMPROVING") recoveryQuality += 20;
+  if (breadth50 > 65) recoveryQuality += 10;
+  if (breadth200 > 55) recoveryQuality += 10;
+  if (participationScore > 60) recoveryQuality += 10;
+  if (rotationDecayScore < 30) recoveryQuality += 5;
 
-  if (breadth50 > 65) {
-    recoveryQuality += 10;
-  }
-
-  if (breadth200 > 55) {
-    recoveryQuality += 10;
-  }
-
-  if (participationScore > 60) {
-    recoveryQuality += 10;
-  }
-
-  if (rotationDecayScore < 30) {
-    recoveryQuality += 5;
-  }
-
-  if (fragilityScore > 70) {
-    recoveryQuality -= 15;
-  }
-
-  if (distributionRisk > 60) {
-    recoveryQuality -= 15;
-  }
+  if (fragilityScore > 70) recoveryQuality -= 15;
+  if (distributionRisk > 60) recoveryQuality -= 15;
 
   recoveryQuality = clamp(recoveryQuality);
 
-  /* =====================================================
+  /* ===================================================
   FALSE RECOVERY RISK
-  ===================================================== */
+  =================================================== */
 
   let falseRecoveryRisk = 0;
 
@@ -527,9 +492,9 @@ export function regimePersistenceEngine(
 
   falseRecoveryRisk = clamp(falseRecoveryRisk);
 
-  /* =====================================================
-  BEARISH / BULLISH PERSISTENCE
-  ===================================================== */
+  /* ===================================================
+  PERSISTENCE
+  =================================================== */
 
   const bearishPersistence =
     (
@@ -549,27 +514,16 @@ export function regimePersistenceEngine(
     rotationDecayScore < 40 &&
     trend === "IMPROVING";
 
-  /* =====================================================
-  ESCALATION BIAS
-  ===================================================== */
+  /* ===================================================
+  ESCALATION
+  =================================================== */
 
   let escalationBias = 0;
 
-  if (persistentBreadthDecay) {
-    escalationBias += 10;
-  }
-
-  if (persistentParticipationFailure) {
-    escalationBias += 10;
-  }
-
-  if (persistentRotationStress) {
-    escalationBias += 8;
-  }
-
-  if (persistentInternalDivergence) {
-    escalationBias += 12;
-  }
+  if (persistentBreadthDecay) escalationBias += 10;
+  if (persistentParticipationFailure) escalationBias += 10;
+  if (persistentRotationStress) escalationBias += 8;
+  if (persistentInternalDivergence) escalationBias += 12;
 
   if (
     breadth50 < 50 &&
@@ -578,21 +532,10 @@ export function regimePersistenceEngine(
     escalationBias += 6;
   }
 
-  if (participationScore < 40) {
-    escalationBias += 8;
-  }
-
-  if (rotationDecayScore > 50) {
-    escalationBias += 8;
-  }
-
-  if (dangerScore > 55) {
-    escalationBias += 6;
-  }
-
-  if (fragilityScore > 70) {
-    escalationBias += 6;
-  }
+  if (participationScore < 40) escalationBias += 8;
+  if (rotationDecayScore > 50) escalationBias += 8;
+  if (dangerScore > 55) escalationBias += 6;
+  if (fragilityScore > 70) escalationBias += 6;
 
   if (phase === "PHASE_3_DISTRIBUTION") {
     escalationBias += 6;
@@ -604,9 +547,9 @@ export function regimePersistenceEngine(
 
   escalationBias = clamp(escalationBias);
 
-  /* =====================================================
+  /* ===================================================
   SCORE
-  ===================================================== */
+  =================================================== */
 
   let score =
     distributionRisk * 0.45 +
@@ -624,9 +567,9 @@ export function regimePersistenceEngine(
 
   score = clamp(score);
 
-  /* =====================================================
-  STATE
-  ===================================================== */
+  /* ===================================================
+  STATE / SUMMARY
+  =================================================== */
 
   let state: RegimePersistenceEngineOutput["state"];
 
@@ -651,10 +594,6 @@ export function regimePersistenceEngine(
     state = "STABLE";
   }
 
-  /* =====================================================
-  SUMMARY
-  ===================================================== */
-
   let summary =
     "Market regime stable without persistent deterioration";
 
@@ -673,16 +612,15 @@ export function regimePersistenceEngine(
       "Persistent institutional distribution regime detected";
   }
 
-  /* =====================================================
+  /* ===================================================
   RETURN
-  ===================================================== */
+  =================================================== */
 
   return {
     persistentWeaknessDays,
 
     persistentBreadthDecay,
     persistentParticipationFailure,
-
     persistentRotationStress,
     persistentInternalDivergence,
 
