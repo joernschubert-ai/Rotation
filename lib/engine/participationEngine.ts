@@ -1,1469 +1,1063 @@
 // /lib/engine/participationEngine.ts
 
-import {
-getMarketStructureFlags
-} from "./marketStructureFlags";
-
+import { getMarketStructureFlags } from "./marketStructureFlags";
 
 /* =====================================================
 INPUT
 ===================================================== */
 
 export interface ParticipationEngineInput {
+  history?: any[];
+  historyMetrics?: any;
 
-history?: any[];
-historyMetrics?: any;
+  marketDrivers?: any;
+  systemHeat?: any;
+  driversCore?: any;
 
-marketDrivers?: any;
-systemHeat?: any;
-driversCore?: any;
+  /*
+   * Direct breadth inputs use percent by default.
+   * Fractional inputs require an explicit unit.
+   *
+   * Persisted structure and history series use percent.
+   */
+  breadthUnit?: "PERCENT" | "FRACTION";
 
-breadth20?: number;
-breadth50?: number;
-breadth200?: number;
+  breadth20?: number;
+  breadth50?: number;
+  breadth200?: number;
 
-structure?: any;
+  structure?: any;
 
-highs?: number;
-lows?: number;
+  highs?: number;
+  lows?: number;
 
-rsEqual?: number;
-rsSmall?: number;
-rsGrowth?: number;
+  rsEqual?: number;
+  rsSmall?: number;
+  rsGrowth?: number;
 
-rotation?: any;
+  rotation?: any;
+  divergenceState?: string;
+  concentrationScore?: number;
+  rotationScore?: number;
 
-divergenceState?: string;
+  previousParticipationScore?: number;
+  previousParticipation10d?: number;
+  previousParticipation20d?: number;
 
-concentrationScore?: number;
+  previousLeadershipBreadth?: number;
+  previousPassiveDependence?: number;
 
-rotationScore?: number;
+  previousRsEqual?: number;
+  previousRsSmall?: number;
+  previousGrowthBreadth?: number;
 
-previousParticipationScore?: number;
-previousParticipation10d?: number;
-previousParticipation20d?: number;
+  previousBreadth50?: number;
+  previousBreadth50_10d?: number;
 
-previousLeadershipBreadth?: number;
-previousPassiveDependence?: number;
-
-previousRsEqual?: number;
-previousRsSmall?: number;
-previousGrowthBreadth?: number;
-
-previousBreadth50?: number;
-previousBreadth50_10d?: number;
-
-previousBreadth200?: number;
-previousBreadth200_20d?: number;
+  previousBreadth200?: number;
+  previousBreadth200_20d?: number;
 }
-
 
 /* =====================================================
 OUTPUT
 ===================================================== */
 
 export interface ParticipationEngineOutput {
+  score: number;
 
-score: number;
+  state:
+    | "STRONG"
+    | "HEALTHY"
+    | "FRAGILE"
+    | "WEAK";
 
-state:
-| "STRONG"
-| "HEALTHY"
-| "FRAGILE"
-| "WEAK";
+  quality:
+    | "HIGH"
+    | "MEDIUM"
+    | "LOW";
 
-quality:
-| "HIGH"
-| "MEDIUM"
-| "LOW";
+  expansion: boolean;
 
-expansion: boolean;
+  participationVelocity: number;
+  participationDecayRate: number;
+  participationSlope: number;
+  participationAcceleration: number;
 
-participationVelocity: number;
-participationDecayRate: number;
-participationSlope: number;
-participationAcceleration: number;
+  breadth50Trend: number;
+  breadth50Slope: number;
 
-breadth50Trend: number;
-breadth50Slope: number;
+  breadth200Trend: number;
+  breadth200Slope: number;
 
-breadth200Trend: number;
-breadth200Slope: number;
+  breadthParticipationDecay: number;
 
-breadthParticipationDecay: number;
+  leadershipBreadthTrend: number;
+  megaCapDependenceTrend: number;
 
-leadershipBreadthTrend: number;
-megaCapDependenceTrend: number;
+  equalWeightTrend: number;
+  smallCapTrend: number;
+  growthBreadthTrend: number;
 
-equalWeightTrend: number;
-smallCapTrend: number;
-growthBreadthTrend: number;
+  decayPersistence: number;
 
-decayPersistence: number;
+  narrowLeadership: boolean;
+  severeNarrowLeadership: boolean;
 
-narrowLeadership: boolean;
-severeNarrowLeadership: boolean;
+  equalWeightWeakness: boolean;
+  smallCapWeakness: boolean;
+  breadthFailure: boolean;
 
-equalWeightWeakness: boolean;
-smallCapWeakness: boolean;
+  institutionalParticipation: number;
+  passiveDependence: number;
+  leadershipBreadth: number;
 
-breadthFailure: boolean;
+  summary: string;
+  metrics: any;
 
-institutionalParticipation: number;
+  components: Record<string, number | boolean>;
 
-passiveDependence: number;
+  dataQuality: {
+    completeCurrentStructure: boolean;
+    missingCurrentInputs: string[];
+    missingComparisons: string[];
 
-leadershipBreadth: number;
-
-summary: string;
-
-metrics: any;
+    historyOrder: "OLDEST_FIRST";
+    directBreadthUnit: "PERCENT" | "FRACTION";
+  };
 }
-
 
 /* =====================================================
 HELPERS
 ===================================================== */
 
-function normalizePercent(
-value: number
-): number {
+function numeric(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
 
-if (!Number.isFinite(value)) {
-return 50;
+  if (
+    typeof value === "string" &&
+    value.trim() !== ""
+  ) {
+    const n = Number(value);
+
+    return Number.isFinite(n) ? n : null;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    const object = value as Record<string, unknown>;
+
+    for (const key of ["value", "score", "current"]) {
+      const candidate = object[key];
+
+      if (
+        typeof candidate === "number" ||
+        typeof candidate === "string"
+      ) {
+        const n = numeric(candidate);
+
+        if (n !== null) {
+          return n;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
-return value <= 1
-? value * 100
-: value;
-}
+function first(...values: unknown[]): number | null {
+  for (const value of values) {
+    const n = numeric(value);
 
+    if (n !== null) {
+      return n;
+    }
+  }
+
+  return null;
+}
 
 function clamp(
-value: number,
-min = 0,
-max = 100
+  value: number,
+  min = 0,
+  max = 100
 ): number {
-
-return Math.max(
-min,
-Math.min(max, value)
-);
+  return Math.max(min, Math.min(max, value));
 }
 
-
-function safeNumber(
-value: any,
-fallback = 50
-): number {
-
-const numeric = Number(value);
-
-return Number.isFinite(numeric)
-? numeric
-: fallback;
+function read(
+  snapshot: any,
+  paths: string[]
+): number | null {
+  return first(
+    ...paths.map(path =>
+      path.split(".").reduce(
+        (current: any, key) => current?.[key],
+        snapshot
+      )
+    )
+  );
 }
 
+/*
+ * Numeric compatibility:
+ * unavailable comparisons return zero change.
+ * dataQuality identifies these as missing comparisons.
+ */
+function change(
+  current: number,
+  previous: number | null
+): number {
+  return previous === null
+    ? 0
+    : current - previous;
+}
 
 /* =====================================================
 ENGINE
 ===================================================== */
 
 export function participationEngine(
-input: ParticipationEngineInput
+  input: ParticipationEngineInput
 ): ParticipationEngineOutput {
-
-
-/* ===================================================
-INPUT
-==================================================== */
-
-const breadth20 =
-clamp(
-normalizePercent(
-safeNumber(
-input.breadth20 ??
-input.structure?.breadth?.b20?.value,
-50
-)
-)
-);
-
-
-const breadth50 =
-clamp(
-normalizePercent(
-safeNumber(
-input.breadth50 ??
-input.structure?.breadth?.b50?.value,
-50
-)
-)
-);
-
-
-const breadth200 =
-clamp(
-normalizePercent(
-safeNumber(
-input.breadth200 ??
-input.structure?.breadth?.b200?.value,
-50
-)
-)
-);
-
-
-const highs =
-safeNumber(
-input.highs ??
-input.structure?.highsLows?.highs,
-0
-);
-
-
-const lows =
-safeNumber(
-input.lows ??
-input.structure?.highsLows?.lows,
-0
-);
-
-
-const rsEqual =
-safeNumber(
-input.rsEqual ??
-input.rotation?.rsEqual,
-1
-);
-
-
-const rsSmall =
-safeNumber(
-input.rsSmall ??
-input.rotation?.rsSmall,
-1
-);
-
-
-const rsGrowth =
-safeNumber(
-input.rsGrowth ??
-input.rotation?.rsGrowth,
-1
-);
-
-
-const divergenceState =
-input.divergenceState ??
-"NONE";
-
-
-const concentrationScore =
-clamp(
-safeNumber(
-input.concentrationScore ??
-input.rotation?.concentrationScore,
-50
-)
-);
-
-
-const rotationScore =
-clamp(
-safeNumber(
-input.rotationScore ??
-input.rotation?.score,
-50
-)
-);
-
-
-/* ===================================================
-HISTORY
-==================================================== */
-
-const history =
-input.history ?? [];
-
-
-const h5 =
-history.length >= 5
-? history[history.length - 5]
-: null;
-
-
-const h10 =
-history.length >= 10
-? history[history.length - 10]
-: null;
-
-
-const h20 =
-history.length >= 20
-? history[history.length - 20]
-: null;
-
-
-const historyMetrics =
-input.historyMetrics ?? {};
-
-
-const marketDrivers =
-input.marketDrivers ?? {};
-
-
-const systemHeat =
-input.systemHeat ?? {};
-
-
-const driversCore =
-input.driversCore ?? {};
-
-
-/* ===================================================
-HISTORY METRICS
-==================================================== */
-
-const participationPersistence =
-clamp(
-safeNumber(
-historyMetrics.participationPersistence,
-50
-)
-);
-
-
-const averageParticipation =
-clamp(
-safeNumber(
-historyMetrics.averageParticipation,
-50
-)
-);
-
-
-const institutionalParticipationTrend =
-safeNumber(
-historyMetrics.institutionalParticipation,
-50
-);
-
-
-const participationAccelerationHistory =
-safeNumber(
-historyMetrics.participationAcceleration,
-0
-);
-
-
-const passiveFlowRisk =
-clamp(
-safeNumber(
-marketDrivers.passiveFlowRisk,
-0
-)
-);
-
-
-const systemHeatBreadth =
-safeNumber(
-systemHeat.components?.breadth,
-1
-);
-
-
-const driversParticipation =
-safeNumber(
-driversCore.score,
-0
-);
-
-
-/* ===================================================
-RELATIVE BREADTH SYSTEM
-==================================================== */
-
-const previousBreadth50 =
-safeNumber(
-input.previousBreadth50 ??
-h5?.breadth50,
-breadth50
-);
-
-
-const previousBreadth50_10d =
-safeNumber(
-input.previousBreadth50_10d ??
-h10?.breadth50,
-previousBreadth50
-);
-
-
-const previousBreadth200 =
-safeNumber(
-input.previousBreadth200 ??
-h10?.breadth200,
-breadth200
-);
-
-
-const previousBreadth200_20d =
-safeNumber(
-input.previousBreadth200_20d ??
-h20?.breadth200,
-previousBreadth200
-);
-
-
-const breadth50Slope =
-Math.round(
-breadth50 -
-previousBreadth50
-);
-
-
-const breadth50Trend =
-Math.round(
-(
-(breadth50 - previousBreadth50) * 0.60 +
-(breadth50 - previousBreadth50_10d) * 0.40
-)
-);
-
-
-const breadth200Slope =
-Math.round(
-breadth200 -
-previousBreadth200
-);
-
-
-const breadth200Trend =
-Math.round(
-(
-(breadth200 - previousBreadth200) * 0.55 +
-(breadth200 - previousBreadth200_20d) * 0.45
-)
-);
-
-
-/* ===================================================
-CENTRAL MARKET STRUCTURE FLAGS
-==================================================== */
-
-const structureFlags =
-getMarketStructureFlags({
-
-rsGrowth,
-rsSmall,
-rsEqual,
-
-breadth50,
-breadth200,
-
-highs,
-lows
-
-});
-
-
-const {
-
-equalWeightWeakness,
-smallCapWeakness,
-
-narrowLeadership,
-severeNarrowLeadership,
-
-breadthFailure
-
-} = structureFlags;
-
-
-/* ===================================================
-LEADERSHIP BREADTH
-==================================================== */
-
-let leadershipBreadth = 58;
-
-
-leadershipBreadth +=
-Math.round(
-(breadth50 - 50) * 0.22
-);
-
-
-leadershipBreadth +=
-Math.round(
-(breadth200 - 50) * 0.18
-);
-
-
-if (equalWeightWeakness) {
-leadershipBreadth -= 12;
-}
-
-
-if (smallCapWeakness) {
-leadershipBreadth -= 12;
-}
-
-
-if (narrowLeadership) {
-leadershipBreadth -= 14;
-}
-
-
-leadershipBreadth =
-clamp(
-leadershipBreadth
-);
-
-
-/* ===================================================
-PASSIVE DEPENDENCE
-==================================================== */
-
-let passiveDependence = 18;
-
-
-if (narrowLeadership) {
-passiveDependence += 18;
-}
-
-
-if (breadth50 < 50) {
-passiveDependence += 12;
-}
-
-
-if (breadth200 < 45) {
-passiveDependence += 10;
-}
-
-
-if (concentrationScore >= 70) {
-passiveDependence += 14;
-}
-
-
-if (equalWeightWeakness) {
-passiveDependence += 8;
-}
-
-
-if (smallCapWeakness) {
-passiveDependence += 6;
-}
-
-
-if (severeNarrowLeadership) {
-passiveDependence += 10;
-}
-
-
-passiveDependence =
-clamp(
-passiveDependence
-);
-
-
-/* ===================================================
-INSTITUTIONAL PARTICIPATION
-==================================================== */
-
-let institutionalParticipation = 55;
-
-
-institutionalParticipation +=
-Math.round(
-(breadth20 - 50) * 0.10
-);
-
-
-institutionalParticipation +=
-Math.round(
-(breadth50 - 50) * 0.22
-);
-
-
-institutionalParticipation +=
-Math.round(
-(breadth200 - 50) * 0.18
-);
-
-
-if (highs > lows) {
-institutionalParticipation += 6;
-}
-
-
-if (narrowLeadership) {
-institutionalParticipation -= 14;
-}
-
-
-if (severeNarrowLeadership) {
-institutionalParticipation -= 8;
-}
-
-
-if (passiveDependence >= 65) {
-institutionalParticipation -= 12;
-}
-
-
-if (breadthFailure) {
-institutionalParticipation -= 10;
-}
-
-
-institutionalParticipation =
-clamp(
-institutionalParticipation
-);
-
-
-/* ===================================================
-BASE SCORE
-==================================================== */
-
-let score = 60;
-
-
-/*
-* Drivers Core is only an environmental modifier.
-* It must never dominate participation itself.
-*/
-
-score +=
-Math.round(
-clamp(
-driversParticipation,
--10,
-10
-) * 0.40
-);
-
-
-/*
-* System heat is centered around 1.
-*/
-
-score +=
-Math.round(
-(systemHeatBreadth - 1) * 8
-);
-
-
-/* ===================================================
-BREADTH
-==================================================== */
-
-score +=
-Math.round(
-(breadth20 - 50) * 0.08
-);
-
-
-score +=
-Math.round(
-(breadth50 - 50) * 0.18
-);
-
-
-score +=
-Math.round(
-(breadth200 - 50) * 0.16
-);
-
-
-/* ===================================================
-RELATIVE BREADTH PENALTIES
-==================================================== */
-
-if (breadth50Trend < -4) {
-score -= 6;
-}
-
-
-if (breadth50Trend < -8) {
-score -= 4;
-}
-
-
-if (breadth200Trend < -3) {
-score -= 6;
-}
-
-
-if (breadth200Trend < -7) {
-score -= 4;
-}
-
-
-/* ===================================================
-HIGHS / LOWS
-==================================================== */
-
-if (highs > lows) {
-
-score += 6;
-
-}
-
-else if (lows > highs) {
-
-const hlDelta =
-Math.min(
-8,
-Math.abs(lows - highs)
-);
-
-score -=
-Math.round(
-hlDelta * 0.50
-);
-
-}
-
-
-/* ===================================================
-LEADERSHIP QUALITY
-==================================================== */
-
-if (equalWeightWeakness) {
-score -= 6;
-}
-
-
-if (smallCapWeakness) {
-score -= 6;
-}
-
-
-if (narrowLeadership) {
-score -= 10;
-}
-
-
-if (severeNarrowLeadership) {
-score -= 8;
-}
-
-
-/* ===================================================
-PASSIVE MARKET PENALTY
-==================================================== */
-
-if (
-narrowLeadership &&
-rsEqual < 0.97
-) {
-
-score -= 12;
-
-}
-
-
-if (passiveDependence >= 70) {
-
-score -= 10;
-
-}
-
-
-if (passiveDependence >= 85) {
-
-score -= 6;
-
-}
-
-
-/* ===================================================
-ROTATION
-==================================================== */
-
-score +=
-Math.round(
-(rotationScore - 50) * 0.10
-);
-
-
-/* ===================================================
-BREADTH FAILURE
-==================================================== */
-
-if (breadthFailure) {
-
-score -= 12;
-
-}
-
-
-/* ===================================================
-DIVERGENCE
-==================================================== */
-
-if (
-divergenceState ===
-"BEARISH_DIVERGENCE"
-) {
-
-score -= 6;
-
-}
-
-
-/* ===================================================
-STRUCTURAL BONUS
-==================================================== */
-
-if (
-
-breadth50 > 72 &&
-breadth200 > 62 &&
-
-!narrowLeadership
-
-) {
-
-score += 8;
-
-}
-
-
-/* ===================================================
-VELOCITY / DECAY
-==================================================== */
-
-const previousParticipationScore =
-safeNumber(
-input.previousParticipationScore ??
-h5?.participationScore,
-score
-);
-
-
-const previousParticipation10d =
-safeNumber(
-input.previousParticipation10d ??
-h10?.participationScore,
-previousParticipationScore
-);
-
-
-const previousParticipation20d =
-safeNumber(
-input.previousParticipation20d ??
-h20?.participationScore,
-previousParticipation10d
-);
-
-
-const participationVelocity =
-Math.round(
-score -
-previousParticipationScore
-);
-
-
-const participationDecayRate =
-Math.round(
-score -
-previousParticipation10d
-);
-
-
-const participationSlope =
-Math.round(
-(
-score -
-previousParticipation20d
-) / 2
-);
-
-
-/*
-* Short-term movement relative to
-* medium-term movement.
-*/
-
-const participationAcceleration =
-Math.round(
-participationVelocity -
-(
-participationDecayRate / 2
-)
-);
-
-
-if (
-participationDecayRate <= -15
-) {
-
-score -= 8;
-
-}
-
-
-if (
-participationDecayRate <= -25
-) {
-
-score -= 6;
-
-}
-
-
-/* ===================================================
-RELATIVE TRENDS
-==================================================== */
-
-const previousLeadershipBreadth =
-safeNumber(
-input.previousLeadershipBreadth,
-leadershipBreadth
-);
-
-
-const previousPassiveDependence =
-safeNumber(
-input.previousPassiveDependence,
-passiveDependence
-);
-
-
-const leadershipBreadthTrend =
-Math.round(
-leadershipBreadth -
-previousLeadershipBreadth
-);
-
-
-const megaCapDependenceTrend =
-Math.round(
-passiveDependence -
-previousPassiveDependence
-);
-
-
-const previousRsEqual =
-safeNumber(
-input.previousRsEqual,
-rsEqual
-);
-
-
-const previousRsSmall =
-safeNumber(
-input.previousRsSmall,
-rsSmall
-);
-
-
-const previousGrowthBreadth =
-safeNumber(
-input.previousGrowthBreadth,
-rsGrowth
-);
-
-
-const equalWeightTrend =
-Number(
-(
-(rsEqual - previousRsEqual) * 100
-).toFixed(2)
-);
-
-
-const smallCapTrend =
-Number(
-(
-(rsSmall - previousRsSmall) * 100
-).toFixed(2)
-);
-
-
-const growthBreadthTrend =
-Number(
-(
-(rsGrowth - previousGrowthBreadth) * 100
-).toFixed(2)
-);
-
-
-/* ===================================================
-BREADTH PARTICIPATION DECAY
-==================================================== */
-
-let breadthParticipationDecay = 0;
-
-
-if (breadth50Slope < 0) {
-breadthParticipationDecay += 4;
-}
-
-
-if (breadth50Trend < 0) {
-breadthParticipationDecay += 5;
-}
-
-
-if (breadth200Slope < 0) {
-breadthParticipationDecay += 3;
-}
-
-
-if (breadth200Trend < 0) {
-breadthParticipationDecay += 4;
-}
-
-
-if (participationVelocity < 0) {
-breadthParticipationDecay += 4;
-}
-
-
-if (participationDecayRate < 0) {
-breadthParticipationDecay += 5;
-}
-
-
-breadthParticipationDecay =
-Math.min(
-30,
-breadthParticipationDecay
-);
-
-
-/* ===================================================
-DECAY PERSISTENCE
-==================================================== */
-
-let decayPersistence = 0;
-
-
-if (participationVelocity < 0) {
-decayPersistence += 3;
-}
-
-
-if (participationDecayRate < 0) {
-decayPersistence += 4;
-}
-
-
-if (participationSlope < 0) {
-decayPersistence += 5;
-}
-
-
-if (leadershipBreadthTrend < 0) {
-decayPersistence += 3;
-}
-
-
-if (equalWeightTrend < 0) {
-decayPersistence += 2;
-}
-
-
-if (smallCapTrend < 0) {
-decayPersistence += 2;
-}
-
-
-if (breadth50Trend < 0) {
-decayPersistence += 3;
-}
-
-
-if (breadth200Trend < 0) {
-decayPersistence += 3;
-}
-
-
-if (megaCapDependenceTrend > 0) {
-decayPersistence += 3;
-}
-
-
-decayPersistence =
-Math.min(
-20,
-decayPersistence
-);
-
-
-/* ===================================================
-HISTORICAL OVERLAYS
-==================================================== */
-
-if (
-participationPersistence < 40
-) {
-
-score -= 6;
-
-}
-
-
-if (
-averageParticipation < 55
-) {
-
-score -= 4;
-
-}
-
-
-if (
-institutionalParticipationTrend < 45
-) {
-
-score -= 5;
-
-}
-
-
-if (
-participationAccelerationHistory < -10
-) {
-
-score -= 5;
-
-}
-
-
-if (
-passiveFlowRisk > 25
-) {
-
-score -= 6;
-
-}
-
-
-if (
-passiveFlowRisk > 50
-) {
-
-score -= 4;
-
-}
-
-
-/* ===================================================
-FINAL SCORE
-==================================================== */
-
-score =
-clamp(
-Math.round(score)
-);
-
-
-/* ===================================================
-STATE
-==================================================== */
-
-let state:
-| "STRONG"
-| "HEALTHY"
-| "FRAGILE"
-| "WEAK";
-
-
-if (score >= 70) {
-
-state = "STRONG";
-
-}
-
-else if (score >= 52) {
-
-state = "HEALTHY";
-
-}
-
-else if (score >= 42) {
-
-state = "FRAGILE";
-
-}
-
-else {
-
-state = "WEAK";
-
-}
-
-
-/* ===================================================
-QUALITY
-==================================================== */
-
-let quality:
-| "HIGH"
-| "MEDIUM"
-| "LOW";
-
-
-if (
-score >= 72 &&
-!narrowLeadership &&
-passiveDependence < 45
-) {
-
-quality = "HIGH";
-
-}
-
-else if (score >= 48) {
-
-quality = "MEDIUM";
-
-}
-
-else {
-
-quality = "LOW";
-
-}
-
-
-/* ===================================================
-EXPANSION
-==================================================== */
-
-const expansion =
-
-breadth20 > 72 &&
-breadth50 > 68 &&
-breadth200 > 60 &&
-
-highs > lows &&
-
-rsEqual >= 1 &&
-rsSmall >= 1 &&
-
-!narrowLeadership &&
-
-participationPersistence >= 55 &&
-
-driversParticipation >= 5;
-
-
-/* ===================================================
-SUMMARY
-==================================================== */
-
-let summary =
-"Average market participation";
-
-
-if (state === "STRONG") {
-
-summary =
-"Broad institutional participation";
-
-}
-
-
-if (state === "HEALTHY") {
-
-summary =
-"Healthy institutional participation";
-
-}
-
-
-if (state === "FRAGILE") {
-
-if (
-passiveDependence >= 60
-) {
-
-summary =
-"Participation fragile | passive liquidity masking weakening internals";
-
-}
-
-else if (
-narrowLeadership
-) {
-
-summary =
-"Participation fragile | concentrated in narrow leadership";
-
-}
-
-else {
-
-summary =
-"Participation becoming structurally fragile";
-
-}
-
-}
-
-
-if (state === "WEAK") {
-
-summary =
-"Participation breakdown active";
-
-}
-
-
-if (
-severeNarrowLeadership
-) {
-
-summary +=
-" | Severe leadership concentration";
-
-}
-
-
-if (
-decayPersistence >= 14
-) {
-
-summary +=
-" | Persistent deterioration";
-
-}
-
-
-/* ===================================================
-RETURN
-==================================================== */
-
-return {
-
-score,
-
-state,
-quality,
-
-expansion,
-
-
-participationVelocity,
-participationDecayRate,
-participationSlope,
-participationAcceleration,
-
-
-breadth50Trend,
-breadth50Slope,
-
-breadth200Trend,
-breadth200Slope,
-
-
-breadthParticipationDecay,
-
-
-leadershipBreadthTrend,
-megaCapDependenceTrend,
-
-equalWeightTrend,
-smallCapTrend,
-growthBreadthTrend,
-
-
-decayPersistence,
-
-
-narrowLeadership,
-severeNarrowLeadership,
-
-equalWeightWeakness,
-smallCapWeakness,
-
-breadthFailure,
-
-
-institutionalParticipation,
-
-passiveDependence,
-
-leadershipBreadth,
-
-
-summary,
-
-
-metrics: {
-
-breadth20,
-breadth50,
-breadth200,
-
-
-breadth50Trend,
-breadth50Slope,
-
-breadth200Trend,
-breadth200Slope,
-
-
-breadthParticipationDecay,
-
-
-highs,
-lows,
-
-
-rsEqual,
-rsSmall,
-rsGrowth,
-
-
-concentrationScore,
-
-rotationScore,
-
-
-institutionalParticipation,
-
-passiveDependence,
-
-leadershipBreadth,
-
-
-participationPersistence,
-
-averageParticipation,
-
-institutionalParticipationTrend,
-
-participationAccelerationHistory,
-
-
-driversParticipation,
-
-systemHeatBreadth,
-
-passiveFlowRisk,
-
-
-narrowLeadership,
-
-severeNarrowLeadership,
-
-equalWeightWeakness,
-
-smallCapWeakness,
-
-breadthFailure
-
-}
-
-};
-
+  const safeInput = input ?? {};
+  const historyMetrics = safeInput.historyMetrics ?? {};
+
+  const unit =
+    safeInput.breadthUnit === "FRACTION"
+      ? "FRACTION"
+      : "PERCENT";
+
+  function directBreadth(
+    value: unknown
+  ): number | null {
+    const n = numeric(value);
+
+    return n === null
+      ? null
+      : clamp(
+          n * (unit === "FRACTION" ? 100 : 1)
+        );
+  }
+
+  /* ===================================================
+  CURRENT INPUTS
+  =================================================== */
+
+  const raw = {
+    breadth20: first(
+      directBreadth(safeInput.breadth20),
+      safeInput.structure?.breadth?.b20
+    ),
+
+    breadth50: first(
+      directBreadth(safeInput.breadth50),
+      safeInput.structure?.breadth?.b50
+    ),
+
+    breadth200: first(
+      directBreadth(safeInput.breadth200),
+      safeInput.structure?.breadth?.b200
+    ),
+
+    highs: first(
+      safeInput.highs,
+      safeInput.structure?.highsLows?.highs
+    ),
+
+    lows: first(
+      safeInput.lows,
+      safeInput.structure?.highsLows?.lows
+    ),
+
+    rsEqual: first(
+      safeInput.rsEqual,
+      safeInput.rotation?.rsEqual
+    ),
+
+    rsSmall: first(
+      safeInput.rsSmall,
+      safeInput.rotation?.rsSmall
+    ),
+
+    rsGrowth: first(
+      safeInput.rsGrowth,
+      safeInput.rotation?.rsGrowth
+    ),
+
+    concentrationScore: first(
+      safeInput.concentrationScore,
+      safeInput.rotation?.concentrationScore
+    ),
+
+    rotationScore: first(
+      safeInput.rotationScore,
+      safeInput.rotation?.score
+    )
+  };
+
+  const breadth20 = clamp(raw.breadth20 ?? 50);
+  const breadth50 = clamp(raw.breadth50 ?? 50);
+  const breadth200 = clamp(raw.breadth200 ?? 50);
+
+  const highs = raw.highs ?? 0;
+  const lows = raw.lows ?? 0;
+
+  const rsEqual = raw.rsEqual ?? 1;
+  const rsSmall = raw.rsSmall ?? 1;
+  const rsGrowth = raw.rsGrowth ?? 1;
+
+  const concentrationScore =
+    clamp(raw.concentrationScore ?? 50);
+
+  const rotationScore =
+    clamp(raw.rotationScore ?? 50);
+
+  const divergenceState =
+    safeInput.divergenceState ?? "NONE";
+
+  /* ===================================================
+  HISTORY
+
+  Expected chronological daily observations:
+  oldest first, newest last.
+  =================================================== */
+
+  const history = Array.isArray(safeInput.history)
+    ? safeInput.history
+    : Array.isArray(historyMetrics.history)
+    ? historyMetrics.history
+    : [];
+
+  function at(offset: number): any {
+    return history.length > offset
+      ? history[history.length - 1 - offset]
+      : null;
+  }
+
+  function historical(
+    seriesName: string,
+    offset: number,
+    paths: string[]
+  ): number | null {
+    const series = historyMetrics[seriesName];
+
+    if (
+      Array.isArray(series) &&
+      series.length > offset
+    ) {
+      /*
+       * Preserve the selected observation.
+       * Missing values must not shift the comparison.
+       */
+      return numeric(
+        series[series.length - 1 - offset]
+      );
+    }
+
+    return read(at(offset), paths);
+  }
+
+  const comparisons = {
+    breadth50_5d: first(
+      directBreadth(safeInput.previousBreadth50),
+      historical(
+        "breadth50History",
+        5,
+        ["structure.breadth.b50", "breadth50"]
+      )
+    ),
+
+    breadth50_10d: first(
+      directBreadth(safeInput.previousBreadth50_10d),
+      historical(
+        "breadth50History",
+        10,
+        ["structure.breadth.b50", "breadth50"]
+      )
+    ),
+
+    breadth200_10d: first(
+      directBreadth(safeInput.previousBreadth200),
+      historical(
+        "breadth200History",
+        10,
+        ["structure.breadth.b200", "breadth200"]
+      )
+    ),
+
+    breadth200_20d: first(
+      directBreadth(safeInput.previousBreadth200_20d),
+      historical(
+        "breadth200History",
+        20,
+        ["structure.breadth.b200", "breadth200"]
+      )
+    ),
+
+    participation_5d: first(
+      safeInput.previousParticipationScore,
+      historical(
+        "participationHistory",
+        5,
+        ["participation.score", "participationScore"]
+      )
+    ),
+
+    participation_10d: first(
+      safeInput.previousParticipation10d,
+      historical(
+        "participationHistory",
+        10,
+        ["participation.score", "participationScore"]
+      )
+    ),
+
+    participation_20d: first(
+      safeInput.previousParticipation20d,
+      historical(
+        "participationHistory",
+        20,
+        ["participation.score", "participationScore"]
+      )
+    ),
+
+    leadership_5d: first(
+      safeInput.previousLeadershipBreadth,
+      read(at(5), [
+        "participation.leadershipBreadth",
+        "rotation.leadershipBreadth"
+      ])
+    ),
+
+    passive_5d: first(
+      safeInput.previousPassiveDependence,
+      read(at(5), [
+        "participation.passiveDependence"
+      ])
+    ),
+
+    equal_5d: first(
+      safeInput.previousRsEqual,
+      read(at(5), ["rotation.rsEqual", "rsEqual"])
+    ),
+
+    small_5d: first(
+      safeInput.previousRsSmall,
+      read(at(5), ["rotation.rsSmall", "rsSmall"])
+    ),
+
+    growth_5d: first(
+      safeInput.previousGrowthBreadth,
+      read(at(5), ["rotation.rsGrowth", "rsGrowth"])
+    )
+  };
+
+  /* ===================================================
+  BREADTH TRENDS
+  =================================================== */
+
+  const breadth50Slope = Math.round(
+    change(breadth50, comparisons.breadth50_5d)
+  );
+
+  const breadth50Trend =
+    comparisons.breadth50_5d !== null &&
+    comparisons.breadth50_10d !== null
+      ? Math.round(
+          change(
+            breadth50,
+            comparisons.breadth50_5d
+          ) * 0.60 +
+          change(
+            breadth50,
+            comparisons.breadth50_10d
+          ) * 0.40
+        )
+      : 0;
+
+  const breadth200Slope = Math.round(
+    change(breadth200, comparisons.breadth200_10d)
+  );
+
+  const breadth200Trend =
+    comparisons.breadth200_10d !== null &&
+    comparisons.breadth200_20d !== null
+      ? Math.round(
+          change(
+            breadth200,
+            comparisons.breadth200_10d
+          ) * 0.55 +
+          change(
+            breadth200,
+            comparisons.breadth200_20d
+          ) * 0.45
+        )
+      : 0;
+
+  /* ===================================================
+  HISTORICAL / ENVIRONMENTAL INPUTS
+
+  Optional legacy metrics remain supported.
+  Missing environmental inputs are neutral.
+  =================================================== */
+
+  const participationPersistence = clamp(
+    numeric(historyMetrics.participationPersistence) ?? 50
+  );
+
+  const averageParticipation = clamp(
+    numeric(historyMetrics.averageParticipation) ?? 50
+  );
+
+  const measuredAverageParticipation =
+    numeric(historyMetrics.averageParticipation) !== null &&
+    (
+      !historyMetrics.dataQuality ||
+      (
+        numeric(
+          historyMetrics.dataQuality.dailyObservations
+        ) !== null &&
+        historyMetrics.dataQuality.dailyObservations > 0 &&
+        numeric(
+          historyMetrics.dataQuality.missingValues?.participation
+        ) !== null &&
+        historyMetrics.dataQuality.missingValues.participation <
+          historyMetrics.dataQuality.dailyObservations
+      )
+    );
+
+  const institutionalParticipationTrend =
+    numeric(historyMetrics.institutionalParticipation) ?? 50;
+
+  const participationAccelerationHistory =
+    numeric(historyMetrics.participationAcceleration) ?? 0;
+
+  const passiveFlowRisk = clamp(
+    numeric(safeInput.marketDrivers?.passiveFlowRisk) ?? 0
+  );
+
+  /*
+   * Actual System Heat components use -2..+2,
+   * centered around zero.
+   */
+  const systemHeatBreadth = clamp(
+    numeric(safeInput.systemHeat?.components?.breadth) ?? 0,
+    -2,
+    2
+  );
+
+  /*
+   * Drivers Core uses 0..100,
+   * centered around 50.
+   */
+  const driversSource =
+    numeric(safeInput.driversCore?.score);
+
+  const driversParticipation =
+    clamp(driversSource ?? 50);
+
+  /* ===================================================
+  CENTRAL FLAGS
+  =================================================== */
+
+  const flags = getMarketStructureFlags({
+    rsGrowth,
+    rsSmall,
+    rsEqual,
+    breadth50,
+    breadth200,
+    highs,
+    lows
+  });
+
+  const {
+    equalWeightWeakness,
+    smallCapWeakness,
+    narrowLeadership,
+    severeNarrowLeadership,
+    breadthFailure
+  } = flags;
+
+  /* ===================================================
+  LEADERSHIP BREADTH
+  =================================================== */
+
+  let leadershipBreadth =
+    58 +
+    Math.round((breadth50 - 50) * 0.22) +
+    Math.round((breadth200 - 50) * 0.18);
+
+  if (equalWeightWeakness) leadershipBreadth -= 12;
+  if (smallCapWeakness) leadershipBreadth -= 12;
+  if (narrowLeadership) leadershipBreadth -= 14;
+
+  leadershipBreadth = clamp(leadershipBreadth);
+
+  /* ===================================================
+  PASSIVE DEPENDENCE
+  =================================================== */
+
+  let passiveDependence = 18;
+
+  if (narrowLeadership) passiveDependence += 18;
+  if (breadth50 < 50) passiveDependence += 12;
+  if (breadth200 < 45) passiveDependence += 10;
+  if (concentrationScore >= 70) passiveDependence += 14;
+  if (equalWeightWeakness) passiveDependence += 8;
+  if (smallCapWeakness) passiveDependence += 6;
+  if (severeNarrowLeadership) passiveDependence += 10;
+
+  passiveDependence = clamp(passiveDependence);
+
+  /* ===================================================
+  INSTITUTIONAL PARTICIPATION
+  =================================================== */
+
+  let institutionalParticipation =
+    55 +
+    Math.round((breadth20 - 50) * 0.10) +
+    Math.round((breadth50 - 50) * 0.22) +
+    Math.round((breadth200 - 50) * 0.18);
+
+  if (highs > lows) institutionalParticipation += 6;
+  if (narrowLeadership) institutionalParticipation -= 14;
+  if (severeNarrowLeadership) institutionalParticipation -= 8;
+  if (passiveDependence >= 65) institutionalParticipation -= 12;
+  if (breadthFailure) institutionalParticipation -= 10;
+
+  institutionalParticipation = clamp(
+    institutionalParticipation
+  );
+
+  /* ===================================================
+  SCORE CONTRIBUTIONS
+
+  Existing structural thresholds and deductions retained.
+  =================================================== */
+
+  let relativeBreadthPenalty = 0;
+
+  if (breadth50Trend < -4) relativeBreadthPenalty -= 6;
+  if (breadth50Trend < -8) relativeBreadthPenalty -= 4;
+  if (breadth200Trend < -3) relativeBreadthPenalty -= 6;
+  if (breadth200Trend < -7) relativeBreadthPenalty -= 4;
+
+  let leadershipPenalty = 0;
+
+  if (equalWeightWeakness) leadershipPenalty -= 6;
+  if (smallCapWeakness) leadershipPenalty -= 6;
+  if (narrowLeadership) leadershipPenalty -= 10;
+  if (severeNarrowLeadership) leadershipPenalty -= 8;
+
+  let passivePenalty = 0;
+
+  if (narrowLeadership && rsEqual < 0.97) {
+    passivePenalty -= 12;
+  }
+
+  if (passiveDependence >= 70) {
+    passivePenalty -= 10;
+  }
+
+  if (passiveDependence >= 85) {
+    passivePenalty -= 6;
+  }
+
+  const highLow =
+    highs > lows
+      ? 6
+      : lows > highs
+      ? -Math.round(
+          Math.min(8, Math.abs(lows - highs)) * 0.50
+        )
+      : 0;
+
+  const components = {
+    base: 60,
+
+    drivers: Math.round(
+      clamp(
+        (driversParticipation - 50) / 5,
+        -10,
+        10
+      ) * 0.40
+    ),
+
+    systemHeat:
+      Math.round(systemHeatBreadth * 8),
+
+    breadth:
+      Math.round((breadth20 - 50) * 0.08) +
+      Math.round((breadth50 - 50) * 0.18) +
+      Math.round((breadth200 - 50) * 0.16),
+
+    relativeBreadthPenalty,
+    highLow,
+    leadershipPenalty,
+    passivePenalty,
+
+    rotation:
+      Math.round((rotationScore - 50) * 0.10),
+
+    breadthFailure:
+      breadthFailure ? -12 : 0,
+
+    divergence:
+      divergenceState === "BEARISH_DIVERGENCE"
+        ? -6
+        : 0,
+
+    structuralBonus:
+      breadth50 > 72 &&
+      breadth200 > 62 &&
+      !narrowLeadership
+        ? 8
+        : 0,
+
+    velocityPenalty: 0,
+    historicalOverlay: 0
+  };
+
+  const beforeHistory = Object.values(components).reduce(
+    (sum, value) => sum + value,
+    0
+  );
+
+  /*
+   * Compare historical final scores with a bounded
+   * current score, not a negative raw sum.
+   */
+  const measuredCurrentScore = clamp(
+    Math.round(beforeHistory)
+  );
+
+  if (comparisons.participation_10d !== null) {
+    const decay =
+      measuredCurrentScore -
+      comparisons.participation_10d;
+
+    if (decay <= -15) {
+      components.velocityPenalty -= 8;
+    }
+
+    if (decay <= -25) {
+      components.velocityPenalty -= 6;
+    }
+  }
+
+  /* ===================================================
+  HISTORICAL OVERLAYS
+  =================================================== */
+
+  if (participationPersistence < 40) {
+    components.historicalOverlay -= 6;
+  }
+
+  if (
+    measuredAverageParticipation &&
+    averageParticipation < 55
+  ) {
+    components.historicalOverlay -= 4;
+  }
+
+  if (institutionalParticipationTrend < 45) {
+    components.historicalOverlay -= 5;
+  }
+
+  if (participationAccelerationHistory < -10) {
+    components.historicalOverlay -= 5;
+  }
+
+  if (passiveFlowRisk > 25) {
+    components.historicalOverlay -= 6;
+  }
+
+  if (passiveFlowRisk > 50) {
+    components.historicalOverlay -= 4;
+  }
+
+  const unclampedScore = Object.values(components).reduce(
+    (sum, value) => sum + value,
+    0
+  );
+
+  const score = clamp(
+    Math.round(unclampedScore)
+  );
+
+  /* ===================================================
+  FINAL SCORE TRENDS
+
+  Exported trends describe the actual final score.
+  =================================================== */
+
+  const participationVelocity = Math.round(
+    change(score, comparisons.participation_5d)
+  );
+
+  const participationDecayRate = Math.round(
+    change(score, comparisons.participation_10d)
+  );
+
+  const participationSlope = Math.round(
+    change(score, comparisons.participation_20d) / 2
+  );
+
+  const participationAcceleration =
+    comparisons.participation_5d !== null &&
+    comparisons.participation_10d !== null
+      ? Math.round(
+          participationVelocity -
+          participationDecayRate / 2
+        )
+      : 0;
+
+  const leadershipBreadthTrend = Math.round(
+    change(
+      leadershipBreadth,
+      comparisons.leadership_5d
+    )
+  );
+
+  const megaCapDependenceTrend = Math.round(
+    change(
+      passiveDependence,
+      comparisons.passive_5d
+    )
+  );
+
+  const equalWeightTrend = Number(
+    (
+      change(rsEqual, comparisons.equal_5d) * 100
+    ).toFixed(2)
+  );
+
+  const smallCapTrend = Number(
+    (
+      change(rsSmall, comparisons.small_5d) * 100
+    ).toFixed(2)
+  );
+
+  const growthBreadthTrend = Number(
+    (
+      change(rsGrowth, comparisons.growth_5d) * 100
+    ).toFixed(2)
+  );
+
+  /* ===================================================
+  DECAY DIAGNOSTICS
+  =================================================== */
+
+  const breadthParticipationDecay = Math.min(
+    30,
+
+    (breadth50Slope < 0 ? 4 : 0) +
+    (breadth50Trend < 0 ? 5 : 0) +
+    (breadth200Slope < 0 ? 3 : 0) +
+    (breadth200Trend < 0 ? 4 : 0) +
+    (participationVelocity < 0 ? 4 : 0) +
+    (participationDecayRate < 0 ? 5 : 0)
+  );
+
+  const decayPersistence = Math.min(
+    20,
+
+    (participationVelocity < 0 ? 3 : 0) +
+    (participationDecayRate < 0 ? 4 : 0) +
+    (participationSlope < 0 ? 5 : 0) +
+    (leadershipBreadthTrend < 0 ? 3 : 0) +
+    (equalWeightTrend < 0 ? 2 : 0) +
+    (smallCapTrend < 0 ? 2 : 0) +
+    (breadth50Trend < 0 ? 3 : 0) +
+    (breadth200Trend < 0 ? 3 : 0) +
+    (megaCapDependenceTrend > 0 ? 3 : 0)
+  );
+
+  /* ===================================================
+  STATE / QUALITY
+  =================================================== */
+
+  const state: ParticipationEngineOutput["state"] =
+    score >= 70
+      ? "STRONG"
+      : score >= 52
+      ? "HEALTHY"
+      : score >= 42
+      ? "FRAGILE"
+      : "WEAK";
+
+  const quality: ParticipationEngineOutput["quality"] =
+    score >= 72 &&
+    !narrowLeadership &&
+    passiveDependence < 45
+      ? "HIGH"
+      : score >= 48
+      ? "MEDIUM"
+      : "LOW";
+
+  const missingCurrentInputs = Object.entries(raw)
+    .filter(([, value]) => value === null)
+    .map(([name]) => name);
+
+  const expansion =
+    missingCurrentInputs.length === 0 &&
+    breadth20 > 72 &&
+    breadth50 > 68 &&
+    breadth200 > 60 &&
+    highs > lows &&
+    rsEqual >= 1 &&
+    rsSmall >= 1 &&
+    !narrowLeadership &&
+    participationPersistence >= 55 &&
+    driversSource !== null &&
+    driversParticipation >= 5;
+
+  /* ===================================================
+  SUMMARY
+  =================================================== */
+
+  let summary =
+    state === "STRONG"
+      ? "Broad institutional participation"
+      : state === "HEALTHY"
+      ? "Healthy institutional participation"
+      : state === "WEAK"
+      ? "Participation breakdown active"
+      : passiveDependence >= 60
+      ? "Participation fragile | passive liquidity masking weakening internals"
+      : narrowLeadership
+      ? "Participation fragile | concentrated in narrow leadership"
+      : "Participation becoming structurally fragile";
+
+  if (severeNarrowLeadership) {
+    summary += " | Severe leadership concentration";
+  }
+
+  if (decayPersistence >= 14) {
+    summary += " | Persistent deterioration";
+  }
+
+  if (missingCurrentInputs.length) {
+    summary += " | Incomplete current inputs";
+  }
+
+  /* ===================================================
+  RETURN
+  =================================================== */
+
+  return {
+    score,
+    state,
+    quality,
+    expansion,
+
+    participationVelocity,
+    participationDecayRate,
+    participationSlope,
+    participationAcceleration,
+
+    breadth50Trend,
+    breadth50Slope,
+
+    breadth200Trend,
+    breadth200Slope,
+
+    breadthParticipationDecay,
+
+    leadershipBreadthTrend,
+    megaCapDependenceTrend,
+
+    equalWeightTrend,
+    smallCapTrend,
+    growthBreadthTrend,
+
+    decayPersistence,
+
+    narrowLeadership,
+    severeNarrowLeadership,
+
+    equalWeightWeakness,
+    smallCapWeakness,
+    breadthFailure,
+
+    institutionalParticipation,
+    passiveDependence,
+    leadershipBreadth,
+
+    summary,
+
+    components: {
+      ...components,
+
+      scoreBeforeHistory: beforeHistory,
+      unclampedScore,
+
+      saturatedLow: unclampedScore < 0,
+      saturatedHigh: unclampedScore > 100
+    },
+
+    dataQuality: {
+      completeCurrentStructure:
+        missingCurrentInputs.length === 0,
+
+      missingCurrentInputs,
+
+      missingComparisons: Object.entries(comparisons)
+        .filter(([, value]) => value === null)
+        .map(([name]) => name),
+
+      historyOrder: "OLDEST_FIRST",
+      directBreadthUnit: unit
+    },
+
+    metrics: {
+      breadth20,
+      breadth50,
+      breadth200,
+
+      breadth50Trend,
+      breadth50Slope,
+
+      breadth200Trend,
+      breadth200Slope,
+
+      breadthParticipationDecay,
+
+      highs,
+      lows,
+
+      rsEqual,
+      rsSmall,
+      rsGrowth,
+
+      concentrationScore,
+      rotationScore,
+
+      institutionalParticipation,
+      passiveDependence,
+      leadershipBreadth,
+
+      participationPersistence,
+      averageParticipation,
+      institutionalParticipationTrend,
+      participationAccelerationHistory,
+
+      driversParticipation,
+      systemHeatBreadth,
+      passiveFlowRisk,
+
+      narrowLeadership,
+      severeNarrowLeadership,
+
+      equalWeightWeakness,
+      smallCapWeakness,
+      breadthFailure
+    }
+  };
 }
