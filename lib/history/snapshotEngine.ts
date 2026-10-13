@@ -191,6 +191,16 @@ export function createMarketSnapshot({
 
     // Persist coverage and universe identity alongside the daily measurements.
     breadthDataQuality,
+    calculationVersions: {
+      history: "VERSIONED_HISTORY_V3",
+      master: "MATURITY_WEIGHTED_HISTORY_V3",
+      rotation: "STRUCTURAL_MODEL_2026_10_V3",
+      liquidity: "STRUCTURAL_MODEL_2026_10_V3",
+      rotationDecay: "STRUCTURAL_MODEL_2026_10_V3",
+      participation: participation.diagnostics?.aggregationPolicy ?? null,
+      marketQuality: marketQuality.diagnostics?.aggregationPolicy ?? null,
+      fragility: fragility.diagnostics?.aggregationPolicy ?? null,
+    },
 
     credit: {
       rawRatio: map?.creditRatio ?? null,
