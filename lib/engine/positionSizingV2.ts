@@ -802,7 +802,8 @@ export function positionSizingV2(engine: any) {
         maxFlowSize = 25;
       }
 
-      if (riskState === "CRISIS") maxFlowSize = Math.min(maxFlowSize, 20);
+      // Severe structural breakdown retains the existing defensive ceiling.
+      if (["BREAKDOWN", "CRISIS"].includes(riskState)) maxFlowSize = Math.min(maxFlowSize, 20);
     }
 
     if (direction === "LONG" && defensivePhase) {
@@ -934,7 +935,7 @@ export function positionSizingV2(engine: any) {
   }
 
   if (riskState === "BREAKDOWN") portfolioCap = Math.min(portfolioCap, 50);
-  if (riskState === "CRISIS") portfolioCap = Math.min(portfolioCap, 25);
+  if (["BREAKDOWN", "CRISIS"].includes(riskState)) portfolioCap = Math.min(portfolioCap, 25);
 
   const rawPortfolioSize = activeBeforePortfolio.reduce(
     (total, flow) => total + flow.size,

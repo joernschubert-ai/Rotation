@@ -135,6 +135,7 @@ export interface ExecutionStateOutput {
    * null means unavailable, not measured zero quality.
    */
   confidence: null;
+  diagnostics: Record<string, any>;
 
   regimeAlignment: boolean;
   summary: string;
@@ -181,7 +182,7 @@ export function executionStateEngine(
     vix = 20,
 
     masterScore: _masterScore = 50
-  } = input;
+  } = input ?? {} as ExecutionStateInput;
 
   /* =====================================================
   SAFE REGIME
@@ -453,24 +454,29 @@ export function executionStateEngine(
 
   let riskState: ExecutionStateOutput["riskState"];
 
-  if (
-    crashProbability >= 70 ||
-    dangerScore >= 82 ||
-    stressScore >= 8.5 ||
-    rotationDecayScore >= 75 ||
-    fragilityScore >= 85 ||
-    divergenceSeverity >= 70 ||
-    (
-      persistentRisk &&
-      persistenceScore >= 80
-    ) ||
-    (
-      structuralWeakness &&
-      rotationDecayScore >= 70 &&
-      breadth50 < 45
-    )
-  ) {
+  // Heat-derived stress and internal model scores do not independently prove
+  // an acute market crisis. Keep structural and acute evidence separate.
+  const crisisReasons = [
+    crashProbability >= 70 ? "CRASH_RISK_LIMIT" : null,
+    dangerScore >= 82 ? "DANGER_LIMIT" : null,
+    ["CRISIS", "CAPITULATION"].includes(regimeSignal) ? "ACUTE_PHASE_REGIME" : null,
+    gammaExposure < 0 && vix > 28 && liquidityScore < 35 ? "NEGATIVE_GAMMA_VOLATILITY_LIQUIDITY_STRESS" : null,
+    stressScore >= 8.5 && (vix > 28 || liquidityScore < 35 || gammaExposure < 0) ? "STRESS_WITH_MARKET_CONFIRMATION" : null
+  ].filter((reason): reason is string => reason !== null);
+  const severeStructuralReasons = [
+    rotationDecayScore >= 75 ? "ROTATION_EXHAUSTION" : null,
+    fragilityScore >= 85 ? "HIGH_STRUCTURAL_FRAGILITY" : null,
+    divergenceSeverity >= 70 ? "HIGH_INTERNAL_DIVERGENCE" : null,
+    persistentRisk && persistenceScore >= 80 ? "PERSISTENT_STRUCTURAL_RISK" : null,
+    structuralWeakness && rotationDecayScore >= 70 && breadth50 < 45 ? "WEAK_INTERNALS_AND_ROTATION" : null
+  ].filter((reason): reason is string => reason !== null);
+  const acuteCrisis = crisisReasons.length > 0;
+  const severeStructuralRisk = severeStructuralReasons.length > 0;
+
+  if (acuteCrisis) {
     riskState = "CRISIS";
+  } else if (severeStructuralRisk) {
+    riskState = "BREAKDOWN";
   } else if (
     internalBreakdown &&
     rotationDecayScore >= 50 &&
@@ -739,18 +745,12 @@ export function executionStateEngine(
   let urgency: ExecutionStateOutput["urgency"];
 
   if (
-    dangerScore >= 85 ||
-    stressScore >= 9 ||
-    rotationDecayScore >= 70 ||
-    divergenceSeverity >= 70 ||
-    (
-      persistentRisk &&
-      persistenceScore >= 80
-    )
+    acuteCrisis
   ) {
     urgency = "EXTREME";
   } else if (
     dangerScore >= 70 ||
+    riskState === "BREAKDOWN" ||
     rotationDecayScore >= 55 ||
     divergenceSeverity >= 50 ||
     persistentDistribution ||
@@ -878,6 +878,7 @@ export function executionStateEngine(
     urgency,
     confidence: null,
     regimeAlignment,
-    summary
+    summary,
+    diagnostics: { classificationPolicy: "ACUTE_CRISIS_SEPARATE_FROM_STRUCTURAL_BREAKDOWN", acuteCrisis, crisisReasons, severeStructuralRisk, severeStructuralReasons, stressRequiresMarketConfirmation: true, confidenceIsProbability: false, thresholdsCalibratedByThisAudit: false }
   };
 }
