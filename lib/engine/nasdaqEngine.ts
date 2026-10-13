@@ -87,10 +87,7 @@ putTiming?.score ??
 );
 
 const earlyScore =
-Number(
-earlyWarning?.score ??
-0
-);
+finite(earlyWarning?.score, 0);
 
 const qualityScore =
 Number(
