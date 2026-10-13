@@ -196,8 +196,29 @@ export function mapBackendToEngine(data: any) {
       sourceCreditQuality.dateAlignmentVerified === true,
   };
 
+  // Preserve the producer's universe identity and coverage diagnostics.
+  // Missing legacy metadata must not be assigned the current universe version.
+  const sourceBreadthQuality =
+    data.breadthDataQuality &&
+    typeof data.breadthDataQuality === "object" &&
+    !Array.isArray(data.breadthDataQuality)
+      ? data.breadthDataQuality
+      : null;
+
+  const breadthDataQuality = sourceBreadthQuality
+    ? {
+        ...sourceBreadthQuality,
+        universeVersion:
+          typeof sourceBreadthQuality.universeVersion === "string" &&
+          sourceBreadthQuality.universeVersion.trim() !== ""
+            ? sourceBreadthQuality.universeVersion
+            : null,
+      }
+    : null;
+
   return {
     rotation,
+    breadthDataQuality,
 
     marketLiquidityScore:
       numberOr(data.marketLiquidityScore, 0),
