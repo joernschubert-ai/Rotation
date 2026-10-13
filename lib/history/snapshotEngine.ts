@@ -88,6 +88,23 @@ export function createMarketSnapshot({
   const mapFutures = map?.futures ?? {};
   const mapMarketData = map?.marketData ?? {};
 
+  // The mapped input identifies the universe used for this calculation.
+  // Never infer its version from historical metrics or from today's date.
+  const sourceBreadthQuality = map?.breadthDataQuality;
+  const breadthDataQuality =
+    sourceBreadthQuality &&
+    typeof sourceBreadthQuality === "object" &&
+    !Array.isArray(sourceBreadthQuality)
+      ? {
+          ...sourceBreadthQuality,
+          universeVersion:
+            typeof sourceBreadthQuality.universeVersion === "string" &&
+            sourceBreadthQuality.universeVersion.trim() !== ""
+              ? sourceBreadthQuality.universeVersion
+              : null,
+        }
+      : null;
+
   const persistedIndices = {
     dow:
       mapIndices?.dow ??
@@ -171,6 +188,9 @@ export function createMarketSnapshot({
 
   return {
     timestamp: new Date().toISOString(),
+
+    // Persist coverage and universe identity alongside the daily measurements.
+    breadthDataQuality,
 
     credit: {
       rawRatio: map?.creditRatio ?? null,

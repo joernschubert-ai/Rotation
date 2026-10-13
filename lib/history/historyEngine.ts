@@ -67,6 +67,15 @@ export interface HistoryMetrics {
   rutHistory: Array<number | null>;
 
   dataQuality: {
+    universeCompatibility: {
+      universeVersion: string | null;
+      compatibleDailyObservations: number;
+      excludedDailyObservations: number;
+      structuralHistoryAvailable: boolean;
+      has5StructuralWindow: boolean;
+      has20StructuralWindow: boolean;
+      policy: "CONTIGUOUS_SAME_KNOWN_UNIVERSE";
+    };
     priceAvailability: Record<string, { momentum5D: boolean; momentum20D: boolean; acceleration: boolean }>;
     rawSnapshots: number;
     validSnapshots: number;
@@ -180,7 +189,10 @@ const PERSISTENCE_OBSERVATIONS = 21;
  * Weekend snapshots are retained; the backend supplies no market-session date.
  * Intraday snapshots in storage are not modified or deleted by this function.
  */
-export function historyEngine(history: any[]): HistoryMetrics {
+export function historyEngine(
+  history: any[],
+  context?: { universeVersion?: string | null }
+): HistoryMetrics {
   const raw = Array.isArray(history) ? history : [];
   const valid = raw.flatMap((snapshot: any) => {
     if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return [];
@@ -196,18 +208,37 @@ export function historyEngine(history: any[]): HistoryMetrics {
     const date = dateFormatter.format(new Date(item.time));
     if (!perDate.has(date)) perDate.set(date, item.snapshot);
   }
-  const daily = Array.from(perDate.values()); // Newest first.
+  const priceDaily = Array.from(perDate.values()); // Newest first.
+  const versionOf = (snapshot: any): string | null => {
+    const version = snapshot?.breadthDataQuality?.universeVersion;
+    return typeof version === "string" && version.trim() !== "" ? version : null;
+  };
+  // An explicit live context also protects the first load after a universe switch.
+  // Legacy observations without identity cannot establish comparable structure.
+  const requestedVersion = context !== undefined
+    ? context.universeVersion
+    : versionOf(priceDaily[0]);
+  const universeVersion = typeof requestedVersion === "string" && requestedVersion.trim() !== ""
+    ? requestedVersion : null;
+  const daily: any[] = [];
+  if (universeVersion !== null) {
+    for (const snapshot of priceDaily) {
+      if (versionOf(snapshot) !== universeVersion) break;
+      daily.push(snapshot);
+    }
+  }
   const recent = daily.slice(0, PERSISTENCE_OBSERVATIONS);
   const chronological = [...daily].reverse();
   const newest = daily[0];
   const mid = daily[5];
   const oldest = daily[20];
-  const has5 = daily.length >= 6;
-  const has20 = daily.length >= 21;
+  const has5 = priceDaily.length >= 6;
+  const has20 = priceDaily.length >= 21;
 
   const missingValues: Record<string, number> = {};
   for (const [name, reader] of Object.entries(readers)) {
-    missingValues[name] = daily.filter(s => reader(s) === null).length;
+    const observations = ["ndx", "spx", "rut"].includes(name) ? priceDaily : daily;
+    missingValues[name] = observations.filter(s => reader(s) === null).length;
   }
   const series = (reader: (s: any) => number | null) => chronological.map(reader);
   const values = (reader: (s: any) => number | null) =>
@@ -233,15 +264,15 @@ export function historyEngine(history: any[]): HistoryMetrics {
   const crashTrend = difference(readers.crash(newest), readers.crash(oldest));
   const relativeBreadthWeakness = difference(readers.breadth50(newest), readers.breadth20(newest));
 
-  const ndxNewest = readers.ndx(newest);
-  const ndxMid = readers.ndx(mid);
-  const ndxOldest = readers.ndx(oldest);
-  const spxNewest = readers.spx(newest);
-  const spxMid = readers.spx(mid);
-  const spxOldest = readers.spx(oldest);
-  const rutNewest = readers.rut(newest);
-  const rutMid = readers.rut(mid);
-  const rutOldest = readers.rut(oldest);
+  const ndxNewest = readers.ndx(priceDaily[0]);
+  const ndxMid = readers.ndx(priceDaily[5]);
+  const ndxOldest = readers.ndx(priceDaily[20]);
+  const spxNewest = readers.spx(priceDaily[0]);
+  const spxMid = readers.spx(priceDaily[5]);
+  const spxOldest = readers.spx(priceDaily[20]);
+  const rutNewest = readers.rut(priceDaily[0]);
+  const rutMid = readers.rut(priceDaily[5]);
+  const rutOldest = readers.rut(priceDaily[20]);
   const priceAvailability = Object.fromEntries([
     ["ndx", ndxNewest, ndxMid, ndxOldest],
     ["spx", spxNewest, spxMid, spxOldest],
@@ -334,7 +365,7 @@ export function historyEngine(history: any[]): HistoryMetrics {
   );
   const marketCharacter: HistoryMetrics["marketCharacter"] = prolongedBearRegime ? "BEAR" :
     persistentDistribution ? "DISTRIBUTION" : institutionalPressure > 35 ? "TRANSITION" : "EXPANSION";
-  // Historical extremes still describe the complete supplied archive.
+  // Structural extremes describe only the comparable universe period.
   const breadthValues = daily.map(readers.breadth50).filter((n): n is number => n !== null);
   const rotationValues = daily.map(readers.rotation).filter((n): n is number => n !== null);
 
@@ -364,12 +395,23 @@ export function historyEngine(history: any[]): HistoryMetrics {
     breadth20History: series(readers.breadth20), breadth50History: series(readers.breadth50),
     breadth200History: series(readers.breadth200), advanceDeclineHistory: series(readers.ad),
     participationHistory: series(readers.participation), rotationDecayHistory: series(readers.decay),
-    spxHistory: series(readers.spx), ndxHistory: series(readers.ndx), rutHistory: series(readers.rut),
+    spxHistory: [...priceDaily].reverse().map(readers.spx),
+    ndxHistory: [...priceDaily].reverse().map(readers.ndx),
+    rutHistory: [...priceDaily].reverse().map(readers.rut),
     dataQuality: {
+      universeCompatibility: {
+        universeVersion,
+        compatibleDailyObservations: daily.length,
+        excludedDailyObservations: priceDaily.length - daily.length,
+        structuralHistoryAvailable: daily.length > 0,
+        has5StructuralWindow: daily.length >= 6,
+        has20StructuralWindow: daily.length >= 21,
+        policy: "CONTIGUOUS_SAME_KNOWN_UNIVERSE"
+      },
       priceAvailability,
       rawSnapshots: raw.length, validSnapshots: valid.length,
-      invalidSnapshots: raw.length - valid.length, dailyObservations: daily.length,
-      collapsedIntradaySnapshots: valid.length - daily.length,
+      invalidSnapshots: raw.length - valid.length, dailyObservations: priceDaily.length,
+      collapsedIntradaySnapshots: valid.length - priceDaily.length,
       has5ObservationWindow: has5, has20ObservationWindow: has20,
       missingValues, timeBasis: "LATEST_PER_NEW_YORK_DATE"
     }
