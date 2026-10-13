@@ -43,7 +43,7 @@ export interface HistoryMetrics {
   acceleratingWeakness: boolean;
   persistentDistribution: boolean;
   prolongedBearRegime: boolean;
-  marketCharacter: "EXPANSION" | "TRANSITION" | "DISTRIBUTION" | "BEAR";
+  marketCharacter: "EXPANSION" | "TRANSITION" | "DISTRIBUTION" | "BEAR" | "UNKNOWN";
   averageBreadth: number;
   averageParticipation: number;
   averageRotation: number;
@@ -75,6 +75,7 @@ export interface HistoryMetrics {
       has5StructuralWindow: boolean;
       has20StructuralWindow: boolean;
       policy: "CONTIGUOUS_SAME_KNOWN_UNIVERSE";
+      persistenceAvailability: { rotation: boolean; liquidity: boolean; fragility: boolean };
     };
     priceAvailability: Record<string, { momentum5D: boolean; momentum20D: boolean; acceleration: boolean }>;
     rawSnapshots: number;
@@ -364,7 +365,18 @@ export function historyEngine(
     (values(readers.fragility).length > 0 && averageFragility > 65)
   );
   const marketCharacter: HistoryMetrics["marketCharacter"] = prolongedBearRegime ? "BEAR" :
-    persistentDistribution ? "DISTRIBUTION" : institutionalPressure > 35 ? "TRANSITION" : "EXPANSION";
+    persistentDistribution ? "DISTRIBUTION" : institutionalPressure > 35 ? "TRANSITION" :
+    recent.length === PERSISTENCE_OBSERVATIONS && recent.every(s =>
+      [readers.breadth50, readers.participation, readers.rotation, readers.liquidity, readers.fragility]
+        .every(reader => reader(s) !== null)) ? "EXPANSION" : "UNKNOWN";
+  // A short sample without measured weakness does not establish high persistence.
+  const completePersistence = (reader: (s: any) => number | null) =>
+    recent.length === PERSISTENCE_OBSERVATIONS && recent.every(s => reader(s) !== null);
+  const persistenceAvailability = {
+    rotation: completePersistence(readers.rotation),
+    liquidity: completePersistence(readers.liquidity),
+    fragility: completePersistence(readers.fragility)
+  };
   // Structural extremes describe only the comparable universe period.
   const breadthValues = daily.map(readers.breadth50).filter((n): n is number => n !== null);
   const rotationValues = daily.map(readers.rotation).filter((n): n is number => n !== null);
@@ -381,9 +393,9 @@ export function historyEngine(
     phasePersistence: daysInPhase, daysInPhase,
     breadthWeakDays, participationWeakDays, rotationWeakDays, liquidityWeakDays,
     fragilityHighDays, distributionDays, institutionalPressure,
-    rotationPersistence: values(readers.rotation).length ? clamp(100 - rotationWeakDays * 5) : 50,
-    liquidityPersistence: values(readers.liquidity).length ? clamp(100 - liquidityWeakDays * 5) : 50,
-    fragilityPersistence: clamp(fragilityHighDays * 6),
+    rotationPersistence: persistenceAvailability.rotation ? clamp(100 - rotationWeakDays * 5) : 50,
+    liquidityPersistence: persistenceAvailability.liquidity ? clamp(100 - liquidityWeakDays * 5) : 50,
+    fragilityPersistence: persistenceAvailability.fragility ? clamp(fragilityHighDays * 6) : 50,
     dangerPersistence, executionPersistence, edgePersistence,
     acceleratingWeakness, persistentDistribution, prolongedBearRegime, marketCharacter,
     averageBreadth, averageParticipation, averageRotation, averageLiquidity, averageFragility,
@@ -406,6 +418,7 @@ export function historyEngine(
         structuralHistoryAvailable: daily.length > 0,
         has5StructuralWindow: daily.length >= 6,
         has20StructuralWindow: daily.length >= 21,
+        persistenceAvailability,
         policy: "CONTIGUOUS_SAME_KNOWN_UNIVERSE"
       },
       priceAvailability,
