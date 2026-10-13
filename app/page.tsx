@@ -121,7 +121,11 @@ export default function Home() {
         throw new Error("History response is not an array");
       }
 
-      const historyMetrics = historyEngine(history);
+      // Use the universe of the currently loaded market data, including on
+      // the first refresh before any snapshot of that universe has been saved.
+      const historyMetrics = historyEngine(history, {
+        universeVersion: mapped.breadthDataQuality?.universeVersion ?? null,
+      });
       const mappedWithHistory = {
         ...mapped,
         historyMetrics,
