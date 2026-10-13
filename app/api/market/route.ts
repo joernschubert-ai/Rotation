@@ -2863,6 +2863,22 @@ return [];
 }
 
 function buildPriceMetrics(closes: number[]) {
+const metrics = buildLegacyPriceMetrics(closes);
+const validWindow = (offset: number) => Array.isArray(closes) && closes.length > offset && closes.slice(-offset - 1).every(value => typeof value === "number" && Number.isFinite(value) && value > 0);
+return { ...metrics, dataQuality: {
+  source: "INDEX_DAILY_CLOSE_BARS",
+  timeBasis: "OBSERVED_DAILY_PRICE_BARS",
+  observations: Array.isArray(closes) ? closes.length : 0,
+  momentum5DAvailable: validWindow(5),
+  momentum20DAvailable: validWindow(20),
+  dateAlignmentVerified: false,
+  latestBarFinality: "UNVERIFIED",
+  providerAccelerationDefinition: "RETURN_5D_MINUS_RETURN_10D_DIVIDED_BY_2"
+} };
+}
+
+// Existing output for legacy backend consumers is retained.
+function buildLegacyPriceMetrics(closes: number[]) {
 
 if (!closes || closes.length < 2) {
 return {
