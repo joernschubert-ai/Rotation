@@ -212,11 +212,16 @@ export function positionSizingV2(engine: any) {
 
   const ndxMomentum5D = nullableNum(priceMomentum?.ndx?.momentum5D);
   const ndxAcceleration = nullableNum(priceMomentum?.ndx?.acceleration);
+  const ndxQuality = priceMomentum?.ndx?.dataQuality ?? {};
+  const ndxShortAvailable = ndxQuality.momentum5DAvailable === true && ndxMomentum5D !== null;
+  const ndxMediumAvailable = ndxQuality.momentum20DAvailable === true && nullableNum(priceMomentum?.ndx?.momentum20D) !== null;
+  const ndxAccelerationAvailable = ndxQuality.accelerationAvailable === true && ndxAcceleration !== null;
+  const ndxScoreAvailable = ndxShortAvailable && ndxMediumAvailable && nullableNum(priceMomentum?.ndx?.score) !== null;
 
   const ndxBullishImpulse =
-    ndxMomentum5D !== null && ndxAcceleration !== null
+    ndxShortAvailable && ndxAccelerationAvailable && ndxMomentum5D !== null && ndxAcceleration !== null
       ? ndxMomentum5D >= 3 && ndxAcceleration >= 0.5
-      : priceMomentum.bullishImpulse === true;
+      : false;
 
   const deterioratingBreadth =
     hasNumber(input.history.breadthTrend) && breadthTrend <= -2;
@@ -732,7 +737,7 @@ export function positionSizingV2(engine: any) {
 
     if (flow === "NASDAQ_PUT") {
       const ndxPriceScore = nullableNum(
-        priceMomentum?.ndx?.score ?? priceMomentum.score
+        ndxScoreAvailable ? priceMomentum?.ndx?.score : null
       );
 
       if (
@@ -870,6 +875,7 @@ export function positionSizingV2(engine: any) {
         maxFlowSize,
         postRiskMinimumSize: 0,
         exactRiskMultiplier: riskMultiplier,
+        priceDataQuality: { ndxMomentum5DAvailable: ndxShortAvailable, ndxMomentum20DAvailable: ndxMediumAvailable, ndxAccelerationAvailable, ndxScoreAvailable, ndxBullishImpulse, measured: { momentum5D: ndxShortAvailable ? ndxMomentum5D : null, momentum20D: ndxMediumAvailable ? nullableNum(priceMomentum?.ndx?.momentum20D) : null, acceleration: ndxAccelerationAvailable ? ndxAcceleration : null }, aggregatePriceFallbackUsed: false },
         confidenceType: "CANDIDATE_SUPPORT_HEURISTIC",
         confidenceIsProbability: false,
         edgeIsStatisticalEstimate: false,
