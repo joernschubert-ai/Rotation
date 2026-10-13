@@ -358,7 +358,7 @@ export function masterScoreEngine(engine: any) {
   Correlated components are not independent evidence.
   ===================================================== */
 
-  const historicalRisk = weightedAverage([
+  const observedHistoricalRisk = weightedAverage([
     { value: inverse(averageBreadth), weight: 0.20 },
     { value: inverse(averageParticipation), weight: 0.20 },
     { value: inverse(averageRotation), weight: 0.15 },
@@ -388,6 +388,20 @@ export function masterScoreEngine(engine: any) {
     { value: dangerRisk, weight: 0.03 }
   ]);
 
+  // Missing history contributes current component risk, not invented health.
+  // Each historical component reaches its fixed maximum weight automatically.
+  const historicalQuality = historyMetrics.dataQuality?.historicalComponents ?? {};
+  const historicalMix = [
+    { name: "breadth", historical: inverse(averageBreadth), current: inverse(numeric(input.structure?.breadth?.b50) ?? 50), weight: 0.20 },
+    { name: "participation", historical: inverse(averageParticipation), current: participationRisk, weight: 0.20 },
+    { name: "rotation", historical: inverse(averageRotation), current: rotationRisk, weight: 0.15 },
+    { name: "liquidity", historical: inverse(averageLiquidity), current: liquidityRisk, weight: 0.20 },
+    { name: "fragility", historical: averageFragility, current: fragilityRisk, weight: 0.25 }
+  ].map(component => {
+    const maturity = clamp(num(historicalQuality[component.name]?.maturity), 0, 1);
+    return { ...component, maturity, value: component.current * (1 - maturity) + component.historical * maturity };
+  });
+  const historicalRisk = weightedAverage(historicalMix);
   const baseRisk = weightedAverage([
     { value: currentMarketRisk, weight: 0.70 },
     { value: structuralRisk, weight: 0.20 },
@@ -603,9 +617,11 @@ export function masterScoreEngine(engine: any) {
 
     const quality = historyMetrics.dataQuality;
 
-    if (!quality) {
-      return true;
-    }
+    if (!quality) return false;
+
+    const component = source === "breadth50" ? "breadth" : source;
+    const measured = numeric(quality.historicalComponents?.[component]?.measuredObservations);
+    if (measured !== null) return measured > 0;
 
     const observations =
       numeric(quality.dailyObservations);
@@ -1059,6 +1075,10 @@ export function masterScoreEngine(engine: any) {
     },
 
     diagnostics: {
+      calculationVersion: "MATURITY_WEIGHTED_HISTORY_V3",
+      historicalMix,
+      observedHistoricalRisk,
+      historyTargetObservations: 21,
       baseRisk,
       preOverlayRisk,
 
