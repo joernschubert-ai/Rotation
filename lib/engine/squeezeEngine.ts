@@ -122,7 +122,7 @@ export function squeezeEngine(input: SqueezeEngineInput): SqueezeEngineOutput {
   };
   // Explicit zero is a producer result, not permission to derive again.
   let structuralGammaFloor = external.structuralGammaFloor ?? 0;
-  if (external.structuralGammaFloor === null && rawGamma >= 0 && contango) {
+  if (external.structuralGammaFloor === null && measured.gamma !== null && rawGamma >= 0 && contango) {
     if (lowVolatility) structuralGammaFloor = 35;
     if (calmVolatility && narrowLeadership) structuralGammaFloor = Math.max(structuralGammaFloor, 45);
     if (lowVolatility && megaCapOnlyTape && weakBreadth) structuralGammaFloor = Math.max(structuralGammaFloor, 55);
@@ -196,6 +196,15 @@ export function squeezeEngine(input: SqueezeEngineInput): SqueezeEngineOutput {
     liquidity: (measured.liquidity !== null && liquidity < 40 ? 7 : 0) + (measured.liquidity !== null && liquidity < 30 ? 8 : 0),
     reflexiveMeltup: (dealerCompression >= 60 && passiveFlowRisk >= 55 && volSuppression >= 55 ? 10 : 0) + (passiveGammaCompression >= 70 && weakBreadth && weakParticipation ? 12 : 0) + (megaCapOnlyTape && calmVolatility && weakParticipation ? 8 : 0)
   };
+  // These diagnostics reuse breadth, participation, volatility and each other.
+  // Their strongest existing contribution represents the shared evidence group.
+  // External delivery does not establish independent evidence either.
+  const compressionKeys = ["passiveGamma", "dealerCompression", "passiveFlow", "volatilitySuppression", "combinedPassiveRegime", "structuralCompression", "reflexiveMeltup"];
+  const compressionCandidates = Object.fromEntries(compressionKeys.map(key => [key, riskComponents[key]]));
+  const compressionGroup = Math.max(0, ...Object.values(compressionCandidates));
+  const legacyUnclampedRisk = Object.values(riskComponents).reduce((sum, value) => sum + value, 0);
+  for (const key of compressionKeys) delete riskComponents[key];
+  riskComponents.compressionGroup = compressionGroup;
   const unclampedRisk = Object.values(riskComponents).reduce((sum, value) => sum + value, 0);
   const risk = clamp(Math.round(unclampedRisk));
   const state: SqueezeEngineOutput["state"] = risk >= 80 ? "EXTREME" : risk >= 60 ? "HIGH" : risk >= 35 ? "MODERATE" : "LOW";
@@ -205,9 +214,7 @@ export function squeezeEngine(input: SqueezeEngineInput): SqueezeEngineOutput {
     risk,
     negativeGamma: rawGamma < 0 ? 8 : 0,
     forcedVolatility: measured.vix !== null && measured.move !== null && vix > 30 && move > 110 ? 8 : 0,
-    dealerCompression: dealerCompression >= 60 ? 8 : 0,
-    passiveGamma: passiveGammaCompression >= 65 ? 8 : 0,
-    passiveFlow: passiveFlowRisk >= 65 && weakBreadth ? 8 : 0
+    compressionGroup: dealerCompression >= 60 || passiveGammaCompression >= 65 || (passiveFlowRisk >= 65 && weakBreadth) ? 8 : 0
   };
   const instabilityUnclamped = Object.values(instabilityComponents).reduce((sum, value) => sum + value, 0);
   const instability = clamp(Math.round(instabilityUnclamped));
@@ -218,7 +225,7 @@ export function squeezeEngine(input: SqueezeEngineInput): SqueezeEngineOutput {
   if (missingInputs.length > 0) summary += " | Incomplete positioning inputs";
   return {
     risk, state, squeezeType, instability, effectiveGamma, structuralGammaFloor, passiveGammaCompression, dealerCompression, passiveFlowRisk, volSuppression, narrowLeadership, weakBreadth, weakParticipation, summary,
-    components: { risk: riskComponents, instability: instabilityComponents, unclampedRisk, instabilityUnclamped, saturated: unclampedRisk > 100, scoreType: "POSITIONING_INSTABILITY", directionalSignal: "NONE", creditConventionVerified: true, creditContext, termRatioDefinition: "VIX / VIX3M", weightsCalibratedByThisAudit: false },
+    components: { risk: riskComponents, instability: instabilityComponents, unclampedRisk, instabilityUnclamped, saturated: unclampedRisk > 100, scoreType: "POSITIONING_INSTABILITY", directionalSignal: "NONE", creditConventionVerified: true, creditContext, termRatioDefinition: "VIX / VIX3M", weightsCalibratedByThisAudit: false, aggregationPolicy: "STRONGEST_SHARED_COMPRESSION_CONTRIBUTION", compressionCandidates, legacyUnclampedRisk, duplicateCompressionPointsRemoved: legacyUnclampedRisk - unclampedRisk },
     dataQuality: { missingInputs, measured, explicitDiagnostics: Object.fromEntries(Object.entries(external).map(([key, value]) => [key, value !== null])), derivedGammaFloorIsEstimate: external.structuralGammaFloor === null, missingValuesAreNotMeasurements: true },
     metrics: { gamma: rawGamma, effectiveGamma, structuralGammaFloor, vix, move, breadth50, breadth200, putCall, shortInterest, vixTerm, credit, liquidity, dealerCompression, passiveFlowRisk, volSuppression, passiveGammaCompression, rsSmall, rsEqual, rsGrowth, participationScore, narrowLeadership, severeNarrowLeadership, megaCapOnlyTape, equalWeightWeakness, smallCapWeakness, weakBreadth, breadthFailure, weakParticipation, contango }
   };
