@@ -6,9 +6,9 @@ export type PriceStructureAlignment = "CONFIRMED_BULLISH" | "BULLISH" | "NEUTRAL
 export interface PriceMomentumInput {
   historyMetrics?: any;
   indices?: {
-    ndx?: { value?: number; change?: number };
-    spx?: { value?: number; change?: number };
-    rut?: { value?: number; change?: number };
+    ndx?: { value?: number; change?: number; priceMetrics?: any };
+    spx?: { value?: number; change?: number; priceMetrics?: any };
+    rut?: { value?: number; change?: number; priceMetrics?: any };
   };
   rotation?: any;
   structure?: any;
@@ -152,6 +152,15 @@ function classifyState(score: number, short: number, medium: number, acceleratio
 export function priceMomentumEngine(input: PriceMomentumInput): PriceMomentumResult {
   const safeInput = input ?? {};
   const history = safeInput.historyMetrics ?? {};
+  // Select one coherent price source for the entire weighted basket.
+  // Provider metrics without explicit availability are not accepted as measured.
+  const useDailyBars = (["ndx", "spx", "rut"] as const).every(name => {
+    const metrics = safeInput.indices?.[name]?.priceMetrics;
+    return metrics?.dataQuality?.source === "INDEX_DAILY_CLOSE_BARS" &&
+      metrics.dataQuality.momentum5DAvailable === true && metrics.dataQuality.momentum20DAvailable === true &&
+      (numeric(metrics.current) ?? 0) > 0 &&
+      numeric(metrics.return5D) !== null && numeric(metrics.return20D) !== null;
+  });
   function index(name: "ndx" | "spx" | "rut"): IndexMomentum {
     const availability = history.dataQuality?.priceAvailability?.[name];
     // Older history producers expose nullable chronological series instead.
@@ -164,15 +173,17 @@ export function priceMomentumEngine(input: PriceMomentumInput): PriceMomentumRes
       // Legacy numeric metrics without provenance do not establish valid endpoints.
       return false;
     }
-    const shortMeasured = available("momentum5D", 5) ? numeric(history[`${name}Momentum5D`]) : null;
-    const mediumMeasured = available("momentum20D", 20) ? numeric(history[`${name}Momentum20D`]) : null;
-    const accelerationMeasured = shortMeasured !== null && mediumMeasured !== null && available("acceleration", 20) ? numeric(history[`${name}Acceleration`]) : null;
+    const metrics = safeInput.indices?.[name]?.priceMetrics;
+    const shortMeasured = useDailyBars ? numeric(metrics.return5D) : available("momentum5D", 5) ? numeric(history[`${name}Momentum5D`]) : null;
+    const mediumMeasured = useDailyBars ? numeric(metrics.return20D) : available("momentum20D", 20) ? numeric(history[`${name}Momentum20D`]) : null;
+    const accelerationMeasured = shortMeasured !== null && mediumMeasured !== null
+      ? shortMeasured - mediumMeasured / 4 : null;
     const short = shortMeasured ?? 0;
     const medium = mediumMeasured ?? 0;
     const acceleration = accelerationMeasured ?? 0;
     const score = momentumScore(short, medium);
     return {
-      dataQuality: { momentum5DAvailable: shortMeasured !== null, momentum20DAvailable: mediumMeasured !== null, accelerationAvailable: accelerationMeasured !== null, measured: { momentum5D: shortMeasured, momentum20D: mediumMeasured, acceleration: accelerationMeasured }, source: availability ? "HISTORY_ENDPOINT_FLAGS" : Array.isArray(series) ? "HISTORY_SERIES_ENDPOINTS" : "UNVERIFIED" },
+      dataQuality: { momentum5DAvailable: shortMeasured !== null, momentum20DAvailable: mediumMeasured !== null, accelerationAvailable: accelerationMeasured !== null, measured: { momentum5D: shortMeasured, momentum20D: mediumMeasured, acceleration: accelerationMeasured }, source: useDailyBars ? "INDEX_DAILY_CLOSE_BARS" : availability ? "HISTORY_ENDPOINT_FLAGS" : Array.isArray(series) ? "HISTORY_SERIES_ENDPOINTS" : "UNVERIFIED" },
       value: num(safeInput.indices?.[name]?.value),
       momentum5D: short,
       momentum20D: medium,
@@ -218,7 +229,7 @@ export function priceMomentumEngine(input: PriceMomentumInput): PriceMomentumRes
   const accelerationText = `${acceleration >= 0 ? "+" : ""}${acceleration.toFixed(2)}`;
   const summary = `PRICE ${complete ? state : "INCOMPLETE"} | ${shortAvailable ? shortText : "5D UNKNOWN"} | ${mediumAvailable ? mediumText : "20D UNKNOWN"} | ACC ${accelerationAvailable ? accelerationText : "UNKNOWN"} | STRUCTURE ${structureAlignment}`;
   return {
-    dataQuality: { complete, momentum5DAvailable: shortAvailable, momentum20DAvailable: mediumAvailable, accelerationAvailable, measured: { momentum5D: shortAvailable ? momentum5D : null, momentum20D: mediumAvailable ? momentum20D : null, acceleration: accelerationAvailable ? acceleration : null }, numericFallbackIsMeasurement: false, scoreIsPartial: !complete, classificationAvailable: complete, timeBasis: history.dataQuality?.timeBasis ?? "UNKNOWN", weightsRenormalized: false },
+    dataQuality: { complete, momentum5DAvailable: shortAvailable, momentum20DAvailable: mediumAvailable, accelerationAvailable, measured: { momentum5D: shortAvailable ? momentum5D : null, momentum20D: mediumAvailable ? momentum20D : null, acceleration: accelerationAvailable ? acceleration : null }, numericFallbackIsMeasurement: false, scoreIsPartial: !complete, classificationAvailable: complete, source: useDailyBars ? "INDEX_DAILY_CLOSE_BARS" : "SNAPSHOT_HISTORY", timeBasis: useDailyBars ? "OBSERVED_DAILY_PRICE_BARS" : history.dataQuality?.timeBasis ?? "UNKNOWN", accelerationDefinition: "MOMENTUM_5D_MINUS_MOMENTUM_20D_DIVIDED_BY_4", dateAlignmentVerified: false, latestBarFinality: "UNVERIFIED", coherentBasketSource: true, weightsRenormalized: false },
     ndx, spx, rut, momentum5D, momentum20D, acceleration, score, trend,
     direction: dir, state, structureScore, structureAlignment,
     earlyBullish, earlyBearish, bullishImpulse, bearishImpulse, cooling,

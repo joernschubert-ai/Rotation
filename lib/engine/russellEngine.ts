@@ -53,6 +53,7 @@ Priority:
 
 const nasdaq5dReturn =
 num(
+priceMomentum?.ndx?.momentum5D ??
 history.nasdaq5dReturn ??
 history.ndxMomentum5D ??
 priceMomentum?.ndx?.momentum5D ??
@@ -62,6 +63,7 @@ priceMomentum?.momentum5D ??
 
 const russell5dReturn =
 num(
+priceMomentum?.rut?.momentum5D ??
 history.russell5dReturn ??
 history.rutMomentum5D ??
 priceMomentum?.rut?.momentum5D ??
@@ -70,6 +72,7 @@ priceMomentum?.rut?.momentum5D ??
 
 const sp5005dReturn =
 num(
+priceMomentum?.spx?.momentum5D ??
 history.sp500_5dReturn ??
 history.sp5005dReturn ??
 history.spxMomentum5D ??
