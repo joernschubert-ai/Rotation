@@ -1006,24 +1006,6 @@ export function marketEngine(
     gamma
   });
 
-  const russell = russellEngine({
-    rsSmall: rotation.rsSmall,
-    rsGrowth: rotation.rsGrowth,
-    breadth50,
-    breadth200,
-    concentrationScore: Number(data.concentrationScore ?? 0),
-    phase,
-    crash,
-    vix,
-    historyMetrics,
-    rotationDecay,
-    rotationConfirm,
-    participation,
-    internalDivergence,
-    priceMomentum: priceMomentumPre,
-    gamma
-  });
-
   /* =====================================================
   PHASE CONFIRMATION / MARKET QUALITY
   ===================================================== */
@@ -1096,6 +1078,16 @@ export function marketEngine(
     rotation,
     liquidity,
     fragility
+  });
+
+  // Evaluate the final Russell candidate with completed quality and price context.
+  // Preliminary Russell remains separate for earlier structural consumers.
+  const russell = russellEngine({
+    rsSmall: rotation.rsSmall, rsGrowth: rotation.rsGrowth,
+    breadth50, breadth200, concentrationScore: data.concentrationScore,
+    phase, phaseData, phaseConfirmation, crash, vix, historyMetrics,
+    rotationDecay, rotationConfirm, participation, internalDivergence,
+    marketQuality, priceMomentum, gamma
   });
 
   /* =====================================================

@@ -1,6 +1,7 @@
 // /lib/engine/russellEngine.ts
 
 export function russellEngine(data: any) {
+data = data ?? {};
 
 /* =====================================================
 INPUT / SAFE SOURCES
@@ -17,7 +18,7 @@ const participation = data.participation ?? {};
 const phaseConfirmation = data.phaseConfirmation ?? {};
 
 const phase =
-data.phase ??
+(typeof data.phase === "string" ? data.phase : data.phase?.phase) ??
 data.marketPhase?.phase ??
 "UNKNOWN";
 
@@ -27,6 +28,8 @@ SAFE NUMBER HELPER
 ===================================================== */
 
 function num(value: any, fallback = 0) {
+if (value === null || value === undefined || typeof value === "boolean" || (typeof value === "string" && value.trim() === "")) return fallback;
+if (value && typeof value === "object") return num(value.value ?? value.score ?? value.current, fallback);
 
 const parsed = Number(value);
 
@@ -179,6 +182,8 @@ rotationMetrics.concentrationScore ??
 data.master?.components?.concentration ??
 0
 );
+// The adapter contract is 0..100; historical thresholds below use 0..3.
+const concentrationLevel = Math.max(0, Math.min(100, concentration)) * 3 / 100;
 
 
 /* =====================================================
@@ -240,7 +245,7 @@ num(
 participation?.score ??
 data.participationScore ??
 rotationMetrics.participation ??
-data.master?.components?.participation ??
+
 50,
 50
 );
@@ -280,7 +285,7 @@ const marketQualityScore =
 num(
 marketQuality?.score ??
 marketQuality?.value ??
-data.master?.components?.marketQuality ??
+
 50,
 50
 );
@@ -311,7 +316,7 @@ PRICE MOMENTUM
 const priceMomentumScore =
 num(
 priceMomentum?.score ??
-data.master?.components?.priceMomentum ??
+
 50,
 50
 );
@@ -385,17 +390,34 @@ num(history.crashTrend ?? 0);
 /* =====================================================
 ABSOLUTE MARKET STATE
 ===================================================== */
+function available(name: string, field: string) {
+  const index = priceMomentum[name] ?? {};
+  const value = index[field] ?? history[`${name}${field === "acceleration" ? "Acceleration" : field === "momentum5D" ? "Momentum5D" : "Momentum20D"}`];
+  const declared = index.dataQuality?.[`${field === "momentum5D" ? "momentum5D" : field === "momentum20D" ? "momentum20D" : "acceleration"}Available`] ?? history.dataQuality?.priceAvailability?.[name]?.[field];
+  return declared === true && Number.isFinite(num(value, NaN));
+}
+const rutShortAvailable = available("rut", "momentum5D");
+const rutMediumAvailable = available("rut", "momentum20D");
+const rutAccelerationAvailable = available("rut", "acceleration");
+const rutPriceComplete = rutShortAvailable && rutMediumAvailable && rutAccelerationAvailable && Number.isFinite(num(priceMomentum.rut?.score, NaN));
+const requiredCore = { marketQuality: marketQuality.score ?? marketQuality.value, participation: participation.score ?? data.participationScore ?? rotationMetrics.participation, breadth50: data.breadth50 ?? rotationMetrics.breadth50, breadth200: data.breadth200 ?? rotationMetrics.breadth200, rsSmall: data.rsSmall ?? rotationMetrics.rsSmall ?? data.rotation?.rsSmall, concentration: data.concentrationScore ?? rotationMetrics.concentrationScore, rotationConfidence: rotationConfirm.confidence, rotationQuality: rotationConfirm.quality, falseBreakRisk: rotationConfirm.falseBreakRisk, phaseConfirmation: phaseConfirmation.confidence ?? phaseConfirmation.score };
+const missingInputs = Object.entries(requiredCore).filter(([, value]) => !Number.isFinite(num(value, NaN))).map(([key]) => key);
+const ndxShortAvailable = available("ndx", "momentum5D");
+const spxShortAvailable = available("spx", "momentum5D");
 
 const absoluteRiskOff =
+rutShortAvailable && ndxShortAvailable &&
 russell5dReturn < -3 &&
 nasdaq5dReturn < -5;
 
 const broadMarketWeakness =
+rutShortAvailable && ndxShortAvailable && spxShortAvailable &&
 russell5dReturn < 0 &&
 nasdaq5dReturn < 0 &&
 sp5005dReturn < 0;
 
 const severeMarketBreakdown =
+rutShortAvailable && ndxShortAvailable &&
 russell5dReturn < -5 &&
 nasdaq5dReturn < -8;
 
@@ -420,15 +442,19 @@ RUSSELL ABSOLUTE STATE
 ===================================================== */
 
 const russellAbsoluteStrength =
+rutShortAvailable &&
 russell5dReturn > 1;
 
 const russellModerateStrength =
+rutShortAvailable &&
 russell5dReturn > 0;
 
 const russellAbsoluteWeakness =
+rutShortAvailable &&
 russell5dReturn < -1;
 
 const russellSevereWeakness =
+rutShortAvailable &&
 russell5dReturn < -3;
 
 
@@ -437,17 +463,21 @@ RUSSELL MOMENTUM STATE
 ===================================================== */
 
 const russellMomentumPositive =
+rutShortAvailable && rutMediumAvailable &&
 rutMomentum5D > 0 &&
 rutMomentum20D >= 0;
 
 const russellMomentumStrong =
+rutShortAvailable && rutMediumAvailable &&
 rutMomentum5D > 1 &&
 rutMomentum20D > 1;
 
 const russellMomentumAccelerating =
+rutAccelerationAvailable &&
 rutAcceleration > 0;
 
 const russellMomentumWeak =
+rutShortAvailable && rutMediumAvailable &&
 rutMomentum5D < 0 &&
 rutMomentum20D < 0;
 
@@ -474,11 +504,19 @@ ROTATION STATE
 ===================================================== */
 
 const rotationConfirmed =
+(
+rotationConfirmState === "BULLISH_CONFIRMED" ||
+(["CONFIRMED", "INSTITUTIONAL_CONFIRMATION"].includes(rotationConfirmState) && rotationConfirm.direction === "BULLISH")
+) &&
 rotationConfidence >= 70 &&
 rotationQuality >= 65 &&
 falseBreakRisk < 40;
 
 const rotationConstructive =
+(
+["BULLISH_CONFIRMED", "BULLISH_CONFIRMING"].includes(rotationConfirmState) ||
+(["CONFIRMED", "INSTITUTIONAL_CONFIRMATION"].includes(rotationConfirmState) && rotationConfirm.direction === "BULLISH")
+) &&
 rotationConfidence >= 60 &&
 rotationQuality >= 55 &&
 falseBreakRisk < 50;
@@ -507,19 +545,13 @@ STRUCTURAL RISK FLAGS
 ===================================================== */
 
 const prolongedDistribution =
-phasePersistence >= 60;
+history.prolongedDistribution === true;
 
 const prolongedBearRegime =
-regimePersistence >= 60 ||
-Boolean(
-data.phaseData?.drivers?.prolongedBearRegime
-);
+history.prolongedBearRegime === true;
 
 const severeBearRegime =
-regimePersistence >= 85 ||
-Boolean(
-data.phaseData?.drivers?.severeBearRegime
-);
+history.severeBearRegime === true;
 
 const broadParticipationFailure =
 relativeBreadthWeakness > 10;
@@ -656,10 +688,10 @@ structureScore -= 2;
 
 /* Concentration */
 
-if (concentration <= 1) {
+if (concentrationLevel <= 1) {
 structureScore += 1;
 }
-else if (concentration >= 3) {
+else if (concentrationLevel >= 3) {
 structureScore -= 1;
 }
 
@@ -952,18 +984,12 @@ riskScore -= 1;
 
 /* General momentum */
 
-if (priceMomentumScore < 40) {
-riskScore -= 1;
-}
-
-if (priceMomentumScore < 30) {
-riskScore -= 1;
-}
+// Aggregate Nasdaq-heavy price strength is not a Russell entry gate.
 
 
 /* Russell momentum */
 
-if (rutPriceScore < 40) {
+if (rutPriceComplete && rutPriceScore < 40) {
 riskScore -= 1;
 }
 
@@ -1048,8 +1074,7 @@ marketQualityScore >= 55 &&
 participationScore >= 55 &&
 
 rutPriceScore >= 50 &&
-
-priceMomentumScore >= 50;
+rutPriceComplete;
 
 
 /* =====================================================
@@ -1086,6 +1111,7 @@ RUSSELL HARD BLOCK
 ===================================================== */
 
 const russellLongBlocked =
+missingInputs.length > 0 ||
 absoluteRiskOff ||
 
 severeMarketBreakdown ||
@@ -1110,9 +1136,9 @@ participationScore < 40 ||
 
 phaseConfirmationScore < 30 ||
 
-priceMomentumScore < 30 ||
+!rutPriceComplete ||
 
-rutPriceScore < 30 ||
+(rutPriceComplete && rutPriceScore < 30) ||
 
 phase === "PHASE_5_BREAKDOWN" ||
 
@@ -1232,6 +1258,11 @@ Important for dashboard transparency.
 ===================================================== */
 
 const blockReasons: string[] = [];
+if (missingInputs.length) blockReasons.push("MISSING_CORE_INPUTS");
+if (!rutPriceComplete) blockReasons.push("RUSSELL_PRICE_DATA_INCOMPLETE");
+if (!rotationConfirmed) blockReasons.push("NO_BULLISH_ROTATION_CONFIRMATION");
+if (!russellRelativeStrength) blockReasons.push("NO_RUSSELL_RELATIVE_STRENGTH");
+if (!russellAbsoluteStrength) blockReasons.push("NO_RUSSELL_ABSOLUTE_STRENGTH");
 
 if (absoluteRiskOff) {
 blockReasons.push("ABSOLUTE_RISK_OFF");
@@ -1273,7 +1304,7 @@ if (participationScore < 40) {
 blockReasons.push("LOW_PARTICIPATION");
 }
 
-if (rutPriceScore < 30) {
+if (rutPriceComplete && rutPriceScore < 30) {
 blockReasons.push("WEAK_RUSSELL_MOMENTUM");
 }
 
@@ -1575,6 +1606,7 @@ BLOCK REASONS
 ================================================= */
 
 blockReasons,
+dataQuality: { complete: missingInputs.length === 0 && rutPriceComplete, missingInputs, priceComplete: rutPriceComplete, momentum5DAvailable: rutShortAvailable, momentum20DAvailable: rutMediumAvailable, accelerationAvailable: rutAccelerationAvailable, measured: { momentum5D: rutShortAvailable ? rutMomentum5D : null, momentum20D: rutMediumAvailable ? rutMomentum20D : null, acceleration: rutAccelerationAvailable ? rutAcceleration : null }, aggregatePriceUsedForEntry: false },
 
 
 /* =================================================
@@ -1750,6 +1782,7 @@ rsSmall,
 rsGrowth,
 
 concentration,
+concentrationLevel,
 
 crashProbability,
 
@@ -1760,3 +1793,4 @@ vix
 };
 
 }
+

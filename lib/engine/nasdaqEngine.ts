@@ -1,13 +1,20 @@
 // /lib/engine/nasdaqEngine.ts
 
 export function nasdaqEngine(data: any) {
+data = data ?? {};
+function finite(value: any, fallback: number): number {
+  if (value === null || value === undefined || typeof value === "boolean" || (typeof value === "string" && value.trim() === "")) return fallback;
+  if (typeof value === "object") return finite(value.value ?? value.score ?? value.current, fallback);
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
 
 /* =====================================================
 INPUT
 ===================================================== */
 
 const phase =
-data?.phase ?? "NEUTRAL";
+typeof data?.phase === "string" ? data.phase : data?.phase?.phase ?? "UNKNOWN";
 
 const crash =
 data?.crash ?? {};
@@ -116,16 +123,13 @@ regimeSync?.score ??
 );
 
 const executionScore =
-Number(
-executionState?.score ??
-50
-);
+finite(executionState?.score, NaN);
 
 const phaseConfidence =
 Number(
 master?.meta?.phaseConfidence ??
 phaseData?.confidence ??
-100
+0
 );
 
 
@@ -213,16 +217,16 @@ const severeParticipationErosion =
 participationDecay > 20;
 
 const leadershipConcentration =
-leadershipDecay <= -2;
+leadershipDecay >= 2;
 
 const prolongedDistribution =
-phasePersistence >= 60;
+historyMetrics.prolongedDistribution === true;
 
 const prolongedBearRegime =
-regimePersistence >= 60;
+historyMetrics.prolongedBearRegime === true;
 
 const severeBearRegime =
-regimePersistence >= 85;
+historyMetrics.severeBearRegime === true;
 
 const broadParticipationFailure =
 relativeBreadthWeakness > 10;
@@ -819,6 +823,13 @@ active = true;
 /* =====================================================
 HARD SAFETY BLOCK
 ===================================================== */
+const blockReasons: string[] = [];
+if (!/^PHASE_[1-7]_/.test(String(phase))) blockReasons.push("UNKNOWN_MARKET_PHASE");
+if (["CRISIS", "BREAKDOWN", "INTERNAL_BREAKDOWN"].includes(executionState.riskState)) blockReasons.push("LONG_RISK_BLOCK");
+if (!["BUILD_POSITION", "ADD_ON_PULLBACKS"].includes(executionState.executionMode)) blockReasons.push("LONG_EXECUTION_NOT_ALLOWED");
+const requiredInputs = { crashProbability: crash?.probability ?? data?.crashProbability, crashScore: crash?.score ?? data?.crashScore, rotationScore: rotation?.score, putScore: putTiming?.score, qualityScore: marketQuality?.score, participationScore: participation?.score, liquidityScore: liquidity?.score, breadthThrustScore: breadthThrust?.score, regimeSyncScore: regimeSync?.score };
+const missingInputs = Object.entries(requiredInputs).filter(([, value]) => !Number.isFinite(finite(value, NaN))).map(([key]) => key);
+if (missingInputs.length) blockReasons.push("MISSING_CORE_INPUTS");
 
 if (
 phase === "PHASE_3_DISTRIBUTION" ||
@@ -827,6 +838,7 @@ phase === "PHASE_5_BREAKDOWN" ||
 phase === "PHASE_6_ACCELERATION" ||
 phase === "PHASE_7_CAPITULATION"
 ) {
+blockReasons.push("HOSTILE_MARKET_PHASE");
 
 /*
 * A Nasdaq CALL may still receive
@@ -854,6 +866,7 @@ EXTREME CRASH BLOCK
 ===================================================== */
 
 if (crashProbability >= 55) {
+blockReasons.push("CRASH_RISK_LIMIT");
 
 active = false;
 
@@ -874,6 +887,7 @@ EXTREME PUT PRESSURE BLOCK
 ===================================================== */
 
 if (putScore >= 8) {
+blockReasons.push("PUT_PRESSURE_LIMIT");
 
 active = false;
 
@@ -892,6 +906,10 @@ note =
 /* =====================================================
 SIZE MULTIPLIER
 ===================================================== */
+if (blockReasons.length) {
+  active = false; decision = "NONE"; mode = "OFF"; execution = "NONE";
+  note = `Nasdaq CALL blocked: ${blockReasons.join(", ")}`;
+}
 
 let sizeMultiplier = 0;
 
@@ -958,6 +976,8 @@ note,
 sizeMultiplier,
 
 driver,
+blockReasons,
+dataQuality: { complete: missingInputs.length === 0, missingInputs, priceUsedForEntry: false },
 
 meta: {
 
@@ -985,7 +1005,13 @@ liquidityScore,
 
 regimeSyncScore,
 
-executionScore
+executionScore: Number.isFinite(executionScore) ? executionScore : null
+,
+executionMode: executionState.executionMode ?? "UNKNOWN",
+riskState: executionState.riskState ?? "UNKNOWN",
+putPressureThreshold: 8,
+putPressureMaxScore: finite(putTiming.maxScore, 24),
+confidenceIsProbability: false
 
 },
 
