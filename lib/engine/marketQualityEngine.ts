@@ -34,6 +34,7 @@ regimeSync?: any;
 export interface MarketQualityEngineOutput {
 
 score: number;
+diagnostics: Record<string, any>;
 
 marketIntegrity: number;
 
@@ -134,6 +135,7 @@ Math.min(max, value)
 export function marketQualityEngine(
 input: MarketQualityEngineInput
 ): MarketQualityEngineOutput {
+input = input ?? {};
 
 
 /* =====================================================
@@ -145,6 +147,7 @@ clamp(
 Number(
 input.breadth50 ??
 input.structure?.breadth?.b50?.value ??
+input.structure?.breadth?.b50 ??
 50
 )
 );
@@ -155,6 +158,7 @@ clamp(
 Number(
 input.breadth200 ??
 input.structure?.breadth?.b200?.value ??
+input.structure?.breadth?.b200 ??
 50
 )
 );
@@ -499,18 +503,10 @@ Math.round(
 );
 
 
-if (weakParticipation) {
-
-participationIntegrity -= 10;
-
-}
 
 
-if (divergenceScore >= 70) {
 
-participationIntegrity -= 8;
 
-}
 
 
 participationIntegrity =
@@ -545,25 +541,13 @@ Math.round(
 );
 
 
-if (breadth50 < 45) {
-
-breadthIntegrity -= 10;
-
-}
 
 
-if (breadth200 < 40) {
-
-breadthIntegrity -= 10;
-
-}
 
 
-if (divergenceScore >= 75) {
 
-breadthIntegrity -= 8;
 
-}
+
 
 
 breadthIntegrity =
@@ -592,18 +576,10 @@ rotationDecayScore * 0.28
 );
 
 
-if (rotationScore < 40) {
-
-rotationIntegrity -= 8;
-
-}
 
 
-if (divergenceScore >= 70) {
 
-rotationIntegrity -= 6;
 
-}
 
 
 rotationIntegrity =
@@ -626,28 +602,13 @@ Math.round(
 );
 
 
-if (narrowLeadership) {
-
-leadershipIntegrity -= 15;
-
-}
 
 
-if (institutionalDistortion) {
-
-leadershipIntegrity -= 18;
-
-}
 
 
-if (
-narrowLeadership &&
-rsEqual < 0.97
-) {
 
-leadershipIntegrity -= 10;
 
-}
+
 
 
 leadershipIntegrity =
@@ -670,52 +631,7 @@ Math.round(
 );
 
 
-liquidityIntegrity +=
-Math.round(
-(regimeSyncScore - 50) * 0.15
-);
-
-
-liquidityIntegrity -=
-Math.round(
-Math.max(
-0,
-fragilityScore - 50
-) * 0.35
-);
-
-
-if (
-liquidityEngineCharacter === "ILLUSION"
-) {
-
-liquidityIntegrity -= 14;
-
-}
-
-else if (
-liquidityEngineCharacter === "FRAGILE"
-) {
-
-liquidityIntegrity -= 8;
-
-}
-
-else if (
-liquidityEngineCharacter === "NARROW"
-) {
-
-liquidityIntegrity -= 5;
-
-}
-
-
-if (passiveDependence >= 70) {
-
-liquidityIntegrity -= 8;
-
-}
-
+// Derived regime, fragility and passive character remain diagnostics.
 
 liquidityIntegrity =
 clamp(
@@ -739,93 +655,12 @@ rotationIntegrity * 0.18 +
 leadershipIntegrity * 0.15 +
 
 liquidityIntegrity * 0.10;
+const weightedIntegrity = marketIntegrity;
+const warningCandidates = { divergence: divergenceScore >= 80 ? -12 : divergenceScore >= 65 ? -8 : divergenceScore >= 50 ? -4 : 0, passiveDependence: passiveDependence >= 75 ? -10 : passiveDependence >= 65 ? -6 : 0, fragility: fragilityScore >= 80 ? -10 : 0, leadership: narrowLeadership && weakParticipation ? -8 : 0 };
 
 
 
-/* =====================================================
-STRUCTURAL OVERLAYS
-===================================================== */
-
-/*
-* Divergence is a direct structural warning.
-*/
-
-if (divergenceScore >= 80) {
-
-marketIntegrity -= 12;
-
-}
-
-else if (divergenceScore >= 65) {
-
-marketIntegrity -= 8;
-
-}
-
-else if (divergenceScore >= 50) {
-
-marketIntegrity -= 4;
-
-}
-
-
-/*
-* Passive market structure.
-*/
-
-if (passiveDependence >= 75) {
-
-marketIntegrity -= 10;
-
-}
-
-else if (passiveDependence >= 65) {
-
-marketIntegrity -= 6;
-
-}
-
-
-/*
-* Strong synchronized expansion.
-*/
-
-if (
-strongParticipation &&
-leadershipBreadth >= 65 &&
-regimeSyncScore >= 60 &&
-divergenceScore < 35
-) {
-
-marketIntegrity += 5;
-
-}
-
-
-/*
-* Severe fragility.
-*/
-
-if (fragilityScore >= 80) {
-
-marketIntegrity -= 10;
-
-}
-
-
-/*
-* Internal leadership failure.
-*/
-
-if (
-narrowLeadership &&
-weakParticipation
-) {
-
-marketIntegrity -= 8;
-
-}
-
+// Shared warnings are retained in diagnostics, not added again.
 
 marketIntegrity =
 clamp(
@@ -1218,6 +1053,7 @@ RETURN
 return {
 
 score,
+diagnostics: { aggregationPolicy: "WEIGHTED_INTEGRITY_WITHOUT_SHARED_WARNING_OVERLAYS", weightedIntegrity, warningCandidates, preliminaryFragilityUsedForScore: false, weightsCalibratedByThisAudit: false },
 
 marketIntegrity,
 

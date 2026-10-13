@@ -30,6 +30,7 @@ export interface FragilityEngineInput {
 
 export interface FragilityEngineOutput {
   score: number;
+  diagnostics: Record<string, any>;
 
   state:
     | "RESILIENT"
@@ -244,6 +245,7 @@ ENGINE
 export function fragilityEngine(
   input: FragilityEngineInput
 ): FragilityEngineOutput {
+  input = input ?? {};
   /* =====================================================
   CURRENT DATA
   ===================================================== */
@@ -269,6 +271,7 @@ export function fragilityEngine(
 
   const rawGamma =
     safeNumber(input.gammaExposure, 0);
+  const measuredGamma = numericValue(input.gammaExposure);
 
   const correlation =
     safeNumber(input.correlationScore, 0);
@@ -353,8 +356,8 @@ export function fragilityEngine(
     input.historyMetrics ?? {};
 
   const h10 =
-    history.length >= 10
-      ? history[history.length - 10]
+    history.length > 10
+      ? history[history.length - 1 - 10]
       : null;
 
   const h20 =
@@ -372,7 +375,7 @@ export function fragilityEngine(
   ===================================================== */
 
   const historicalParticipation = getHistoryValue(
-    h10,
+    h10?.participation?.diagnostics?.aggregationPolicy === "STRONGEST_SHARED_LEADERSHIP_PENALTY" ? h10 : null,
     [
       "participationScore",
       "participation.score",
@@ -404,7 +407,7 @@ export function fragilityEngine(
   );
 
   const historicalQuality = getHistoryValue(
-    h10,
+    h10?.marketQuality?.diagnostics?.aggregationPolicy === "WEIGHTED_INTEGRITY_WITHOUT_SHARED_WARNING_OVERLAYS" ? h10 : null,
     [
       "marketQualityScore",
       "marketQuality.score"
@@ -518,8 +521,9 @@ export function fragilityEngine(
     structuralGammaFloor = 55;
   }
 
+  if (measuredGamma === null || rawGamma < 0) structuralGammaFloor = 0;
   const effectiveGamma =
-    Math.max(rawGamma, structuralGammaFloor);
+    rawGamma < 0 ? rawGamma : Math.max(rawGamma, structuralGammaFloor);
 
   /* =====================================================
   STRUCTURAL CONDITIONS
@@ -558,13 +562,7 @@ export function fragilityEngine(
   ===================================================== */
 
   const synchronizationFailure =
-    hasSynchronizationData
-      ? internalSynchronization === false
-      : (
-          weakParticipation &&
-          weakRotation &&
-          weakBreadthStructure
-        );
+    weakParticipation && weakRotation && weakBreadthStructure;
 
   /* =====================================================
   LIQUIDITY CONDITIONS
@@ -574,14 +572,12 @@ export function fragilityEngine(
     liquidity >= 65 &&
     (
       weakParticipation ||
-      narrowLeadership ||
-      marketQualityScore < 45
+      narrowLeadership
     );
 
   const liquidityIllusion =
     liquidity >= 68 &&
     (
-      marketQualityScore < 42 ||
       weakParticipation ||
       failedRotation ||
       megaCapOnlyTape
@@ -693,18 +689,25 @@ export function fragilityEngine(
   if (smallCapWeakness) concentrationRisk += 10;
 
   concentrationRisk = clamp(concentrationRisk);
+  const legacyConcentrationRisk = concentrationRisk;
+  concentrationRisk = Math.max(
+    narrowLeadership ? 30 + (severeNarrowLeadership ? 20 : 0) : 0,
+    megaCapOnlyTape ? 25 : 0,
+    (equalWeightWeakness ? 15 : 0) + (smallCapWeakness ? 10 : 0)
+  );
 
   /* =====================================================
   CORE STRUCTURAL RISK
 
-  Existing weights retained; total weight = 100%.
+  Relative weights retained for the remaining core inputs.
+  Excluding derived MarketQuality leaves 85%; normalize that sum.
   ===================================================== */
 
   const coreStructuralRisk = weightedAverage([
     { value: participationRisk, weight: 0.22 },
     { value: breadthRisk, weight: 0.20 },
     { value: rotationRisk, weight: 0.18 },
-    { value: marketQualityRisk, weight: 0.15 },
+    // MarketQuality aggregates these same inputs; diagnostic only.
     { value: liquidityRisk, weight: 0.08 },
     { value: concentrationRisk, weight: 0.10 },
     { value: crashProbability, weight: 0.07 }
@@ -782,6 +785,10 @@ export function fragilityEngine(
 
   gammaOverlay =
     clamp(gammaOverlay, 0, 8);
+  const estimatedGammaOverlay = gammaOverlay;
+  gammaOverlay = measuredGamma !== null && rawGamma < 0
+    ? clamp((rawGamma < 0 ? 3 : 0) + (rawGamma < -10 ? 3 : 0), 0, 8)
+    : 0;
 
   /* =====================================================
   VOLATILITY / CORRELATION OVERLAY / 10
@@ -831,18 +838,32 @@ export function fragilityEngine(
 
   historyOverlay =
     clamp(historyOverlay, 0, 25);
+  const legacyHistoryOverlay = historyOverlay;
+  // Historical scores from older versions do not independently validate risk.
+  // Shared regime-duration flags count as one strongest existing contribution.
+  historyOverlay = Math.max(
+    persistentDistribution ? 2 : 0,
+    prolongedBearRegime ? 2 : 0,
+    institutionalPressure > 60 ? 2 : 0,
+    acceleratingWeakness ? 2 : 0
+  ) + (breadthErosion ? 2 : 0) + (liquidityErosion ? 1 : 0) +
+    (participationDecayHistory > 20 ? 1 : 0) +
+    (breadthTrendHistory < -1 ? 1 : 0) +
+    (breadthAcceleration < -1 ? 2 : 0) +
+    (relativeBreadthWeakness > 10 ? 2 : 0) +
+    (crashTrend > 5 ? 2 : 0);
 
   /* =====================================================
   FINAL SCORE
 
-  Existing additive model retained.
-  Components expose saturation rather than concealing it.
+  Shared structural overlays are diagnostics, not additional core evidence.
+  Independent stress and grouped history remain score contributions.
   ===================================================== */
 
   const unclampedScore =
     coreStructuralRisk +
-    structuralOverlay +
-    liquidityOverlay +
+    // Structural flags are already represented by the core inputs.
+    Math.max(liquidityDependence ? 3 : 0, liquidityIllusion ? 4 : 0, latentFragility ? 2 : 0, passiveFragility ? 3 : 0, dealerCompression ? 2 : 0) +
     gammaOverlay +
     volatilityOverlay +
     historyOverlay;
@@ -1030,11 +1051,12 @@ export function fragilityEngine(
     structuralGammaFloor,
     effectiveGamma,
     summary,
+    diagnostics: { aggregationPolicy: "CORE_WITHOUT_DERIVED_QUALITY_OR_REPEATED_STRUCTURAL_OVERLAYS", marketQualityRiskDiagnostic: marketQualityRisk, marketQualityUsedForCoreScore: false, structuralOverlayDiagnostic: structuralOverlay, estimatedGammaOverlayDiagnostic: estimatedGammaOverlay, legacyConcentrationRisk, concentrationRisk, legacyHistoryOverlay, historicalModelScoreLevelsUsedForScoring: false, coreWeightSumBeforeNormalization: 0.85, weightsCalibratedByThisAudit: false },
 
     components: {
       coreStructuralRisk,
-      structuralOverlay,
-      liquidityOverlay,
+      structuralOverlay: 0,
+      liquidityOverlay: Math.max(liquidityDependence ? 3 : 0, liquidityIllusion ? 4 : 0, latentFragility ? 2 : 0, passiveFragility ? 3 : 0, dealerCompression ? 2 : 0),
       gammaOverlay,
       volatilityOverlay,
       historyOverlay,

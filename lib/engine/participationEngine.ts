@@ -115,6 +115,7 @@ export interface ParticipationEngineOutput {
   metrics: any;
 
   components: Record<string, number | boolean>;
+  diagnostics: Record<string, any>;
 
   dataQuality: {
     completeCurrentStructure: boolean;
@@ -345,6 +346,9 @@ export function participationEngine(
     offset: number,
     paths: string[]
   ): number | null {
+    if (seriesName === "participationHistory" && at(offset)?.participation?.diagnostics?.aggregationPolicy !== "STRONGEST_SHARED_LEADERSHIP_PENALTY") {
+      return null; // Do not report model revisions as measured participation changes.
+    }
     const series = historyMetrics[seriesName];
 
     if (
@@ -678,6 +682,10 @@ export function participationEngine(
         )
       : 0;
 
+  // Both penalties reuse the same leadership/breadth conditions.
+  // Keep their strongest existing deduction, rather than adding both.
+  const groupedLeadershipPenalty = Math.min(leadershipPenalty, passivePenalty);
+
   const components = {
     base: 60,
 
@@ -699,11 +707,11 @@ export function participationEngine(
 
     relativeBreadthPenalty,
     highLow,
-    leadershipPenalty,
-    passivePenalty,
+    leadershipPenalty: groupedLeadershipPenalty,
+    passivePenalty: 0,
 
     rotation:
-      Math.round((rotationScore - 50) * 0.10),
+      0, // Rotation is derived from overlapping structure; diagnostic only.
 
     breadthFailure:
       breadthFailure ? -12 : 0,
@@ -737,42 +745,19 @@ export function participationEngine(
     Math.round(beforeHistory)
   );
 
-  if (comparisons.participation_10d !== null) {
-    const decay =
-      measuredCurrentScore -
-      comparisons.participation_10d;
-
-    if (decay <= -15) {
-      components.velocityPenalty -= 8;
-    }
-
-    if (decay <= -25) {
-      components.velocityPenalty -= 6;
-    }
-  }
+  // Historical model-score velocity remains diagnostic only.
 
   /* ===================================================
   HISTORICAL OVERLAYS
   =================================================== */
 
-  if (participationPersistence < 40) {
-    components.historicalOverlay -= 6;
-  }
+  // Persistence/averages of this engine's own score are diagnostic only.
 
-  if (
-    measuredAverageParticipation &&
-    averageParticipation < 55
-  ) {
-    components.historicalOverlay -= 4;
-  }
+  
 
-  if (institutionalParticipationTrend < 45) {
-    components.historicalOverlay -= 5;
-  }
+  
 
-  if (participationAccelerationHistory < -10) {
-    components.historicalOverlay -= 5;
-  }
+  
 
   if (passiveFlowRisk > 25) {
     components.historicalOverlay -= 6;
@@ -991,6 +976,7 @@ export function participationEngine(
     leadershipBreadth,
 
     summary,
+    diagnostics: { aggregationPolicy: "STRONGEST_SHARED_LEADERSHIP_PENALTY", leadershipPenaltyCandidate: leadershipPenalty, passivePenaltyCandidate: passivePenalty, rotationContributionCandidate: Math.round((rotationScore - 50) * 0.10), historicalModelScoresUsedForScoring: false, weightsCalibratedByThisAudit: false },
 
     components: {
       ...components,
