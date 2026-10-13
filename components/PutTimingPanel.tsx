@@ -42,6 +42,16 @@ const summary =
 putTiming.summary ??
 "No structural short edge";
 
+const price = putTiming.price ?? {};
+const priceQuality = price.dataQuality ?? {};
+const priceComplete = priceQuality.complete === true;
+function priceValue(key: string, availability: string, percent = false) {
+  const value = priceQuality.measured?.[key];
+  return priceQuality[availability] === true && typeof value === "number" && Number.isFinite(value)
+    ? `${value >= 0 ? "+" : ""}${value.toFixed(2)}${percent ? "%" : ""}`
+    : "Not available";
+}
+
 
 /* =====================================================
 INFO BOX
@@ -657,7 +667,18 @@ label="Price Execution"
 value={priceComponent.value}
 max={priceComponent.max}
 bar={bar}
+available={priceComplete && putTiming.layers?.price?.available === true}
 />
+
+<div style={{ fontSize: "11px", color: priceComplete ? "#bbb" : "#faad14", marginBottom: "12px", lineHeight: 1.6 }}>
+  <div>{priceComplete ? "Price timing data complete" : "Price timing data incomplete"}</div>
+  <div>5D: {priceValue("momentum5D", "momentum5DAvailable", true)}</div>
+  <div>20D: {priceValue("momentum20D", "momentum20DAvailable", true)}</div>
+  <div>Acceleration: {priceValue("acceleration", "accelerationAvailable")}</div>
+  <div>Price state: {priceComplete ? price.state ?? "UNKNOWN" : "UNKNOWN"}</div>
+  <div>Structure alignment: {price.structureAlignment ?? "UNKNOWN"}</div>
+  {!priceComplete && <div>Structural bias remains separate from price entry confirmation.</div>}
+</div>
 
 
 <LayerRow
@@ -792,7 +813,8 @@ function LayerRow({
 label,
 value,
 max,
-bar
+bar,
+available = true
 }: any) {
 
 const safeValue =
@@ -830,7 +852,7 @@ fontSize: "12px"
 </span>
 
 <span>
-{safeValue}/{safeMax}
+{available ? `${safeValue}/${safeMax}` : "Not available"}
 </span>
 
 </div>
@@ -846,7 +868,7 @@ marginTop: "4px"
 
 <div
 style={bar(
-safeValue,
+available ? safeValue : 0,
 safeMax
 )}
 />
