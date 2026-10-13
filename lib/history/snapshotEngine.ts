@@ -648,6 +648,7 @@ export function createMarketSnapshot({
     },
 
     nasdaqCall: {
+      ...nasdaqCall,
       decision: nasdaqCall.decision,
       signal: nasdaqCall.signal,
       score: nasdaqCall.score,
@@ -656,6 +657,7 @@ export function createMarketSnapshot({
     },
 
     russell: {
+      ...russell,
       action: russell.action,
       decision: russell.decision,
       score: russell.score,
