@@ -56,6 +56,8 @@ export interface HistoryMetrics {
 
   // Chronological daily observations: oldest first, newest last.
   history: any[];
+  // Complete archive for inspection/reconstruction, never embed in snapshots.
+  archiveHistory: any[];
   breadth20History: Array<number | null>;
   breadth50History: Array<number | null>;
   breadth200History: Array<number | null>;
@@ -77,6 +79,7 @@ export interface HistoryMetrics {
       policy: "CONTIGUOUS_SAME_KNOWN_UNIVERSE";
       persistenceAvailability: { rotation: boolean; liquidity: boolean; fragility: boolean };
     };
+    historicalComponents: Record<string, { measuredObservations: number; maturity: number }>;
     priceAvailability: Record<string, { momentum5D: boolean; momentum20D: boolean; acceleration: boolean }>;
     rawSnapshots: number;
     validSnapshots: number;
@@ -127,21 +130,35 @@ const readers = {
   breadth50: (s: any) => read(s, ["structure.breadth.b50", "breadth50"]),
   breadth200: (s: any) => read(s, ["structure.breadth.b200", "breadth200"]),
   ad: (s: any) => read(s, ["structure.advanceDecline", "advanceDecline"]),
-  participation: (s: any) => read(s, ["participation.score", "participationScore"]),
-  rotation: (s: any) => read(s, ["rotation.score", "rotationScore"]),
-  liquidity: (s: any) => read(s, ["liquidity.score", "liquidityScore"]),
-  fragility: (s: any) => read(s, ["fragility.score", "fragilityScore"]),
-  leadership: (s: any) => read(s, ["participation.leadershipBreadth", "rotation.leadershipBreadth"]),
+  participation: (s: any) => modelCompatible(s, "participation", "STRONGEST_SHARED_LEADERSHIP_PENALTY")
+    ? read(s, ["participation.score", "participationScore"]) : null,
+  rotation: (s: any) => modelCompatible(s, "rotation", "STRUCTURAL_MODEL_2026_10_V3")
+    ? read(s, ["rotation.score", "rotationScore"]) : null,
+  liquidity: (s: any) => modelCompatible(s, "liquidity", "STRUCTURAL_MODEL_2026_10_V3")
+    ? read(s, ["liquidity.score", "liquidityScore"]) : null,
+  fragility: (s: any) => modelCompatible(s, "fragility", "CORE_WITHOUT_DERIVED_QUALITY_OR_REPEATED_STRUCTURAL_OVERLAYS")
+    ? read(s, ["fragility.score", "fragilityScore"]) : null,
+  leadership: (s: any) => modelCompatible(s, "participation", "STRONGEST_SHARED_LEADERSHIP_PENALTY")
+    ? read(s, ["participation.leadershipBreadth"]) :
+    modelCompatible(s, "rotation", "STRUCTURAL_MODEL_2026_10_V3")
+      ? read(s, ["rotation.leadershipBreadth"]) : null,
   crash: (s: any) => read(s, ["crash.probability", "crashProbability"]),
   master: (s: any) => read(s, ["master.score"]),
   highs: (s: any) => read(s, ["structure.highsLows.highs", "newHighs"]),
   danger: (s: any) => read(s, ["dangerZone.score"]),
   edge: (s: any) => read(s, ["edgeState.score"]),
-  decay: (s: any) => read(s, ["rotationDecay.score", "rotationDecayScore"]),
+  decay: (s: any) => modelCompatible(s, "rotationDecay", "STRUCTURAL_MODEL_2026_10_V3")
+    ? read(s, ["rotationDecay.score", "rotationDecayScore"]) : null,
   ndx: (s: any) => positive(read(s, ["indices.ndx", "indices.nasdaq", "indices.NASDAQ"])),
   spx: (s: any) => positive(read(s, ["indices.spx", "indices.sp500", "indices.SP500"])),
   rut: (s: any) => positive(read(s, ["indices.rut", "indices.russell", "indices.RUSSELL"]))
 };
+
+function modelCompatible(snapshot: any, component: string, policy: string): boolean {
+  const version = snapshot?.calculationVersions?.[component] ??
+    snapshot?.[component]?.diagnostics?.aggregationPolicy;
+  return version === policy;
+}
 
 function positive(value: number | null): number | null {
   return value !== null && value > 0 ? value : null;
@@ -404,6 +421,7 @@ export function historyEngine(
     highestRotation: rotationValues.length ? Math.max(...rotationValues) : 50,
     lowestRotation: rotationValues.length ? Math.min(...rotationValues) : 50,
     history: chronological,
+    archiveHistory: [...priceDaily].reverse(),
     breadth20History: series(readers.breadth20), breadth50History: series(readers.breadth50),
     breadth200History: series(readers.breadth200), advanceDeclineHistory: series(readers.ad),
     participationHistory: series(readers.participation), rotationDecayHistory: series(readers.decay),
@@ -411,6 +429,14 @@ export function historyEngine(
     ndxHistory: [...priceDaily].reverse().map(readers.ndx),
     rutHistory: [...priceDaily].reverse().map(readers.rut),
     dataQuality: {
+      historicalComponents: Object.fromEntries([
+        ["breadth", readers.breadth50], ["participation", readers.participation],
+        ["rotation", readers.rotation], ["liquidity", readers.liquidity],
+        ["fragility", readers.fragility]
+      ].map(([name, reader]) => {
+        const measuredObservations = values(reader as (s: any) => number | null).length;
+        return [name, { measuredObservations, maturity: measuredObservations / PERSISTENCE_OBSERVATIONS }];
+      })),
       universeCompatibility: {
         universeVersion,
         compatibleDailyObservations: daily.length,

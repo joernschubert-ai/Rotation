@@ -10,7 +10,6 @@ try {
 }
 
 const KEY = "marketHistory";
-const MAX_ITEMS = 120;
 const MAX_RETRIES = 5;
 
 /* =====================================================
@@ -130,9 +129,7 @@ function normalizeHistory(history: any[]): any[] {
     days.add(day);
     result.push(item.snapshot);
 
-    if (result.length === MAX_ITEMS) {
-      break;
-    }
+    // Keep the daily archive. Consumers select their own bounded windows.
   }
 
   return result;
@@ -191,11 +188,11 @@ LOAD
 
 export async function loadMarketHistory(): Promise<any[]> {
   if (
-    process.env.NODE_ENV === "development" ||
-    !redis
+    process.env.NODE_ENV === "development"
   ) {
     return [];
   }
+  if (!redis) throw new Error("Redis not available for history load");
 
   try {
     const data = await redis.get(KEY);
@@ -209,7 +206,7 @@ export async function loadMarketHistory(): Promise<any[]> {
       error
     );
 
-    return [];
+    throw error;
   }
 }
 
