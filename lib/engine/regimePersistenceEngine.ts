@@ -39,6 +39,7 @@ export interface RegimePersistenceEngineOutput {
   escalationBias: number;
 
   state:
+    | "INSUFFICIENT_HISTORY"
     | "STABLE"
     | "TRANSITION"
     | "PERSISTENT_WEAKNESS"
@@ -59,6 +60,7 @@ export interface RegimePersistenceEngineOutput {
   bullishPersistence: boolean;
 
   trend:
+    | "UNKNOWN"
     | "IMPROVING"
     | "STABLE"
     | "DETERIORATING";
@@ -75,6 +77,12 @@ export interface RegimePersistenceEngineOutput {
   falseRecoveryRisk: number;
   trendStability: number;
   marketFatigue: number;
+  dataQuality: {
+    trendAvailable: boolean;
+    persistenceWindowComplete: boolean;
+    measuredObservations: Record<string, number>;
+    numericFallbacksAreNotMeasurements: boolean;
+  };
 }
 
 /* =====================================================
@@ -180,6 +188,7 @@ TREND
 ===================================================== */
 
 type PersistenceTrend =
+  | "UNKNOWN"
   | "IMPROVING"
   | "STABLE"
   | "DETERIORATING";
@@ -193,13 +202,13 @@ function calculateTrend(
    * Missing values must not shift these windows.
    */
   if (history.length < 6) {
-    return "STABLE";
+    return "UNKNOWN";
   }
 
   const window = history.slice(-6);
 
   if (window.some(value => value === null)) {
-    return "STABLE";
+    return "UNKNOWN";
   }
 
   const values = window as number[];
@@ -384,7 +393,9 @@ export function regimePersistenceEngine(
   ).length;
 
   const trend: PersistenceTrend =
-    deterioratingSignals >= 2
+    trends.filter(value => value !== "UNKNOWN").length < 2
+      ? "UNKNOWN"
+      : deterioratingSignals >= 2
       ? "DETERIORATING"
       : improvingSignals >= 2
       ? "IMPROVING"
@@ -394,7 +405,7 @@ export function regimePersistenceEngine(
   STABILITY / FATIGUE
   =================================================== */
 
-  const trendStability = clamp(
+  const trendStability = trend === "UNKNOWN" ? 50 : clamp(
     50 +
     persistentWeaknessDays * 1.5 +
     (trend === "DETERIORATING" ? 15 : 0) +
@@ -454,6 +465,8 @@ export function regimePersistenceEngine(
   if (distributionRisk > 60) recoveryQuality -= 15;
 
   recoveryQuality = clamp(recoveryQuality);
+  // Current healthy levels alone do not demonstrate a recovery trajectory.
+  if (trend === "UNKNOWN") recoveryQuality = Math.min(recoveryQuality, 50);
 
   /* ===================================================
   FALSE RECOVERY RISK
@@ -558,6 +571,7 @@ export function regimePersistenceEngine(
     falseRecoveryRisk * 0.15;
 
   if (
+    trend !== "UNKNOWN" &&
     recoveryQuality > 75 &&
     !persistentBreadthDecay &&
     !persistentParticipationFailure
@@ -591,11 +605,14 @@ export function regimePersistenceEngine(
   ) {
     state = "TRANSITION";
   } else {
-    state = "STABLE";
+    state = trend === "UNKNOWN" ? "INSUFFICIENT_HISTORY" : "STABLE";
   }
 
   let summary =
     "Market regime stable without persistent deterioration";
+  if (state === "INSUFFICIENT_HISTORY") {
+    summary = "Insufficient comparable history | current risk assessed without confirmed stability";
+  }
 
   if (state === "TRANSITION") {
     summary =
@@ -610,6 +627,9 @@ export function regimePersistenceEngine(
   if (state === "STRUCTURAL_DISTRIBUTION") {
     summary =
       "Persistent institutional distribution regime detected";
+  }
+  if (trend === "UNKNOWN" && state !== "INSUFFICIENT_HISTORY") {
+    summary += " | Comparable trend history unavailable";
   }
 
   /* ===================================================
@@ -646,6 +666,19 @@ export function regimePersistenceEngine(
     recoveryQuality: Math.round(recoveryQuality),
     falseRecoveryRisk: Math.round(falseRecoveryRisk),
     trendStability: Math.round(trendStability),
-    marketFatigue: Math.round(marketFatigue)
+    marketFatigue: Math.round(marketFatigue),
+    dataQuality: {
+      trendAvailable: trend !== "UNKNOWN",
+      persistenceWindowComplete: [breadth50History, breadth200History, participationHistory, rotationDecayHistory]
+        .every(series => series.length === PERSISTENCE_OBSERVATIONS && series.every(value => value !== null)),
+      measuredObservations: {
+        breadth50: breadth50History.filter(value => value !== null).length,
+        breadth200: breadth200History.filter(value => value !== null).length,
+        participation: participationHistory.filter(value => value !== null).length,
+        rotationDecay: rotationDecayHistory.filter(value => value !== null).length,
+        internalDivergence: internalDivergenceHistory.filter(value => value !== null).length
+      },
+      numericFallbacksAreNotMeasurements: true
+    }
   };
 }

@@ -134,7 +134,10 @@ export function marketEngine(
     creditDataQuality: data.creditDataQuality
   };
 
-  const historyMetrics = data.historyMetrics ?? historyEngine(data.history ?? []);
+  const historyContext = {
+    universeVersion: data.breadthDataQuality?.universeVersion ?? null
+  };
+  const historyMetrics = data.historyMetrics ?? historyEngine(data.history ?? [], historyContext);
 
   /* =====================================================
   HISTORY ACCESS
@@ -144,7 +147,7 @@ export function marketEngine(
   const history =
     Array.isArray(historyMetrics?.history)
       ? historyMetrics.history
-      : historyEngine(data.history ?? []).history;
+      : historyEngine(data.history ?? [], historyContext).history;
 
   function getHistoryValue(
     offset: number,
