@@ -68,7 +68,10 @@ evidence: AIResearchHistoricalEvidence
 ): AIResearchReport {
 
 const interpretation =
-interpretAIHistoricalEvidence(evidence);
+interpretAIHistoricalEvidence({
+  ...evidence,
+  currentStates: evidence.currentStates.filter(state => state.comparable),
+});
 
 /*
 * Always attach the structured evidence.
@@ -176,27 +179,8 @@ historicalFinding(finding)
 }
 
 } else {
-
-/*
-* For NEUTRAL/MIXED bias, historical direction
-* cannot be classified as supporting a thesis.
-*/
-
-for (
-const finding of [
-...interpretation.supportingObservations,
-...interpretation.counterObservations,
-]
-) {
-counterEvidence.push(
-historicalFinding(
-"Descriptive context without a clear " +
-"directional structural thesis. " +
-finding
-)
-);
-}
-
+// Neutral/mixed theses have no direction to support or contradict.
+// Descriptive findings remain in historicalEvidence and the report summary.
 }
 
 /* =================================================

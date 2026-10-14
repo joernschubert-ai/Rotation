@@ -42,6 +42,17 @@ COT TRADER GROUPS
 * useful when participant groups diverge.
 */
 
+// Fixed index contracts. Do not substitute sectors, dividends, real estate or micros.
+// Primary consolidated series and concrete standard/mini fallbacks are not spliced.
+// CFTC financial futures report: https://www.cftc.gov/dea/futures/financial_lf.htm
+const INDEX_CONTRACT_CODES: Partial<Record<COTMarket, string[]>> = {
+  NASDAQ: ["20974+", "209742", "209741"],
+  SP500: ["13874+", "13874A", "138741"],
+  RUSSELL_2000: ["239742"],
+  DOW: ["12460+", "124603"],
+};
+const ALL_INDEX_CODES = Object.values(INDEX_CONTRACT_CODES).flatMap(codes => codes ?? []);
+
 const COT_TRADER_GROUPS:
 COTTraderGroup[] = [
 "DEALER",
@@ -368,88 +379,6 @@ timestamp
 MARKET DETECTION
 ===================================================== */
 
-function detectMarket(
-contractName:
-string
-): COTMarket | null {
-const normalized =
-contractName
-.toUpperCase()
-.trim();
-
-
-/*
-* Market detection remains intentionally broad here.
-*
-* IMPORTANT:
-*
-* Broad detection is now safe because this step only
-* classifies possible candidates.
-*
-* It no longer decides which concrete CFTC contract
-* becomes the historical market series.
-*
-* Contract selection happens later using stable
-* contract identity, history coverage and liquidity.
-*/
-
-
-/*
-* Russell before generic index names.
-*/
-
-if (
-normalized.includes(
-"RUSSELL"
-)
-) {
-return "RUSSELL_2000";
-}
-
-
-/*
-* Nasdaq.
-*/
-
-if (
-normalized.includes(
-"NASDAQ"
-)
-) {
-return "NASDAQ";
-}
-
-
-/*
-* S&P.
-*/
-
-if (
-normalized.includes(
-"S&P"
-)
-) {
-return "SP500";
-}
-
-
-/*
-* Dow.
-*/
-
-if (
-normalized.includes(
-"DOW"
-)
-) {
-return "DOW";
-}
-
-
-return null;
-}
-
-
 /* =====================================================
 TRADER GROUP MAPPING
 ===================================================== */
@@ -569,17 +498,17 @@ fields.spread
 : null;
 
 if (
-long === null &&
-short === null
+long === null ||
+short === null || long < 0 || short < 0
 ) {
 return null;
 }
 
 const safeLong =
-long ?? 0;
+long;
 
 const safeShort =
-short ?? 0;
+short;
 
 return {
 traderGroup,
@@ -675,10 +604,8 @@ if (
 return null;
 }
 
-const market =
-detectMarket(
-contractName
-);
+const code = normalizeContractCode(record.cftc_contract_market_code);
+const market = code ? (Object.entries(INDEX_CONTRACT_CODES).find(([, codes]) => codes?.includes(code))?.[0] as COTMarket | undefined) : undefined;
 
 if (
 !market
@@ -801,7 +728,7 @@ url.searchParams.set(
 
 url.searchParams.set(
 "$where",
-`report_date_as_yyyy_mm_dd >= '${startDate}'`
+`report_date_as_yyyy_mm_dd >= '${startDate}' AND cftc_contract_market_code in (${ALL_INDEX_CODES.map(code => "'" + code + "'").join(',')})`
 );
 
 const controller =
@@ -859,6 +786,7 @@ throw new Error(
 );
 }
 
+if (json.length >= 5000) throw new Error("CFTC result reached the row limit; refusing a potentially truncated series.");
 return json
 .filter(
 (
@@ -993,7 +921,7 @@ const marketObservations =
 observations.filter(
 observation =>
 observation.market ===
-market
+market && (INDEX_CONTRACT_CODES[market] ?? []).includes(observation.contract.cftcCode ?? "")
 );
 
 const grouped =
@@ -1148,12 +1076,11 @@ CONTRACT-SERIES SELECTION
 *
 * Selection priorities:
 *
-* 1. Historical coverage
-* 2. Latest available report date
-* 3. Latest open interest
-* 4. Average open interest
+* 1. Fixed index-contract preference
+* 2. Historical coverage within that identity
+* 3. Latest report and open interest
 *
-* Historical coverage deliberately comes first.
+* Contract identity deliberately comes first.
 *
 * AI Research needs a stable 52-week positioning series.
 * A newly introduced contract with very high open
@@ -1168,6 +1095,9 @@ ContractSeriesCandidate,
 b:
 ContractSeriesCandidate
 ): number {
+const priorities = INDEX_CONTRACT_CODES[a.market] ?? [];
+const priorityDifference = priorities.indexOf(a.cftcCode ?? "") - priorities.indexOf(b.cftcCode ?? "");
+if (priorityDifference !== 0) return priorityDifference;
 if (
 a.uniqueReportDates !==
 b.uniqueReportDates
@@ -1265,8 +1195,13 @@ warnings.push(
 continue;
 }
 
-const chosen =
-candidates[0];
+const chosen = candidates[0];
+const reportTime = Date.parse(chosen.latestReportDate);
+if (!Number.isFinite(reportTime) || reportTime > Date.now() || Date.now() - reportTime > 14 * 86400000) {
+  warnings.push(market + ": selected contract is future-dated or older than 14 calendar days; not used in current positioning.");
+  continue;
+}
+warnings.push(market + ": fixed index-contract policy selected " + chosen.cftcCode + " | " + chosen.contractName + "; observation date " + chosen.latestReportDate + ". Publication timestamp is not supplied.");
 
 
 /*
@@ -1453,7 +1388,7 @@ previous
 
 if (
 currentContractIdentity ===
-previousContractIdentity
+previousContractIdentity && getObservationTimestamp(observation) - getObservationTimestamp(previous) === 7 * 86400000
 ) {
 const groups =
 Object.keys(
@@ -1582,7 +1517,7 @@ Math.max(
 Math.min(
 260,
 Math.round(
-input.lookbackWeeks ??
+typeof input.lookbackWeeks === "number" && Number.isFinite(input.lookbackWeeks) ? input.lookbackWeeks :
 DEFAULT_LOOKBACK_WEEKS
 )
 )

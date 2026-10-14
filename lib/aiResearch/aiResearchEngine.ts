@@ -1236,7 +1236,7 @@ data: ExtractedSnapshot
 ): boolean {
 
 const structuralRisk =
-data.masterScore >= 65 &&
+determineStructuralBias(data) === "BEARISH" &&
 isStructuralBreakdown(data);
 
 return (
@@ -2800,55 +2800,14 @@ summary:
 STRUCTURAL BIAS
 ===================================================== */
 
-function determineStructuralBias(
-data: ExtractedSnapshot
-): AIResearchStructuralBias {
-
-if (
-data.masterScore >= 65
-) {
-
-return "BEARISH";
-
+function determineStructuralBias(data: ExtractedSnapshot): AIResearchStructuralBias {
+  // Structural direction and price behaviour are separate research layers.
+  // Existing structural predicates are retained; no new numeric thresholds.
+  const weakInternals = isStructuralBreakdown(data);
+  if (data.masterScore <= 35) return weakInternals ? "MIXED" : "BULLISH";
+  if (data.masterScore >= 65 || weakInternals) return "BEARISH";
+  return "NEUTRAL";
 }
-
-
-if (
-data.masterScore <= 35
-) {
-
-return "BULLISH";
-
-}
-
-
-const bearishInternals =
-data.fragilityScore >= 70 ||
-isWeakParticipation(data) ||
-isPoorMarketQuality(data) ||
-data.internalDivergenceScore >= 60 ||
-data.rotationConfirmState ===
-"INTERNAL_BREAKDOWN";
-
-
-const constructivePrice =
-isNasdaqPriceConstructive(data);
-
-
-if (
-bearishInternals &&
-constructivePrice
-) {
-
-return "MIXED";
-
-}
-
-
-return "NEUTRAL";
-
-}
-
 
 /* =====================================================
 EVIDENCE HELPERS
@@ -5033,7 +4992,7 @@ evidence,
 summary:
 [
 `Structural bias ${structuralBias}.`,
-`Independent confirmation ${confirmation}.`,
+`Cross-family confirmation (heuristic) ${confirmation}.`,
 `Contradiction ${contradiction}.`,
 `Entry maturity ${entryMaturity}.`,
 `Research opportunity state ${opportunityState}.`,
@@ -6215,10 +6174,10 @@ horizonDays:
 5,
 
 confirmationCondition:
-"Master Score remains >= 65 and price begins to confirm existing structural weakness without material improvement in breadth, participation or liquidity.",
+"At the next 5 trading-day review, Nasdaq return from this snapshot is negative and participation, liquidity and rotation confirmation have not recovered. Master Score >= 65 is additional evidence, not a prerequisite.",
 
 invalidationCondition:
-"Master Score falls below 50 together with improving breadth, participation, market quality and liquidity.",
+"At the next 5 trading-day review, Nasdaq return from this snapshot is non-negative, or rotation recovers from breakdown while participation and liquidity both improve. This weakens or invalidates the downside hypothesis.",
 
 confidence:
 evidenceAssessment.confirmation ===
@@ -6302,6 +6261,15 @@ confidence:
 
 }
 
+
+if (claims.length === 0) {
+  claims.push({
+    claim: "No directional edge is established. Review whether this mixed/neutral regime resolves toward recovery or further structural deterioration; this is a monitoring hypothesis, not an entry signal.",
+    expectedDirection: "UNKNOWN", horizonDays: 5, confidence: 0,
+    confirmationCondition: "After 5 trading days, Nasdaq snapshot-to-review return is non-negative, participation and liquidity both exceed their snapshot values, and rotation is not in INTERNAL_BREAKDOWN.",
+    invalidationCondition: "After 5 trading days, Nasdaq snapshot-to-review return is negative, participation and liquidity do not improve, and rotation remains in INTERNAL_BREAKDOWN. Mixed outcomes remain unresolved.",
+  });
+}
 
 return claims;
 
