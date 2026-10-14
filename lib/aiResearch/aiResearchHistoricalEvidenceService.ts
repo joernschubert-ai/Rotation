@@ -231,7 +231,7 @@ return evidence;
 PUBLIC SERVICE
 ===================================================== */
 
-export async function loadAIResearchHistoricalEvidence():
+async function loadCachedHistoricalEvidence():
 Promise<AIResearchHistoricalEvidence> {
 const now = Date.now();
 
@@ -286,5 +286,61 @@ pendingCalculation = null;
 })();
 
 return pendingCalculation;
+}
+
+
+/* A per-request view of the cache. Never change the shared historical result.
+ * The cache creation time is not the market observation time.
+ * This is descriptive comparison, not point-in-time historical backtesting.
+ */
+export async function loadAIResearchHistoricalEvidence(
+  snapshotTimestamp?: string
+): Promise<AIResearchHistoricalEvidence> {
+  const evidence = await loadCachedHistoricalEvidence();
+  if (!snapshotTimestamp) return evidence;
+  const timestamp = Date.parse(snapshotTimestamp);
+  if (!Number.isFinite(timestamp)) {
+    return unavailableEvidence("Historical comparison requires a valid snapshot timestamp.");
+  }
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(timestamp));
+  const part = (name: string) => parts.find(item => item.type === name)?.value ?? "";
+  const snapshotDay = `${part("year")}-${part("month")}-${part("day")}`;
+  const dateKey = (value: string | null): string | null => {
+    if (!value || !/^\d{4}-\d{2}-\d{2}(?:$|T)/.test(value)) return null;
+    const day = value.slice(0, 10);
+    const parsed = Date.parse(`${day}T00:00:00Z`);
+    return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === day ? day : null;
+  };
+  // A later dataset can contain outcomes that did not exist at snapshot time.
+  // Refuse to reuse it for an older snapshot rather than claim lookahead safety.
+  if ([evidence.asOfDate, evidence.lastDate].some(value => {
+    const day = dateKey(value); return day !== null && day > snapshotDay;
+  })) return unavailableEvidence("Historical dataset is later than the snapshot date; point-in-time comparison is unavailable.");
+
+  const timingNote = `Historical dataset as of ${evidence.asOfDate ?? "UNKNOWN"}; last historical day ${evidence.lastDate ?? "UNKNOWN"}; snapshot market date ${snapshotDay}. Daily matching does not establish intraday confirmation or publication-time availability.`;
+  const currentStates = evidence.currentStates.map(state => {
+    const sameDay = dateKey(state.asOfDate) === snapshotDay;
+    return { ...state, comparable: state.comparable && sameDay,
+      limitations: [...state.limitations, timingNote,
+        ...(sameDay ? [] : ["This state is not dated to the snapshot market day; do not treat it as a current-state match."])],
+    };
+  });
+  const matched = currentStates.filter(state => state.comparable).length;
+  return {
+    ...evidence,
+    status: evidence.status === "AVAILABLE" && matched < currentStates.length ? "PARTIAL" : evidence.status,
+    currentStates,
+    observations: evidence.observations.map(observation => ({
+      ...observation, limitations: [...observation.limitations, timingNote],
+    })),
+    diagnostics: {
+      ...evidence.diagnostics,
+      matchedCurrentStates: matched,
+      unmatchedCurrentStates: currentStates.length - matched,
+      warnings: [...evidence.diagnostics.warnings, timingNote],
+    },
+  };
 }
 
