@@ -30,9 +30,21 @@ const score = Math.max(
 0,
 Math.min(
 100,
-Number(master.score ?? 0)
+Number.isFinite(Number(master.score)) && master.score !== null
+? Number(master.score)
+: 50
 )
 );
+
+// Classification belongs to the Master Engine, including its phase thresholds.
+const declaredSignal = master.signal ?? master.meta?.signal;
+const masterSignal = ["CALL", "NEUTRAL", "PUT"].includes(declaredSignal)
+  ? declaredSignal
+  : "UNKNOWN";
+const putThreshold = Number(master.meta?.putThreshold ??
+  (marketPhase === "PHASE_3_DISTRIBUTION" ? 75 : 65));
+const callThreshold = Number(master.meta?.callThreshold ?? 35);
+const callAllowed = master.meta?.callAllowed !== false;
 
 /* =====================================================
 COLOR SYSTEM
@@ -72,15 +84,15 @@ MASTER SCORE COLOR
 
 function getScoreColor(value: number) {
 
-if (value >= 65) {
+if (masterSignal === "PUT") {
   return COLORS.red;
 }
 
-if (value >= 36) {
+if (masterSignal === "NEUTRAL") {
   return COLORS.yellow;
 }
 
-return COLORS.green;
+return masterSignal === "CALL" ? COLORS.green : COLORS.textMuted;
 
 }
 
@@ -90,15 +102,15 @@ MASTER SCORE LABEL
 
 function getScoreLabel(value: number) {
 
-if (value <= 35) {
+if (masterSignal === "CALL") {
   return "CALL / CONSTRUCTIVE";
 }
 
-if (value <= 64) {
+if (masterSignal === "NEUTRAL") {
   return "NEUTRAL / TRANSITION";
 }
 
-return "PUT / DEFENSIVE";
+return masterSignal === "PUT" ? "PUT / DEFENSIVE" : "UNKNOWN";
 
 }
 
@@ -108,15 +120,15 @@ MASTER SCORE DESCRIPTION
 
 function getScoreDescription(value: number) {
 
-if (value <= 35) {
+if (masterSignal === "CALL") {
   return "Constructive market structure";
 }
 
-if (value <= 64) {
-  return "No clear directional edge";
+if (masterSignal === "NEUTRAL") {
+  return "Transition | no directional Master signal";
 }
 
-return "Defensive market structure";
+return masterSignal === "PUT" ? "Defensive market structure" : "Master classification unavailable";
 
 }
 
@@ -269,9 +281,7 @@ SIGNAL
 ===================================================== */
 
 const signalFromMaster =
-master.signal ??
-signal?.type ??
-"NO SIGNAL";
+masterSignal;
 
 function getSignalColor(type: string) {
 
@@ -406,10 +416,10 @@ const action =
   String(globalDecision)
     .toUpperCase();
 
-if (
-  action.includes("MAX")
-) {
-  return "FULL POSITION";
+const producedExecution = decision?.execution;
+if (typeof producedExecution === "string") return producedExecution.replaceAll("_", " ");
+if (producedExecution && typeof producedExecution.mode === "string") {
+  return producedExecution.mode.replaceAll("_", " ");
 }
 
 if (
@@ -1291,7 +1301,7 @@ return (
           "5px",
 
         background:
-          "linear-gradient(to right, #52c41a 0%, #52c41a 35%, #fadb14 35%, #fadb14 65%, #ff4d4f 65%, #ff4d4f 100%)",
+          `linear-gradient(to right, ${callAllowed ? "#52c41a" : "#fadb14"} 0%, ${callAllowed ? "#52c41a" : "#fadb14"} ${callThreshold}%, #fadb14 ${callThreshold}%, #fadb14 ${putThreshold}%, #ff4d4f ${putThreshold}%, #ff4d4f 100%)`,
 
         borderRadius:
           "3px",
@@ -1564,7 +1574,7 @@ return (
     />
 
     <MetricCard
-      label="Net Exposure"
+      label="Regime Exposure"
       value={`${Number(
         master.netExposure ?? 0
       )}%`}
@@ -1866,7 +1876,7 @@ return (
       <div style={gridStyle}>
 
         <MetricCard
-          label="Current Quality"
+          label="Current Risk"
           value={`${currentQuality}/100`}
           color={
             getRiskColor(
@@ -1876,7 +1886,7 @@ return (
         />
 
         <MetricCard
-          label="Structural Quality"
+          label="Structural Risk"
           value={`${structuralQuality}/100`}
           color={
             getRiskColor(
@@ -1886,7 +1896,7 @@ return (
         />
 
         <MetricCard
-          label="Historical Quality"
+          label="Historical Risk"
           value={`${historicalQuality}/100`}
           color={
             getRiskColor(
