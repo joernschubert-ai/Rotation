@@ -29,6 +29,9 @@ structureFlags,
 }: any) {
 if (!rotation) return null;
 
+// Prefer supplied flags; use actual Rotation output rather than invented health.
+const effectiveFlags = { ...rotation, ...(structureFlags ?? {}) };
+
 /* ==========================================================
 HELPERS
 ========================================================== */
@@ -255,7 +258,7 @@ confirmParticipation
 const narrowLeadershipRisk =
 Boolean(
 rotationDecay?.narrowLeadershipRisk ??
-structureFlags?.narrowLeadership
+effectiveFlags?.narrowLeadership
 );
 
 const narrowLeadershipScore =
@@ -303,47 +306,48 @@ STRUCTURE FLAGS
 
 const severeNarrowLeadership =
 Boolean(
-structureFlags?.severeNarrowLeadership
+effectiveFlags?.severeNarrowLeadership
 );
 
 const megaCapDominance =
 Boolean(
-structureFlags?.megaCapDominance
+effectiveFlags?.megaCapDominance
 );
 
 const severeMegaCapDominance =
 Boolean(
-structureFlags?.severeMegaCapDominance
+effectiveFlags?.severeMegaCapDominance
 );
 
 const equalWeightWeakness =
 Boolean(
-structureFlags?.equalWeightWeakness
+effectiveFlags?.equalWeightWeakness
 );
 
 const smallCapWeakness =
 Boolean(
-structureFlags?.smallCapWeakness
+effectiveFlags?.smallCapWeakness
 );
 
 const weakParticipation =
 Boolean(
-structureFlags?.weakParticipation
+effectiveFlags?.weakParticipation
 );
 
 const breadthFailure =
 Boolean(
-structureFlags?.breadthFailure
+effectiveFlags?.breadthFailure
 );
 
 const hiddenDistribution =
 Boolean(
-structureFlags?.hiddenDistribution
+effectiveFlags?.hiddenDistribution
 );
 
 const structureState =
-structureFlags?.structureState ??
-"BALANCED";
+effectiveFlags?.structureState ??
+(effectiveFlags.breadthFailure === true ? "STRUCTURAL WEAKNESS" :
+ effectiveFlags.narrowLeadership === true ? "NARROW LEADERSHIP" : "UNKNOWN");
 
 /* ==========================================================
 DOMINANCE

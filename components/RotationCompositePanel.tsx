@@ -115,6 +115,8 @@ return metricColor(
 }
 
 function stateColor() {
+if (["BEARISH_CONFIRMING", "BEARISH_CONFIRMED"].includes(rotationConfirm?.state)) return "#ff7875";
+if (["BULLISH_CONFIRMING", "BULLISH_CONFIRMED"].includes(rotationConfirm?.state)) return "#52c41a";
 
 const state =
 rotationConfirm?.state ??
@@ -307,6 +309,7 @@ const momentumQuality =
 clamp(
 Number(
 rotationConfirm?.momentumQuality ??
+rotationDecay?.momentumQuality ??
 50
 )
 );
@@ -346,6 +349,10 @@ HEADER LABEL
 ===================================================== */
 
 function headerLabel() {
+if (confirmState === "BEARISH_CONFIRMING") return "BEARISH ROTATION BUILDING";
+if (confirmState === "BEARISH_CONFIRMED") return "BEARISH ROTATION CONFIRMED";
+if (confirmState === "BULLISH_CONFIRMING") return "BULLISH ROTATION BUILDING";
+if (confirmState === "BULLISH_CONFIRMED") return "BULLISH ROTATION CONFIRMED";
 
 if (
 confirmState ===
