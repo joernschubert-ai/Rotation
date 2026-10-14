@@ -4,6 +4,9 @@ import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import type { Redis as RedisType } from "@upstash/redis";
 
+// Must exist before GET performs its first index fetch.
+const indexObservationQuality = new WeakMap<number[], Record<string, any>>();
+
 import {
 loadMarketHistory
 } from "@/lib/history/marketHistory";
@@ -2416,8 +2419,6 @@ return [];
 
 }
 }
-
-const indexObservationQuality = new WeakMap<number[], Record<string, any>>();
 
 function buildPriceMetrics(closes: number[]) {
 const metrics = buildLegacyPriceMetrics(closes);
