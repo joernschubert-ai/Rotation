@@ -710,6 +710,9 @@ return "UNRESOLVED";
 }
 
 
+// Negation, forecasts and conditional headlines do not establish observed direction.
+if (/\b(no|not|never|without|unlikely|may|might|could|would|expects?|expected|forecast|if)\b/.test(text)) return "UNRESOLVED";
+
 const bullishMatches =
 countMatches(
 text,
@@ -861,26 +864,6 @@ return "BULLISH";
 if (
 bearishMatches > 0 &&
 bullishMatches === 0
-) {
-
-return "BEARISH";
-
-}
-
-
-if (
-bullishMatches > bearishMatches &&
-bullishMatches >= 2
-) {
-
-return "BULLISH";
-
-}
-
-
-if (
-bearishMatches > bullishMatches &&
-bearishMatches >= 2
 ) {
 
 return "BEARISH";
@@ -1305,7 +1288,8 @@ PUBLIC EXTERNAL EVIDENCE BUILDER
 
 export function buildExternalEvidence(
 sources: AIResearchSource[],
-structuralBias: AIResearchStructuralBias
+structuralBias: AIResearchStructuralBias,
+referenceTime: string = new Date().toISOString()
 ): AIResearchEvidenceBlock {
 
 if (
@@ -1337,6 +1321,18 @@ evidence:
 }
 
 
+// Only dated sources available at the snapshot time can support this report.
+const suppliedCount = sources.length;
+const asOf = Date.parse(referenceTime);
+const seen = new Set<string>();
+sources = sources.filter(source => {
+  const published = Date.parse(source.publishedAt ?? "");
+  if (!Number.isFinite(asOf) || !Number.isFinite(published) || published > asOf || asOf - published > 7 * 86400000) return false;
+  const key = normalizeText(source.title);
+  if (!key || seen.has(key)) return false;
+  seen.add(key);
+  return true;
+});
 const interpretations =
 sources.map(
 (source) =>
@@ -1353,8 +1349,21 @@ item.usable
 );
 
 
+// Keep at most one directional contribution per topic. Repeated headlines
+// are not additional independent confirmations; opposing reports stay unresolved.
+const topicDirections = new Map<ExternalTopic, Set<string>>();
+for (const item of usable) {
+  if (item.direction !== "BULLISH" && item.direction !== "BEARISH") continue;
+  const directions = topicDirections.get(item.topic) ?? new Set<string>();
+  directions.add(item.direction); topicDirections.set(item.topic, directions);
+}
+const topicsUsed = new Set<ExternalTopic>();
 const directional =
-usable.filter(
+usable.filter(item => {
+  if (topicDirections.get(item.topic)?.size !== 1 || topicsUsed.has(item.topic)) return false;
+  if (item.direction !== "BULLISH" && item.direction !== "BEARISH") return false;
+  topicsUsed.add(item.topic); return true;
+}).filter(
 (item) =>
 item.direction === "BULLISH" ||
 item.direction === "BEARISH"
@@ -1486,11 +1495,8 @@ directional.length
 * rotation or liquidity.
 */
 
-const strength =
-evidenceStrength(
-directional.length,
-agreementShare
-);
+// Keyword interpretation is context, not verified factual market confirmation.
+const strength: AIResearchEvidenceStrength = "LOW";
 
 
 const averageDirectionalConfidence =
@@ -1553,8 +1559,11 @@ sourceCoverage *
 );
 
 
-const evidence:
-string[] = [];
+const evidence: string[] = [
+  "Method: conservative keyword heuristic; interpretation confidence is not a probability of market direction.",
+  "Publication times are source metadata, not independently verified; one contribution per topic does not prove independence.",
+  (suppliedCount - sources.length) + " source(s) excluded for unknown/outdated/future publication time or duplicate title. Reference: " + referenceTime
+];
 
 
 evidence.push(
@@ -1727,16 +1736,16 @@ return {
 category:
 "EXTERNAL",
 
-state,
+state: sources.length === 0 ? "NOT_AVAILABLE" : state,
 
 strength,
 
 confidence:
-Math.round(
+sources.length === 0 ? 0 : Math.min(55, Math.round(
 confidence
-),
+)),
 
-summary,
+summary: sources.length === 0 ? "No dated, recent external evidence is available at the snapshot time." : "Heuristic news context | " + summary,
 
 evidence:
 uniqueStrings(

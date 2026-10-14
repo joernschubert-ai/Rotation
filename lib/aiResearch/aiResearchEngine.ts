@@ -4050,7 +4050,7 @@ cot.latestReportDate
 ) {
 
 evidence.push(
-`Latest COT report date is ${cot.latestReportDate}.`
+`Latest COT position observation date is ${cot.latestReportDate}; publication time is not supplied. Weekly positioning is contextual and not an intraday trigger.`
 );
 
 }
@@ -4550,32 +4550,23 @@ evidence: AIResearchEvidenceBlock[]
 | "STRONG"
 | "VERY_STRONG" {
 
-const independentEvidence =
-evidence.filter(
-(item) =>
-item.category !== "STRUCTURE" &&
-item.state !== "NOT_AVAILABLE"
-);
-
-
-const supportWeight =
-independentEvidence
-.filter(
-(item) =>
-item.state === "SUPPORTS"
-)
-.reduce(
-(total, item) =>
-total +
-evidenceWeight(
-item.strength
-),
-0
-);
+// These are evidence families, not statistically independent signals.
+// History, rotation and liquidity reuse the same underlying app observations.
+const families = new Map<string, number>();
+for (const item of evidence) {
+  if (item.state !== "SUPPORTS") continue;
+  const family = ["STRUCTURE", "HISTORY", "ROTATION", "LIQUIDITY"].includes(item.category)
+    ? "APP_STRUCTURE" : item.category;
+  // News interpretation and weekly positioning remain supplementary.
+  const cap = family === "EXTERNAL" || family === "POSITIONING" ? 1 : 4;
+  families.set(family, Math.max(families.get(family) ?? 0, Math.min(cap, evidenceWeight(item.strength))));
+}
+const supportWeight = [...families.values()].reduce((sum, value) => sum + value, 0);
+const supportingFamilies = families.size;
 
 
 if (
-supportWeight >= 8
+supportWeight >= 8 && supportingFamilies >= 3
 ) {
 
 return "VERY_STRONG";
@@ -4584,7 +4575,7 @@ return "VERY_STRONG";
 
 
 if (
-supportWeight >= 5
+supportWeight >= 5 && supportingFamilies >= 2
 ) {
 
 return "STRONG";
@@ -4897,7 +4888,8 @@ function buildEvidenceAssessment(
 data: ExtractedSnapshot,
 history: HistoryResearchSummary,
 cot: COTResearchSummary,
-sources: AIResearchInput["sources"]
+sources: AIResearchInput["sources"],
+referenceTime?: string
 ): AIResearchEvidenceAssessment {
 
 const structuralBias =
@@ -4965,7 +4957,8 @@ structuralBias
 const externalEvidence =
 buildExternalEvidence(
 sources ?? [],
-structuralBias
+structuralBias,
+referenceTime
 );
 
 const evidence:
@@ -6344,7 +6337,7 @@ data.masterScore
 
 `Structural research bias: ${evidenceAssessment.structuralBias}.`,
 
-`Independent confirmation: ${evidenceAssessment.confirmation}.`,
+`Cross-family confirmation (heuristic): ${evidenceAssessment.confirmation}.`,
 
 `Contradiction: ${evidenceAssessment.contradiction}.`,
 
@@ -6397,10 +6390,13 @@ input.history
 );
 
 
-const cot =
-extractCOTResearchSummary(
-input.positioning
-);
+const snapshotTime = Date.parse(stringValue(input.snapshot.timestamp));
+if (!Number.isFinite(snapshotTime)) throw new Error("Research requires a valid snapshot timestamp.");
+const cotDate = Date.parse(input.positioning?.latestReportDate ?? "");
+const cotTimeUsable = Number.isFinite(cotDate) && cotDate <= snapshotTime && snapshotTime - cotDate <= 14 * 86400000;
+// Report date is the position observation date, not the release date.
+// Missing publication metadata prevents point-in-time validation.
+const cot = extractCOTResearchSummary(cotTimeUsable ? input.positioning : undefined);
 
 
 const regime =
@@ -6414,7 +6410,8 @@ buildEvidenceAssessment(
 data,
 history,
 cot,
-input.sources
+input.sources,
+stringValue(input.snapshot.timestamp)
 );
 
 
@@ -6508,6 +6505,11 @@ input.history.length,
 
 sourceCount:
 input.sources?.length ?? 0,
+warnings: [
+"Research confirmation and confidence are heuristic, not calibrated probabilities or validated trading edge.",
+"App structure, history, rotation and liquidity share one confirmation family; raw price is separate but independence is not proven.",
+cotTimeUsable ? "COT publication time is unknown; positioning is weekly context and cannot be point-in-time validated." : "COT excluded: position date is missing, future-dated or older than 14 calendar days relative to the snapshot."
+],
 
 },
 
