@@ -2394,7 +2394,20 @@ return [];
 const closes =
 data.chart.result[0].indicators.quote[0].close ?? [];
 
-return closes.filter((v: number) => v !== null);
+const observedCloses = closes.map((value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : NaN);
+const times = data.chart.result[0].timestamp ?? [];
+const barTime = Number(times[times.length - 1]) * 1000;
+const marketTime = Number(data.chart.result[0].meta?.regularMarketTime) * 1000;
+indexObservationQuality.set(observedCloses, {
+  symbol,
+  retrievedAt: new Date().toISOString(),
+  latestBarTimestamp: Number.isFinite(barTime) ? new Date(barTime).toISOString() : null,
+  regularMarketTimestamp: Number.isFinite(marketTime) ? new Date(marketTime).toISOString() : null,
+  missingBars: observedCloses.filter((value: number) => !Number.isFinite(value)).length,
+  gapsPreserved: true
+});
+return observedCloses;
 
 } catch (e) {
 
@@ -2404,10 +2417,18 @@ return [];
 }
 }
 
+const indexObservationQuality = new WeakMap<number[], Record<string, any>>();
+
 function buildPriceMetrics(closes: number[]) {
 const metrics = buildLegacyPriceMetrics(closes);
-const validWindow = (offset: number) => Array.isArray(closes) && closes.length > offset && closes.slice(-offset - 1).every(value => typeof value === "number" && Number.isFinite(value) && value > 0);
+const observation = indexObservationQuality.get(closes) ?? {};
+const observedTime = Date.parse(observation.regularMarketTimestamp ?? observation.latestBarTimestamp ?? "");
+const stale = Number.isFinite(observedTime) && (Date.now() - observedTime > 5 * 86400000 || observedTime > Date.now() + 86400000);
+const validWindow = (offset: number) => !stale && Array.isArray(closes) && closes.length > offset && closes.slice(-offset - 1).every(value => typeof value === "number" && Number.isFinite(value) && value > 0);
 return { ...metrics, dataQuality: {
+  ...(indexObservationQuality.get(closes) ?? {}),
+  freshnessVerified: Number.isFinite(observedTime),
+  stale,
   source: "INDEX_DAILY_CLOSE_BARS",
   timeBasis: "OBSERVED_DAILY_PRICE_BARS",
   observations: Array.isArray(closes) ? closes.length : 0,
@@ -3786,6 +3807,13 @@ fragilityIndex: fragilityData.fragility,
 fragilityRegime: fragilityData.fragilityRegime,
 
 gammaExposure: gamma.gammaBillions,
+gammaDataQuality: {
+  source: "VIX_BREADTH_PRICE_MODEL_PROXY",
+  measuredDealerGamma: false,
+  optionsChainUsed: false,
+  units: "SYNTHETIC_BILLIONS_SCALE",
+  zeroMeansModelNeutral: true
+},
 gammaRegime: gamma.regime,
 
 dealerPressureScore: dealerPressure.score,
