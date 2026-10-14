@@ -1537,7 +1537,8 @@ export function marketEngine(
   const decision = rotationDecisionEngine({
     phase, crash, putTiming, russell, confidence,
     earlyWarning, master, positioning, edgeState,
-    rotation, rotationConfirm, executionState
+    rotation, rotationConfirm, executionState,
+    tradeStack, sizing, nasdaq: nasdaqCall
   });
 
   /* =====================================================

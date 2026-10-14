@@ -1,439 +1,65 @@
 // /lib/engine/rotationDecisionEngine.ts
-
-function numeric(
-  value: unknown,
-  fallback = 0
-): number {
-  if (
-    typeof value !== "number" &&
-    typeof value !== "string"
-  ) {
-    return fallback;
-  }
-
-  if (
-    typeof value === "string" &&
-    value.trim() === ""
-  ) {
-    return fallback;
-  }
-
+// Report approved instrument actions. Risk context alone never creates an entry.
+function numeric(value: unknown, fallback = 0): number {
+  if (value && typeof value === "object" && !Array.isArray(value)) return numeric((value as any).value, fallback);
+  if (typeof value !== "number" && typeof value !== "string") return fallback;
+  if (typeof value === "string" && value.trim() === "") return fallback;
   const parsed = Number(value);
-
-  return Number.isFinite(parsed)
-    ? parsed
-    : fallback;
-}
-
-function clamp(value: number): number {
-  return Math.max(0, Math.min(100, value));
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 export function rotationDecisionEngine(input: any) {
-  const safeInput = input ?? {};
+  const data = input ?? {};
+  const put = data.putTiming ?? {};
+  const stack = data.tradeStack ?? {};
+  const sizing = data.sizing ?? {};
+  const putMax = numeric(put.maxScore ?? put.score?.max, 24);
+  const putScore = Math.max(0, Math.min(100, numeric(put.score) / (putMax > 0 ? putMax : 24) * 100));
+  const russellScore = Math.max(0, Math.min(100, numeric(data.russell?.confidence)));
+  const conflict = stack.directionalConflict === true || stack.meta?.directionalConflict === true || sizing.portfolio?.directionalConflict === true;
+  const panic = put.decision === "PANIC_SHORT" || put.execution === "REDUCE RISK";
 
-  const {
-    phase,
-    crash = {},
-    putTiming = {},
-    russell = {},
-    confidence = {},
-    earlyWarning = {},
-    master = {},
-    positioning = {},
-    edgeState = {},
-    rotation = {},
-    rotationConfirm = {},
-    executionState = {},
-    superSignal = {}
-  } = safeInput;
-
-  /* =====================================================
-  SCORES
-
-  Current Put Timing:
-  score: number
-  maxScore: 24
-
-  Legacy wrapped scores may declare their own maximum.
-  ===================================================== */
-
-  const wrappedPutScore =
-    putTiming.score &&
-    typeof putTiming.score === "object";
-
-  const putScore = numeric(
-    wrappedPutScore
-      ? putTiming.score.value
-      : putTiming.score
-  );
-
-  const declaredMax = numeric(
-    putTiming.maxScore ??
-    putTiming.score?.max,
-    wrappedPutScore ? 12 : 24
-  );
-
-  const putMax =
-    declaredMax > 0
-      ? declaredMax
-      : wrappedPutScore
-        ? 12
-        : 24;
-
-  const putNorm =
-    clamp((putScore / putMax) * 100);
-
-  const russellNorm =
-    clamp(numeric(russell.confidence));
-
-  const edge =
-    putNorm - russellNorm;
-
-  /* =====================================================
-  EDGE / ROTATION / EXECUTION
-  ===================================================== */
-
-  const edgeLevel =
-    numeric(edgeState.strength);
-
-  const edgeLabel =
-    edgeState.state ?? "NEUTRAL";
-
-  const rotationSignal =
-    rotation.signal ?? "NEUTRAL";
-
-  const rotationConfidence =
-    numeric(rotation.confidence, 50);
-
-  const confirmState =
-    rotationConfirm.state ?? "EARLY";
-
-  const executionMode =
-    executionState.executionMode ?? "WAIT";
-
-  const riskState =
-    executionState.riskState ?? "UNKNOWN";
-
-  const institutional =
-    superSignal.quality === "INSTITUTIONAL";
-
-  /* =====================================================
-  DIRECTIONAL CONFIRMATION
-
-  Risk confirmation is not bullish confirmation.
-  Missing execution context does not authorize longs.
-  ===================================================== */
-
-  const bullishConfirmed =
-    confirmState === "BULLISH_CONFIRMED" ||
-    (
-      confirmState === "INSTITUTIONAL_CONFIRMATION" &&
-      rotationConfirm.direction === "BULLISH"
-    );
-
-  const bullishConfirming =
-    confirmState === "BULLISH_CONFIRMING";
-
-  const executionAllowsLong =
-    (
-      riskState === "STABLE" ||
-      riskState === "FRAGILE"
-    ) &&
-    (
-      executionMode === "BUILD_POSITION" ||
-      executionMode === "ADD_ON_PULLBACKS"
-    );
-
-  const longConfirmed =
-    rotationSignal === "RISK_ON" &&
-    (
-      bullishConfirmed ||
-      bullishConfirming
-    ) &&
-    executionAllowsLong;
-
-  const riskConfirmed =
-    confidence.state === "CONFIRMED";
-
-  /* =====================================================
-  CONSISTENT OUTPUT
-  ===================================================== */
-
-  function result(
-    finalAction: string,
-    direction: string,
-    reason: string
-  ) {
+  function result(finalAction: string, direction: string, execution: string, reason: string, flows: string[] = []) {
     return {
-      finalAction,
-      direction,
-
-      edge,
-
-      edgeState: edgeLabel,
-
-      putScore: putNorm,
-      russellScore: russellNorm,
-
-      reason
+      finalAction, direction, execution, reason,
+      edge: putScore - russellScore,
+      edgeState: data.edgeState?.state ?? "NEUTRAL",
+      putScore, russellScore, activeFlows: flows,
+      diagnostics: {
+        policy: "APPROVED_FLOW_ACTIONS_V1",
+        riskScoreIsNotEntryAuthorization: true,
+        masterNeutralDoesNotBlockApprovedStarter: true,
+        scoreDifferenceIsNotStatisticalEdge: true,
+        conflict, panic
+      }
     };
   }
 
-  /* =====================================================
-  HARD OVERRIDES
+  if (conflict) return result("WAIT", "NEUTRAL", "NONE", "Directional portfolio conflict");
+  if (panic) return result("REDUCE RISK", "DEFENSIVE", "MANAGE EXISTING POSITIONS", "Panic management; no new put entry");
 
-  Existing dominant-risk priorities and thresholds retained.
-  ===================================================== */
-
-  if (numeric(crash.probability) > 80) {
-    return result(
-      "MAX PUT EXPOSURE",
-      "NET SHORT",
-      "Crash dominant"
-    );
+  function approved(name: string) {
+    const candidate = stack[name];
+    const flow = sizing[name];
+    return candidate?.eligible === true && flow?.eligible === true && numeric(flow?.size) > 0 && numeric(candidate?.strength) >= 20 &&
+      (!Array.isArray(candidate.blockReasons) || candidate.blockReasons.length === 0);
   }
 
-  if (numeric(master.score) > 80) {
-    return result(
-      "FULL DEFENSIVE",
-      "NET SHORT",
-      "Master risk extreme"
-    );
+  const putOpen = ["DEFENSIVE_BUILD", "STRUCTURAL_BUILD", "TACTICAL_BUILD", "STRONG_BUILD"].includes(put.decision) &&
+    put.entryWindow === "OPEN" && ["SMALL STARTER", "PARTIAL SIZE", "FULL SIZE"].includes(put.execution);
+  const approvedPut = approved("nasdaqPut") && putOpen;
+  const approvedNasdaq = approved("nasdaqCall");
+  const approvedRussell = approved("russellCall");
+  if (approvedPut && (approvedNasdaq || approvedRussell)) return result("WAIT", "NEUTRAL", "NONE", "Opposing approved flows require portfolio resolution");
+  if (approvedPut) {
+    const starter = put.execution === "SMALL STARTER";
+    return result(starter ? "START SMALL PUT" : "BUILD PUTS", starter ? "LIGHT SHORT" : "NET SHORT",
+      put.execution, "Put Timing entry approved by Trade Stack and position sizing", ["NASDAQ_PUT"]);
   }
-
-  /* =====================================================
-  PHASE DOMINANCE
-  ===================================================== */
-
-  if (
-    phase === "PHASE_5_BREAKDOWN" ||
-    phase === "PHASE_6_ACCELERATION"
-  ) {
-    return result(
-      "AGGRESSIVE PUTS",
-      "NET SHORT",
-      "Breakdown regime"
-    );
+  if (approvedNasdaq || approvedRussell) {
+    const flows = [approvedNasdaq ? "NASDAQ_CALL" : null, approvedRussell ? "RUSSELL_CALL" : null].filter((value): value is string => value !== null);
+    return result(approvedNasdaq && approvedRussell ? "BUILD APPROVED CALLS" : approvedRussell ? "BUILD RUSSELL" : "BUILD NASDAQ CALLS",
+      "NET LONG", "APPROVED SIZE", "Independent call setup approved by Trade Stack and position sizing", flows);
   }
-
-  /* =====================================================
-  INSTITUTIONAL LONG
-  ===================================================== */
-
-  if (
-    institutional &&
-    bullishConfirmed &&
-    longConfirmed &&
-    executionMode === "ADD_ON_PULLBACKS" &&
-    riskState === "STABLE"
-  ) {
-    return result(
-      "INSTITUTIONAL LONG",
-      "NET LONG",
-      "Institutional alignment"
-    );
-  }
-
-  /* =====================================================
-  EDGE PRIORITY
-
-  Early long returns require bullish confirmation
-  and suitable execution conditions.
-  ===================================================== */
-
-  if (
-    edgeLabel === "ATTACK" &&
-    longConfirmed
-  ) {
-    return result(
-      "FULL RISK-ON",
-      "NET LONG",
-      "Edge ATTACK state"
-    );
-  }
-
-  if (
-    edgeLabel === "EXPAND" &&
-    longConfirmed
-  ) {
-    return result(
-      "ADD RUSSELL AGGRESSIVE",
-      "NET LONG",
-      "Edge EXPAND state"
-    );
-  }
-
-  /* =====================================================
-  ROTATION OVERRIDE
-  ===================================================== */
-
-  const rotationOverrideActive =
-    master.mode === "ROTATION" &&
-    [
-      "BUILD",
-      "ADD",
-      "AGGRESSIVE"
-    ].includes(russell.decision) &&
-    numeric(crash.probability) < 40 &&
-    [
-      "PHASE_1_EXPANSION",
-      "PHASE_2_WARNING",
-      "PHASE_3_DISTRIBUTION"
-    ].includes(phase);
-
-  if (
-    rotationOverrideActive &&
-    edgeLevel >= 1 &&
-    edge > -10 &&
-    rotationConfidence >= 65 &&
-    longConfirmed
-  ) {
-    return result(
-      "BUILD RUSSELL",
-      "NET LONG",
-      "Rotation + Edge alignment"
-    );
-  }
-
-  /* =====================================================
-  CONFIRMATION FILTER
-
-  A high risk-confirmation score must not be required
-  to authorize bullish exposure.
-  ===================================================== */
-
-  if (edge < -20) {
-    if (!longConfirmed) {
-      return result(
-        "WAIT",
-        "LOW EXPOSURE",
-        "Bullish confirmation or execution missing"
-      );
-    }
-  } else if (!riskConfirmed) {
-    return result(
-      "WAIT",
-      "LOW EXPOSURE",
-      "Risk evidence not confirmed"
-    );
-  }
-
-  /* =====================================================
-  EARLY WARNING
-  ===================================================== */
-
-  if (
-    earlyWarning.active === true &&
-    edgeLevel <= 1 &&
-    edge > -10 &&
-    edge < 15
-  ) {
-    return result(
-      "DEFENSIVE BIAS",
-      "LIGHT SHORT",
-      "Weak edge + Early warning"
-    );
-  }
-
-  /* =====================================================
-  CORE DECISION
-  ===================================================== */
-
-  let finalAction =
-    "WAIT / REDUCE";
-
-  let direction =
-    "LOW EXPOSURE";
-
-  let reason =
-    "No strong edge";
-
-  if (edge > 20) {
-    finalAction = "ADD PUTS";
-    direction = "NET SHORT";
-    reason = "Put edge dominant";
-  } else if (edge < -20) {
-    finalAction = "ENTER RUSSELL CALLS";
-    direction = "NET LONG";
-    reason = "Russell edge dominant";
-  }
-
-  /* =====================================================
-  PHASE OVERLAY
-  ===================================================== */
-
-  if (
-    phase === "PHASE_2_WARNING" &&
-    edge < 10 &&
-    edge > -10
-  ) {
-    finalAction = "WAIT";
-    direction = "NEUTRAL";
-    reason = "Early phase no edge";
-  }
-
-  if (
-    phase === "PHASE_3_DISTRIBUTION" &&
-    edge > 0
-  ) {
-    finalAction = "BUILD PUTS";
-    direction = "NET SHORT";
-    reason = "Distribution phase";
-  }
-
-  /* =====================================================
-  POSITIONING
-
-  Apply after core and phase logic.
-  Crowding modifies an existing directional setup;
-  it does not create an opposing trade by itself.
-  ===================================================== */
-
-  if (
-    [
-      "EXTREME_LONG",
-      "CROWDED_LONG"
-    ].includes(positioning.crowding) &&
-    direction === "NET SHORT"
-  ) {
-    finalAction = "FADE LONGS";
-    direction = "SHORT BIAS";
-    reason = "Crowded longs + bearish setup";
-  }
-
-  if (
-    [
-      "EXTREME_SHORT",
-      "CROWDED_SHORT"
-    ].includes(positioning.crowding) &&
-    direction === "NET LONG" &&
-    longConfirmed
-  ) {
-    finalAction = "FADE SHORTS";
-    direction = "LONG BIAS";
-    reason = "Crowded shorts + bullish setup";
-  }
-
-  /* =====================================================
-  NASDAQ OVERLAY
-  ===================================================== */
-
-  if (
-    safeInput.nasdaq?.active === true &&
-    direction === "NEUTRAL" &&
-    longConfirmed
-  ) {
-    return result(
-      "NASDAQ OPPORTUNITY",
-      "LIGHT LONG",
-      "Opportunistic Nasdaq setup"
-    );
-  }
-
-  return result(
-    finalAction,
-    direction,
-    reason
-  );
+  return result("WAIT", "NEUTRAL", "NONE", "No instrument entry approved by Trade Stack and position sizing");
 }
