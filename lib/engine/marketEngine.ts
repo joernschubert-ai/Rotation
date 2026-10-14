@@ -549,6 +549,7 @@ export function marketEngine(
   ===================================================== */
 
   const gamma = gammaEngine({
+    gammaDataQuality: data.gammaDataQuality,
     gammaExposure: Number(data.gammaExposure ?? 0),
     vix,
     breadth50,

@@ -1,6 +1,7 @@
 // /lib/engine/gammaEngine.ts
 
 export interface GammaEngineInput {
+gammaDataQuality?: any;
 gammaExposure?: number;
 vix?: number;
 breadth50?: number;
@@ -19,6 +20,7 @@ participationScore?: number;
 
 
 export interface GammaEngineOutput {
+dataQuality: Record<string, any>;
 /*
 * STABILITY SCORE
 *
@@ -148,7 +150,7 @@ STRUCTURAL FLAGS
 ===================================================== */
 
 const contango =
-vixTerm >= 0.98;
+Number.isFinite(input.vixTermRatio) && vixTerm > 0 && vixTerm < 1;
 
 const softVol =
 vix < 20;
@@ -1127,6 +1129,10 @@ summary +=
 RETURN
 ===================================================== */
 
+if (input.gammaDataQuality?.measuredDealerGamma !== true) {
+  summary = "Model estimate | " + summary;
+}
+
 return {
 
 score,
@@ -1148,6 +1154,14 @@ passiveGammaCompression,
 instability,
 
 summary,
+dataQuality: {
+  source: input.gammaDataQuality?.source ?? "UNVERIFIED_INPUT",
+  measuredDealerGamma: input.gammaDataQuality?.measuredDealerGamma === true,
+  optionsChainUsed: input.gammaDataQuality?.optionsChainUsed === true,
+  structuralDiagnosticsAreEstimates: true,
+  termRatioDefinition: "VIX / VIX3M",
+  weightsCalibrated: false
+},
 
 };
 
