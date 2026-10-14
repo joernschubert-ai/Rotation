@@ -27,7 +27,6 @@ import ExitPanel from "@/components/ExitPanel";
 import TradeStackPanel from "@/components/TradeStackPanel";
 import SignalPanel from "@/components/SignalPanel";
 import SignalHistoryPanel from "@/components/SignalHistoryPanel";
-import SystemDiagnosticsPanel from "@/components/SystemDiagnosticsPanel";
 import RegimeRibbonPanel from "@/components/RegimeRibbonPanel";
 import SuperSignalPanel from "@/components/SuperSignalPanel";
 import AIResearchPanel from "@/components/AIResearchPanel";
@@ -506,15 +505,6 @@ export default function Home() {
         <HistoricalReplayPanel replay={engine.replay} />
       </section>
 
-      <section className="mb-8">
-        <SectionHeader
-          title="SYSTEM DIAGNOSTICS"
-          subtitle="Engine validation and technical diagnostics"
-        />
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <SystemDiagnosticsPanel engine={engine} />
-        </div>
-      </section>
     </main>
   );
 }
