@@ -512,6 +512,11 @@ export function createMarketSnapshot({
 
     liquidity: {
       ...liquidity,
+      dataQuality: {
+        ...(liquidity.dataQuality ?? {}),
+        headlineLiquiditySource: "BACKEND_MODEL_SCORE",
+        measuredOrderBookLiquidity: false,
+      },
       score: liquidity.score,
       state: liquidity.state,
       trend: liquidity.trend,
@@ -536,6 +541,7 @@ export function createMarketSnapshot({
     /* GAMMA */
 
     gamma: {
+      ...gamma,
       score: gamma.score,
       state: gamma.state,
       regime: gamma.regime,
