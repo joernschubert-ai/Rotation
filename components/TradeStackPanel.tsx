@@ -169,15 +169,15 @@ return "#666";
 }
 
 function getEdgeLabel(score: number) {
-if (score >= 80) return "EXTREME ASYMMETRY";
+if (score >= 80) return "VERY HIGH MODEL SCORE";
 
-if (score >= 60) return "STRONG EDGE";
+if (score >= 60) return "HIGH MODEL SCORE";
 
-if (score >= 40) return "TRADEABLE";
+if (score >= 40) return "MODERATE MODEL SCORE";
 
-if (score >= 20) return "EARLY EDGE";
+if (score >= 20) return "EARLY MODEL SUPPORT";
 
-return "NO EDGE";
+return "LOW MODEL SCORE";
 }
 
 /* ======================================================
@@ -401,43 +401,11 @@ color: "#faad14",
 };
 }
 
-if (edgeScore < 20) {
-return {
-text:
-"No statistical edge → exposure should remain minimal",
-color: "#777",
-};
+if (size <= 0 || primary.instrument === "NONE") {
+return { text: "No new entry approved", color: "#777" };
 }
 
-if (edgeScore < 40) {
-return {
-text:
-"Early edge detected → probing size only",
-color: "#73d13d",
-};
-}
-
-if (edgeScore < 60) {
-return {
-text:
-"Tradeable setup → controlled exposure",
-color: "#fadb14",
-};
-}
-
-if (edgeScore < 80) {
-return {
-text:
-"Strong asymmetric setup → active positioning",
-color: "#fa8c16",
-};
-}
-
-return {
-text:
-"Extreme asymmetry → aggressive execution possible",
-color: "#ff4d4f",
-};
+return { text: "Instrument setup approved; allocation comes from position sizing", color: "#888" };
 }
 
 const executionExplanation =
@@ -954,7 +922,7 @@ color: "#666",
 fontSize: "11px",
 }}
 >
-CENTRAL EDGE SYSTEM
+ROTATION MODEL SCORE
 </div>
 
 <div

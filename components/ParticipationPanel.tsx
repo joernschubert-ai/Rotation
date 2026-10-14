@@ -1,10 +1,15 @@
-// /components/panels/ParticipationPanel.tsx
+// /components/ParticipationPanel.tsx
 
 "use client";
 
 
 interface Props {
 data: any;
+}
+
+function comparisonAvailable(quality: any, required: string[]): boolean {
+  return Array.isArray(quality?.missingComparisons) &&
+    required.every(name => !quality.missingComparisons.includes(name));
 }
 
 
@@ -750,36 +755,42 @@ sm:grid-cols-3
 <TrendMetric
 label="Velocity"
 value={participationVelocity}
+available={comparisonAvailable(participation.dataQuality, ["participation_5d"])}
 />
 
 
 <TrendMetric
 label="10D Trend"
 value={participationDecayRate}
+available={comparisonAvailable(participation.dataQuality, ["participation_10d"])}
 />
 
 
 <TrendMetric
 label="Slope"
 value={participationSlope}
+available={comparisonAvailable(participation.dataQuality, ["participation_20d"])}
 />
 
 
 <TrendMetric
 label="Acceleration"
 value={participationAcceleration}
+available={comparisonAvailable(participation.dataQuality, ["participation_5d", "participation_10d"])}
 />
 
 
 <TrendMetric
 label="Breadth 50"
 value={breadth50Trend}
+available={comparisonAvailable(participation.dataQuality, ["breadth50_5d", "breadth50_10d"])}
 />
 
 
 <TrendMetric
 label="Breadth 200"
 value={breadth200Trend}
+available={comparisonAvailable(participation.dataQuality, ["breadth200_10d", "breadth200_20d"])}
 />
 
 </div>
@@ -1204,18 +1215,20 @@ TREND METRIC
 
 function TrendMetric({
 label,
-value
+value,
+available = false
 }: {
 label: string;
 value: number;
+available?: boolean;
 }) {
 
 const color =
-trendColor(value);
+available && Number.isFinite(value) ? trendColor(value) : "text-zinc-500";
 
 
 const labelText =
-trendLabel(value);
+available && Number.isFinite(value) ? trendLabel(value) : "UNKNOWN";
 
 
 return (
@@ -1242,8 +1255,7 @@ font-semibold
 ${color}
 `}
 >
-{value > 0 ? "+" : ""}
-{value}
+{available && Number.isFinite(value) ? `${value > 0 ? "+" : ""}${value}` : "—"}
 </div>
 
 
