@@ -225,6 +225,7 @@ export function mapBackendToEngine(data: any) {
 
     gammaExposure:
       numberOr(data.gammaExposure, 0),
+    gammaDataQuality: data.gammaDataQuality ?? null,
 
     creditRatio,
     creditRatioMA50,
