@@ -737,6 +737,8 @@ export function createMarketSnapshot({
 
     /* TRADE STACK */
 
+    decision: engine.decision ?? null,
+
     tradeStack: {
       type: tradeStack.type,
       strength: tradeStack.strength,
