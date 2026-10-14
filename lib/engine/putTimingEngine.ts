@@ -184,6 +184,26 @@ export function putTimingEngine(input: any) {
   const structuralPutTrigger = structuralBreakdown && structurePoints >= 12 && rotationPoints >= 3;
   const earlyStructuralTrigger = structurePoints >= 8 && (earlyWarning?.active === true || deterioratingBreadth || risingCrashRisk);
 
+  // Early entry uses current structure and Nasdaq timing, not old-model history
+  // or an already bearish 20D index return. This is a model rule, not proven edge.
+  const ndx = priceMomentum?.ndx ?? {};
+  const ndxQuality = ndx.dataQuality ?? {};
+  const ndx5D = num(ndx.momentum5D, NaN);
+  const ndxAcceleration = num(ndx.acceleration, NaN);
+  const earlyNasdaqTimingAvailable = ndxQuality.momentum5DAvailable === true &&
+    ndxQuality.accelerationAvailable === true && Number.isFinite(ndx5D) && Number.isFinite(ndxAcceleration);
+  const currentStructureAvailable = Number.isFinite(numericValue(input?.breadth50,
+    numericValue(input?.structure?.breadth?.b50, NaN))) &&
+    Number.isFinite(num(participation?.score, NaN)) &&
+    Number.isFinite(num(marketQuality?.score ?? marketQuality?.value ?? marketQuality?.qualityScore, NaN));
+  const bearishRotationContext = ["BEARISH_CONFIRMING", "BEARISH_CONFIRMED", "INTERNAL_BREAKDOWN"].includes(rotationConfirmState);
+  const earlyCurrentTrigger = currentStructureAvailable &&
+    [2, 3, 4].includes(phaseRank(phase)) && earlyWarning?.active === true &&
+    breadth50 < 50 && participationWeak && deterioratingQuality && bearishRotationContext &&
+    earlyNasdaqTimingAvailable && ndx5D <= 0 && ndxAcceleration < 0 &&
+    !bool(ndx.bullishImpulse) && !bullishImpulse && !bullishCounterMove &&
+    !panicEligible && contradictionPoints <= 2;
+
   let decision: PutTimingDecision = "WAIT";
   let timing: PutTimingTiming = "WAIT";
   let execution: PutTimingExecution = "NONE";
@@ -197,13 +217,15 @@ export function putTimingEngine(input: any) {
     decision = "STRUCTURAL_BUILD"; timing = "BUILD"; execution = priceNeutral ? "PARTIAL SIZE" : "SMALL STARTER";
   } else if (earlyStructuralTrigger && structurePoints >= 7 && contradictionPoints <= 2) {
     decision = "DEFENSIVE_BUILD"; timing = "EARLY"; execution = "SMALL STARTER";
+  } else if (earlyCurrentTrigger) {
+    decision = "DEFENSIVE_BUILD"; timing = "EARLY"; execution = "SMALL STARTER";
   }
   if (bullishImpulse && decision !== "PANIC_SHORT") {
     decision = "WAIT"; timing = "WAIT"; execution = "NONE";
   }
 
   const entryWindow = decision !== "WAIT" && decision !== "PANIC_SHORT" ? "OPEN" : decision === "PANIC_SHORT" ? "EXTENDED" : "CLOSED";
-  const institutionalState = decision === "PANIC_SHORT" ? "PANIC_SHORT" : structuralPutTrigger ? "STRUCTURAL_SHORT" : earlyStructuralTrigger ? "DEFENSIVE_SHORT" : "NEUTRAL";
+  const institutionalState = decision === "PANIC_SHORT" ? "PANIC_SHORT" : structuralPutTrigger ? "STRUCTURAL_SHORT" : earlyStructuralTrigger || earlyCurrentTrigger ? "DEFENSIVE_SHORT" : "NEUTRAL";
   const structuralComposite = (structurePoints / 20) * 0.45 + (phasePoints / 9) * 0.25 + (rotationPoints / 6) * 0.20 + (pricePoints / 14) * 0.10;
   const score = Math.round(clamp(Math.round(structuralComposite * 24), 0, 24));
 
@@ -218,7 +240,7 @@ export function putTimingEngine(input: any) {
 
   return {
     decision, timing, execution, score, maxScore: 24, entryWindow,
-    triggerQuality: structuralPutTrigger ? "STRUCTURAL_BREAKDOWN" : earlyStructuralTrigger ? "EARLY_STRUCTURAL" : "NONE",
+    triggerQuality: structuralPutTrigger ? "STRUCTURAL_BREAKDOWN" : earlyStructuralTrigger || earlyCurrentTrigger ? "EARLY_STRUCTURAL" : "NONE",
     summary,
     layers: {
       structure: {score: structurePoints, max: 20, state: structuralPutTrigger ? "STRONG_BEARISH" : structurePoints >= 8 ? "BEARISH" : "NEUTRAL"},
@@ -246,6 +268,11 @@ export function putTimingEngine(input: any) {
     meta: {
       panicConfirmed, panicEligible, structuralBreakdown, internalDeterioration,
       earlyStructuralTrigger, structuralPutTrigger, priceComplete,
+      earlyCurrentTrigger,
+      earlyNasdaqTimingAvailable,
+      earlyEntryPolicy: "CURRENT_STRUCTURE_NASDAQ_COOLING_STARTER_V1",
+      earlyEntryRequiresBearish20DReturn: false,
+      earlyEntryRuleCalibrated: false,
       lowVolatility: numericValue(input?.vix, numericValue(input?.marketData?.["^VIX"], 20)) < 18,
       volatilityExpansion: bool(input?.volatilityExpansion ?? false),
       regimeAligned: typeof regimeSync?.aligned === "boolean" ? regimeSync.aligned : regimeSync?.state === "ALIGNED",

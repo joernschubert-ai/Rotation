@@ -814,6 +814,14 @@ export function positionSizingV2(engine: any) {
       maxFlowSize = Math.min(maxFlowSize, 20);
     }
 
+    // The current-structure entry is a probe, not a full defensive build.
+    // Preserve every upstream veto and risk multiplier; this is only a ceiling.
+    if (flow === "NASDAQ_PUT" &&
+      engine?.putTiming?.meta?.earlyCurrentTrigger === true &&
+      engine?.putTiming?.decision === "DEFENSIVE_BUILD" &&
+      engine?.putTiming?.execution === "SMALL STARTER") {
+      maxFlowSize = Math.min(maxFlowSize, 5);
+    }
     rawSize = Math.min(rawSize, maxFlowSize);
 
     const earlyStarterState =
