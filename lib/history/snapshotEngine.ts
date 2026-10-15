@@ -193,7 +193,7 @@ export function createMarketSnapshot({
     breadthDataQuality,
     calculationVersions: {
       history: "VERSIONED_HISTORY_V3",
-      master: "MATURITY_WEIGHTED_HISTORY_V3",
+      master: master.diagnostics?.calculationVersion ?? null,
       rotation: "STRUCTURAL_MODEL_2026_10_V3",
       liquidity: "STRUCTURAL_MODEL_2026_10_V3",
       rotationDecay: "STRUCTURAL_MODEL_2026_10_V3",
@@ -218,6 +218,7 @@ export function createMarketSnapshot({
       regimeState: phase.regimeState,
       subPhase: phase.subPhase,
       confidence: phase.confidence,
+      dataQuality: phase.dataQuality,
     },
 
     /* MASTER */
