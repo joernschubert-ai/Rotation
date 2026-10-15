@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { prepareObservedIndexSeries } from "@/lib/market/priceSeriesIntegrity";
 import { Redis } from "@upstash/redis";
 import type { Redis as RedisType } from "@upstash/redis";
 
@@ -1478,10 +1479,10 @@ vix:number,
 vix3m:number
 ){
 
-if(vix3m === 0){
+if(!Number.isFinite(vix) || vix <= 0 || !Number.isFinite(vix3m) || vix3m <= 0){
 return{
-ratio:0,
-regime:"neutral"
+ratio:NaN,
+regime:"unknown"
 }
 }
 
@@ -1508,10 +1509,10 @@ vix:number,
 vix9d:number
 ){
 
-if(vix === 0){
+if(!Number.isFinite(vix) || vix <= 0 || !Number.isFinite(vix9d) || vix9d <= 0){
 return{
-ratio:0,
-regime:"neutral"
+ratio:NaN,
+regime:"unknown"
 }
 }
 
@@ -2397,20 +2398,9 @@ return [];
 const closes =
 data.chart.result[0].indicators.quote[0].close ?? [];
 
-const observedCloses = closes.map((value: unknown) =>
-  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : NaN);
-const times = data.chart.result[0].timestamp ?? [];
-const barTime = Number(times[times.length - 1]) * 1000;
-const marketTime = Number(data.chart.result[0].meta?.regularMarketTime) * 1000;
-indexObservationQuality.set(observedCloses, {
-  symbol,
-  retrievedAt: new Date().toISOString(),
-  latestBarTimestamp: Number.isFinite(barTime) ? new Date(barTime).toISOString() : null,
-  regularMarketTimestamp: Number.isFinite(marketTime) ? new Date(marketTime).toISOString() : null,
-  missingBars: observedCloses.filter((value: number) => !Number.isFinite(value)).length,
-  gapsPreserved: true
-});
-return observedCloses;
+const prepared = prepareObservedIndexSeries(data.chart.result[0], symbol);
+indexObservationQuality.set(prepared.closes, prepared.quality);
+return prepared.closes;
 
 } catch (e) {
 
@@ -2420,23 +2410,31 @@ return [];
 }
 }
 
-function buildPriceMetrics(closes: number[]) {
-const metrics = buildLegacyPriceMetrics(closes);
+function buildPriceMetrics(closes: number[]): Record<string, any> {
+const legacy = buildLegacyPriceMetrics(closes);
 const observation = indexObservationQuality.get(closes) ?? {};
-const observedTime = Date.parse(observation.regularMarketTimestamp ?? observation.latestBarTimestamp ?? "");
-const stale = Number.isFinite(observedTime) && (Date.now() - observedTime > 5 * 86400000 || observedTime > Date.now() + 86400000);
-const validWindow = (offset: number) => !stale && Array.isArray(closes) && closes.length > offset && closes.slice(-offset - 1).every(value => typeof value === "number" && Number.isFinite(value) && value > 0);
+const observedTime = Date.parse(observation.currentObservationTimestamp ?? "");
+const stale = Number.isFinite(observedTime) && (Date.now() - observedTime > 5 * 86400000 || observedTime > Date.now() + 60000);
+const validWindow = (offset: number) => observation.latestEndpointAvailable === true && Number.isFinite(observedTime) && !stale && closes.length > offset && closes.slice(-offset - 1).every(value => Number.isFinite(value) && value > 0);
+const metrics: Record<string, any> = Object.fromEntries(Object.entries(legacy).map(([key,value]) => [key, typeof value === "number" && !Number.isFinite(value) ? null : value]));
+const currentAvailable = validWindow(0);
+metrics.current = currentAvailable ? closes[closes.length - 1] : null;
+metrics.previous = closes.length >= 2 && Number.isFinite(closes[closes.length - 2]) && closes[closes.length - 2] > 0 ? closes[closes.length - 2] : null;
+for (const period of [1,3,5,10,20,50]) metrics['return'+period+'D'] = validWindow(period) ? legacy['return'+period+'D' as keyof typeof legacy] : null;
+for (const period of [5,10,20]) metrics['momentum'+period+'D'] = metrics['return'+period+'D'];
+for (const period of [20,50,200]) {
+  const available = validWindow(period-1);
+  metrics['ma'+period] = available ? legacy['ma'+period as keyof typeof legacy] : null;
+  metrics['distanceFromMA'+period] = available ? legacy['distanceFromMA'+period as keyof typeof legacy] : null;
+}
+metrics.acceleration = validWindow(10) ? legacy.acceleration : null;
+metrics.drawdown20D = validWindow(19) ? legacy.drawdown20D : null;
+metrics.trend = validWindow(20) ? legacy.trend : "UNKNOWN";
 return { ...metrics, dataQuality: {
-  ...(indexObservationQuality.get(closes) ?? {}),
-  freshnessVerified: Number.isFinite(observedTime),
-  stale,
-  source: "INDEX_DAILY_CLOSE_BARS",
-  timeBasis: "OBSERVED_DAILY_PRICE_BARS",
-  observations: Array.isArray(closes) ? closes.length : 0,
-  momentum5DAvailable: validWindow(5),
-  momentum20DAvailable: validWindow(20),
-  dateAlignmentVerified: false,
-  latestBarFinality: "UNVERIFIED",
+  ...observation, freshnessVerified: Number.isFinite(observedTime), stale,
+  source: "INDEX_DAILY_CLOSE_BARS", timeBasis: "OBSERVED_DAILY_PRICE_BARS", observations: closes.length,
+  momentum5DAvailable: validWindow(5), momentum20DAvailable: validWindow(20),
+  dateAlignmentVerified: false, latestBarFinality: "UNVERIFIED",
   providerAccelerationDefinition: "RETURN_5D_MINUS_RETURN_10D_DIVIDED_BY_2"
 } };
 }
@@ -2922,13 +2920,13 @@ vix9d,
 vix3m
 );
 
-let vixTermStructure = "contango";
+let vixTermStructure = "unknown";
 
-const ratio = vix3m ? vix / vix3m : 0;
+const ratio = Number.isFinite(vix) && vix > 0 && Number.isFinite(vix3m) && vix3m > 0 ? vix / vix3m : NaN;
 
 if (ratio > 1.15) vixTermStructure = "stress";
 else if (ratio > 1.05) vixTermStructure = "backwardation";
-else vixTermStructure = "contango";
+else if (Number.isFinite(ratio)) vixTermStructure = "contango";
 
 const vixSpread = vix3m - vix;
 
@@ -3850,6 +3848,13 @@ change: rty.length > 1
 },
 
 dataQuality: {
+indexObservationPolicy: "GAPS_WITH_SAME_DATE_QUOTES_V2",
+auxiliaryIndices: {
+  move: indexObservationQuality.get(moveCloses) ?? null,
+  vix: indexObservationQuality.get(vixCloses) ?? null,
+  vix3m: indexObservationQuality.get(vix3mCloses) ?? null,
+  vix9d: indexObservationQuality.get(vix9dCloses) ?? null
+},
 futuresAvailable:
 es.length > 0 && nq.length > 0 && rty.length > 0,
 timestamp: Date.now()
