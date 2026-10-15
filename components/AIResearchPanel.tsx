@@ -86,13 +86,17 @@ export function AIResearchDecisionSummary({ report, snapshotTimestamp, suspended
   </section>;
 }
 
-export default function AIResearchPanel() {
+export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady = true }: {
+  expectedSnapshotTimestamp?: string;
+  marketReady?: boolean;
+} = {}) {
   const [data, setData] = useState<ResponseData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
   const requestId = useRef(0);
   const load = useCallback(async () => {
+    if (!marketReady) return;
     const id = ++requestId.current;
     controller.current?.abort();
     const request = new AbortController(); controller.current = request;
@@ -107,22 +111,26 @@ export default function AIResearchPanel() {
     } finally {
       if (id === requestId.current && !request.signal.aborted) setLoading(false);
     }
-  }, []);
-  useEffect(() => { void load(); return () => { controller.current?.abort(); }; }, [load]);
+  }, [marketReady, expectedSnapshotTimestamp]);
+  useEffect(() => { if (marketReady) void load(); return () => { controller.current?.abort(); }; }, [load, marketReady]);
   const report = data?.report;
+  const reportSnapshotTimestamp = report?.decisionSupport?.snapshotTimestamp ?? data?.diagnostics?.snapshotTimestamp;
+  const snapshotMismatch = Boolean(report && expectedSnapshotTimestamp && reportSnapshotTimestamp !== expectedSnapshotTimestamp);
   const evidence = report?.evidenceAssessment?.evidence ?? [];
   const historical = report?.historicalEvidence;
   return <div className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="text-xs font-semibold text-[#999]">AI RESEARCH</div>
-      <button type="button" disabled={loading} onClick={() => void load()} className="border border-[#444] bg-[#181818] px-3 py-2 text-xs text-[#bbb] hover:bg-[#252525] disabled:opacity-50">
+      <button type="button" disabled={loading || !marketReady} onClick={() => void load()} className="border border-[#444] bg-[#181818] px-3 py-2 text-xs text-[#bbb] hover:bg-[#252525] disabled:opacity-50">
         {loading ? "Wird aktualisiert …" : "Research aktualisieren"}
       </button>
     </div>
     {error && <p role="alert" className="border border-red-900 p-3 text-xs text-red-300">{error}{report ? " Angezeigt wird der vorherige Bericht; seine Einstiegsaussage ist ausgesetzt." : ""}</p>}
-    {!report && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
+    {!marketReady && <p className="border border-[#292929] p-3 text-xs text-[#999]">Research wartet auf den erfolgreich gespeicherten aktuellen Marktstand.</p>}
+    {snapshotMismatch && <p role="status" className="border border-amber-900 p-3 text-xs text-amber-200">Research und Dashboard verwenden unterschiedliche Snapshots. Die Einstiegsaussage ist ausgesetzt. Bitte den Marktstand erneut aktualisieren.</p>}
+    {!report && marketReady && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
     {report && <>
-      <AIResearchDecisionSummary report={report} snapshotTimestamp={data?.diagnostics?.snapshotTimestamp} suspended={loading || Boolean(error)} />
+      <AIResearchDecisionSummary report={report} snapshotTimestamp={data?.diagnostics?.snapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       <Detail title="Begründung: App, Kurse, COT und Nachrichten">
         <p className="text-xs leading-relaxed text-[#bbb]">{report.thesis.statement}</p>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{evidence.map(block => <div key={block.category} className="border border-[#292929] p-3">
