@@ -214,6 +214,18 @@ HISTORICAL EVIDENCE DATASET
 ===================================================== */
 
 export interface AIResearchHistoricalEvidence {
+/** Independent multi-market studies; original Nasdaq tables remain unchanged. */
+marketStudies?: AIHistoricalMarketStudy[];
+coverage?: {
+  policy: string;
+  requestedRange: string;
+  sourceSeries: Array<{ market: string; symbol: string; count: number; firstDate: string | null; lastDate: string | null }>;
+  alignedDates: number;
+  firstAlignedDate: string | null;
+  lastAlignedDate: string | null;
+  ratesAlignedDates: number;
+  omittedModules: string[];
+};
 /*
 * Latest date represented by the research data.
 */
@@ -277,5 +289,34 @@ predictiveEdgeValidated: boolean;
 
 warnings: string[];
 };
+}
+
+export interface AIHistoricalStudyStatistics {
+  horizonDays: AIHistoricalEvidenceHorizon;
+  sampleSize: number;
+  firstDate: string | null;
+  lastDate: string | null;
+  meanReturn: number | null;
+  medianReturn: number | null;
+  p10Return: number | null;
+  p90Return: number | null;
+  positiveRate: number | null;
+  meanMaximumRise: number | null;
+  meanMaximumFall: number | null;
+  baselineSampleSize: number;
+  baselineMeanReturn: number | null;
+  excessMeanReturn: number | null;
+  nonOverlapping: { sampleSize: number; meanReturn: number | null; medianReturn: number | null };
+}
+
+export interface AIHistoricalMarketStudy {
+  market: "NASDAQ" | "RUSSELL_2000";
+  asOfDate: string;
+  currentMatch: boolean;
+  family: "OWN_TREND" | "ROTATION_20D" | "OWN_PRICE_VIX_5D";
+  state: string;
+  definition: string;
+  statistics: AIHistoricalStudyStatistics[];
+  limitations: string[];
 }
 

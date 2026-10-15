@@ -44,6 +44,8 @@ export interface BuildAIHistoricalEvidenceInput {
 forwardDataset: HistoricalPriceVixForwardDataset;
 
 currentFeatureDay?: HistoricalPriceVixFeatureDay | null;
+marketStudies?: AIResearchHistoricalEvidence["marketStudies"];
+coverage?: AIResearchHistoricalEvidence["coverage"];
 }
 
 /* =====================================================
@@ -386,6 +388,8 @@ unmatchedCurrentStates > 0
 
 return {
 asOfDate: lastDate,
+marketStudies: input.marketStudies,
+coverage: input.coverage,
 
 firstDate,
 

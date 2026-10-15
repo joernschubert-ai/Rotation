@@ -37,6 +37,7 @@ buildAIHistoricalEvidence,
 import type {
 AIResearchHistoricalEvidence,
 } from "./aiResearchHistoricalEvidenceTypes";
+import { buildHistoricalMarketStudies } from "./aiResearchHistoricalMarketStudies";
 
 /* =====================================================
 AI RESEARCH - HISTORICAL EVIDENCE SERVICE
@@ -135,28 +136,50 @@ HISTORICAL CALCULATION
 
 async function calculateHistoricalEvidence():
 Promise<AIResearchHistoricalEvidence> {
-const [marketData, ratesData] =
-await Promise.all([
+const [marketLoad, ratesLoad] =
+await Promise.allSettled([
 loadHistoricalRegimeMarketData(),
 loadHistoricalRegimeRatesData(),
 ]);
+if (marketLoad.status === "rejected") throw new Error("Historical index provider failed.");
+const marketData = marketLoad.value;
 
 const market =
 alignHistoricalRegimeMarketData(
 marketData
 );
 
-if (market.count === 0) {
-return unavailableEvidence(
-"Historical market alignment returned no observations."
-);
-}
+const coverage: NonNullable<AIResearchHistoricalEvidence["coverage"]> = {
+  policy: "HISTORICAL_INDEX_STUDIES_V1",
+  requestedRange: "15y",
+  sourceSeries: Object.entries(marketData).map(([market, series]) => ({
+    market, symbol: series.symbol, count: series.count, firstDate: series.firstDate, lastDate: series.lastDate
+  })),
+  alignedDates: market.count, firstAlignedDate: market.firstDate, lastAlignedDate: market.lastDate,
+  ratesAlignedDates: 0,
+  omittedModules: ["COT-conditioned outcomes", "ETF leadership/divergence episode controls", "CPI/NFCI/real-yield vintage studies", "historical constituent breadth", "chart-zone studies"]
+};
+if (market.count === 0) return {
+  ...unavailableEvidence("Historical market alignment returned no observations; inspect source coverage."), coverage
+};
+const marketStudies = buildHistoricalMarketStudies(market.days);
+const partial = (warning: string): AIResearchHistoricalEvidence => ({
+  ...unavailableEvidence(warning), status: marketStudies.length ? "PARTIAL" : "NOT_AVAILABLE",
+  asOfDate: market.lastDate, firstDate: market.firstDate, lastDate: market.lastDate,
+  marketStudies, coverage
+});
+// A rates outage must not suppress independent index/rotation studies.
+if (ratesLoad.status === "rejected") return partial("Rates provider unavailable; independent market studies remain available.");
+const ratesData = ratesLoad.value;
 
+try {
 const ratesAligned =
 alignHistoricalRegimeRates(
 market,
 ratesData
 );
+coverage.ratesAlignedDates = ratesAligned.days.length;
+if (!ratesAligned.days.length) return partial("No rates-aligned dates; independent market studies remain available.");
 
 const marketFeatures =
 buildHistoricalRegimeFeatures(
@@ -198,6 +221,8 @@ const evidence =
 buildAIHistoricalEvidence({
 forwardDataset: forward,
 currentFeatureDay: latestFeature,
+marketStudies,
+coverage,
 });
 
 /*
@@ -219,12 +244,15 @@ forward.diagnostics.matchedFeatureDays ===
 priceVixFeatures.count;
 
 if (!validDataset) {
-return unavailableEvidence(
+return partial(
 "Historical Price/VIX dataset failed integrity checks."
 );
 }
 
 return evidence;
+} catch {
+  return partial("Legacy Price/VIX or rates calculation failed; independent market studies remain available.");
+}
 }
 
 /* =====================================================
@@ -315,7 +343,8 @@ export async function loadAIResearchHistoricalEvidence(
   };
   // A later dataset can contain outcomes that did not exist at snapshot time.
   // Refuse to reuse it for an older snapshot rather than claim lookahead safety.
-  if ([evidence.asOfDate, evidence.lastDate].some(value => {
+  if ([evidence.asOfDate, evidence.lastDate, evidence.coverage?.lastAlignedDate ?? null,
+    ...(evidence.marketStudies ?? []).map(study => study.asOfDate)].some(value => {
     const day = dateKey(value); return day !== null && day > snapshotDay;
   })) return unavailableEvidence("Historical dataset is later than the snapshot date; point-in-time comparison is unavailable.");
 
@@ -330,6 +359,10 @@ export async function loadAIResearchHistoricalEvidence(
   const matched = currentStates.filter(state => state.comparable).length;
   return {
     ...evidence,
+    marketStudies: evidence.marketStudies?.map(study => ({ ...study,
+      currentMatch: study.currentMatch && study.asOfDate === snapshotDay,
+      limitations: [...study.limitations, timingNote]
+    })),
     status: evidence.status === "AVAILABLE" && matched < currentStates.length ? "PARTIAL" : evidence.status,
     currentStates,
     observations: evidence.observations.map(observation => ({

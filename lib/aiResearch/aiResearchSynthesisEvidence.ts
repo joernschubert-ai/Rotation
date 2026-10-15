@@ -101,15 +101,41 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
   const marketDate = `${part("year")}-${part("month")}-${part("day")}`;
   const states = (historical?.currentStates ?? []).filter(state => /^\d{4}-\d{2}-\d{2}$/.test(state.asOfDate) && state.asOfDate <= marketDate).slice(0, 6)
     .map(state => ({ ...state, comparable: state.comparable && state.asOfDate === marketDate }));
-  const comparisons = states.flatMap(state => (historical?.observations ?? [])
+  // Own trend and five-day price/VIX are already included in the expanded studies.
+  // Preserve all original tables in the report, but avoid duplicate prompt evidence.
+  const comparisons = states.filter(state => !(historical?.marketStudies?.length &&
+    ["PRICE_TREND", "PRICE_VIX_5D"].includes(state.family))).flatMap(state => (historical?.observations ?? [])
     .filter(item => item.family === state.family && item.market === state.market && item.state === state.state)
     .sort((a, b) => a.horizonDays - b.horizonDays).slice(0, 3)
     .map(item => ({ ...pick(item, ["family", "market", "state", "horizonDays", "sampleSize", "averageForwardReturn", "baselineAverageReturn", "excessReturn", "baselineSampleSize", "overlappingObservations", "matchedControl"]), stateAsOf: state.asOfDate, currentMatch: state.comparable })));
   evidence.push({ id: "HISTORY", kind: "HISTORY", available: comparisons.length > 0, data: {
+    coverage: historical?.coverage ?? null,
     quality: pick(input.historyQuality, ["policy", "trustedStart", "currentVersionKnown", "retainedPriceDates", "comparableStructureDates"]),
     asOf: historical?.asOfDate ?? null, states: states.map(state => pick(state, ["family", "market", "state", "asOfDate", "comparable"])), comparisons,
     selection: "Only groups matching the supplied dated states; non-current states are descriptive only. Overlapping index returns are not warrant returns or proven alpha.",
   } });
+  const studies = (historical?.marketStudies ?? []).filter(study => study.asOfDate <= marketDate);
+  for (const market of ["NASDAQ", "RUSSELL_2000"] as const) {
+    const ownStudies = studies.filter(study => study.market === market);
+    evidence.push({ id: `HISTORY_${market}`, kind: "HISTORY", market,
+      available: ownStudies.some(study => study.statistics.some(stats => stats.sampleSize > 0)),
+      data: {
+        studies: ownStudies.map(study => ({ family: study.family, state: study.state, asOfDate: study.asOfDate,
+          currentMatch: study.currentMatch && study.asOfDate === marketDate, definition: study.definition,
+          statistics: study.statistics.map(stats => {
+            const rounded = (value: number | null) => value === null ? null : Number(value.toFixed(4));
+            return { horizonDays: stats.horizonDays, sampleSize: stats.sampleSize,
+              meanReturn: rounded(stats.meanReturn), medianReturn: rounded(stats.medianReturn),
+              p10Return: rounded(stats.p10Return), p90Return: rounded(stats.p90Return), positiveRate: rounded(stats.positiveRate),
+              meanMaximumRise: rounded(stats.meanMaximumRise), meanMaximumFall: rounded(stats.meanMaximumFall),
+              baselineSampleSize: stats.baselineSampleSize, baselineMeanReturn: rounded(stats.baselineMeanReturn),
+              excessMeanReturn: rounded(stats.excessMeanReturn),
+              nonOverlapping: { sampleSize: stats.nonOverlapping.sampleSize, meanReturn: rounded(stats.nonOverlapping.meanReturn) }
+            };
+          }) })),
+        interpretation: "Own-index 5/20/60 aligned-observation outcomes. Mean, median and tails are descriptive, not calibrated forecasts. Maximum rise/fall use daily closes including entry zero; reverse their directional meaning for PUT. Non-overlapping subset is not independent validation. No COT-conditioned or combined-factor edge has been established. Do not infer non-existent options-market activity from app permissions."
+      } });
+  }
   const sources = report.sources.filter(source => {
     const time = iso(source.publishedAt);
     return time !== null && Date.parse(time) <= reference && reference - Date.parse(time) <= 7 * 86400000;
