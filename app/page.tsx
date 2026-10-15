@@ -299,7 +299,8 @@ export default function Home() {
 
           <button
             type="button"
-            onClick={() => {
+              onClick={async () => {
+                await fetch("/api/login", { method: "DELETE" }).catch(() => undefined);
               localStorage.removeItem("auth");
               router.push("/login");
             }}
