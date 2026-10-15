@@ -37,6 +37,11 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   // Response diagnostics changed; do not reuse a rejection whose wording was discarded.
   // Daily quota, cooldown and lock namespaces deliberately remain unchanged.
   const cacheKey = `${PREFIX}:cache:${SYNTHESIS_CONTRACT}:condition-audit-v1:${createHash("sha256").update(payload).digest("hex")}`;
+  // Rejected text is diagnostic only. Keep it addressable even if news/context
+  // change between the POST and a later GET for the identical snapshot/task/question.
+  const diagnosticKey = `${PREFIX}:rejected:${SYNTHESIS_CONTRACT}:${createHash("sha256").update(JSON.stringify({
+    snapshotTimestamp, task: input.context.task, question: text(input.context.question,500)
+  })).digest("hex")}`;
   let redis: Redis;
   try { redis = Redis.fromEnv(); } catch { return unavailable("Der dauerhafte KI-Aufrufschutz ist nicht verfügbar. Keine KI-Anfrage ausgelöst."); }
   const lockKey = `${PREFIX}:lock`;
@@ -44,13 +49,28 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   let locked = false;
   let stage = "CACHE_READ";
   let providerRequestStarted = false;
+  const storeRejectedDiagnosis = async (value: ResearchSynthesis): Promise<void> => {
+    try { await redis.set(diagnosticKey, value, { ex: 900 }); }
+    catch { /* Optional diagnostic archive must not change validation or trigger retries. */ }
+  };
   try {
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
     if (cached?.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
       if (cached.status === "SUCCESS" && validateSynthesis(cached.content, evidence)) return { ...cached, cached: true };
-      if (cached.status === "UNAVAILABLE" && cached.quality.issues.length) return { ...cached, cached: true };
+      if (cached.status === "UNAVAILABLE" && cached.quality.issues.length) {
+        if (allowGeneration) await storeRejectedDiagnosis(cached);
+        return { ...cached, cached: true };
+      }
     }
-    if (!allowGeneration) return unavailable("Noch keine KI-Analyse für diesen Snapshot gespeichert. In der App Research aktualisieren.");
+    if (!allowGeneration) {
+      stage = "DIAGNOSTIC_READ";
+      const rejected = await redis.get<ResearchSynthesis>(diagnosticKey);
+      if (rejected?.status === "UNAVAILABLE" && rejected.snapshotTimestamp === snapshotTimestamp &&
+        rejected.quality?.contractVersion === SYNTHESIS_CONTRACT && rejected.quality.rejectedConditions?.length) {
+        return { ...rejected, cached: true };
+      }
+      return unavailable("Noch keine KI-Analyse für diesen Snapshot gespeichert. In der App Research aktualisieren.");
+    }
     stage = "LOCK_ACQUIRE";
     locked = Boolean(await redis.set(lockKey, lockToken, { nx: true, ex: 60 }));
     if (!locked) return unavailable("Eine KI-Analyse läuft bereits. Bitte kurz warten.");
@@ -58,7 +78,10 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const completed = await redis.get<ResearchSynthesis>(cacheKey);
     if (completed?.snapshotTimestamp === snapshotTimestamp && completed.quality?.contractVersion === SYNTHESIS_CONTRACT) {
       if (completed.status === "SUCCESS" && validateSynthesis(completed.content, evidence)) return { ...completed, cached: true };
-      if (completed.status === "UNAVAILABLE" && completed.quality.issues.length) return { ...completed, cached: true };
+      if (completed.status === "UNAVAILABLE" && completed.quality.issues.length) {
+        await storeRejectedDiagnosis(completed);
+        return { ...completed, cached: true };
+      }
     }
     // Atomic daily admission AND cooldown. Attempts count, including provider failures.
     const dayKey = `${PREFIX}:day:${new Date().toISOString().slice(0, 10)}`;
@@ -98,6 +121,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
         quality: { ...quality, issues, rejectedConditions } };
       // Cache rejected answers too; refreshing must not burn quota on the same frame.
       stage = "REJECTED_ANSWER_CACHE_WRITE";
+      await storeRejectedDiagnosis(rejected);
       await redis.set(cacheKey, rejected, { ex: 900 });
       return rejected;
     }
@@ -111,6 +135,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const timeout = name === "TimeoutError" || name === "AbortError";
     const messages: Record<string, string> = {
       CACHE_READ: "Der Research-Zwischenspeicher konnte nicht gelesen werden. Keine neue KI-Anfrage ausgelöst.",
+      DIAGNOSTIC_READ: "Die gespeicherte Ablehnungsdiagnose konnte nicht gelesen werden. Keine neue KI-Anfrage ausgelöst.",
       LOCK_ACQUIRE: "Der KI-Aufrufschutz konnte nicht aktiviert werden. Keine neue KI-Anfrage ausgelöst.",
       CACHE_RECHECK: "Der Research-Zwischenspeicher ist bei der erneuten Prüfung ausgefallen. Keine neue KI-Anfrage ausgelöst.",
       QUOTA_CHECK: "Das KI-Tageskontingent konnte nicht geprüft werden. Keine neue KI-Anfrage ausgelöst.",
