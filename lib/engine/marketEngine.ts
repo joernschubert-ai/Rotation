@@ -39,7 +39,8 @@ import { internalDivergenceEngine } from "./internalDivergenceEngine";
 import { fragilityEngine } from "./fragilityEngine";
 import { squeezeEngine } from "./squeezeEngine";
 import { participationEngine } from "./participationEngine";
-import { priceMomentumEngine } from "./priceMomentumEngine";
+import { priceMomentumEngine, priceMomentumForIndex } from "./priceMomentumEngine";
+import { engineDataIssues, guardOwnPriceEntry } from "./marketInputIntegrity";
 import { gammaEngine } from "./gammaEngine";
 import { historicalReplay } from "../history/historicalReplay";
 import { historyEngine } from "../history/historyEngine";
@@ -55,6 +56,9 @@ export function marketEngine(
   const isHistoricalScenario =
     data?.historicalScenario === true &&
     data?.historicalScenarioInput?.historicalScenario === true;
+
+  const inputIssues = isHistoricalScenario ? [] : engineDataIssues(data);
+  if (inputIssues.length) throw new Error('Market input incomplete: ' + inputIssues.join(', '));
 
   const historicalInput = isHistoricalScenario
     ? data.historicalScenarioInput
@@ -693,7 +697,7 @@ export function marketEngine(
     crash,
     earlyWarning,
     historyMetrics,
-    priceMomentum: priceMomentumPre
+    priceMomentum: priceMomentumForIndex(priceMomentumPre, "ndx")
   });
 
   const russellTemp = russellEngine({
@@ -1086,13 +1090,13 @@ export function marketEngine(
 
   // Evaluate the final Russell candidate with completed quality and price context.
   // Preliminary Russell remains separate for earlier structural consumers.
-  const russell = russellEngine({
+  const russell = guardOwnPriceEntry(russellEngine({
     rsSmall: rotation.rsSmall, rsGrowth: rotation.rsGrowth,
     breadth50, breadth200, concentrationScore: data.concentrationScore,
     phase, phaseData, phaseConfirmation, crash, vix, historyMetrics,
     rotationDecay, rotationConfirm, participation, internalDivergence,
     marketQuality, priceMomentum, gamma
-  });
+  }), priceMomentum.rut, "RUSSELL_CALL", isHistoricalScenario);
 
   /* =====================================================
   SYSTEM HEAT — FINAL
@@ -1155,7 +1159,7 @@ export function marketEngine(
   FINAL PUT TIMING
   ===================================================== */
 
-  const putTiming = putTimingEngine({
+  const putTiming = guardOwnPriceEntry(putTimingEngine({
     structure,
     breadth20,
     breadth50,
@@ -1163,11 +1167,11 @@ export function marketEngine(
     fragility,
     vix,
     phase, phaseData, rotation, rotationConfirm, crash,
-    earlyWarning, historyMetrics, priceMomentum,
+    earlyWarning, historyMetrics, priceMomentum: priceMomentumForIndex(priceMomentum, "ndx"),
     participation, liquidity, dangerZone, marketDrivers,
     regimeSync, breadthThrust, marketQuality, rotationDecay,
     regimePersistence, gamma
-  });
+  }), priceMomentum.ndx, "NASDAQ_PUT", isHistoricalScenario);
 
   /* Risk confirmation uses the completed risk components.
    * It is consumed by the decision layer, not Execution State.
@@ -1324,7 +1328,7 @@ export function marketEngine(
   };
 
   const nonFiniteMasterInputs = Object.entries(masterDiagnostics)
-    .filter(([, value]) => !Number.isFinite(Number(value)))
+    .filter(([, value]) => finiteValue(value) === null)
     .map(([name, value]) => ({ name, value }));
 
   if (nonFiniteMasterInputs.length > 0) {
@@ -1430,13 +1434,13 @@ export function marketEngine(
     dangerZone, marketData: data.marketData ?? {}, gamma
   });
 
-  const nasdaqCall = nasdaqEngine({
+  const nasdaqCall = guardOwnPriceEntry(nasdaqEngine({
     ...data,
     phase, phaseData, crash, rotation, putTiming, earlyWarning,
     historyMetrics, priceMomentum, marketQuality, participation,
     breadthThrust, liquidity, regimeSync, executionState,
     master, gamma
-  });
+  }), priceMomentum.ndx, "NASDAQ_CALL", isHistoricalScenario);
 
   /* =====================================================
   POSITIONING

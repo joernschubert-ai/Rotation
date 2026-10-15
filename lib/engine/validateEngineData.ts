@@ -1,13 +1,5 @@
-export function validateEngineData(data: any) {
+import { engineDataIssues } from "./marketInputIntegrity";
 
-if (!data) return false;
-
-if (!data.rotation) return false;
-if (typeof data.rotation.rsSmall !== "number") return false;
-if (typeof data.rotation.rsGrowth !== "number") return false;
-if (typeof data.rotation.rsEqual !== "number") return false;
-
-if (!data.marketData) return false;
-
-return true;
+export function validateEngineData(data: any): boolean {
+  return engineDataIssues(data).length === 0;
 }
