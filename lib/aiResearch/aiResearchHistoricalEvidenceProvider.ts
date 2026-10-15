@@ -109,7 +109,7 @@ const limitations: string[] = [
 "Historical outcomes describe underlying-index returns, not Optionsschein performance.",
 "Overlapping forward-return windows reduce effective sample independence.",
 "No predictive trading edge is established by these descriptive statistics.",
-"No matched-control or risk-adjusted baseline is supplied by this dataset.",
+"The unconditional baseline uses each aligned historical date once per horizon. It is not a matched control, risk adjustment or out-of-sample test.",
 ];
 
 if (sampleSize < 30) {
@@ -148,7 +148,8 @@ OBSERVATION MAPPING
 
 function buildObservation(
 statistics: HistoricalPriceVixResearchStatistics,
-horizon: AIHistoricalEvidenceHorizon
+horizon: AIHistoricalEvidenceHorizon,
+baseline?: HistoricalPriceVixHorizonStatistics
 ): AIHistoricalEvidenceObservation {
 const horizonStats = getHorizonStatistics(
 statistics,
@@ -192,11 +193,12 @@ averageMAE: finiteOrNull(
 horizonStats?.averageMAE
 ),
 
-baselineSampleSize: null,
+baselineSampleSize: baseline?.available ?? null,
 
-baselineAverageReturn: null,
+baselineAverageReturn: finiteOrNull(baseline?.averageReturn),
 
-excessReturn: null,
+excessReturn: finiteOrNull(horizonStats?.averageReturn) !== null && finiteOrNull(baseline?.averageReturn) !== null
+? horizonStats!.averageReturn! - baseline!.averageReturn! : null,
 
 overlappingObservations: true,
 
@@ -315,7 +317,7 @@ const observations: AIHistoricalEvidenceObservation[] =
 for (const statistics of dataset.statistics) {
 for (const horizon of HORIZONS) {
 observations.push(
-buildObservation(statistics, horizon)
+buildObservation(statistics, horizon, dataset.baselineStatistics?.find(item => item.horizon === horizon))
 );
 }
 }

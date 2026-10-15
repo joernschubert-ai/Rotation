@@ -1272,9 +1272,11 @@ return null;
 }
 
 
-return parsed
-.toISOString()
-.slice(0, 10);
+const parts = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+}).formatToParts(parsed);
+const get = (key: string) => parts.find(item => item.type === key)?.value ?? "";
+return get("year") + "-" + get("month") + "-" + get("day");
 
 }
 
@@ -3125,7 +3127,7 @@ evidence.push(
 
 
 evidence.push(
-`Trusted research history currently spans ${history.uniqueTradingDays} trading day(s).`
+`Trusted research history currently spans ${history.uniqueTradingDays} observed market date(s).`
 );
 
 
@@ -3351,10 +3353,10 @@ confidence
 
 summary:
 state === "SUPPORTS"
-? `Trusted research history supports the current structural thesis across ${history.uniqueTradingDays} trading day(s).`
+? `Trusted research history supports the current structural thesis across ${history.uniqueTradingDays} observed market date(s).`
 : state === "CONTRADICTS"
-? `Trusted research history contradicts the current structural thesis across ${history.uniqueTradingDays} trading day(s).`
-: `Trusted research history does not yet strongly confirm the current structural thesis across ${history.uniqueTradingDays} trading day(s).`,
+? `Trusted research history contradicts the current structural thesis across ${history.uniqueTradingDays} observed market date(s).`
+: `Trusted research history does not yet strongly confirm the current structural thesis across ${history.uniqueTradingDays} observed market date(s).`,
 
 evidence:
 uniqueStrings(
@@ -4463,7 +4465,7 @@ history.available
 ? `Observed across ${Math.max(
 1,
 history.consecutiveTensionTradingDays
-)} consecutive trading day(s) in available research history.`
+)} successive observed market date(s) in available research history.`
 : "Historical duration cannot yet be established reliably.",
 ].join(" "),
 
@@ -4848,7 +4850,8 @@ data: ExtractedSnapshot,
 history: HistoryResearchSummary,
 cot: COTResearchSummary,
 sources: AIResearchInput["sources"],
-referenceTime?: string
+referenceTime?: string,
+rawSnapshot?: AIResearchInput["snapshot"]
 ): AIResearchEvidenceAssessment {
 
 const structuralBias =
@@ -4964,7 +4967,7 @@ tension,
 data
 );
 
-const opportunityState =
+const proposedOpportunityState =
 determineOpportunityState(
 structuralBias,
 confirmation,
@@ -4972,6 +4975,24 @@ contradiction,
 entryMaturity,
 tension
 );
+
+// Structure-only research cannot promote an unapproved trade to an entry.
+// This is an execution-availability guard, not independent edge validation.
+const raw = rawSnapshot ?? {};
+const stack = objectValue(raw.tradeStack);
+const sizing = objectValue(raw.positionSizing ?? raw.sizing);
+const bearish = structuralBias === "BEARISH";
+const flowName = bearish ? "nasdaqPut" : "nasdaqCall";
+const flow = objectValue(stack[flowName]);
+const size = optionalNumber(objectValue(sizing[flowName]).size);
+const timing = objectValue(bearish ? raw.putTiming : raw.nasdaqCall);
+const explicitExecution = ["SMALL STARTER", "PARTIAL SIZE", "FULL SIZE"].includes(stringValue(timing.execution));
+const entryOpen = bearish ? timing.entryWindow === "OPEN" && explicitExecution : explicitExecution;
+const blocked = Array.isArray(flow.blockReasons) && flow.blockReasons.length > 0;
+const approved = flow.eligible === true && size !== null && size > 0 && entryOpen && !blocked;
+const entryStates = ["EARLY_STARTER", "CONFIRM", "SCALE_IN"];
+const opportunityState: AIResearchOpportunityState = entryStates.includes(proposedOpportunityState) && !approved
+  ? "ARMED" : proposedOpportunityState;
 
 return {
 
@@ -4996,6 +5017,7 @@ summary:
 `Contradiction ${contradiction}.`,
 `Entry maturity ${entryMaturity}.`,
 `Research opportunity state ${opportunityState}.`,
+...(opportunityState !== proposedOpportunityState ? ["Entry promotion withheld: the snapshot does not contain an eligible, funded and open Nasdaq flow. Research remains observational."] : []),
 `Price-vs-structure tension ${tension.state}.`,
 `COT positioning ${cot.available ? cot.overallDirection : "NOT_AVAILABLE"}.`,
 `External evidence ${externalEvidence.state} with ${externalEvidence.strength} strength and confidence ${Math.round(
@@ -5053,7 +5075,7 @@ significance:
 [
 "Defensive internal structure is not yet fully confirmed by NASDAQ price behavior.",
 history.consecutiveTensionTradingDays > 0
-? `The conflict has persisted for ${history.consecutiveTensionTradingDays} trading day(s) in available research history.`
+? `The conflict has persisted for ${history.consecutiveTensionTradingDays} observed market date(s) in available research history.`
 : "",
 ]
 .filter(Boolean)
@@ -6039,7 +6061,7 @@ history.available
 ? `Defensive internals coexist with constructive NASDAQ price behavior across ${Math.max(
 1,
 history.consecutiveTensionTradingDays
-)} consecutive trading day(s) in available research history.`
+)} successive observed market date(s) in available research history.`
 : "Defensive internals coexist with constructive NASDAQ price behavior.",
 
 evidenceType:
@@ -6316,7 +6338,7 @@ data.masterScore
 `Price-vs-structure tension: ${evidenceAssessment.tension.state}.`,
 
 history.available
-? `Research history: ${history.snapshotCount} snapshot(s) across ${history.uniqueTradingDays} trading day(s).`
+? `Research history: ${history.snapshotCount} snapshot(s) across ${history.uniqueTradingDays} observed market date(s).`
 : "Research history: not available.",
 
 `Detected divergences: ${divergences.length}.`,
@@ -6379,7 +6401,8 @@ data,
 history,
 cot,
 input.sources,
-stringValue(input.snapshot.timestamp)
+stringValue(input.snapshot.timestamp),
+input.snapshot
 );
 
 
@@ -6474,8 +6497,11 @@ input.history.length,
 sourceCount:
 input.sources?.length ?? 0,
 warnings: [
+...(input.historyQuality?.warnings ?? []),
+...(input.historyQuality ? [`Research history policy ${input.historyQuality.policy}: ${input.historyQuality.comparableStructureDates} comparable structural date(s); ${input.historyQuality.retainedPriceDates} raw price-reference date(s) retained since ${input.historyQuality.trustedStart}.`] : []),
 "Research confirmation and confidence are heuristic, not calibrated probabilities or validated trading edge.",
 "App structure, history, rotation and liquidity share one confirmation family; raw price is separate but independence is not proven.",
+"Research entry states require an eligible, funded and open snapshot flow; they are not validated independent entry recommendations.",
 cotTimeUsable ? "COT publication time is unknown; positioning is weekly context and cannot be point-in-time validated." : "COT excluded: position date is missing, future-dated or older than 14 calendar days relative to the snapshot."
 ],
 

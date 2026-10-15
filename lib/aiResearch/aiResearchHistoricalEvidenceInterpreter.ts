@@ -65,6 +65,10 @@ number;
 meanMedianDisagreement:
 boolean;
 
+baselineSampleSize: number | null;
+baselineAverageReturn: number | null;
+excessReturn: number | null;
+
 /*
 * This is a description of historical data,
 * not a forecast confidence score.
@@ -251,7 +255,8 @@ direction === "INSUFFICIENT_DATA"
 `positive Beobachtungen ${formatPercent(
 observation.positiveRate
 )}, ` +
-`n=${observation.sampleSize}.`
+`n=${observation.sampleSize}. ` +
+`Unbedingter Nasdaq-Vergleich ${formatPercent(observation.baselineAverageReturn)} (n=${observation.baselineSampleSize ?? "n/a"}); Differenz ${formatPercent(observation.excessReturn).replace("%", "")} Prozentpunkte. Kein nachgewiesener Prognosevorteil.`
 );
 
 return {
@@ -277,6 +282,10 @@ sampleSize:
 observation.sampleSize,
 
 meanMedianDisagreement,
+
+baselineSampleSize: observation.baselineSampleSize,
+baselineAverageReturn: observation.baselineAverageReturn,
+excessReturn: observation.excessReturn,
 
 summary,
 
@@ -460,7 +469,8 @@ horizon.averageForwardReturn
 `Median ${formatPercent(
 horizon.medianForwardReturn
 )}, ` +
-`n=${horizon.sampleSize}.`;
+`n=${horizon.sampleSize}. ` +
+`Unbedingter Vergleich ${formatPercent(horizon.baselineAverageReturn)}; Differenz ${formatPercent(horizon.excessReturn).replace("%", "")} Prozentpunkte.`;
 
 /*
 * Supporting means historically positive
@@ -535,7 +545,7 @@ states.length === 0
 `positivem Mittelwert und Median, ` +
 `${counterObservations.length} Horizonte mit ` +
 `negativem Mittelwert und Median. ` +
-`Die Ergebnisse sind deskriptiv und keine Handelssignale.`
+`Absolute Renditen sind vom unbedingten Nasdaq-Vergleich zu unterscheiden; die Differenz wird je Horizont ausgewiesen. Die Ergebnisse sind deskriptiv und keine Handelssignale.`
 );
 
 return {

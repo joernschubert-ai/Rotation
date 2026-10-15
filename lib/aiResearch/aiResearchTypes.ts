@@ -98,6 +98,16 @@ AI RESEARCH INPUT
 ===================================================== */
 
 export interface AIResearchInput {
+/** Raw index archive, kept separate from comparable structural observations. */
+priceHistory?: AIResearchHistory;
+historyQuality?: {
+policy: string;
+trustedStart: string;
+currentVersionKnown: boolean;
+retainedPriceDates: number;
+comparableStructureDates: number;
+warnings: string[];
+};
 snapshot: AIResearchSnapshot;
 history: AIResearchHistory;
 context: AIResearchContext;
