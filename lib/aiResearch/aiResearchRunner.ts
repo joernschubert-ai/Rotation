@@ -2,6 +2,7 @@ import { loadMarketHistory } from "@/lib/history/marketHistory";
 import { buildAIResearchContext } from "./aiResearchContext";
 import { runAIResearch } from "./aiResearchEngine";
 import { buildAIResearchDecisionSupport } from "./aiResearchDecisionSupport";
+import { synthesizeResearch } from "./aiResearchCloudflare";
 import { fetchExternalResearchSources } from "./aiResearchExternalSources";
 import { selectTopResearchSources } from "./aiResearchSourceRelevance";
 import { fetchCOTData } from "./aiResearchCOTProvider";
@@ -12,6 +13,7 @@ import type { AIResearchResult, AIResearchTask } from "./aiResearchTypes";
 export interface RunAIResearchFromHistoryInput {
   task: AIResearchTask;
   question?: string;
+  allowAIGeneration?: boolean;
 }
 
 function message(error: unknown): string {
@@ -98,6 +100,11 @@ export async function runAIResearchFromHistory(
     }
     if (result.status === "SUCCESS" && result.report) {
       result.report = { ...result.report, decisionSupport: buildAIResearchDecisionSupport(result.report, currentSnapshot) };
+      try {
+        result.report.aiSynthesis = await synthesizeResearch(researchInput, result.report, input.allowAIGeneration === true);
+      } catch {
+        warnings.push("KI-Synthese nicht verfügbar; regelbasierter Bericht bleibt unverändert.");
+      }
     }
     result.diagnostics = {
       ...result.diagnostics,
