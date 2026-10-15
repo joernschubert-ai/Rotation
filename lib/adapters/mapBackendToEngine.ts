@@ -34,8 +34,8 @@ export function mapBackendToEngine(data: any) {
     const source = marketData[symbol] ?? {};
 
     return {
-      value: numberOr(source.current, 0),
-      change: numberOr(source.change, 0),
+      value: positiveNumber(source.current),
+      change: finiteNumber(source.change),
     };
   }
 
@@ -61,14 +61,14 @@ export function mapBackendToEngine(data: any) {
   };
 
   // Backend relative-performance differences arrive as decimals.
-  function toRatio(value: any): number {
+  function toRatio(value: any): number | null {
     const delta = finiteNumber(value);
 
-    if (delta === null) return 1;
+    if (delta === null) return null;
 
     const ratio = 1 + delta;
 
-    return Number.isFinite(ratio) ? ratio : 1;
+    return Number.isFinite(ratio) && ratio > 0 ? ratio : null;
   }
 
   const details = data.rotationDetails ?? {};
@@ -77,12 +77,9 @@ export function mapBackendToEngine(data: any) {
   const rsGrowth = toRatio(details.rsGrowth20);
 
   // RSP minus SPY performance arrives in percentage points.
-  const concentrationDivergence = numberOr(
-    details.concentrationDivergence,
-    0
-  );
+  const concentrationDivergence = finiteNumber(details.concentrationDivergence);
 
-  const rsEqual = 1 + concentrationDivergence / 100;
+  const rsEqual = concentrationDivergence === null ? null : 1 + concentrationDivergence / 100;
 
   // Convert the discrete backend level 0..3 exactly once.
   const rawConcentration = finiteNumber(
@@ -100,7 +97,7 @@ export function mapBackendToEngine(data: any) {
 
   const concentrationScore =
     concentrationScoreRaw === null
-      ? 0
+      ? null
       : (concentrationScoreRaw / 3) * 100;
 
   const rotation = {
@@ -111,10 +108,10 @@ export function mapBackendToEngine(data: any) {
     strength: numberOr(data.rotationStrength, 0),
   };
 
-  const moveIndex = numberOr(data.moveIndex, 0);
-  const vixTermRatio = numberOr(data.vixTermRatio, 1);
-  const volOfVolRatio = numberOr(data.volOfVolRatio, 1);
-  const skewRatio = numberOr(data.optionsSkewRatio, 100);
+  const moveIndex = positiveNumber(data.moveIndex);
+  const vixTermRatio = positiveNumber(data.vixTermRatio);
+  const volOfVolRatio = positiveNumber(data.volOfVolRatio);
+  const skewRatio = positiveNumber(data.optionsSkewRatio);
 
   /*
    * Preserve distinct credit quantities:
@@ -221,7 +218,7 @@ export function mapBackendToEngine(data: any) {
     breadthDataQuality,
 
     marketLiquidityScore:
-      numberOr(data.marketLiquidityScore, 0),
+      finiteNumber(data.marketLiquidityScore),
 
     gammaExposure:
       numberOr(data.gammaExposure, 0),
@@ -245,9 +242,9 @@ export function mapBackendToEngine(data: any) {
       momentum: numberOr(data.crashMomentum, 0),
     },
 
-    breadth20: numberOr(data.breadth20, 0),
-    breadth50: numberOr(data.breadth50, 0),
-    breadth200: numberOr(data.breadth200, 0),
+    breadth20: finiteNumber(data.breadth20),
+    breadth50: finiteNumber(data.breadth50),
+    breadth200: finiteNumber(data.breadth200),
 
     advanceDecline: numberOr(data.advanceDecline, 0),
     advances: numberOr(data.advances, 0),
