@@ -1,6 +1,5 @@
 import type {
 AIResearchReport,
-AIResearchStructuralBias,
 } from "./aiResearchTypes";
 
 import type {
@@ -106,83 +105,15 @@ report.summary,
 };
 }
 
-/* =================================================
-* CURRENT STRUCTURAL RESEARCH BIAS
-* ================================================= */
-
-const structuralBias:
-AIResearchStructuralBias =
-report.evidenceAssessment?.structuralBias ??
-"NEUTRAL";
-
-const supportingEvidence = [
-...report.thesis.supportingEvidence,
-];
-
-const counterEvidence = [
-...report.thesis.counterEvidence,
-];
-
-/*
-* The interpreter uses:
-*
-* supportingObservations = positive Nasdaq returns
-* counterObservations = negative Nasdaq returns
-*
-* These are reclassified relative to the
-* current structural research bias.
-*
-* IMPORTANT:
-*
-* Classification describes historical alignment,
-* not validated predictive confirmation.
-*/
-
-if (structuralBias === "BEARISH") {
-
-for (
-const finding of
-interpretation.supportingObservations
-) {
-counterEvidence.push(
-historicalFinding(finding)
-);
-}
-
-for (
-const finding of
-interpretation.counterObservations
-) {
-supportingEvidence.push(
-historicalFinding(finding)
-);
-}
-
-} else if (structuralBias === "BULLISH") {
-
-for (
-const finding of
-interpretation.supportingObservations
-) {
-supportingEvidence.push(
-historicalFinding(finding)
-);
-}
-
-for (
-const finding of
-interpretation.counterObservations
-) {
-counterEvidence.push(
-historicalFinding(finding)
-);
-}
-
-} else {
-// Neutral/mixed theses have no direction to support or contradict.
-// Descriptive findings remain in historicalEvidence and the report summary.
-}
-
+/* Absolute forward returns remain descriptive context.
+ * Positive average returns do not demonstrate outperformance against the
+ * normal index return; negative returns alone do not establish a short edge.
+ * The existing interpreter groups findings by absolute return sign, so its
+ * output must not be relabelled as thesis support or contradiction.
+ * Keep every structured observation attached for later baseline evaluation.
+ */
+const supportingEvidence = [...report.thesis.supportingEvidence];
+const counterEvidence = [...report.thesis.counterEvidence];
 /* =================================================
 * HISTORICAL RESEARCH LIMITATIONS
 * ================================================= */
@@ -202,7 +133,7 @@ explanation: [
 (interpretation.asOfDate ?? "unknown") +
 ".",
 
-"Historical Nasdaq outcomes are descriptive.",
+"Historical Nasdaq outcomes are descriptive. Absolute return signs are not classified as support or contradiction of the current thesis; baseline-relative evidence is not established.",
 
 "Overlapping observations and correlated " +
 "state families are not independent " +
