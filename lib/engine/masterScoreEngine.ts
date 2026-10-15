@@ -130,6 +130,9 @@ export function masterScoreEngine(engine: any) {
   const phaseConfirmation = input.phaseConfirmation ?? {};
   const priceMomentum = input.priceMomentum ?? {};
 
+  // A partial deterioration score is a lower bound, not measured absence of risk.
+  const breadthVelocityIncomplete = breadthVelocity.dataQuality?.complete === false;
+
   /* =====================================================
   SAFE COMPONENT INPUTS
 
@@ -156,6 +159,9 @@ export function masterScoreEngine(engine: any) {
   const missingInputs = Object.entries(raw)
     .filter(([, value]) => value === null)
     .map(([name]) => name);
+  if (breadthVelocityIncomplete && !missingInputs.includes("breadthVelocity")) {
+    missingInputs.push("breadthVelocity");
+  }
 
   const crashScore = clamp(raw.crashScore ?? 50);
   const crashProbability = clamp(raw.crashProbability ?? 50);
@@ -166,7 +172,9 @@ export function masterScoreEngine(engine: any) {
   const fragilityScore = clamp(raw.fragility ?? 50);
   const rotationDecayScore = clamp(raw.rotationDecay ?? 50);
   const marketQualityScore = clamp(raw.marketQuality ?? 50);
-  const breadthVelocityScore = clamp(raw.breadthVelocity ?? 50);
+  const breadthVelocityScore = clamp(breadthVelocityIncomplete
+    ? Math.max(50, raw.breadthVelocity ?? 50)
+    : raw.breadthVelocity ?? 50);
   const regimeSyncScore = clamp(raw.regimeSync ?? 50);
   const dangerScore = clamp(raw.dangerZone ?? 50);
   const priceMomentumScore = clamp(raw.priceMomentum ?? 50);
@@ -211,7 +219,8 @@ export function masterScoreEngine(engine: any) {
   );
 
   const phaseConfirmed =
-    phaseConfirmation.confirmed === true;
+    phaseConfirmation.confirmed === true &&
+    phaseData.dataQuality?.classificationIsProvisional !== true;
 
   const distributionPhase =
     phase === "PHASE_3_DISTRIBUTION";
@@ -1075,7 +1084,7 @@ export function masterScoreEngine(engine: any) {
     },
 
     diagnostics: {
-      calculationVersion: "MATURITY_WEIGHTED_HISTORY_V3",
+      calculationVersion: "MATURITY_WEIGHTED_HISTORY_V4_INPUT_QUALITY",
       historicalMix,
       observedHistoricalRisk,
       historyTargetObservations: 21,
@@ -1097,6 +1106,9 @@ export function masterScoreEngine(engine: any) {
       baseContributions,
 
       timingAndRussellDirectScoreWeight: 0,
+      breadthVelocityInputScore: raw.breadthVelocity,
+      breadthVelocityIncomplete,
+      breadthVelocityMissingDataPolicy: "NEUTRAL_FLOOR_PRESERVE_OBSERVED_RISK",
       weightsCalibratedByThisAudit: false
     },
 
