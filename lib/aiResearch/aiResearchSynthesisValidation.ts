@@ -1,7 +1,7 @@
 import type { ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 import type { SynthesisEvidence } from "./aiResearchSynthesisEvidence";
 
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V2";
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V3_QUALITATIVE_CONDITIONS";
 export const SYNTHESIS_INSTRUMENTS = ["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const;
 export const SYNTHESIS_ACTIONS = ["WATCH", "PREPARE", "STARTER_CANDIDATE", "CONFIRM", "REDUCE"];
 const object = (value: unknown): Record<string, any> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -44,8 +44,14 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
       if (!useful(flow[key])) issues.push(`${instrument}:EMPTY_OR_PLACEHOLDER_${key.toUpperCase()}`);
     }
     for (const key of ["confirmation", "invalidation"]) {
+      // This contract accepts qualitative observable triggers. Numeric trade
+      // thresholds require a future, explicitly calculated chart-level schema.
+      // Matching a number to any sample count or lookback is not a derivation.
+      if (typeof flow[key] === "string" && /\d|%|\bprozent(?:punkt)?(?:e|en)?\b/i.test(flow[key])) {
+        issues.push(`${instrument}:UNSUPPORTED_NUMERIC_${key.toUpperCase()}`);
+      }
       if (typeof flow[key] === "string" && (!/nasdaq|russell|kurs|preis|rendit|momentum|teilnahme|partizipation|liquid|rotation|marktbreit|breadth|participation|durchschnitt|ma(?:20|50|200)/i.test(flow[key]) ||
-        !/steig|fall|fäll|sink|dreh|erhol|verschlech|stabilis|bestätig|zurück|schwäch|verbess|unter|über|beschleun|zunehm|abnehm|aktuali|vorlieg|verfüg|halt|hält|ausweit|verlier|verliert|brech|brich|rück/i.test(flow[key]))) issues.push(`${instrument}:UNOBSERVABLE_${key.toUpperCase()}`);
+        !/steig|fall|fäll|sink|dreh|erhol|verschlech|stabilis|bestätig|zurück|schwäch|verbess|unter|über|beschleun|zunehm|abnehm|aktuali|vorlieg|verfüg|halt|hält|ausweit|verlier|verliert|brech|brich|rück|korrektur|rally|abgabe|anstieg|ausbruch|scheiter|höher|tiefer|zuleg|gewinnt|nachgibt|nachgeben/i.test(flow[key]))) issues.push(`${instrument}:UNOBSERVABLE_${key.toUpperCase()}`);
     }
     for (const key of ["evidenceRefs", "confirmationRefs", "invalidationRefs"]) {
       if (!refs(flow[key])) issues.push(`${instrument}:INVALID_${key.toUpperCase()}`);
