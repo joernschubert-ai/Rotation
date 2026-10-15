@@ -1,6 +1,7 @@
 import { loadMarketHistory } from "@/lib/history/marketHistory";
 import { buildAIResearchContext } from "./aiResearchContext";
 import { runAIResearch } from "./aiResearchEngine";
+import { buildAIResearchDecisionSupport } from "./aiResearchDecisionSupport";
 import { fetchExternalResearchSources } from "./aiResearchExternalSources";
 import { selectTopResearchSources } from "./aiResearchSourceRelevance";
 import { fetchCOTData } from "./aiResearchCOTProvider";
@@ -94,6 +95,9 @@ export async function runAIResearchFromHistory(
           summary: `${result.report.summary} Historical dataset as of ${historicalEvidence.asOfDate ?? "UNKNOWN"}; no comparable current-day state match. Dated observations and baseline returns remain descriptive context only.`,
         };
       }
+    }
+    if (result.status === "SUCCESS" && result.report) {
+      result.report = { ...result.report, decisionSupport: buildAIResearchDecisionSupport(result.report, currentSnapshot) };
     }
     result.diagnostics = {
       ...result.diagnostics,

@@ -345,6 +345,17 @@ RESEARCH REPORT
 ===================================================== */
 
 export interface AIResearchReport {
+decisionSupport?: {
+action: string;
+reason: string;
+asymmetry: string;
+snapshotTimestamp: string;
+flows: Array<{ instrument: string; eligible: boolean; modelSize: number | null; execution: string; reason: string }>;
+evidence: Array<{ category: string; state: string; summary: string }>;
+confirmation: string[];
+invalidation: string[];
+limitations: string[];
+};
 generatedAt: string;
 task: AIResearchTask;
 
