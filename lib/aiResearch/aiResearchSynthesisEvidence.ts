@@ -120,18 +120,16 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     evidence.push({ id: `HISTORY_${market}`, kind: "HISTORY", market,
       available: ownStudies.some(study => study.statistics.some(stats => stats.sampleSize > 0)),
       data: {
+        statisticsColumns: ["horizonDays", "sampleSize", "meanReturn", "medianReturn", "p10Return", "p90Return", "positiveRate", "meanMaximumRise", "meanMaximumFall", "baselineSampleSize", "baselineMeanReturn", "excessMeanReturn", "nonOverlappingSampleSize", "nonOverlappingMeanReturn"],
         studies: ownStudies.map(study => ({ family: study.family, state: study.state, asOfDate: study.asOfDate,
           currentMatch: study.currentMatch && study.asOfDate === marketDate, definition: study.definition,
-          statistics: study.statistics.map(stats => {
+          statisticsRows: study.statistics.map(stats => {
             const rounded = (value: number | null) => value === null ? null : Number(value.toFixed(4));
-            return { horizonDays: stats.horizonDays, sampleSize: stats.sampleSize,
-              meanReturn: rounded(stats.meanReturn), medianReturn: rounded(stats.medianReturn),
-              p10Return: rounded(stats.p10Return), p90Return: rounded(stats.p90Return), positiveRate: rounded(stats.positiveRate),
-              meanMaximumRise: rounded(stats.meanMaximumRise), meanMaximumFall: rounded(stats.meanMaximumFall),
-              baselineSampleSize: stats.baselineSampleSize, baselineMeanReturn: rounded(stats.baselineMeanReturn),
-              excessMeanReturn: rounded(stats.excessMeanReturn),
-              nonOverlapping: { sampleSize: stats.nonOverlapping.sampleSize, meanReturn: rounded(stats.nonOverlapping.meanReturn) }
-            };
+            return [stats.horizonDays, stats.sampleSize, rounded(stats.meanReturn), rounded(stats.medianReturn),
+              rounded(stats.p10Return), rounded(stats.p90Return), rounded(stats.positiveRate),
+              rounded(stats.meanMaximumRise), rounded(stats.meanMaximumFall), stats.baselineSampleSize,
+              rounded(stats.baselineMeanReturn), rounded(stats.excessMeanReturn),
+              stats.nonOverlapping.sampleSize, rounded(stats.nonOverlapping.meanReturn)];
           }) })),
         interpretation: "Own-index 5/20/60 aligned-observation outcomes. Mean, median and tails are descriptive, not calibrated forecasts. Maximum rise/fall use daily closes including entry zero; reverse their directional meaning for PUT. Non-overlapping subset is not independent validation. No COT-conditioned or combined-factor edge has been established. Do not infer non-existent options-market activity from app permissions."
       } });
