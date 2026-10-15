@@ -78,13 +78,22 @@ export async function runAIResearchFromHistory(
     });
     const result = runAIResearch(researchInput);
     if (result.status === "SUCCESS" && result.report && historicalEvidence) {
+      // Always retain dated descriptive data, including baselines and failures.
+      // A missing current-day match must not silently remove the whole dataset.
+      result.report = { ...result.report, historicalEvidence };
       // The existing renderer is used only when matching refers to the snapshot day.
       // Older descriptive results remain cached; they are not relabelled as live matches.
       if (historicalEvidence.currentStates.some(state => state.comparable)) {
         try {
           result.report = enrichAIResearchWithHistoricalEvidence(result.report, historicalEvidence);
         } catch (error) { warnings.push(`Historical report enrichment unavailable: ${message(error)}`); }
-      } else warnings.push("Historical live-state matching omitted: no comparable state for the snapshot date. Cached historical data were preserved.");
+      } else {
+        warnings.push("Historical live-state matching omitted: no comparable state for the snapshot date. Dated historical data remain attached as descriptive context.");
+        result.report = {
+          ...result.report,
+          summary: `${result.report.summary} Historical dataset as of ${historicalEvidence.asOfDate ?? "UNKNOWN"}; no comparable current-day state match. Dated observations and baseline returns remain descriptive context only.`,
+        };
+      }
     }
     result.diagnostics = {
       ...result.diagnostics,
