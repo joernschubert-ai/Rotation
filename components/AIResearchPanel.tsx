@@ -102,7 +102,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     const request = new AbortController(); controller.current = request;
     setLoading(true); setError(null);
     try {
-      const response = await fetch("/api/ai-research/dashboard?task=DAILY_MARKET_REVIEW", { cache: "no-store", signal: request.signal });
+      const response = await fetch("/api/ai-research/dashboard?task=DAILY_MARKET_REVIEW", { method: "POST", cache: "no-store", credentials: "same-origin", signal: request.signal });
       const result: ResponseData = await response.json();
       if (!response.ok || result.status !== "SUCCESS" || !result.report) throw new Error(result.error ?? "Kein vollständiger Research-Bericht verfügbar.");
       if (id === requestId.current && !request.signal.aborted) setData(result);
@@ -131,6 +131,21 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     {!report && marketReady && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
     {report && <>
       <AIResearchDecisionSummary report={report} snapshotTimestamp={data?.diagnostics?.snapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+      <section className="border border-[#344656] bg-[#10151a] p-4 sm:p-5" aria-label="Unabhängige KI-Einschätzung">
+        <h3 className="text-sm font-semibold text-[#c4d8e8]">Unabhängige KI-Einschätzung</h3>
+        {report.aiSynthesis?.status === "SUCCESS" && report.aiSynthesis.content && !loading && !error && marketReady && !snapshotMismatch ? <>
+          <p className="mt-3 text-sm leading-relaxed text-[#ddd]">{report.aiSynthesis.content.summary}</p>
+          <p className="mt-3 text-xs leading-relaxed text-amber-200/80">{report.aiSynthesis.content.asymmetry}</p>
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">{report.aiSynthesis.content.flows.map(flow => <div key={flow.instrument} className="border border-[#344656] p-3 text-xs leading-relaxed">
+            <h4 className="font-semibold text-[#ddd]">{flow.instrument} · {({ WATCH: "Beobachten", PREPARE: "Vorbereiten", STARTER_CANDIDATE: "Früher Einstiegskandidat", CONFIRM: "Bestätigung prüfen", REDUCE: "Risiko reduzieren prüfen" })[flow.assessment]}</h4>
+            <p className="mt-2 text-[#bbb]">{flow.reasoning}</p>
+            <p className="mt-2 text-[#aaa]">Bestätigung: {flow.confirmation}</p>
+            <p className="mt-2 text-[#aaa]">Verwerfen: {flow.invalidation}</p>
+          </div>)}</div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2"><div><h4 className="mb-2 text-xs text-[#ccc]">Gegenargumente</h4><List items={report.aiSynthesis.content.counterarguments} /></div><div><h4 className="mb-2 text-xs text-[#ccc]">Grenzen der Einschätzung</h4><List items={report.aiSynthesis.content.limitations} /></div></div>
+          <p className="mt-4 text-[10px] text-[#888]">Cloudflare · Llama 3.3 70B · erstellt {date(report.aiSynthesis.generatedAt)}{report.aiSynthesis.cached ? " · gespeichert wiederverwendet" : ""}. Research-Kandidaten sind keine App-Freigaben. Maßgeblich für Modellanteile bleibt die App-Entscheidung oben.</p>
+        </> : <p className="mt-3 text-xs text-[#999]">{loading || snapshotMismatch || !marketReady || error ? "Aktuelle KI-Einschätzung ausgesetzt, bis der Marktstand abgeglichen ist." : report.aiSynthesis?.message ?? "Noch keine KI-Einschätzung verfügbar. Angezeigt wird die regelbasierte App-Auswertung."}</p>}
+      </section>
       <Detail title="Begründung: App, Kurse, COT und Nachrichten">
         <p className="text-xs leading-relaxed text-[#bbb]">{report.thesis.statement}</p>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{evidence.map(block => <div key={block.category} className="border border-[#292929] p-3">
