@@ -34,7 +34,9 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     } };
   const payload = JSON.stringify({ contractVersion: SYNTHESIS_CONTRACT, snapshotTimestamp, task: input.context.task, question: text(input.context.question, 500), evidence });
   if (payload.length > 26000) return unavailable("Die Belege überschreiten die festgelegte Eingabegrenze. Keine KI-Anfrage ausgelöst.");
-  const cacheKey = `${PREFIX}:cache:${SYNTHESIS_CONTRACT}:${createHash("sha256").update(payload).digest("hex")}`;
+  // Response diagnostics changed; do not reuse a rejection whose wording was discarded.
+  // Daily quota, cooldown and lock namespaces deliberately remain unchanged.
+  const cacheKey = `${PREFIX}:cache:${SYNTHESIS_CONTRACT}:condition-audit-v1:${createHash("sha256").update(payload).digest("hex")}`;
   let redis: Redis;
   try { redis = Redis.fromEnv(); } catch { return unavailable("Der dauerhafte KI-Aufrufschutz ist nicht verfügbar. Keine KI-Anfrage ausgelöst."); }
   const lockKey = `${PREFIX}:lock`;
@@ -76,7 +78,15 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     try { content = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { content = null; }
     const issues = inspectSynthesis(content, evidence);
     if (issues.length) {
-      const rejected: ResearchSynthesis = { ...unavailable("KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."), quality: { ...quality, issues } };
+      const candidate = content && typeof content === "object" ? content as Record<string, unknown> : {};
+      const rejectedConditions = (Array.isArray(candidate.flows) ? candidate.flows : []).slice(0,3)
+        .filter((flow): flow is Record<string, unknown> => Boolean(flow && typeof flow === "object" && !Array.isArray(flow)))
+        .map(flow => ({ instrument: text(flow.instrument,40), confirmation: text(flow.confirmation,1200), invalidation: text(flow.invalidation,1200) }));
+      const conditionFailure = issues.every(issue => /UNOBSERVABLE_(CONFIRMATION|INVALIDATION)$/.test(issue));
+      const rejected: ResearchSynthesis = { ...unavailable(conditionFailure
+        ? "Die KI hat geantwortet, aber ihre Bestätigungs- oder Widerlegungsbedingungen sind nicht eindeutig prüfbar. Deshalb wird keine Einstiegsaussage angezeigt."
+        : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),
+        quality: { ...quality, issues, rejectedConditions } };
       // Cache rejected answers too; refreshing must not burn quota on the same frame.
       await redis.set(cacheKey, rejected, { ex: 900 });
       return rejected;

@@ -32,6 +32,8 @@ export interface ResearchSynthesis {
     availableEvidenceIds: string[];
     missingOwnPriceMarkets: string[];
     semanticTruthVerified: false;
+    /** Diagnostic text only. Never an approved recommendation or displayed content. */
+    rejectedConditions?: Array<{ instrument: string; confirmation: string; invalidation: string }>;
     inputSummary?: {
       prices: Array<{ market: string; current: number | null; momentum5D: number | null; momentum20D: number | null; quoteTimestamp: string | null; entryDataReady: boolean }>;
       cotReportDates: string[];
