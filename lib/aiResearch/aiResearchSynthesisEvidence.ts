@@ -1,0 +1,120 @@
+import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
+
+export type SynthesisMarket = "NASDAQ" | "RUSSELL_2000" | "SP500";
+export interface SynthesisEvidence {
+  id: string;
+  kind: "APP" | "PRICE" | "LAYER" | "COT" | "HISTORY" | "NEWS";
+  market?: SynthesisMarket;
+  available: boolean;
+  entryDataReady?: boolean;
+  data: Record<string, unknown>;
+}
+const object = (value: unknown): Record<string, any> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
+const finite = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) ? value : null;
+const text = (value: unknown, limit = 400): string | null => typeof value === "string" && value.trim() ? value.slice(0, limit) : null;
+const pick = (value: unknown, keys: string[]) => {
+  const data = object(value);
+  return Object.fromEntries(keys.filter(key => finite(data[key]) !== null || typeof data[key] === "boolean" || typeof data[key] === "string")
+    .map(key => [key, typeof data[key] === "string" ? text(data[key], 180) : data[key]]));
+};
+function iso(value: unknown): string | null {
+  return typeof value === "string" && /(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value)) ? value : null;
+}
+
+function priceEvidence(snapshot: Record<string, any>, market: SynthesisMarket, indexKey: string, momentumKey: string): SynthesisEvidence {
+  const quote = object(object(snapshot.indices)[indexKey]);
+  const bars = object(quote.priceMetrics);
+  const momentum = object(object(snapshot.priceMomentum)[momentumKey]);
+  const quality = object(momentum.dataQuality);
+  const barsQuality = object(bars.dataQuality);
+  const measured = object(quality.measured);
+  const current = [quote.value, quote.current, quote.price, bars.current, momentum.value].map(finite).find(value => value !== null && value > 0) ?? null;
+  function change(key: "momentum5D" | "momentum20D", barKey: "return5D" | "return20D") {
+    if (quality[`${key}Available`] === true) return finite(measured[key]) ?? finite(momentum[key]);
+    if (quality[`${key}Available`] === false) return null;
+    return barsQuality[`${key}Available`] === true ? finite(bars[barKey]) : null;
+  }
+  const momentum5D = change("momentum5D", "return5D");
+  const momentum20D = change("momentum20D", "return20D");
+  const quoteTimestamp = iso(quote.timestamp) ?? iso(quote.asOf) ?? iso(quote.quoteTimestamp);
+  const snapshotTime = Date.parse(snapshot.timestamp);
+  const quoteAgeHours = quoteTimestamp ? (snapshotTime - Date.parse(quoteTimestamp)) / 3600000 : null;
+  return { id: `PRICE_${market}`, kind: "PRICE", market, available: current !== null || momentum5D !== null || momentum20D !== null,
+    // Unknown quote time remains explicit; it does not silently become live data.
+    entryDataReady: current !== null && momentum5D !== null && momentum20D !== null && (quoteAgeHours === null || quoteAgeHours >= 0 && quoteAgeHours <= 96),
+    data: { current, changeAsProvided: finite(quote.change), quoteTimestamp, quoteAgeHours,
+      snapshotTimestampIsNotQuoteTimestamp: true, momentum5D, momentum20D,
+      acceleration: quality.accelerationAvailable === true ? finite(measured.acceleration) ?? finite(momentum.acceleration) : null,
+      accelerationDefinition: "MOMENTUM_5D_MINUS_MOMENTUM_20D_DIVIDED_BY_4",
+      // Bar acceleration uses a different formula; do not merge the two.
+      dailyBars: pick(bars, ["return1D", "return3D", "return5D", "return10D", "return20D", "return50D", "ma20", "ma50", "ma200", "distanceFromMA20", "distanceFromMA50", "distanceFromMA200", "drawdown20D", "trend"]),
+      provenance: { ...pick(quality, ["source", "momentum5DAvailable", "momentum20DAvailable", "accelerationAvailable"]),
+        ...pick(barsQuality, ["dateAlignmentVerified", "latestBarFinality", "timeBasis"]), quoteTimeKnown: quoteTimestamp !== null },
+    } };
+}
+
+/** Only allowlisted market evidence is sent. No raw snapshot or provider credentials. */
+export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearchReport): SynthesisEvidence[] {
+  const snapshot = object(input.snapshot);
+  const reference = Date.parse(snapshot.timestamp);
+  const evidence: SynthesisEvidence[] = [
+    { id: "APP", kind: "APP", available: true, data: {
+      phase: typeof snapshot.phase === "string" ? snapshot.phase : pick(snapshot.phase, ["phase", "regimeState", "subPhase", "confidence"]),
+      master: pick(snapshot.master, ["score", "signal", "mode", "regime"]),
+      flows: report.decisionSupport?.flows.map(flow => ({ instrument: flow.instrument, eligible: flow.eligible, modelSize: flow.modelSize, execution: text(flow.execution), reason: text(flow.reason) })),
+      putTiming: pick(snapshot.putTiming, ["score", "decision", "timing", "execution", "entryWindow"]),
+      nasdaq: pick(snapshot.nasdaqCall, ["score", "decision", "signal", "state"]), russell: pick(snapshot.russell, ["score", "decision", "signal", "state"]),
+      participation: pick(snapshot.participation, ["score", "state"]), liquidity: pick(snapshot.liquidity, ["score", "state"]),
+      fragility: pick(snapshot.fragility, ["score", "state"]), marketQuality: pick(snapshot.marketQuality, ["score", "state"]),
+      crash: pick(snapshot.crash, ["score", "probability"]), squeeze: pick(snapshot.squeeze, ["risk", "state", "squeezeType"]),
+      volatility: { vix: finite(object(object(snapshot.indices).vix).current),
+        vixTermRatio: finite(object(snapshot.indices).vixTermRatio), termDefinition: "VIX / VIX3M; below one is contango",
+        volOfVolRatio: finite(object(snapshot.indices).volOfVolRatio) },
+      credit: { ...pick(snapshot.credit, ["rawRatio", "ma50", "ratioToMA50", "distancePct", "signal"]),
+        ...pick(object(snapshot.credit).dataQuality, ["available", "ratioDefinition", "normalizedDefinition", "dateAlignmentVerified"]),
+        interpretation: "Raw HYG/IEF is a price ratio, not an absolute stress threshold. Interpret its verified signal/ratioToMA50 and data quality." },
+      gammaDiagnostics: { ...pick(snapshot.gamma, ["score", "effectiveGamma", "structuralGammaFloor"]), measurementStatus: "Producer model diagnostics; not independently verified dealer exposure" },
+      rotation: pick(snapshot.rotation, ["score", "signal", "rsSmall", "rsEqual", "rsGrowth"]),
+      breadth: Object.fromEntries(["b20", "b50", "b200"].map(key => { const value = object(object(snapshot.structure).breadth)[key]; return [key, finite(value) ?? finite(object(value).value)]; })),
+      limitations: "Shared inputs overlap; App risk and sizing scores are not independent success probabilities. Gamma and liquidity can include model estimates.",
+    } },
+    priceEvidence(snapshot, "NASDAQ", "nasdaq", "ndx"),
+    priceEvidence(snapshot, "RUSSELL_2000", "russell", "rut"),
+    priceEvidence(snapshot, "SP500", "sp500", "spx"),
+    ...(report.evidenceAssessment?.evidence ?? []).map(block => ({ id: `LAYER_${block.category}`, kind: "LAYER" as const,
+      available: block.state !== "NOT_AVAILABLE", data: { category: block.category, state: block.state, summary: text(block.summary),
+        evidence: block.evidence.slice(0, 4).map(value => text(value, 230)), heuristicNotIndependent: true } })),
+  ];
+  for (const market of ["NASDAQ", "RUSSELL_2000"] as const) {
+    const summaries = (input.positioning?.summaries ?? []).filter(item => item.market === market && ["ASSET_MANAGER", "LEVERAGED_MONEY"].includes(item.group));
+    const fresh = summaries.filter(item => {
+      const time = /^\d{4}-\d{2}-\d{2}$/.test(item.reportDate) ? Date.parse(`${item.reportDate}T00:00:00Z`) : NaN;
+      return Number.isFinite(time) && time <= reference && reference - time <= 14 * 86400000;
+    }).sort((a, b) => b.reportDate.localeCompare(a.reportDate));
+    const safe = [...new Map([...fresh].reverse().map(item => [item.group, item])).values()];
+    evidence.push({ id: `COT_${market}`, kind: "COT", market, available: safe.length > 0,
+      data: { publicationTimeKnown: false, laggedContextOnly: true, summaries: safe.slice(0, 2).map(item => pick(item, ["reportDate", "group", "bias", "netPosition", "weeklyChange", "change4W", "change13W", "change26W", "percentile", "zScore"])), missingOrStale: safe.length === 0 } });
+  }
+  const historical = report.historicalEvidence;
+  const dateParts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(reference));
+  const part = (type: string) => dateParts.find(item => item.type === type)?.value ?? "";
+  const marketDate = `${part("year")}-${part("month")}-${part("day")}`;
+  const states = (historical?.currentStates ?? []).filter(state => /^\d{4}-\d{2}-\d{2}$/.test(state.asOfDate) && state.asOfDate <= marketDate).slice(0, 6)
+    .map(state => ({ ...state, comparable: state.comparable && state.asOfDate === marketDate }));
+  const comparisons = states.flatMap(state => (historical?.observations ?? [])
+    .filter(item => item.family === state.family && item.market === state.market && item.state === state.state)
+    .sort((a, b) => a.horizonDays - b.horizonDays).slice(0, 3)
+    .map(item => ({ ...pick(item, ["family", "market", "state", "horizonDays", "sampleSize", "averageForwardReturn", "baselineAverageReturn", "excessReturn", "baselineSampleSize", "overlappingObservations", "matchedControl"]), stateAsOf: state.asOfDate, currentMatch: state.comparable })));
+  evidence.push({ id: "HISTORY", kind: "HISTORY", available: comparisons.length > 0, data: {
+    quality: pick(input.historyQuality, ["policy", "trustedStart", "currentVersionKnown", "retainedPriceDates", "comparableStructureDates"]),
+    asOf: historical?.asOfDate ?? null, states: states.map(state => pick(state, ["family", "market", "state", "asOfDate", "comparable"])), comparisons,
+    selection: "Only groups matching the supplied dated states; non-current states are descriptive only. Overlapping index returns are not warrant returns or proven alpha.",
+  } });
+  const sources = report.sources.filter(source => {
+    const time = iso(source.publishedAt);
+    return time !== null && Date.parse(time) <= reference && reference - Date.parse(time) <= 7 * 86400000;
+  }).slice(0, 6);
+  sources.forEach((source, index) => evidence.push({ id: `NEWS_${index}`, kind: "NEWS", available: true,
+    data: { ...pick(source, ["title", "summary", "publishedAt", "publisher"]), fullArticleVerified: false } }));
+  return evidence;
+}
