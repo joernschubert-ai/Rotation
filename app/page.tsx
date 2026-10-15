@@ -74,6 +74,7 @@ export default function Home() {
   const [isReloading, setIsReloading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [researchSnapshotTimestamp, setResearchSnapshotTimestamp] = useState<string | null>(null);
 
   // Unlike state, this lock changes immediately.
   const loadingRef = useRef(false);
@@ -164,6 +165,7 @@ export default function Home() {
         if (saveResult?.ok !== true) {
           throw new Error("History save was not confirmed");
         }
+        setResearchSnapshotTimestamp(snapshot.timestamp);
       } catch (error) {
         console.error("HISTORY SNAPSHOT SAVE FAILED", error);
         setSaveError(
@@ -319,6 +321,17 @@ export default function Home() {
           {saveError}
         </div>
       )}
+
+      <section className="mb-8">
+        <SectionHeader
+          title="RESEARCH · ENTSCHEIDUNGSHILFE"
+          subtitle="Marktlage, frühe Einstiegskandidaten, Modellanteile und Gegenargumente"
+        />
+        <AIResearchPanel
+          expectedSnapshotTimestamp={loadedMarket.snapshot.timestamp}
+          marketReady={!isReloading && !loadError && researchSnapshotTimestamp === loadedMarket.snapshot.timestamp}
+        />
+      </section>
 
       <section className="mb-8">
         <SectionHeader
@@ -487,14 +500,6 @@ export default function Home() {
           <GammaPanel data={engine} />
           <SqueezeRiskPanel data={engine} />
         </div>
-      </section>
-
-      <section className="mb-8">
-        <SectionHeader
-          title="AI RESEARCH"
-          subtitle="Independent research layer, positioning, divergences and forward-testable market thesis"
-        />
-        <AIResearchPanel />
       </section>
 
       <section className="mb-8">
