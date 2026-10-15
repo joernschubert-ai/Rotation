@@ -89,6 +89,8 @@ HistoricalPriceVixHorizonStatistics[];
 };
 
 export type HistoricalPriceVixForwardDataset = {
+/* One observation per aligned date, regardless of state. Descriptive, not matched control. */
+baselineStatistics?: HistoricalPriceVixHorizonStatistics[];
 observations:
 HistoricalPriceVixResearchObservation[];
 
@@ -412,6 +414,7 @@ let matchedFeatureDays = 0;
 let unmatchedFeatureDays = 0;
 
 let transitionObservations = 0;
+const baselineDays: HistoricalPriceVixResearchObservation[] = [];
 
 for (
 let index = 0;
@@ -445,6 +448,7 @@ continue;
 }
 
 matchedFeatureDays++;
+baselineDays.push(createObservation(feature, outcome, index, "PRICE_TREND", "UNCONDITIONAL_BASELINE"));
 
 const states: {
 family: HistoricalPriceVixResearchFamily;
@@ -652,6 +656,7 @@ observations[index - 1].date,
 return {
 observations,
 statistics,
+baselineStatistics: [5, 20, 60].map(horizon => buildHorizonStatistics(baselineDays, horizon as 5 | 20 | 60)),
 
 diagnostics: {
 inputFeatureDays:
