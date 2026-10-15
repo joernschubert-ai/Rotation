@@ -42,6 +42,8 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   const lockKey = `${PREFIX}:lock`;
   const lockToken = randomBytes(16).toString("hex");
   let locked = false;
+  let stage = "CACHE_READ";
+  let providerRequestStarted = false;
   try {
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
     if (cached?.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
@@ -49,8 +51,10 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       if (cached.status === "UNAVAILABLE" && cached.quality.issues.length) return { ...cached, cached: true };
     }
     if (!allowGeneration) return unavailable("Noch keine KI-Analyse für diesen Snapshot gespeichert. In der App Research aktualisieren.");
+    stage = "LOCK_ACQUIRE";
     locked = Boolean(await redis.set(lockKey, lockToken, { nx: true, ex: 60 }));
     if (!locked) return unavailable("Eine KI-Analyse läuft bereits. Bitte kurz warten.");
+    stage = "CACHE_RECHECK";
     const completed = await redis.get<ResearchSynthesis>(cacheKey);
     if (completed?.snapshotTimestamp === snapshotTimestamp && completed.quality?.contractVersion === SYNTHESIS_CONTRACT) {
       if (completed.status === "SUCCESS" && validateSynthesis(completed.content, evidence)) return { ...completed, cached: true };
@@ -58,11 +62,14 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     }
     // Atomic daily admission AND cooldown. Attempts count, including provider failures.
     const dayKey = `${PREFIX}:day:${new Date().toISOString().slice(0, 10)}`;
+    stage = "QUOTA_CHECK";
     const admitted = await redis.eval<[number], number>(
       "if redis.call('EXISTS',KEYS[2])==1 then return -1 end local n=tonumber(redis.call('GET',KEYS[1]) or '0') if n>=tonumber(ARGV[1]) then return -2 end redis.call('INCR',KEYS[1]) redis.call('EXPIRE',KEYS[1],172800) redis.call('SET',KEYS[2],'1','EX',90) return n+1",
       [dayKey, `${PREFIX}:cooldown`], [DAILY_LIMIT]);
     if (admitted === -1) return unavailable("Aufrufpause aktiv. Eine neue KI-Analyse ist nach 90 Sekunden möglich.");
     if (admitted < 0) return unavailable("Das App-Tageslimit von 20 KI-Versuchen ist erreicht. Freigabe wieder ab 00:00 UTC.");
+    stage = "CLOUDFLARE_REQUEST";
+    providerRequestStarted = true;
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${MODEL}`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, cache: "no-store", signal: AbortSignal.timeout(35000),
       body: JSON.stringify({ max_tokens: 1800, temperature: 0.2, response_format: { type: "json_schema", json_schema: schema }, messages: [
@@ -71,11 +78,13 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       ] }),
     });
     if (!response.ok) return unavailable(response.status === 429 ? "Cloudflare-Kontingent oder Rate-Limit erreicht. Die regelbasierte Auswertung bleibt verfügbar." : `Cloudflare derzeit nicht verfügbar (HTTP ${response.status}). Die regelbasierte Auswertung bleibt verfügbar.`);
+    stage = "CLOUDFLARE_RESPONSE_JSON";
     const body = await response.json();
     if (body.success !== true) return unavailable("Cloudflare konnte keine vollständige KI-Antwort liefern.");
     const raw = body.result?.response;
     let content: unknown;
     try { content = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { content = null; }
+    stage = "ANSWER_VALIDATION";
     const issues = inspectSynthesis(content, evidence);
     if (issues.length) {
       const candidate = content && typeof content === "object" ? content as Record<string, unknown> : {};
@@ -88,13 +97,33 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
         : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),
         quality: { ...quality, issues, rejectedConditions } };
       // Cache rejected answers too; refreshing must not burn quota on the same frame.
+      stage = "REJECTED_ANSWER_CACHE_WRITE";
       await redis.set(cacheKey, rejected, { ex: 900 });
       return rejected;
     }
     const result: ResearchSynthesis = { status: "SUCCESS", model: MODEL, generatedAt: new Date().toISOString(), snapshotTimestamp, cached: false, message: "Unabhängige KI-Interpretation; Bedingungen und Belegverweise geprüft, wirtschaftliche Richtigkeit nicht bewiesen.", content: content as ResearchSynthesisContent, quality };
+    stage = "APPROVED_ANSWER_CACHE_WRITE";
     await redis.set(cacheKey, result, { ex: 900 });
     return result;
-  } catch { return unavailable("KI oder dauerhafter Aufrufschutz derzeit nicht erreichbar. Die regelbasierte Auswertung bleibt verfügbar."); }
+  } catch (error) {
+    // Do not expose exception messages: providers may include request URLs or credentials.
+    const name = error && typeof error === "object" && "name" in error ? String(error.name) : "";
+    const timeout = name === "TimeoutError" || name === "AbortError";
+    const messages: Record<string, string> = {
+      CACHE_READ: "Der Research-Zwischenspeicher konnte nicht gelesen werden. Keine neue KI-Anfrage ausgelöst.",
+      LOCK_ACQUIRE: "Der KI-Aufrufschutz konnte nicht aktiviert werden. Keine neue KI-Anfrage ausgelöst.",
+      CACHE_RECHECK: "Der Research-Zwischenspeicher ist bei der erneuten Prüfung ausgefallen. Keine neue KI-Anfrage ausgelöst.",
+      QUOTA_CHECK: "Das KI-Tageskontingent konnte nicht geprüft werden. Keine neue KI-Anfrage ausgelöst.",
+      CLOUDFLARE_REQUEST: timeout ? "Cloudflare hat innerhalb von 35 Sekunden nicht geantwortet." : "Die Verbindung zu Cloudflare ist fehlgeschlagen.",
+      CLOUDFLARE_RESPONSE_JSON: "Cloudflare hat geantwortet, aber die Antwort konnte nicht als JSON gelesen werden.",
+      ANSWER_VALIDATION: "Bei der Prüfung der KI-Antwort ist ein interner Verarbeitungsfehler aufgetreten.",
+      REJECTED_ANSWER_CACHE_WRITE: "Die KI-Antwort wurde abgelehnt; ihre Diagnose konnte nicht zwischengespeichert werden.",
+      APPROVED_ANSWER_CACHE_WRITE: "Eine geprüfte KI-Antwort lag vor, konnte aber nicht zwischengespeichert werden."
+    };
+    return { ...unavailable(messages[stage] ?? "Research-Verarbeitung fehlgeschlagen."), quality: {
+      ...quality, issues: [`FAILURE_STAGE:${stage}`, `PROVIDER_REQUEST_STARTED:${providerRequestStarted}`, `ERROR_CLASS:${timeout ? "TIMEOUT" : "UNCLASSIFIED"}`]
+    } };
+  }
   finally {
     if (locked) try { await redis.eval("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0", [lockKey], [lockToken]); } catch { /* Lock expires automatically. */ }
   }
