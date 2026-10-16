@@ -1,7 +1,7 @@
 import type { ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 import type { SynthesisEvidence } from "./aiResearchSynthesisEvidence";
 
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V6_INDEX_NAMES";
+export { SYNTHESIS_CONTRACT } from "./aiResearchSynthesisTypes";
 export const SYNTHESIS_INSTRUMENTS = ["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const;
 export const SYNTHESIS_ACTIONS = ["WATCH", "PREPARE", "STARTER_CANDIDATE", "CONFIRM", "REDUCE"];
 const object = (value: unknown): Record<string, any> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
