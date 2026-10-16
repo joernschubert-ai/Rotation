@@ -59,7 +59,7 @@ export function AIResearchOverview({ report, snapshotTimestamp, suspended = fals
   const overviewTitle = !current ? "Aktuellen Marktstand abgleichen" : content ? titles[content.conclusion] : "KI-Einschätzung noch nicht verfügbar";
   return <section aria-label="Research Überblick" className="overflow-hidden rounded-xl border border-slate-700 bg-gradient-to-br from-slate-900 via-[#101820] to-[#101114]">
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-700/60 p-4 sm:px-5">
-      <div><div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Research · Überblick</div>
+      <div><div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Unabhängige KI · Überblick</div>
         <h3 className="mt-1 text-lg font-semibold text-slate-100">{overviewTitle}</h3>
         <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-400">App: {current ? report.decisionSupport?.action ?? "Auswertung verfügbar" : "Einstiegsaussagen vorübergehend ausgesetzt"}</p>
       </div>
@@ -211,9 +211,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     {!report && marketReady && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
     {report && <>
       <AIResearchOverview report={report} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
-      <Detail title="Unabhängige KI · Einschätzung, früher Vorteil und Bedingungen">
-        <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
-      </Detail>
+      <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       <Detail title="App · Freigaben, Modellanteile und Einstiegsbedingungen">
         <AIResearchDecisionSummary report={report} snapshotTimestamp={data?.diagnostics?.snapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       </Detail>
