@@ -67,7 +67,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       stage = "DIAGNOSTIC_READ";
       const rejected = await redis.get<ResearchSynthesis>(diagnosticKey);
       if (rejected?.status === "UNAVAILABLE" && rejected.snapshotTimestamp === snapshotTimestamp &&
-        rejected.quality?.contractVersion === SYNTHESIS_CONTRACT && rejected.quality.rejectedConditions?.length) {
+        rejected.quality?.contractVersion === SYNTHESIS_CONTRACT && rejected.quality.issues?.length) {
         return { ...rejected, cached: true };
       }
       return unavailable("Noch keine KI-Analyse für diesen Snapshot gespeichert. In der App Research aktualisieren.");
@@ -101,7 +101,28 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
         { role: "user", content: payload },
       ] }),
     });
-    if (!response.ok) return unavailable(response.status === 429 ? "Cloudflare-Kontingent oder Rate-Limit erreicht. Die regelbasierte Auswertung bleibt verfügbar." : `Cloudflare derzeit nicht verfügbar (HTTP ${response.status}). Die regelbasierte Auswertung bleibt verfügbar.`);
+    if (!response.ok) {
+      let jsonModeFailure = false;
+      const errorCodes: string[] = [];
+      try {
+        const failure = await response.json();
+        for (const item of Array.isArray(failure?.errors) ? failure.errors.slice(0,5) : []) {
+          const code = String(item?.code ?? "");
+          if (/^\d{1,8}$/.test(code)) errorCodes.push(code);
+          if (typeof item?.message === "string" && /json\s*mode.*(?:couldn.?t|cannot|could not|failed|not.*met)|schema.*(?:invalid|unsupported|failed)/i.test(item.message)) jsonModeFailure = true;
+        }
+      } catch { /* An HTTP error need not have a JSON response. */ }
+      const failure: ResearchSynthesis = { ...unavailable(response.status === 429
+        ? "Cloudflare-Kontingent oder Rate-Limit erreicht. Die regelbasierte Auswertung bleibt verfügbar."
+        : jsonModeFailure ? `Cloudflare konnte die verlangte JSON-Ausgabe nicht erfüllen (HTTP ${response.status}).`
+        : `Cloudflare hat die Anfrage zurückgewiesen (HTTP ${response.status}). Die genaue Ursache ist noch offen.`),
+        quality: { ...quality, issues: [`PROVIDER_HTTP:${response.status}`,
+          ...(jsonModeFailure ? ["PROVIDER_CATEGORY:JSON_MODE_OR_SCHEMA"] : []),
+          ...errorCodes.map(code=>`PROVIDER_CODE:${code}`), `INPUT_CHARACTERS:${payload.length}`] }
+      };
+      await storeRejectedDiagnosis(failure);
+      return failure;
+    }
     stage = "CLOUDFLARE_RESPONSE_JSON";
     const body = await response.json();
     if (body.success !== true) return unavailable("Cloudflare konnte keine vollständige KI-Antwort liefern.");

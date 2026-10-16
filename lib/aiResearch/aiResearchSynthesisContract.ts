@@ -27,7 +27,22 @@ export function buildSynthesisSchema(evidence: Array<{id: string; available: boo
   const result = JSON.parse(JSON.stringify(synthesisSchema));
   const fields = result.properties.flows.items.properties;
   for (const name of ["evidenceRefs", "confirmationRefs", "invalidationRefs"]) fields[name] = reference;
-  return result;
+  // Keep provider-side grammar deliberately small. The application still checks
+  // lengths, counts, unique references and qualitative conditions after generation.
+  const wireKeys = new Set(["type", "properties", "required", "items", "enum", "additionalProperties"]);
+  const wire = (schema: any): any => {
+    if (!schema || typeof schema !== "object") return schema;
+    if (Array.isArray(schema)) return schema;
+    const output: Record<string, unknown> = {};
+    for (const [key,value] of Object.entries(schema)) {
+      if (!wireKeys.has(key)) continue;
+      output[key] = key === "properties"
+        ? Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([name,child])=>[name,wire(child)]))
+        : key === "items" ? wire(value) : value;
+    }
+    return output;
+  };
+  return wire(result);
 }
 
 export const RESEARCH_SYSTEM_PROMPT = `Du bist ein unabhängiger deutscher Marktresearch-Analyst. Nur JSON im vorgegebenen Schema. Schreibe kurze, klare deutsche Sätze: pro Instrumentfeld ein Satz mit ungefähr zwölf bis achtzehn Wörtern; summary höchstens drei Sätze. Keine Platzhalter wie Keine, Unbekannt oder N/A.
