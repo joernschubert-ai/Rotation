@@ -82,8 +82,8 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     priceEvidence(snapshot, "RUSSELL_2000", "russell", "rut"),
     priceEvidence(snapshot, "SP500", "sp500", "spx"),
     ...(report.evidenceAssessment?.evidence ?? []).map(block => ({ id: `LAYER_${block.category}`, kind: "LAYER" as const,
-      available: block.state !== "NOT_AVAILABLE", data: { category: block.category, state: block.state, summary: text(block.summary),
-        evidence: block.evidence.slice(0, 4).map(value => text(value, 230)), heuristicNotIndependent: true } })),
+      available: block.state !== "NOT_AVAILABLE", data: { category: block.category, state: block.state, summary: text(block.summary, 280),
+        evidence: block.evidence.slice(0, 2).map(value => text(value, 180)), heuristicNotIndependent: true } })),
   ];
   for (const market of ["NASDAQ", "RUSSELL_2000"] as const) {
     const summaries = (input.positioning?.summaries ?? []).filter(item => item.market === market && ["ASSET_MANAGER", "LEVERAGED_MONEY"].includes(item.group));
@@ -92,8 +92,18 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
       return Number.isFinite(time) && time <= reference && reference - time <= 14 * 86400000;
     }).sort((a, b) => b.reportDate.localeCompare(a.reportDate));
     const safe = [...new Map([...fresh].reverse().map(item => [item.group, item])).values()];
+    const asset = safe.find(item => item.group === "ASSET_MANAGER");
+    const leveraged = safe.find(item => item.group === "LEVERAGED_MONEY");
+    const sign = (value: number | null | undefined) => typeof value === "number" && Number.isFinite(value) ? Math.sign(value) : null;
     evidence.push({ id: `COT_${market}`, kind: "COT", market, available: safe.length > 0,
-      data: { publicationTimeKnown: false, laggedContextOnly: true, summaries: safe.slice(0, 2).map(item => pick(item, ["reportDate", "group", "bias", "netPosition", "weeklyChange", "change4W", "change13W", "change26W", "percentile", "zScore"])), missingOrStale: safe.length === 0 } });
+      data: { publicationTimeKnown: false, laggedContextOnly: true, summaries: safe.slice(0, 2).map(item => pick(item, ["reportDate", "group", "bias", "netPosition", "weeklyChange", "change4W", "change13W", "change26W", "percentile", "zScore"])), missingOrStale: safe.length === 0,
+        groupComparison: {
+          bothGroupsPresent: Boolean(asset && leveraged),
+          sameObservationDate: Boolean(asset && leveraged && asset.reportDate === leveraged.reportDate),
+          oppositeNetPositions: asset && leveraged && asset.reportDate === leveraged.reportDate && sign(asset.netPosition) !== null && sign(leveraged.netPosition) !== null ? sign(asset.netPosition)! * sign(leveraged.netPosition)! < 0 : null,
+          opposite13WeekChanges: asset && leveraged && asset.reportDate === leveraged.reportDate && sign(asset.change13W) !== null && sign(leveraged.change13W) !== null ? sign(asset.change13W)! * sign(leveraged.change13W)! < 0 : null,
+          interpretation: "Compare BOTH groups; net-position level and change are different. Opposite signs alone are not unusual or proof of a trading edge. Short covering can coexist with net short. No COT-conditioned return study supplied."
+        } } });
   }
   const historical = report.historicalEvidence;
   const dateParts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(reference));
@@ -123,6 +133,18 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
         statisticsColumns: ["horizonDays", "sampleSize", "meanReturn", "medianReturn", "p10Return", "p90Return", "positiveRate", "meanMaximumRise", "meanMaximumFall", "baselineSampleSize", "baselineMeanReturn", "excessMeanReturn", "nonOverlappingSampleSize", "nonOverlappingMeanReturn"],
         studies: ownStudies.map(study => ({ family: study.family, state: study.state, asOfDate: study.asOfDate,
           currentMatch: study.currentMatch && study.asOfDate === marketDate, definition: study.definition,
+          // Named fields remove the need for the model to decode an array column
+          // before making its main comparison. All horizons remain below.
+          focus20D: (() => {
+            const stats = study.statistics.find(item => item.horizonDays === 20);
+            const rounded = (value: number | null) => value === null ? null : Number(value.toFixed(2));
+            return stats && stats.sampleSize > 0 ? {
+              sampleSize: stats.sampleSize, meanPct: rounded(stats.meanReturn), medianPct: rounded(stats.medianReturn),
+              p10Pct: rounded(stats.p10Return), p90Pct: rounded(stats.p90Return),
+              baselineMeanPct: rounded(stats.baselineMeanReturn), excessMeanPp: rounded(stats.excessMeanReturn),
+              nonOverlappingCount: stats.nonOverlapping.sampleSize,
+            } : null;
+          })(),
           statisticsRows: study.statistics.map(stats => {
             const rounded = (value: number | null) => value === null ? null : Number(value.toFixed(4));
             return [stats.horizonDays, stats.sampleSize, rounded(stats.meanReturn), rounded(stats.medianReturn),
