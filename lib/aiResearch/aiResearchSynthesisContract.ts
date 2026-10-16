@@ -19,7 +19,20 @@ export const synthesisSchema = {
   }, required: ["conclusion", "summary", "asymmetry", "flows", "counterarguments", "limitations"],
 };
 
+/** Bind source identifiers to the evidence actually supplied for this request. */
+export function buildSynthesisSchema(evidence: Array<{id: string; available: boolean}>) {
+  const allowed = [...new Set(evidence.filter(item => item.available).map(item => item.id))];
+  const reference = { type: "array", minItems: 1, maxItems: 5, uniqueItems: true,
+    items: { type: "string", enum: allowed.length ? allowed : ["APP"] } };
+  const result = JSON.parse(JSON.stringify(synthesisSchema));
+  const fields = result.properties.flows.items.properties;
+  for (const name of ["evidenceRefs", "confirmationRefs", "invalidationRefs"]) fields[name] = reference;
+  return result;
+}
+
 export const RESEARCH_SYSTEM_PROMPT = `Du bist ein unabhängiger deutscher Marktresearch-Analyst. Nur JSON im vorgegebenen Schema. Schreibe kurze, klare deutsche Sätze: pro Instrumentfeld ein Satz mit ungefähr zwölf bis achtzehn Wörtern; summary höchstens drei Sätze. Keine Platzhalter wie Keine, Unbekannt oder N/A.
+
+Formale Priorität: summary und asymmetry müssen jeweils ein vollständiger Satz mit mindestens fünfundzwanzig Zeichen sein. counterarguments und limitations enthalten jeweils mindestens einen vollständigen Satz mit mindestens fünfundzwanzig Zeichen, keine leeren Listen oder Stichworte. Alle drei Verweislisten pro Instrument sind erforderlich und nicht leer. Übernimm Beleg-IDs exakt aus dem vorgegebenen Enum, ohne Übersetzung oder erfundene Namen. Für Nasdaq-Bedingungen ist PRICE_NASDAQ die eigene Kursquelle; für Russell-Bedingungen PRICE_RUSSELL_2000. APP und LAYER_STRUCTURE bezeichnen die beigefügte App-Struktur. HISTORY_NASDAQ und HISTORY_RUSSELL_2000 enthalten historische Vergleiche, COT_NASDAQ und COT_RUSSELL_2000 verzögerte Positionierung. Beispiel eines Kursverweises: ["PRICE_NASDAQ"]. Verweise nicht auf Quellen, die available=false haben. Zitiere nur Belege, die die jeweilige Aussage tatsächlich tragen.
 
 HISTORY_NASDAQ und HISTORY_RUSSELL_2000 enthalten getrennte langfristige Vergleichsstudien. Beziehe vorhandene passende Studien konkret in die Instrumentabwägung ein: Mittelwert allein reicht nicht; Median, ungünstiges Zehntel, günstiges Zehntel, Kurszwischenverluste und Vergleichsrendite mitprüfen. Für PUT sind fallende Indexkurse günstig, steigende ungünstig; eine Erholung allein bestätigt keine Put-These. NonOverlapping ist eine beschreibende Teilstichprobe, kein Prognosenachweis. Mehrere übereinstimmende Einzelgruppen sind keine berechnete gemeinsame Bedingung. COT-Zusammenfassungen sind kein bereits durchgeführter COT-Rendite-Backtest. coverage beschreibt tatsächlich geladene Zeiträume und noch nicht eingebundene Module. App-Freigaben sagen nichts darüber aus, ob der reale Put-/Call-Markt aktiv ist. Keine runden Kursmarken erfinden. Bei widersprüchlichen historischen Befunden den konkreten Widerspruch nennen statt bloß neutral zu behaupten.
 

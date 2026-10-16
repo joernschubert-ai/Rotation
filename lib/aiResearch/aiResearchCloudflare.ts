@@ -5,7 +5,7 @@ import type { ResearchSynthesis, ResearchSynthesisContent } from "./aiResearchSy
 
 import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 import { inspectSynthesis, validateSynthesis, SYNTHESIS_CONTRACT } from "./aiResearchSynthesisValidation";
-import { synthesisSchema as schema, RESEARCH_SYSTEM_PROMPT } from "./aiResearchSynthesisContract";
+import { buildSynthesisSchema, RESEARCH_SYSTEM_PROMPT } from "./aiResearchSynthesisContract";
 export { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 export { validateSynthesis } from "./aiResearchSynthesisValidation";
 
@@ -24,6 +24,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   const age = Date.now() - Date.parse(snapshotTimestamp);
   if (!Number.isFinite(age) || age < 0 || age > 86400000) return unavailable("Der Snapshot ist nicht aktuell genug für eine neue KI-Einschätzung.");
   const evidence = buildSynthesisEvidence(input, report);
+  const responseSchema = buildSynthesisSchema(evidence);
   const quality = { contractVersion: SYNTHESIS_CONTRACT, issues: [] as string[], availableEvidenceIds: evidence.filter(item => item.available).map(item => item.id),
     missingOwnPriceMarkets: evidence.filter(item => item.kind === "PRICE" && item.entryDataReady !== true).map(item => item.market ?? item.id), semanticTruthVerified: false as const,
     inputSummary: {
@@ -95,7 +96,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     providerRequestStarted = true;
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${MODEL}`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, cache: "no-store", signal: AbortSignal.timeout(35000),
-      body: JSON.stringify({ max_tokens: 1800, temperature: 0.2, response_format: { type: "json_schema", json_schema: schema }, messages: [
+      body: JSON.stringify({ max_tokens: 1800, temperature: 0.2, response_format: { type: "json_schema", json_schema: responseSchema }, messages: [
         { role: "system", content: RESEARCH_SYSTEM_PROMPT },
         { role: "user", content: payload },
       ] }),
@@ -114,11 +115,21 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       const rejectedConditions = (Array.isArray(candidate.flows) ? candidate.flows : []).slice(0,3)
         .filter((flow): flow is Record<string, unknown> => Boolean(flow && typeof flow === "object" && !Array.isArray(flow)))
         .map(flow => ({ instrument: text(flow.instrument,40), confirmation: text(flow.confirmation,1200), invalidation: text(flow.invalidation,1200) }));
+      const strings = (value: unknown, limit: number): string[] => Array.isArray(value)
+        ? value.slice(0,limit).filter(item => typeof item === "string").map(item => text(item,1200)) : [];
+      const rejectedResponse = {
+        summary: text(candidate.summary,1200), asymmetry: text(candidate.asymmetry,1200),
+        counterarguments: strings(candidate.counterarguments,5), limitations: strings(candidate.limitations,5),
+        references: (Array.isArray(candidate.flows) ? candidate.flows : []).slice(0,3)
+          .filter((flow): flow is Record<string, unknown> => Boolean(flow && typeof flow === "object" && !Array.isArray(flow)))
+          .map(flow => ({ instrument: text(flow.instrument,40), evidenceRefs: strings(flow.evidenceRefs,8),
+            confirmationRefs: strings(flow.confirmationRefs,8), invalidationRefs: strings(flow.invalidationRefs,8) }))
+      };
       const conditionFailure = issues.every(issue => /UNOBSERVABLE_(CONFIRMATION|INVALIDATION)$/.test(issue));
       const rejected: ResearchSynthesis = { ...unavailable(conditionFailure
         ? "Die KI hat geantwortet, aber ihre Bestätigungs- oder Widerlegungsbedingungen sind nicht eindeutig prüfbar. Deshalb wird keine Einstiegsaussage angezeigt."
         : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),
-        quality: { ...quality, issues, rejectedConditions } };
+        quality: { ...quality, issues, rejectedConditions, rejectedResponse } };
       // Cache rejected answers too; refreshing must not burn quota on the same frame.
       stage = "REJECTED_ANSWER_CACHE_WRITE";
       await storeRejectedDiagnosis(rejected);
