@@ -176,11 +176,16 @@ export function AIResearchSynthesisSummary({ synthesis, snapshotTimestamp, suspe
           {flow.grounding.history ? <>
             <p>Historie · {{ OWN_TREND: "Eigener Trend", ROTATION_20D: "Relative Stärke", OWN_PRICE_VIX_5D: "Kurs und VIX" }[flow.grounding.history.family] ?? flow.grounding.history.family} · {flow.grounding.history.horizonDays} Tage · {flow.grounding.history.sampleSize} Fälle</p>
             <p>Mittel {pct(flow.grounding.history.meanPct)} gegenüber {pct(flow.grounding.history.baselineMeanPct)} Vergleich · Median {pct(flow.grounding.history.medianPct)}</p>
+            {flow.grounding.history.comparisonFact && <p className="text-slate-300">{flow.grounding.history.comparisonFact}</p>}
             <p>10.–90. Perzentil: {pct(flow.grounding.history.p10Pct)} bis {pct(flow.grounding.history.p90Pct)} · Stand {flow.grounding.history.asOfDate}{flow.grounding.history.currentMatch ? " · Zustandsabgleich zum Snapshot-Markttag" : " · datierter Kontext"}</p>
           </> : <p>Keine geeignete eigene historische Vergleichsstudie vorhanden.</p>}
           {flow.grounding.cot.map(item => <p key={item.group}>{item.group === "ASSET_MANAGER" ? "Asset Manager" : "Leveraged Money"} ({item.reportDate}): netto {item.netPosition?.toLocaleString("de-DE") ?? "—"}, Änderung 1 Woche {item.weeklyChange?.toLocaleString("de-DE") ?? "—"}, 13 Wochen {item.change13W?.toLocaleString("de-DE") ?? "—"} Kontrakte.</p>)}
+          {flow.grounding.cot.map(item => item.weeklyFact || item.change13WFact ? <div key={`${item.group}-facts`}>
+            <p className="text-slate-300">{item.group === "ASSET_MANAGER" ? "Asset Manager" : "Leveraged Money"}: 1 Woche · {item.weeklyFact ?? "nicht bestimmbar"}</p>
+            <p>13 Wochen · {item.change13WFact ?? "nicht bestimmbar"}</p>
+          </div> : null)}
           {!flow.grounding.cot.length && <p>Keine hinreichend aktuellen eigenen COT-Gruppen verfügbar.</p>}
-          <p className="text-slate-500">Deskriptive Indexrenditen und verzögerte Positionierung; kein berechneter Optionsvorteil. Das Perzentilband ist kein Prognoseintervall.</p>
+          <p className="text-slate-500">Deskriptive Indexrenditen und verzögerte Netto-Positionierung; kein berechneter Optionsvorteil. Netto-Veränderungen beweisen keine einzelnen Brutto-Long-/Short-Transaktionen. Das Perzentilband ist kein Prognoseintervall.</p>
         </div>}
         <p className="mt-2 text-[#aaa]"><strong className="text-[#ccc]">Warum jetzt?</strong> {flow.whyNow}</p>
         <p className="mt-2 text-[#aaa]"><strong className="text-[#ccc]">Gegenargument:</strong> {flow.counterargument}</p>
