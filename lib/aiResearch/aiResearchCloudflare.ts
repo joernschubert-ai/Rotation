@@ -6,6 +6,7 @@ import type { ResearchSynthesis, ResearchSynthesisContent } from "./aiResearchSy
 import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, SYNTHESIS_CONTRACT } from "./aiResearchSynthesisValidation";
 import { buildSynthesisSchema, RESEARCH_SYSTEM_PROMPT } from "./aiResearchSynthesisContract";
+import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
 export { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 export { validateSynthesis } from "./aiResearchSynthesisValidation";
 
@@ -32,8 +33,9 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   const age = Date.now() - Date.parse(snapshotTimestamp);
   if (!Number.isFinite(age) || age < 0 || age > 86400000) return unavailable("Der Snapshot ist nicht aktuell genug für eine neue KI-Einschätzung.");
   const evidence = buildSynthesisEvidence(input, report);
+  const briefs = buildInstrumentBriefs(evidence);
   const responseSchema = buildSynthesisSchema(evidence);
-  const quality = { contractVersion: SYNTHESIS_CONTRACT, issues: [] as string[], availableEvidenceIds: evidence.filter(item => item.available).map(item => item.id),
+  const quality = { contractVersion: SYNTHESIS_CONTRACT, issues: [] as string[], instrumentBriefs: briefs, availableEvidenceIds: evidence.filter(item => item.available).map(item => item.id),
     missingOwnPriceMarkets: evidence.filter(item => item.kind === "PRICE" && item.entryDataReady !== true).map(item => item.market ?? item.id), semanticTruthVerified: false as const,
     inputSummary: {
       prices: evidence.filter(item => item.kind === "PRICE").map(item => ({ market: item.market ?? item.id, current: item.data.current as number | null, momentum5D: item.data.momentum5D as number | null,
@@ -41,7 +43,23 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       cotReportDates: [...new Set(evidence.filter(item => item.kind === "COT").flatMap(item => (item.data.summaries as Array<{ reportDate?: string }>).map(summary => summary.reportDate ?? "")).filter(Boolean))],
       historicalAsOf: report.historicalEvidence?.asOfDate ?? null, newsCount: evidence.filter(item => item.kind === "NEWS").length,
     } };
-  const payload = JSON.stringify({ contractVersion: SYNTHESIS_CONTRACT, snapshotTimestamp, task: input.context.task, question: text(input.context.question, 500), evidence });
+  // Avoid duplicate layer prose; full source statistics and all horizons remain.
+  const modelEvidence = evidence.map(item => {
+    if (item.kind === "LAYER") return { ...item,
+      data: { category: item.data.category, state: item.data.state, heuristicNotIndependent: true } };
+    // The named 20-day values now live in the instrument briefs. Keep the
+    // original statistics rows for ALL horizons, without a third copy.
+    if (item.kind === "HISTORY" && item.market && Array.isArray(item.data.studies)) return { ...item,
+      data: { ...item.data, studies: item.data.studies.map((study: Record<string, unknown>) => {
+        const { focus20D, ...rest } = study;
+        return rest;
+      }) } };
+    return item;
+  });
+  const payload = JSON.stringify({ contractVersion: SYNTHESIS_CONTRACT, snapshotTimestamp, task: input.context.task, question: text(input.context.question, 500),
+    instrumentBriefs: briefs.map(item => ({ instrument: item.instrument, priceRef: item.priceRef,
+      historyChoices: item.histories.map(study => study.id), cotGroups: item.cot.map(group => group.group), cotRef: item.cotRef, reading: item.reading })),
+    evidence: modelEvidence });
   const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, quality: {
     ...(value.quality ?? quality), timing: {
       preparationMs: execution.preparationMs ?? null,
@@ -182,12 +200,16 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
         references: (Array.isArray(candidate.flows) ? candidate.flows : []).slice(0,3)
           .filter((flow): flow is Record<string, unknown> => Boolean(flow && typeof flow === "object" && !Array.isArray(flow)))
           .map(flow => ({ instrument: text(flow.instrument,40), evidenceRefs: strings(flow.evidenceRefs,8),
-            confirmationRefs: strings(flow.confirmationRefs,8), invalidationRefs: strings(flow.invalidationRefs,8) }))
+            confirmationRefs: strings(flow.confirmationRefs,8), invalidationRefs: strings(flow.invalidationRefs,8),
+            historyStudyId: text(flow.historyStudyId,100), cotGroups: strings(flow.cotGroups,2),
+            reasoning: text(flow.reasoning,1200), counterargument: text(flow.counterargument,1200) }))
       };
       const conditionFailure = issues.every(issue => /UNOBSERVABLE_(CONFIRMATION|INVALIDATION)$/.test(issue));
       const rejected: ResearchSynthesis = { ...unavailable(conditionFailure
         ? "Die KI hat geantwortet, aber ihre Bestätigungs- oder Widerlegungsbedingungen sind nicht eindeutig prüfbar. Deshalb wird keine Einstiegsaussage angezeigt."
-        : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),
+        : issues.some(issue => /HISTORICAL|HISTORY_REFERENCE|COT_GROUPS|COT_REFERENCE|MANAGER_INTERPRETATION|MONEY_INTERPRETATION/.test(issue))
+          ? "Die KI hat Historie oder COT nicht vollständig den eigenen Instrumenten zugeordnet. Die Antwort wurde nicht als Einstiegsaussage übernommen; die Details stehen im kopierbaren Bericht."
+          : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),
         quality: { ...answerQuality, issues, rejectedConditions, rejectedResponse } };
       // Cache rejected answers too; refreshing must not burn quota on the same frame.
       stage = "REJECTED_ANSWER_CACHE_WRITE";
@@ -196,7 +218,15 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       await redis.set(cacheKey, diagnosed, { ex: 900 });
       return diagnosed;
     }
-    const result: ResearchSynthesis = { status: "SUCCESS", model: MODEL, generatedAt: new Date().toISOString(), snapshotTimestamp, cached: false, message: "Unabhängige KI-Interpretation; Bedingungen und Belegverweise geprüft, wirtschaftliche Richtigkeit nicht bewiesen.", content: content as ResearchSynthesisContent, quality: answerQuality };
+    // Only attach measured facts after the model's source selections passed.
+    // Do not fill, alter or upgrade any model assessment or its prose.
+    const approved = content as ResearchSynthesisContent;
+    const grounded: ResearchSynthesisContent = { ...approved, flows: approved.flows.map(flow => {
+      const brief = briefs.find(item => item.instrument === flow.instrument)!;
+      return { ...flow, grounding: { history: brief.histories.find(study => study.id === flow.historyStudyId) ?? null,
+        cot: brief.cot, price: brief.price } };
+    }) };
+    const result: ResearchSynthesis = { status: "SUCCESS", model: MODEL, generatedAt: new Date().toISOString(), snapshotTimestamp, cached: false, message: "Unabhängige KI-Interpretation; Quellenzuordnung geprüft, Zahlen aus der Datenbasis ergänzt. Wirtschaftliche Richtigkeit nicht bewiesen.", content: grounded, quality: answerQuality };
     stage = "APPROVED_ANSWER_CACHE_WRITE";
     const diagnosed = withTiming(result);
     await redis.set(cacheKey, diagnosed, { ex: 900 });

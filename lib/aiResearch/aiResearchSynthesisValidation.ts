@@ -1,5 +1,6 @@
 import type { ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 import type { SynthesisEvidence } from "./aiResearchSynthesisEvidence";
+import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
 
 export { SYNTHESIS_CONTRACT } from "./aiResearchSynthesisTypes";
 export const SYNTHESIS_INSTRUMENTS = ["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const;
@@ -45,6 +46,7 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
   const data = object(value);
   const issues: string[] = [];
   const byId = new Map(evidence.map(item => [item.id, item]));
+  const briefs = buildInstrumentBriefs(evidence);
   const numbers: number[] = [];
   function collect(value: unknown): void {
     if (typeof value === "number" && Number.isFinite(value)) numbers.push(value);
@@ -79,6 +81,22 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
     }
     for (const key of ["evidenceRefs", "confirmationRefs", "invalidationRefs"]) {
       if (!refs(flow[key])) issues.push(`${instrument}:INVALID_${key.toUpperCase()}`);
+    }
+    const brief = briefs.find(item => item.instrument === instrument);
+    const selectedHistory = brief?.histories.find(study => study.id === flow.historyStudyId);
+    if (brief?.histories.length) {
+      if (!selectedHistory) issues.push(`${instrument}:OWN_HISTORICAL_STUDY_REQUIRED`);
+      else if (!refs(flow.evidenceRefs) || !flow.evidenceRefs.includes(selectedHistory.sourceRef)) issues.push(`${instrument}:SELECTED_HISTORY_REFERENCE_REQUIRED`);
+      if (typeof flow.reasoning !== "string" || !/histor|vergleich|median|mittel|durchschnitt|folgerendit/i.test(flow.reasoning)) issues.push(`${instrument}:HISTORICAL_INTERPRETATION_REQUIRED`);
+    } else if (flow.historyStudyId !== "NONE") issues.push(`${instrument}:HISTORICAL_STUDY_UNAVAILABLE`);
+    const requiredGroups = brief?.cot.map(item => item.group) ?? [];
+    if (!Array.isArray(flow.cotGroups) || flow.cotGroups.length !== requiredGroups.length || new Set(flow.cotGroups).size !== flow.cotGroups.length ||
+      requiredGroups.some(group => !flow.cotGroups.includes(group))) issues.push(`${instrument}:AVAILABLE_COT_GROUPS_REQUIRED`);
+    if (requiredGroups.length) {
+      if (!refs(flow.evidenceRefs) || !flow.evidenceRefs.includes(brief!.cotRef)) issues.push(`${instrument}:COT_REFERENCE_REQUIRED`);
+      const interpretation = [flow.reasoning, flow.whyNow, flow.counterargument].filter(item => typeof item === "string").join(" ");
+      if (requiredGroups.includes("ASSET_MANAGER") && !/asset\s*manager|vermögensverwalter/i.test(interpretation)) issues.push(`${instrument}:ASSET_MANAGER_INTERPRETATION_REQUIRED`);
+      if (requiredGroups.includes("LEVERAGED_MONEY") && !/leveraged\s*money|hedgefonds/i.test(interpretation)) issues.push(`${instrument}:LEVERAGED_MONEY_INTERPRETATION_REQUIRED`);
     }
     if (typeof flow.confirmation === "string" && typeof flow.invalidation === "string" && normalize(flow.confirmation) === normalize(flow.invalidation)) issues.push(`${instrument}:IDENTICAL_CONFIRMATION_AND_INVALIDATION`);
     if (typeof flow.reasoning === "string" && typeof flow.whyNow === "string" && normalize(flow.reasoning) === normalize(flow.whyNow)) issues.push(`${instrument}:WHY_NOW_REPEATS_REASON`);

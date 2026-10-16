@@ -1,4 +1,5 @@
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V7_EVIDENCE_READING";
+import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V8_BOUND_EVIDENCE";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -15,6 +16,14 @@ export interface ResearchSynthesisContent {
     evidenceRefs: string[];
     confirmationRefs: string[];
     invalidationRefs: string[];
+    historyStudyId?: string;
+    cotGroups?: string[];
+    /** Attached by the server from validated source bindings, not model numbers. */
+    grounding?: {
+      history: InstrumentBrief["histories"][number] | null;
+      cot: InstrumentBrief["cot"];
+      price: InstrumentBrief["price"];
+    };
   }>;
   counterarguments: string[];
   limitations: string[];
@@ -35,6 +44,7 @@ export interface ResearchSynthesis {
     missingOwnPriceMarkets: string[];
     semanticTruthVerified: false;
     normalizations?: string[];
+    instrumentBriefs?: InstrumentBrief[];
     timing?: {
       preparationMs: number | null;
       synthesisMs: number;
@@ -50,7 +60,8 @@ export interface ResearchSynthesis {
       asymmetry: string;
       counterarguments: string[];
       limitations: string[];
-      references: Array<{ instrument: string; evidenceRefs: string[]; confirmationRefs: string[]; invalidationRefs: string[] }>;
+      references: Array<{ instrument: string; evidenceRefs: string[]; confirmationRefs: string[]; invalidationRefs: string[];
+        historyStudyId?: string; cotGroups?: string[]; reasoning?: string; counterargument?: string }>;
     };
     inputSummary?: {
       prices: Array<{ market: string; current: number | null; momentum5D: number | null; momentum20D: number | null; quoteTimestamp: string | null; entryDataReady: boolean }>;
