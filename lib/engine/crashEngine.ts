@@ -1,5 +1,6 @@
 // /lib/engine/crashEngine.ts
 
+import { getCreditContext } from "./creditContext";
 import { THRESHOLDS } from "./thresholds";
 import { getMarketStructureFlags } from "./marketStructureFlags";
 
@@ -47,9 +48,10 @@ const gamma = Number(
 data.gammaExposure ?? 0
 );
 
-const creditRatio = Number(
-data.creditRatio ?? 1
-);
+const creditContext = getCreditContext(data);
+// Existing distance thresholds now consume the verified MA-relative ratio.
+// Raw HYG/IEF has no universal stress threshold; unavailable is not measured calm.
+const creditRatio = creditContext.available ? creditContext.ratioToMA50! : 1;
 
 const marketLiquidityScore = Number(
 data.marketLiquidityScore ?? 50
@@ -141,9 +143,17 @@ data.rotationDecay?.state ??
 INTERNAL DIVERGENCE
 ===================================================== */
 
-const divergenceSeverity = Number(
-data.internalDivergence?.severity ?? 0
-);
+// Current producer exposes a numeric score and a textual severity label.
+// Legacy numeric severity is supported; never convert "LOW" into NaN.
+const divergenceNumber = (value: unknown): number | null => {
+if (typeof value !== "number" && typeof value !== "string") return null;
+if (typeof value === "string" && value.trim() === "") return null;
+const parsed = Number(value);
+return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : null;
+};
+const measuredDivergence = divergenceNumber(data.internalDivergence?.score) ??
+divergenceNumber(data.internalDivergence?.severity);
+const divergenceSeverity = measuredDivergence ?? 0;
 
 const hiddenDistribution =
 Boolean(
@@ -700,12 +710,13 @@ crashTrigger += 5;
 
 /* ---------- TERM STRUCTURE ---------- */
 
+// Producer convention: VIX / VIX3M. Preserve the reciprocal stress magnitude.
 let isBackwardation = false;
 
 if (vix > 22) {
 
 if (
-vixTerm < 0.92
+vixTerm > 1 / 0.92
 ) {
 isBackwardation = true;
 }
@@ -980,6 +991,18 @@ RETURN
 return {
 
 score: finalScore,
+diagnostics: {
+  inputPolicy: "CRASH_CANONICAL_PERCENT_CURRENT_INTERNALS_V1",
+  inputs: { breadth50, breadth200, participationScore, rotationScore, ad, highs, lows, distributionScore, vix, vixTerm, marketLiquidityScore, divergenceSeverity: measuredDivergence },
+  termRatioDefinition: "VIX / VIX3M",
+  termStress: isBackwardation,
+  termStressThreshold: 1 / 0.92,
+  creditContext,
+  creditThresholdBasis: "RATIO_TO_MA50",
+  creditIntensityCalibrated: false,
+  probabilityIsCalibrated: false
+},
+dataQuality: { creditAvailable: creditContext.available, missingCreditIsNotMeasurement: true },
 
 max: 100,
 

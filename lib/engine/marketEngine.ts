@@ -659,6 +659,32 @@ export function marketEngine(
 
   const crash = crashEngine({
     ...data,
+    // Canonical structure uses percent. Raw backend breadth remains fractional.
+    structure,
+    breadth20, breadth50, breadth200,
+    participation,
+    participationScore: participation.score,
+    rotation,
+    rotationScore: rotation.score,
+    ad: finiteOr(structure?.advanceDecline, 0),
+    highs: finiteOr(structure?.highsLows?.highs, 0),
+    lows: finiteOr(structure?.highsLows?.lows, 0),
+    distributionScore: finiteOr(structure?.distribution, 0),
+    internalDivergence,
+    // Retain date slots; only expose compatible stored model measurements.
+    history: history.map((snapshot: any) => ({
+      timestamp: snapshot.timestamp,
+      breadth50: finiteValue(snapshot.structure?.breadth?.b50) ?? undefined,
+      breadth200: finiteValue(snapshot.structure?.breadth?.b200) ?? undefined,
+      participationScore: snapshot.calculationVersions?.participation === "STRONGEST_SHARED_LEADERSHIP_PENALTY" ||
+        snapshot.participation?.diagnostics?.aggregationPolicy === "STRONGEST_SHARED_LEADERSHIP_PENALTY"
+        ? finiteValue(snapshot.participation?.score) ?? undefined : undefined,
+      marketLiquidityScore: finiteValue(snapshot.liquidity?.marketLiquidityScore) ??
+        finiteValue(snapshot.liquidity?.metrics?.liquidity) ?? undefined,
+      highLowDelta: finiteValue(snapshot.structure?.highsLows?.highs) !== null &&
+        finiteValue(snapshot.structure?.highsLows?.lows) !== null
+        ? Number(snapshot.structure.highsLows.highs) - Number(snapshot.structure.highsLows.lows) : undefined
+    })),
     historyMetrics,
     vix,
     vixTermRatio: Number(data.vixTermRatio ?? 1),
