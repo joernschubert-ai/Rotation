@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { AIResearchReport, AIResearchResult } from "@/lib/aiResearch/aiResearchTypes";
+import { SYNTHESIS_CONTRACT } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 import type { ResearchSynthesis } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 
 type ResponseData = AIResearchResult & { ok?: boolean; error?: string };
@@ -92,7 +93,7 @@ export function AIResearchSynthesisSummary({ synthesis, snapshotTimestamp, suspe
 }) {
   const age = snapshotTimestamp ? Date.now() - Date.parse(snapshotTimestamp) : NaN;
   const current = !suspended && Number.isFinite(age) && age >= 0 && age <= 86400000 && synthesis?.snapshotTimestamp === snapshotTimestamp;
-  const content = current && synthesis?.status === "SUCCESS" && synthesis.quality?.contractVersion === "INDEPENDENT_INSTRUMENT_REVIEW_V2" ? synthesis.content : undefined;
+  const content = current && synthesis?.status === "SUCCESS" && synthesis.quality?.contractVersion === SYNTHESIS_CONTRACT ? synthesis.content : undefined;
   const conclusion = { WATCH_ONLY: "Vorerst beobachten", PREPARATION: "Einstiege vorbereiten", CANDIDATES: "Einstiegskandidaten getrennt prüfen", RISK_REVIEW: "Instrumentrisiken neu prüfen" };
   const instrumentNames = { NASDAQ_PUT: "Nasdaq Put", NASDAQ_CALL: "Nasdaq Call", RUSSELL_CALL: "Russell Call" };
   const assessments = { WATCH: "Beobachten", PREPARE: "Vorbereiten", STARTER_CANDIDATE: "Früher Einstiegskandidat", CONFIRM: "Bestätigung prüfen", REDUCE: "Risiko reduzieren prüfen" };
