@@ -97,7 +97,12 @@ export function putTimingEngine(input: any) {
   const structuralFragility = fragilityScore >= 70;
   const extremeFragility = fragilityScore >= 90;
   const marketQualityScore = num(marketQuality?.score ?? marketQuality?.value ?? marketQuality?.qualityScore, 50);
-  const deterioratingQuality = marketQuality?.state === "DETERIORATING" || marketQuality?.marketQuality === "DETERIORATING" || marketQualityScore < 45;
+  // Consume the current MarketQuality producer's states. DETERIORATING is
+  // retained for legacy inputs; FRAGILE alone does not open an early entry.
+  const marketQualityState = marketQuality?.state ?? marketQuality?.marketQuality ?? "UNKNOWN";
+  const qualitySupportsEarlyDeterioration = [
+    "INTERNALLY_WEAK", "DISTRIBUTION", "STRUCTURAL_BREAKDOWN", "DETERIORATING"
+  ].includes(marketQualityState) || marketQualityScore < 45;
 
   // Price timing remains separate from structural scoring.
   const priceScore = num(priceMomentum?.score, 50);
@@ -197,12 +202,21 @@ export function putTimingEngine(input: any) {
     Number.isFinite(num(participation?.score, NaN)) &&
     Number.isFinite(num(marketQuality?.score ?? marketQuality?.value ?? marketQuality?.qualityScore, NaN));
   const bearishRotationContext = ["BEARISH_CONFIRMING", "BEARISH_CONFIRMED", "INTERNAL_BREAKDOWN"].includes(rotationConfirmState);
-  const earlyCurrentTrigger = currentStructureAvailable &&
-    [2, 3, 4].includes(phaseRank(phase)) && earlyWarning?.active === true &&
-    breadth50 < 50 && participationWeak && deterioratingQuality && bearishRotationContext &&
-    earlyNasdaqTimingAvailable && ndx5D <= 0 && ndxAcceleration < 0 &&
-    !bool(ndx.bullishImpulse) && !bullishImpulse && !bullishCounterMove &&
-    !panicEligible && contradictionPoints <= 2;
+  const earlyCurrentChecks = {
+    currentStructureAvailable,
+    eligiblePhase: [2, 3, 4].includes(phaseRank(phase)),
+    earlyWarningActive: earlyWarning?.active === true,
+    weakBreadth: breadth50 < 50,
+    weakParticipation: participationWeak,
+    weakMarketQuality: qualitySupportsEarlyDeterioration,
+    bearishRotationContext,
+    ownNasdaqTimingAvailable: earlyNasdaqTimingAvailable,
+    ownNasdaqCooling: earlyNasdaqTimingAvailable && ndx5D <= 0 && ndxAcceleration < 0,
+    noBullishCountermove: !bool(ndx.bullishImpulse) && !bullishImpulse && !bullishCounterMove,
+    noPanic: !panicEligible,
+    limitedContradiction: contradictionPoints <= 2
+  };
+  const earlyCurrentTrigger = Object.values(earlyCurrentChecks).every(value => value === true);
 
   let decision: PutTimingDecision = "WAIT";
   let timing: PutTimingTiming = "WAIT";
@@ -269,6 +283,11 @@ export function putTimingEngine(input: any) {
       panicConfirmed, panicEligible, structuralBreakdown, internalDeterioration,
       earlyStructuralTrigger, structuralPutTrigger, priceComplete,
       earlyCurrentTrigger,
+      earlyCurrentChecks,
+      earlyCurrentBlockedReasons: Object.entries(earlyCurrentChecks).filter(([, passed]) => !passed).map(([name]) => name),
+      marketQualityState,
+      marketQualityScore,
+      earlyQualityPolicy: "MARKET_QUALITY_PRODUCER_STATES_V1",
       earlyNasdaqTimingAvailable,
       earlyEntryPolicy: "CURRENT_STRUCTURE_NASDAQ_COOLING_STARTER_V1",
       earlyEntryRequiresBearish20DReturn: false,
