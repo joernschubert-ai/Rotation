@@ -599,12 +599,28 @@ export function positionSizingV2(engine: any) {
     const state = candidate?.state ?? "NEUTRAL";
     const direction = candidate?.direction ?? "NONE";
 
+    // The explicit current-structure probe is a separate, capped admission
+    // path. It need not satisfy the mature defensive-build confirmation count.
+    // All hard vetoes and risk reductions below still apply.
+    const earlyCurrentPutStarter = flow === "NASDAQ_PUT" &&
+      candidate?.eligible === true && direction === "SHORT" && strength >= 45 &&
+      engine?.putTiming?.decision === "DEFENSIVE_BUILD" &&
+      engine?.putTiming?.execution === "SMALL STARTER" &&
+      engine?.putTiming?.meta?.earlyCurrentTrigger === true &&
+      engine?.putTiming?.meta?.earlyQualityPolicy === "MARKET_QUALITY_PRODUCER_STATES_V1" &&
+      ["currentStructureAvailable", "eligiblePhase", "earlyWarningActive", "weakBreadth",
+        "weakParticipation", "weakMarketQuality", "bearishRotationContext",
+        "ownNasdaqTimingAvailable", "ownNasdaqCooling", "noBullishCountermove",
+        "noPanic", "limitedContradiction"].every(key => engine?.putTiming?.meta?.earlyCurrentChecks?.[key] === true) &&
+      ndxShortAvailable && ndxMediumAvailable && ndxAccelerationAvailable && ndxScoreAvailable &&
+      !ndxBullishImpulse;
+
     let eligible = strength >= 20;
 
     if (direction === "NONE") eligible = false;
 
     if (flow === "NASDAQ_PUT") {
-      eligible = isDefensivePutEligible(strength, direction);
+      eligible = isDefensivePutEligible(strength, direction) || earlyCurrentPutStarter;
     } else if (executionMode === "WAIT" && strength < 65) {
       eligible = false;
     }
@@ -876,6 +892,7 @@ export function positionSizingV2(engine: any) {
         ? "Risk-adjusted allocation rounds to zero"
         : candidate?.driver ?? candidate?.reason ?? "TradeStack candidate",
       diagnostics: {
+        earlyCurrentPutStarter,
         baseSize,
         supportAdjustedSize,
         flowEdge,
