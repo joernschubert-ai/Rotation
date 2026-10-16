@@ -78,13 +78,20 @@ export function AIResearchOverview({ report, snapshotTimestamp, suspended = fals
       {(["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const).map(instrument => {
         const app = report.decisionSupport?.flows.find(flow => flow.instrument === instrument || flow.instrument === names[instrument]);
         const ai = content?.flows.find(flow => flow.instrument === instrument);
+        const brief = current ? synthesis?.quality?.instrumentBriefs?.find(item => item.instrument === instrument) : undefined;
+        const rejected = synthesis?.status === "UNAVAILABLE" && Boolean(synthesis.quality?.issues.length);
         const candidate = ai && ["STARTER_CANDIDATE", "CONFIRM"].includes(ai.assessment);
         const color = candidate ? "text-amber-200" : ai?.assessment === "REDUCE" ? "text-rose-300" : ai?.assessment === "PREPARE" ? "text-sky-300" : "text-slate-300";
         return <div key={instrument} className="bg-[#111a23] p-4 sm:p-5">
           <div className="text-xs font-semibold text-slate-100">{names[instrument]}</div>
-          <div className={`mt-2 text-base font-semibold ${color}`}>{ai ? states[ai.assessment] : "Auswertung ausstehend"}</div>
+          <div className={`mt-2 text-base font-semibold ${color}`}>{ai ? states[ai.assessment] : rejected && current ? "Nicht übernommen" : "Auswertung ausstehend"}</div>
           <div className="mt-1 text-[10px] text-slate-500">Unabhängige KI-Einschätzung</div>
-          <p className="mt-3 text-xs leading-relaxed text-slate-400">{ai?.whyNow ?? (!current ? "Nach dem Abgleich erneut prüfen." : "Begründung und Status stehen in den Details.")}</p>
+          <p className="mt-3 text-xs leading-relaxed text-slate-400">{ai?.whyNow ?? (!current ? "Nach dem Abgleich erneut prüfen." : rejected ? "Die KI-Antwort wurde abgelehnt; keine Instrumentbewertung übernommen." : "Begründung und Status stehen in den Details.")}</p>
+          {brief && <div className="mt-3 space-y-1 text-[11px] leading-relaxed text-slate-400">
+            <p className="font-semibold text-slate-300">Vorhandene Datenbasis · Index</p>
+            <p>Snapshot-Kurs {brief.price.current?.toLocaleString("de-DE", { maximumFractionDigits: 2 }) ?? "—"} · 5 Tage {pct(brief.price.momentum5D)} · 20 Tage {pct(brief.price.momentum20D)}</p>
+            <p>{brief.histories.length} historische Vergleichsstudien · {brief.cot.length} COT-Gruppen</p>
+          </div>}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-700/60 pt-3 text-[11px]">
             <span className="text-slate-400">App: {!current ? "ausgesetzt" : app?.eligible ? "freigegeben" : "keine Freigabe"}</span>
             <span className="font-semibold text-slate-200">Modellanteil {current && typeof app?.modelSize === "number" && Number.isFinite(app.modelSize) ? `${app.modelSize}%` : "—"}</span>
