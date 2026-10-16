@@ -5,10 +5,22 @@ import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
 export { SYNTHESIS_CONTRACT } from "./aiResearchSynthesisTypes";
 export const SYNTHESIS_INSTRUMENTS = ["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const;
 export const SYNTHESIS_ACTIONS = ["WATCH", "PREPARE", "STARTER_CANDIDATE", "CONFIRM", "REDUCE"];
+export const SYNTHESIS_SLOTS = { nasdaqPut: "NASDAQ_PUT", nasdaqCall: "NASDAQ_CALL", russellCall: "RUSSELL_CALL" } as const;
 const object = (value: unknown): Record<string, any> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
 const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const placeholder = /^(?:keine?|kein(?:e|en|er)? (?:bestätigung|widerlegung|bedingung|gegenargumente?)|nicht (?:vorhanden|verfügbar|bekannt)|unbekannt|abwarten|none|unknown|n a|tbd|not available)[.!\s]*$/i;
 const useful = (value: unknown, minimum = 25) => typeof value === "string" && value.trim().length >= minimum && value.length <= 1200 && !placeholder.test(value.trim());
+
+/** Convert complete named slots to the existing display format. Never invent a missing slot. */
+export function normalizeSynthesisEnvelope(value: unknown): unknown {
+  const data = object(value);
+  if (!Object.keys(SYNTHESIS_SLOTS).every(key => data[key] && typeof data[key] === "object" && !Array.isArray(data[key]))) return value;
+  if ("flows" in data || Object.entries(SYNTHESIS_SLOTS).some(([key,instrument]) =>
+    "instrument" in data[key] && data[key].instrument !== instrument)) return value;
+  const flows = Object.entries(SYNTHESIS_SLOTS).map(([key,instrument]) => ({ ...data[key], instrument }));
+  const { nasdaqPut, nasdaqCall, russellCall, ...rest } = data;
+  return { ...rest, flows };
+}
 
 export function hasUnsupportedConditionNumber(value: string): boolean {
   // Index identities are not proposed entry thresholds. Fold common decimal
@@ -45,6 +57,7 @@ export function synthesisConclusion(flows: ResearchSynthesisContent["flows"]): R
 export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]): string[] {
   const data = object(value);
   const issues: string[] = [];
+  if (Object.keys(SYNTHESIS_SLOTS).some(key => key in data)) issues.push("UNNORMALIZED_OR_AMBIGUOUS_INSTRUMENT_FIELDS");
   const byId = new Map(evidence.map(item => [item.id, item]));
   const briefs = buildInstrumentBriefs(evidence);
   const numbers: number[] = [];

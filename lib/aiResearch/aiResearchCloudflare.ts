@@ -4,7 +4,7 @@ import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
 import type { ResearchSynthesis, ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 
 import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
-import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, SYNTHESIS_CONTRACT } from "./aiResearchSynthesisValidation";
+import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, normalizeSynthesisEnvelope, SYNTHESIS_CONTRACT } from "./aiResearchSynthesisValidation";
 import { buildSynthesisSchema, RESEARCH_SYSTEM_PROMPT } from "./aiResearchSynthesisContract";
 import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
 export { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
@@ -182,9 +182,15 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const raw = body.result?.response;
     let content: unknown;
     try { content = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { content = null; }
-    const derived = deriveSynthesisConclusion(content);
+    const rawObject = content && typeof content === "object" && !Array.isArray(content) ? content as Record<string, unknown> : {};
+    const responseShape = { rootKeys: Object.keys(rawObject).slice(0,20).map(key => key.slice(0,80)),
+      flowsIsArray: Array.isArray(rawObject.flows), flowCount: Array.isArray(rawObject.flows) ? rawObject.flows.length : null };
+    const normalized = normalizeSynthesisEnvelope(content);
+    const derived = deriveSynthesisConclusion(normalized);
+    const answerQuality = { ...quality, responseShape, normalizations: [
+      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS"] : []),
+      ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
     content = derived.value;
-    const answerQuality = { ...quality, normalizations: derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : [] };
     stage = "ANSWER_VALIDATION";
     const issues = inspectSynthesis(content, evidence);
     if (issues.length) {
@@ -207,6 +213,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       const conditionFailure = issues.every(issue => /UNOBSERVABLE_(CONFIRMATION|INVALIDATION)$/.test(issue));
       const rejected: ResearchSynthesis = { ...unavailable(conditionFailure
         ? "Die KI hat geantwortet, aber ihre Bestätigungs- oder Widerlegungsbedingungen sind nicht eindeutig prüfbar. Deshalb wird keine Einstiegsaussage angezeigt."
+        : issues.includes("THREE_INSTRUMENTS_REQUIRED") ? "Die KI hat keine vollständigen Einzelbewertungen für Nasdaq Put, Nasdaq Call und Russell Call geliefert. Die vorhandene Datenbasis bleibt verfügbar; keine KI-Einstiegsaussage übernommen."
         : issues.some(issue => /HISTORICAL|HISTORY_REFERENCE|COT_GROUPS|COT_REFERENCE|MANAGER_INTERPRETATION|MONEY_INTERPRETATION/.test(issue))
           ? "Die KI hat Historie oder COT nicht vollständig den eigenen Instrumenten zugeordnet. Die Antwort wurde nicht als Einstiegsaussage übernommen; die Details stehen im kopierbaren Bericht."
           : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),

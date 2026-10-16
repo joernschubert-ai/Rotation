@@ -1,5 +1,5 @@
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V8_BOUND_EVIDENCE";
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V9_FIXED_FIELDS";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -44,6 +44,7 @@ export interface ResearchSynthesis {
     missingOwnPriceMarkets: string[];
     semanticTruthVerified: false;
     normalizations?: string[];
+    responseShape?: { rootKeys: string[]; flowsIsArray: boolean; flowCount: number | null };
     instrumentBriefs?: InstrumentBrief[];
     timing?: {
       preparationMs: number | null;

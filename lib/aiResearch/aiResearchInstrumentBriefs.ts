@@ -50,7 +50,7 @@ export function buildInstrumentBriefs(evidence: SynthesisEvidence[]): Instrument
       instrument === "NASDAQ_PUT" ? "Für diese Put-Hypothese sind fallende Indexkurse günstig, steigende ungünstig. Keine berechnete Optionsrendite."
         : "Für diese Call-Hypothese sind steigende eigene Indexkurse günstig, fallende ungünstig. Keine berechnete Optionsrendite.",
       `Eigene Kursrendite: 5 Tage ${format(numeric(price.momentum5D))}%, 20 Tage ${format(numeric(price.momentum20D))}%. Unterschiedliche Zeithorizonte getrennt erklären.`,
-      ...histories.map(item => `${item.id}: ${item.sampleSize} überlappende Fälle; 20-Tage-Mittel ${format(item.meanPct)}% gegen ${format(item.baselineMeanPct)}% Vergleich, Median ${format(item.medianPct)}%, p10/p90 ${format(item.p10Pct)}%/${format(item.p90Pct)}%. ${item.currentMatch ? "Zustand zum Snapshot-Markttag." : `Nur datierter Kontext vom ${item.asOfDate}.`}`),
+      ...histories.map(item => `${item.id}: ${item.sampleSize} überlappende Fälle; Index-Folgerendite über 20 Tage: Mittel ${format(item.meanPct)}% gegen ${format(item.baselineMeanPct)}% Vergleich, Median ${format(item.medianPct)}%, p10/p90 ${format(item.p10Pct)}%/${format(item.p90Pct)}%. ${item.currentMatch ? "Zustand zum Snapshot-Markttag." : `Nur datierter Kontext vom ${item.asOfDate}.`}`),
       ...cot.map(item => `${item.group} (${item.reportDate}): netto ${item.netPosition ?? "fehlend"}; Wochenänderung ${item.weeklyChange ?? "fehlend"}; 13-Wochen-Änderung ${item.change13W ?? "fehlend"}. Bestand und Veränderung getrennt erklären.`),
       "Kein kombinierter Historie/COT-Backtest und kein Options-Chance-Risiko-Verhältnis berechnet. Gegensätzliche COT-Gruppen allein beweisen keinen Vorteil."
     ];
