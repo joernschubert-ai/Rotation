@@ -1,5 +1,6 @@
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V9_FIXED_FIELDS";
+import type { ResearchTrigger } from "./aiResearchTriggers";
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V10_FACTS_AND_TRIGGERS";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -18,6 +19,9 @@ export interface ResearchSynthesisContent {
     invalidationRefs: string[];
     historyStudyId?: string;
     cotGroups?: string[];
+    historyMeanVsBaseline?: "ABOVE" | "BELOW" | "EQUAL" | "UNKNOWN";
+    confirmationTrigger?: ResearchTrigger;
+    invalidationTrigger?: ResearchTrigger;
     /** Attached by the server from validated source bindings, not model numbers. */
     grounding?: {
       history: InstrumentBrief["histories"][number] | null;
@@ -62,7 +66,8 @@ export interface ResearchSynthesis {
       counterarguments: string[];
       limitations: string[];
       references: Array<{ instrument: string; evidenceRefs: string[]; confirmationRefs: string[]; invalidationRefs: string[];
-        historyStudyId?: string; cotGroups?: string[]; reasoning?: string; counterargument?: string }>;
+        historyStudyId?: string; cotGroups?: string[]; reasoning?: string; counterargument?: string;
+        historyMeanVsBaseline?: string; confirmationTrigger?: string; invalidationTrigger?: string }>;
     };
     inputSummary?: {
       prices: Array<{ market: string; current: number | null; momentum5D: number | null; momentum20D: number | null; quoteTimestamp: string | null; entryDataReady: boolean }>;
