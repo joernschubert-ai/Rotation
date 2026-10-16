@@ -194,6 +194,7 @@ export function createMarketSnapshot({
     calculationVersions: {
       history: "VERSIONED_HISTORY_V3",
       master: master.diagnostics?.calculationVersion ?? null,
+      crash: crash.diagnostics?.inputPolicy ?? null,
       rotation: "STRUCTURAL_MODEL_2026_10_V3",
       liquidity: "STRUCTURAL_MODEL_2026_10_V3",
       rotationDecay: "STRUCTURAL_MODEL_2026_10_V3",
@@ -283,6 +284,8 @@ export function createMarketSnapshot({
       probability: crash.probability,
       label: crash.label,
       eventType: crash.eventType,
+      diagnostics: crash.diagnostics,
+      dataQuality: crash.dataQuality,
 
       structuralFragility: crash.structuralFragility
         ? {
@@ -291,7 +294,7 @@ export function createMarketSnapshot({
           }
         : undefined,
 
-      trigger: crash.trigger,
+      trigger: crash.crashTrigger ?? crash.trigger,
       panicState: crash.panicState,
       momentum: crash.momentum,
       trend: crash.trend,
