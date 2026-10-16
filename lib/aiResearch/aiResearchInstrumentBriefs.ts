@@ -17,7 +17,7 @@ export interface InstrumentBrief {
   cotRef: string;
   cot: Array<{ group: string; reportDate: string; netPosition: number | null; weeklyChange: number | null; change13W: number | null; percentile: number | null;
     netState?: "NET_LONG" | "NET_SHORT" | "FLAT" | "UNKNOWN";
-    weeklyFact?: string; change13WFact?: string; previousWeekNet?: number | null; previous13WeekNet?: number | null }>;
+    weeklyFact?: string; change4WFact?: string; change13WFact?: string; change4W?: number | null; previousWeekNet?: number | null; previous13WeekNet?: number | null }>;
   reading: string[];
 }
 const object = (value: unknown): Record<string, any> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -74,10 +74,10 @@ export function buildInstrumentBriefs(evidence: SynthesisEvidence[]): Instrument
       ? cotSource.data.summaries.map(raw => {
         const item = object(raw);
         const netPosition = numeric(item.netPosition);
-        const weekly = cotChangeFact(netPosition, numeric(item.weeklyChange)), longTerm = cotChangeFact(netPosition, numeric(item.change13W));
+        const weekly = cotChangeFact(netPosition, numeric(item.weeklyChange)), fourWeek = cotChangeFact(netPosition, numeric(item.change4W)), longTerm = cotChangeFact(netPosition, numeric(item.change13W));
         return { group: String(item.group ?? ""), reportDate: String(item.reportDate ?? ""),
           netState: netPosition === null ? "UNKNOWN" as const : netPosition > 0 ? "NET_LONG" as const : netPosition < 0 ? "NET_SHORT" as const : "FLAT" as const,
-          weeklyFact: weekly.fact, change13WFact: longTerm.fact, previousWeekNet: weekly.previous, previous13WeekNet: longTerm.previous,
+          weeklyFact: weekly.fact, change4WFact: fourWeek.fact, change4W: numeric(item.change4W), change13WFact: longTerm.fact, previousWeekNet: weekly.previous, previous13WeekNet: longTerm.previous,
           netPosition: numeric(item.netPosition), weeklyChange: numeric(item.weeklyChange), change13W: numeric(item.change13W), percentile: numeric(item.percentile) };
       }).filter(item => ["ASSET_MANAGER", "LEVERAGED_MONEY"].includes(item.group)) : [];
     const reading = [
@@ -85,7 +85,7 @@ export function buildInstrumentBriefs(evidence: SynthesisEvidence[]): Instrument
         : "Für diese Call-Hypothese sind steigende eigene Indexkurse günstig, fallende ungünstig. Keine berechnete Optionsrendite.",
       `Eigene Kursrendite: 5 Tage ${format(numeric(price.momentum5D))}%, 20 Tage ${format(numeric(price.momentum20D))}%. Unterschiedliche Zeithorizonte getrennt erklären.`,
       ...histories.map(item => `${item.id}: ${item.sampleSize} überlappende Fälle; 20 Tage. ${item.comparisonFact} Median ${format(item.medianPct)}%, p10/p90 ${format(item.p10Pct)}%/${format(item.p90Pct)}%. ${item.currentMatch ? "Zustand zum Snapshot-Markttag." : `Nur datierter Kontext vom ${item.asOfDate}.`}`),
-      ...cot.map(item => `${item.group} (${item.reportDate}): 1 Woche: ${item.weeklyFact} 13 Wochen: ${item.change13WFact}`),
+      ...cot.map(item => `${item.group} (${item.reportDate}): 1 Woche: ${item.weeklyFact} 4 Wochen: ${item.change4WFact} 13 Wochen: ${item.change13WFact}`),
       "Netto-Veränderungen beweisen keine einzelnen Brutto-Long-/Short-Transaktionen. Kein kombinierter Historie/COT-Backtest oder Options-Chance-Risiko-Verhältnis berechnet. Gegensätzliche COT-Gruppen allein beweisen keinen Vorteil."
     ];
     return { instrument, priceRef, price: { current: numeric(price.current), momentum5D: numeric(price.momentum5D), momentum20D: numeric(price.momentum20D) }, histories, cotRef, cot, reading };

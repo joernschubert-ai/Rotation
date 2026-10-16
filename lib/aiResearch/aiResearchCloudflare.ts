@@ -74,10 +74,10 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   if (payload.length > 26000) return unavailable("Die Belege überschreiten die festgelegte Eingabegrenze. Keine KI-Anfrage ausgelöst.");
   // Response diagnostics changed; do not reuse a rejection whose wording was discarded.
   // Daily quota, cooldown and lock namespaces deliberately remain unchanged.
-  const cacheKey = `${PREFIX}:cache:${SYNTHESIS_CONTRACT}:condition-audit-v1:${createHash("sha256").update(payload).digest("hex")}`;
+  const cacheKey = `${PREFIX}:cache:${SYNTHESIS_CONTRACT}:cot-horizons-v1:${createHash("sha256").update(payload).digest("hex")}`;
   // Rejected text is diagnostic only. Keep it addressable even if news/context
   // change between the POST and a later GET for the identical snapshot/task/question.
-  const diagnosticKey = `${PREFIX}:rejected:${SYNTHESIS_CONTRACT}:${createHash("sha256").update(JSON.stringify({
+  const diagnosticKey = `${PREFIX}:rejected:${SYNTHESIS_CONTRACT}:cot-horizons-v1:${createHash("sha256").update(JSON.stringify({
     snapshotTimestamp, task: input.context.task, question: text(input.context.question,500)
   })).digest("hex")}`;
   let redis: Redis;
