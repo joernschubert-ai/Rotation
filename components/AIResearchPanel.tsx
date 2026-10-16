@@ -44,6 +44,54 @@ const labels: Record<string, string> = {
 };
 const label = (value?: string) => value ? labels[value] ?? value : "Unbekannt";
 
+/** Compact overview; app permissions and independent research remain distinct. */
+export function AIResearchOverview({ report, snapshotTimestamp, suspended = false }: {
+  report: AIResearchReport; snapshotTimestamp?: string; suspended?: boolean;
+}) {
+  const synthesis = report.aiSynthesis;
+  const age = snapshotTimestamp ? Date.now() - Date.parse(snapshotTimestamp) : NaN;
+  const current = !suspended && Number.isFinite(age) && age >= 0 && age <= 86400000;
+  const content = current && synthesis && synthesis.snapshotTimestamp === snapshotTimestamp && synthesis.status === "SUCCESS" &&
+    synthesis.quality?.contractVersion === SYNTHESIS_CONTRACT ? synthesis.content : undefined;
+  const names = { NASDAQ_PUT: "Nasdaq Put", NASDAQ_CALL: "Nasdaq Call", RUSSELL_CALL: "Russell Call" };
+  const states = { WATCH: "Beobachten", PREPARE: "Vorbereiten", STARTER_CANDIDATE: "Früher Kandidat", CONFIRM: "Bestätigung prüfen", REDUCE: "Risiko prüfen" };
+  const titles = { WATCH_ONLY: "Vorerst beobachten", PREPARATION: "Einstiege vorbereiten", CANDIDATES: "Frühe Chancen getrennt prüfen", RISK_REVIEW: "Risiken neu bewerten" };
+  const overviewTitle = !current ? "Aktuellen Marktstand abgleichen" : content ? titles[content.conclusion] : "KI-Einschätzung noch nicht verfügbar";
+  return <section aria-label="Research Überblick" className="overflow-hidden rounded-xl border border-slate-700 bg-gradient-to-br from-slate-900 via-[#101820] to-[#101114]">
+    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-700/60 p-4 sm:px-5">
+      <div><div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Research · Überblick</div>
+        <h3 className="mt-1 text-lg font-semibold text-slate-100">{overviewTitle}</h3>
+        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-400">App: {current ? report.decisionSupport?.action ?? "Auswertung verfügbar" : "Einstiegsaussagen vorübergehend ausgesetzt"}</p>
+      </div>
+      <div className="text-[10px] leading-relaxed text-slate-400">Marktstand {date(snapshotTimestamp)}<br />KI {date(synthesis?.generatedAt)}</div>
+    </div>
+    {!content && current && <p role="status" className="border-b border-slate-700/60 px-4 py-3 text-xs leading-relaxed text-amber-200 sm:px-5">{synthesis?.status === "SUCCESS" ? "Die KI-Antwort gehört zu einer früheren Auswertung. Research bitte aktualisieren." : synthesis?.message ?? "Noch keine KI-Einschätzung verfügbar."}</p>}
+    <div className="grid grid-cols-1 gap-px bg-slate-700/40 sm:grid-cols-3">
+      {(["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const).map(instrument => {
+        const app = report.decisionSupport?.flows.find(flow => flow.instrument === instrument || flow.instrument === names[instrument]);
+        const ai = content?.flows.find(flow => flow.instrument === instrument);
+        const candidate = ai && ["STARTER_CANDIDATE", "CONFIRM"].includes(ai.assessment);
+        const color = candidate ? "text-amber-200" : ai?.assessment === "REDUCE" ? "text-rose-300" : ai?.assessment === "PREPARE" ? "text-sky-300" : "text-slate-300";
+        return <div key={instrument} className="bg-[#111a23] p-4 sm:p-5">
+          <div className="text-xs font-semibold text-slate-100">{names[instrument]}</div>
+          <div className={`mt-2 text-base font-semibold ${color}`}>{ai ? states[ai.assessment] : "Auswertung ausstehend"}</div>
+          <div className="mt-1 text-[10px] text-slate-500">Unabhängige KI-Einschätzung</div>
+          <p className="mt-3 text-xs leading-relaxed text-slate-400">{ai?.whyNow ?? (!current ? "Nach dem Abgleich erneut prüfen." : "Begründung und Status stehen in den Details.")}</p>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-700/60 pt-3 text-[11px]">
+            <span className="text-slate-400">App: {!current ? "ausgesetzt" : app?.eligible ? "freigegeben" : "keine Freigabe"}</span>
+            <span className="font-semibold text-slate-200">Modellanteil {current && typeof app?.modelSize === "number" && Number.isFinite(app.modelSize) ? `${app.modelSize}%` : "—"}</span>
+          </div>
+        </div>;
+      })}
+    </div>
+    <div className="flex flex-wrap gap-x-5 gap-y-2 px-4 py-3 text-[10px] text-slate-400 sm:px-5">
+      <span>Struktur: {label(report.evidenceAssessment?.structuralBias)}</span><span>Bestätigung: {label(report.evidenceAssessment?.confirmation)}</span>
+      <span>Einstiegsreife der App: {label(report.evidenceAssessment?.entryMaturity)}</span>
+      <span>KI-Kandidat und App-Freigabe werden getrennt beurteilt.</span>
+    </div>
+  </section>;
+}
+
 /** Reusable compact summary for later placement at the top of the main page. */
 export function AIResearchDecisionSummary({ report, snapshotTimestamp, suspended = false }: {
   report: AIResearchReport; snapshotTimestamp?: string; suspended?: boolean;
@@ -162,8 +210,13 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     {snapshotMismatch && <p role="status" className="border border-amber-900 p-3 text-xs text-amber-200">Research und Dashboard verwenden unterschiedliche Snapshots. Die Einstiegsaussage ist ausgesetzt. Bitte den Marktstand erneut aktualisieren.</p>}
     {!report && marketReady && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
     {report && <>
-      <AIResearchDecisionSummary report={report} snapshotTimestamp={data?.diagnostics?.snapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
-      <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+      <AIResearchOverview report={report} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+      <Detail title="Unabhängige KI · Einschätzung, früher Vorteil und Bedingungen">
+        <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+      </Detail>
+      <Detail title="App · Freigaben, Modellanteile und Einstiegsbedingungen">
+        <AIResearchDecisionSummary report={report} snapshotTimestamp={data?.diagnostics?.snapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+      </Detail>
       <Detail title="Begründung: App, Kurse, COT und Nachrichten">
         <p className="text-xs leading-relaxed text-[#bbb]">{report.thesis.statement}</p>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{evidence.map(block => <div key={block.category} className="border border-[#292929] p-3">
@@ -178,6 +231,14 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       </Detail>
       <Detail title={`Historische Vergleiche · Datenstand ${historical?.asOfDate ?? "unbekannt"}`}>
         {!historical ? <p className="text-xs text-[#888]">Keine historischen Vergleichsdaten verfügbar.</p> : <>
+          {(historical.marketStudies ?? []).map(study => <Detail key={`${study.market}-${study.family}`} title={`${study.market === "NASDAQ" ? "Nasdaq" : "Russell 2000"} · ${{ OWN_TREND: "Eigener Trend", ROTATION_20D: "Relative Stärke", OWN_PRICE_VIX_5D: "Kurs und VIX" }[study.family]}`}>
+            <p className="text-xs text-slate-300">{study.state} · {study.asOfDate} · {study.currentMatch ? "Zustandsabgleich zum Snapshot-Markttag" : "Datierter Vergleichskontext"}</p>
+            <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-right text-xs text-slate-400">
+              <thead><tr className="border-b border-slate-700"><th className="p-2 text-left">Horizont / Fälle</th><th className="p-2">Mittel</th><th className="p-2">Median</th><th className="p-2">10.–90. Perzentil</th><th className="p-2">Vergleich</th><th className="p-2">Differenz</th></tr></thead>
+              <tbody>{study.statistics.map(stats => <tr key={stats.horizonDays} className="border-b border-slate-800"><td className="p-2 text-left">{stats.horizonDays} Tage / {stats.sampleSize}</td><td className="p-2">{pct(stats.meanReturn)}</td><td className="p-2">{pct(stats.medianReturn)}</td><td className="p-2">{pct(stats.p10Return)} bis {pct(stats.p90Return)}</td><td className="p-2">{pct(stats.baselineMeanReturn)}</td><td className="p-2">{pct(stats.excessMeanReturn, true)}</td></tr>)}</tbody>
+            </table></div>
+            <p className="text-[11px] text-slate-500">Index-Folgerenditen, keine Optionsrenditen. Überlappende Zeiträume sind keine unabhängigen Fälle. Das Perzentilband ist kein Prognoseintervall.</p>
+          </Detail>)}
           <p className="text-xs leading-relaxed text-[#999]">Gruppenrendite und unbedingter Nasdaq-Vergleich sind beschreibende Durchschnittswerte. Die Differenz ist kein nachgewiesener Handelsvorteil. Überlappende Zeiträume sind keine unabhängigen Fälle.</p>
           {historical.currentStates.map((state, index) => {
             const observations = historical.observations.filter(item => item.family === state.family && item.market === state.market && item.state === state.state).sort((a, b) => a.horizonDays - b.horizonDays);
