@@ -1,13 +1,37 @@
 import type { ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 import type { SynthesisEvidence } from "./aiResearchSynthesisEvidence";
 
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V5_PROVIDER_SCHEMA";
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V6_INDEX_NAMES";
 export const SYNTHESIS_INSTRUMENTS = ["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const;
 export const SYNTHESIS_ACTIONS = ["WATCH", "PREPARE", "STARTER_CANDIDATE", "CONFIRM", "REDUCE"];
 const object = (value: unknown): Record<string, any> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
 const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const placeholder = /^(?:keine?|kein(?:e|en|er)? (?:bestätigung|widerlegung|bedingung|gegenargumente?)|nicht (?:vorhanden|verfügbar|bekannt)|unbekannt|abwarten|none|unknown|n a|tbd|not available)[.!\s]*$/i;
 const useful = (value: unknown, minimum = 25) => typeof value === "string" && value.trim().length >= minimum && value.length <= 1200 && !placeholder.test(value.trim());
+
+export function hasUnsupportedConditionNumber(value: string): boolean {
+  // Index identities are not proposed entry thresholds. Fold common decimal
+  // scripts so that a real threshold cannot bypass this check with other digits.
+  const normalized = value.normalize("NFKC").replace(/[\u0660-\u0669\u06f0-\u06f9]/g, character =>
+    String(character.charCodeAt(0) - (character.charCodeAt(0) >= 0x06f0 ? 0x06f0 : 0x0660)));
+  const withoutIndexNames = normalized.replace(/\brussell[\s-]*2000\b/gi,"Russell")
+    .replace(/\bnasdaq[\s-]*100\b/gi,"Nasdaq");
+  return /\p{N}|%|\bprozent(?:punkt)?(?:e|en)?\b/iu.test(withoutIndexNames);
+}
+
+/** A display aggregate is deterministic; no trade assessment or prose is repaired. */
+export function deriveSynthesisConclusion(value: unknown): { value: unknown; changed: boolean } {
+  const data = object(value);
+  if (!Array.isArray(data.flows) || data.flows.length !== 3) return {value,changed:false};
+  const seen = new Set<string>();
+  for (const flow of data.flows) {
+    if (!flow || !SYNTHESIS_INSTRUMENTS.includes(flow.instrument) || seen.has(flow.instrument) ||
+      !SYNTHESIS_ACTIONS.includes(flow.assessment)) return {value,changed:false};
+    seen.add(flow.instrument);
+  }
+  const conclusion = synthesisConclusion(data.flows);
+  return { value: {...data,conclusion}, changed: data.conclusion !== conclusion };
+}
 
 export function synthesisConclusion(flows: ResearchSynthesisContent["flows"]): ResearchSynthesisContent["conclusion"] {
   if (flows.some(flow => ["STARTER_CANDIDATE", "CONFIRM"].includes(flow.assessment))) return "CANDIDATES";
@@ -47,7 +71,7 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
       // This contract accepts qualitative observable triggers. Numeric trade
       // thresholds require a future, explicitly calculated chart-level schema.
       // Matching a number to any sample count or lookback is not a derivation.
-      if (typeof flow[key] === "string" && /\p{N}|%|\bprozent(?:punkt)?(?:e|en)?\b/iu.test(flow[key])) {
+      if (typeof flow[key] === "string" && hasUnsupportedConditionNumber(flow[key])) {
         issues.push(`${instrument}:UNSUPPORTED_NUMERIC_${key.toUpperCase()}`);
       }
       if (typeof flow[key] === "string" && (!/nasdaq|russell|kurs|preis|rendit|momentum|teilnahme|partizipation|liquid|rotation|marktbreit|breadth|participation|durchschnitt|ma(?:20|50|200)/i.test(flow[key]) ||

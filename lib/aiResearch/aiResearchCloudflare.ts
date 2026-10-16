@@ -4,7 +4,7 @@ import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
 import type { ResearchSynthesis, ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 
 import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
-import { inspectSynthesis, validateSynthesis, SYNTHESIS_CONTRACT } from "./aiResearchSynthesisValidation";
+import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, SYNTHESIS_CONTRACT } from "./aiResearchSynthesisValidation";
 import { buildSynthesisSchema, RESEARCH_SYSTEM_PROMPT } from "./aiResearchSynthesisContract";
 export { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 export { validateSynthesis } from "./aiResearchSynthesisValidation";
@@ -129,6 +129,9 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const raw = body.result?.response;
     let content: unknown;
     try { content = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { content = null; }
+    const derived = deriveSynthesisConclusion(content);
+    content = derived.value;
+    const answerQuality = { ...quality, normalizations: derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : [] };
     stage = "ANSWER_VALIDATION";
     const issues = inspectSynthesis(content, evidence);
     if (issues.length) {
@@ -150,14 +153,14 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       const rejected: ResearchSynthesis = { ...unavailable(conditionFailure
         ? "Die KI hat geantwortet, aber ihre Bestätigungs- oder Widerlegungsbedingungen sind nicht eindeutig prüfbar. Deshalb wird keine Einstiegsaussage angezeigt."
         : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),
-        quality: { ...quality, issues, rejectedConditions, rejectedResponse } };
+        quality: { ...answerQuality, issues, rejectedConditions, rejectedResponse } };
       // Cache rejected answers too; refreshing must not burn quota on the same frame.
       stage = "REJECTED_ANSWER_CACHE_WRITE";
       await storeRejectedDiagnosis(rejected);
       await redis.set(cacheKey, rejected, { ex: 900 });
       return rejected;
     }
-    const result: ResearchSynthesis = { status: "SUCCESS", model: MODEL, generatedAt: new Date().toISOString(), snapshotTimestamp, cached: false, message: "Unabhängige KI-Interpretation; Bedingungen und Belegverweise geprüft, wirtschaftliche Richtigkeit nicht bewiesen.", content: content as ResearchSynthesisContent, quality };
+    const result: ResearchSynthesis = { status: "SUCCESS", model: MODEL, generatedAt: new Date().toISOString(), snapshotTimestamp, cached: false, message: "Unabhängige KI-Interpretation; Bedingungen und Belegverweise geprüft, wirtschaftliche Richtigkeit nicht bewiesen.", content: content as ResearchSynthesisContent, quality: answerQuality };
     stage = "APPROVED_ANSWER_CACHE_WRITE";
     await redis.set(cacheKey, result, { ex: 900 });
     return result;

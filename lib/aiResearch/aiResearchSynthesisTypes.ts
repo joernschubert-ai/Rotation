@@ -32,6 +32,7 @@ export interface ResearchSynthesis {
     availableEvidenceIds: string[];
     missingOwnPriceMarkets: string[];
     semanticTruthVerified: false;
+    normalizations?: string[];
     /** Diagnostic text only. Never an approved recommendation or displayed content. */
     rejectedConditions?: Array<{ instrument: string; confirmation: string; invalidation: string }>;
     rejectedResponse?: {
