@@ -24,14 +24,33 @@ function message(error: unknown): string {
 export async function runAIResearchFromHistory(
   input: RunAIResearchFromHistoryInput
 ): Promise<AIResearchResult> {
+  const startedAt = Date.now();
+  const timings: Record<string, number> = {};
+  const timed = async <T>(name: string, work: () => Promise<T>): Promise<T> => {
+    const start = Date.now();
+    try { return await work(); }
+    finally { timings[name] = Date.now() - start; }
+  };
   const warnings: string[] = [];
   try {
+    const historyPromise = timed("historyMs", () => loadMarketHistory());
+    // Historical loading only needs the saved snapshot, not news or COT.
+    // Start it as soon as history is ready instead of waiting for all providers.
+    const historicalPromise = historyPromise.then(history => {
+      const now = Date.now();
+      const latest = (Array.isArray(history) ? history : [])
+        .filter(item => item && typeof item.timestamp === "string" &&
+          Number.isFinite(Date.parse(item.timestamp)) && Date.parse(item.timestamp) <= now)
+        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
+      return latest ? timed("historicalEvidenceMs", () => loadAIResearchHistoricalEvidence(latest.timestamp)) : undefined;
+    });
     // Optional providers fail independently. History remains the required basis.
     // Promise.resolve also captures a provider that throws synchronously.
-    const [historyLoad, newsLoad, cotLoad] = await Promise.allSettled([
-      Promise.resolve().then(() => loadMarketHistory()),
-      Promise.resolve().then(() => fetchExternalResearchSources({ task: input.task })),
-      Promise.resolve().then(() => fetchCOTData()),
+    const [historyLoad, newsLoad, cotLoad, historicalLoad] = await Promise.allSettled([
+      historyPromise,
+      timed("newsMs", () => fetchExternalResearchSources({ task: input.task })),
+      timed("cotMs", () => fetchCOTData()),
+      historicalPromise,
     ]);
     if (historyLoad.status === "rejected") {
       throw new Error(`Required market history unavailable: ${message(historyLoad.reason)}`);
@@ -69,7 +88,9 @@ export async function runAIResearchFromHistory(
     }
     let historicalEvidence: Awaited<ReturnType<typeof loadAIResearchHistoricalEvidence>> | undefined;
     try {
-      historicalEvidence = await loadAIResearchHistoricalEvidence(currentSnapshot.timestamp);
+      if (historicalLoad.status === "rejected") throw historicalLoad.reason;
+      historicalEvidence = historicalLoad.value;
+      if (historicalEvidence)
       warnings.push(...historicalEvidence.diagnostics.warnings);
     } catch (error) { warnings.push(`Historical evidence unavailable: ${message(error)}`); }
 
@@ -101,7 +122,10 @@ export async function runAIResearchFromHistory(
     if (result.status === "SUCCESS" && result.report) {
       result.report = { ...result.report, decisionSupport: buildAIResearchDecisionSupport(result.report, currentSnapshot) };
       try {
-        result.report.aiSynthesis = await synthesizeResearch(researchInput, result.report, input.allowAIGeneration === true);
+        timings.preparationMs = Date.now() - startedAt;
+        result.report.aiSynthesis = await timed("synthesisMs", () => synthesizeResearch(researchInput, result.report!, input.allowAIGeneration === true, {
+          requestStartedAt: startedAt, deadlineAt: startedAt + 55000, preparationMs: timings.preparationMs,
+        }));
       } catch {
         warnings.push("KI-Synthese nicht verfügbar; regelbasierter Bericht bleibt unverändert.");
       }
@@ -111,6 +135,7 @@ export async function runAIResearchFromHistory(
       snapshotTimestamp: currentSnapshot.timestamp,
       historyCount: history.length, sourceCount: rankedSources.length,
       warnings: [...new Set([...(result.diagnostics?.warnings ?? []), ...warnings])],
+      timingsMs: { ...timings, totalMs: Date.now() - startedAt },
     };
     return result;
   } catch (error) {

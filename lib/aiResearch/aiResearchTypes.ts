@@ -419,6 +419,7 @@ status: AIResearchStatus;
 report: AIResearchReport | null;
 
 diagnostics?: {
+timingsMs?: Record<string, number>;
 snapshotTimestamp?: string;
 historyCount?: number;
 sourceCount?: number;

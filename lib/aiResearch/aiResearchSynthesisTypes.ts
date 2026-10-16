@@ -35,6 +35,14 @@ export interface ResearchSynthesis {
     missingOwnPriceMarkets: string[];
     semanticTruthVerified: false;
     normalizations?: string[];
+    timing?: {
+      preparationMs: number | null;
+      synthesisMs: number;
+      providerMs: number | null;
+      providerTimeoutMs: number;
+      inputCharacters: number;
+      requestElapsedMs: number | null;
+    };
     /** Diagnostic text only. Never an approved recommendation or displayed content. */
     rejectedConditions?: Array<{ instrument: string; confirmation: string; invalidation: string }>;
     rejectedResponse?: {
