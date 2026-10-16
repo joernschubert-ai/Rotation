@@ -7,6 +7,14 @@ import { SYNTHESIS_CONTRACT } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 import type { ResearchSynthesis } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 
 type ResponseData = AIResearchResult & { ok?: boolean; error?: string };
+/** Export the exact response in component state; never fetch or regenerate. */
+export function serializeDisplayedResearch(data: ResponseData, expectedSnapshotTimestamp?: string, suspended = false): string {
+  return JSON.stringify({ ...data, display: { copiedAt: new Date().toISOString(),
+    expectedSnapshotTimestamp: expectedSnapshotTimestamp ?? null,
+    displayedSnapshotTimestamp: data.report?.decisionSupport?.snapshotTimestamp ?? data.diagnostics?.snapshotTimestamp ?? null,
+    entryStatementsSuspended: suspended,
+    source: "EXACT_DISPLAYED_RESPONSE" } }, null, 2);
+}
 function date(value?: string | null): string {
   if (!value) return "unbekannt";
   const parsed = new Date(value);
@@ -155,6 +163,18 @@ export function AIResearchSynthesisSummary({ synthesis, snapshotTimestamp, suspe
         <h4 className="font-semibold text-[#ddd]">{instrumentNames[flow.instrument]}</h4>
         <p className="mt-1 text-[#c4d8e8]">{assessments[flow.assessment]}</p>
         <p className="mt-3 text-[#bbb]">{flow.reasoning}</p>
+        {flow.grounding && <div className="mt-3 space-y-2 rounded border border-slate-700 bg-slate-900/60 p-3 text-[11px] text-slate-400">
+          <div className="font-semibold text-slate-300">Zahlen aus der Datenbasis</div>
+          <p>Eigene Kursrendite: 5 Tage {pct(flow.grounding.price.momentum5D)} · 20 Tage {pct(flow.grounding.price.momentum20D)}</p>
+          {flow.grounding.history ? <>
+            <p>Historie · {{ OWN_TREND: "Eigener Trend", ROTATION_20D: "Relative Stärke", OWN_PRICE_VIX_5D: "Kurs und VIX" }[flow.grounding.history.family] ?? flow.grounding.history.family} · {flow.grounding.history.horizonDays} Tage · {flow.grounding.history.sampleSize} Fälle</p>
+            <p>Mittel {pct(flow.grounding.history.meanPct)} gegenüber {pct(flow.grounding.history.baselineMeanPct)} Vergleich · Median {pct(flow.grounding.history.medianPct)}</p>
+            <p>10.–90. Perzentil: {pct(flow.grounding.history.p10Pct)} bis {pct(flow.grounding.history.p90Pct)} · Stand {flow.grounding.history.asOfDate}{flow.grounding.history.currentMatch ? " · Zustandsabgleich zum Snapshot-Markttag" : " · datierter Kontext"}</p>
+          </> : <p>Keine geeignete eigene historische Vergleichsstudie vorhanden.</p>}
+          {flow.grounding.cot.map(item => <p key={item.group}>{item.group === "ASSET_MANAGER" ? "Asset Manager" : "Leveraged Money"} ({item.reportDate}): netto {item.netPosition?.toLocaleString("de-DE") ?? "—"}, Änderung 1 Woche {item.weeklyChange?.toLocaleString("de-DE") ?? "—"}, 13 Wochen {item.change13W?.toLocaleString("de-DE") ?? "—"} Kontrakte.</p>)}
+          {!flow.grounding.cot.length && <p>Keine hinreichend aktuellen eigenen COT-Gruppen verfügbar.</p>}
+          <p className="text-slate-500">Deskriptive Indexrenditen und verzögerte Positionierung; kein berechneter Optionsvorteil. Das Perzentilband ist kein Prognoseintervall.</p>
+        </div>}
         <p className="mt-2 text-[#aaa]"><strong className="text-[#ccc]">Warum jetzt?</strong> {flow.whyNow}</p>
         <p className="mt-2 text-[#aaa]"><strong className="text-[#ccc]">Gegenargument:</strong> {flow.counterargument}</p>
         <p className="mt-2 text-[#aaa]"><strong className="text-[#ccc]">Bestätigung:</strong> {flow.confirmation}</p>
@@ -173,6 +193,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
   const [data, setData] = useState<ResponseData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
   const requestId = useRef(0);
   const load = useCallback(async () => {
@@ -180,7 +201,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     const id = ++requestId.current;
     controller.current?.abort();
     const request = new AbortController(); controller.current = request;
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setCopyStatus(null);
     try {
       const response = await fetch("/api/ai-research/dashboard?task=DAILY_MARKET_REVIEW", { method: "POST", cache: "no-store", credentials: "same-origin", signal: request.signal });
       const result: ResponseData = await response.json();
@@ -198,13 +219,33 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
   const snapshotMismatch = Boolean(report && expectedSnapshotTimestamp && reportSnapshotTimestamp !== expectedSnapshotTimestamp);
   const evidence = report?.evidenceAssessment?.evidence ?? [];
   const historical = report?.historicalEvidence;
+  const suspended = loading || Boolean(error) || !marketReady || snapshotMismatch;
+  async function copyDisplayedReport() {
+    if (!data?.report || loading) return;
+    const serialized = serializeDisplayedResearch(data, expectedSnapshotTimestamp, suspended);
+    try { await navigator.clipboard.writeText(serialized); setCopyStatus("Angezeigter Bericht kopiert."); }
+    catch { setCopyStatus("Kopieren nicht möglich. Bitte JSON herunterladen verwenden."); }
+  }
+  function downloadDisplayedReport() {
+    if (!data?.report || loading) return;
+    const blob = new Blob([serializeDisplayedResearch(data, expectedSnapshotTimestamp, suspended)], { type: "application/json" });
+    const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+    anchor.href = url; anchor.download = `research-${data.report.generatedAt.replace(/[^0-9TZ-]/g, "-")}.json`;
+    document.body.appendChild(anchor); anchor.click(); anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
   return <div className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="text-xs font-semibold text-[#999]">AI RESEARCH</div>
+      <div className="flex flex-wrap gap-2">
+      <button type="button" disabled={!report || loading} onClick={() => void copyDisplayedReport()} className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">Angezeigten Bericht kopieren</button>
+      <button type="button" disabled={!report || loading} onClick={downloadDisplayedReport} className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">JSON herunterladen</button>
       <button type="button" disabled={loading || !marketReady} onClick={() => void load()} className="border border-[#444] bg-[#181818] px-3 py-2 text-xs text-[#bbb] hover:bg-[#252525] disabled:opacity-50">
         {loading ? "Wird aktualisiert …" : "Research aktualisieren"}
       </button>
+      </div>
     </div>
+    {copyStatus && <p role="status" className="text-xs text-slate-400">{copyStatus}</p>}
     {error && <p role="alert" className="border border-red-900 p-3 text-xs text-red-300">{error}{report ? " Angezeigt wird der vorherige Bericht; seine Einstiegsaussage ist ausgesetzt." : ""}</p>}
     {!marketReady && <p className="border border-[#292929] p-3 text-xs text-[#999]">Research wartet auf den erfolgreich gespeicherten aktuellen Marktstand.</p>}
     {snapshotMismatch && <p role="status" className="border border-amber-900 p-3 text-xs text-amber-200">Research und Dashboard verwenden unterschiedliche Snapshots. Die Einstiegsaussage ist ausgesetzt. Bitte den Marktstand erneut aktualisieren.</p>}
