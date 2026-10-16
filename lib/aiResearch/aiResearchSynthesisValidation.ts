@@ -1,6 +1,8 @@
 import type { ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 import type { SynthesisEvidence } from "./aiResearchSynthesisEvidence";
 import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
+import { allowedResearchTriggers, renderResearchTrigger } from "./aiResearchTriggers";
+import type { ResearchTrigger } from "./aiResearchTriggers";
 
 export { SYNTHESIS_CONTRACT } from "./aiResearchSynthesisTypes";
 export const SYNTHESIS_INSTRUMENTS = ["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const;
@@ -11,13 +13,36 @@ const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]+
 const placeholder = /^(?:keine?|kein(?:e|en|er)? (?:bestätigung|widerlegung|bedingung|gegenargumente?)|nicht (?:vorhanden|verfügbar|bekannt)|unbekannt|abwarten|none|unknown|n a|tbd|not available)[.!\s]*$/i;
 const useful = (value: unknown, minimum = 25) => typeof value === "string" && value.trim().length >= minimum && value.length <= 1200 && !placeholder.test(value.trim());
 
+/** Narrow checks for observed factual errors; not a general semantic proof. */
+export function inspectHistoricalClaims(prose: string, relation?: string): string[] {
+  const issues: string[] = [];
+  if (/rendit(?:e|en)\s+(?:der|des|von)\s+(?:nasdaq|russell)[_\s-]*(?:put|call)\b/iu.test(prose)) issues.push("INDEX_RETURNS_MISLABELED_AS_OPTION_RETURNS");
+  const comparisons = /(?:historisch\w*\s+rendit\w*|mittel\w*|durchschnitt\w*)[^.!?]{0,120}?\b(höher|größer|niedriger|geringer|kleiner)\s+als\s+(?:(?:die|der|dem)\s+)?(?:unbedingt\w*\s+)?vergleichs?rendit\w*/giu;
+  for (const match of prose.matchAll(comparisons)) {
+    if (/\bnicht\b|median|perzentil|p10|p90/iu.test(match[0])) continue;
+    const higher = /höher|größer/iu.test(match[1]);
+    if (relation && (higher ? relation !== "ABOVE" : relation !== "BELOW")) issues.push("HISTORICAL_PROSE_COMPARISON_DISAGREES_WITH_DATA");
+  }
+  return issues;
+}
+
 /** Convert complete named slots to the existing display format. Never invent a missing slot. */
 export function normalizeSynthesisEnvelope(value: unknown): unknown {
   const data = object(value);
   if (!Object.keys(SYNTHESIS_SLOTS).every(key => data[key] && typeof data[key] === "object" && !Array.isArray(data[key]))) return value;
   if ("flows" in data || Object.entries(SYNTHESIS_SLOTS).some(([key,instrument]) =>
     "instrument" in data[key] && data[key].instrument !== instrument)) return value;
-  const flows = Object.entries(SYNTHESIS_SLOTS).map(([key,instrument]) => ({ ...data[key], instrument }));
+  const flows = Object.entries(SYNTHESIS_SLOTS).map(([key,instrument]) => {
+    const flow = { ...data[key], instrument };
+    for (const role of ["confirmation", "invalidation"] as const) {
+      const trigger = flow[`${role}Trigger`];
+      if (allowedResearchTriggers(instrument, role).includes(trigger)) {
+        const condition = renderResearchTrigger(instrument, trigger);
+        flow[role] = condition.text; flow[`${role}Refs`] = condition.refs;
+      }
+    }
+    return flow;
+  });
   const { nasdaqPut, nasdaqCall, russellCall, ...rest } = data;
   return { ...rest, flows };
 }
@@ -83,6 +108,13 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
       if (!useful(flow[key])) issues.push(`${instrument}:EMPTY_OR_PLACEHOLDER_${key.toUpperCase()}`);
     }
     for (const key of ["confirmation", "invalidation"]) {
+      const trigger = flow[`${key}Trigger`] as ResearchTrigger;
+      if (!allowedResearchTriggers(instrument, key as "confirmation" | "invalidation").includes(trigger)) {
+        issues.push(`${instrument}:INVALID_${key.toUpperCase()}_DIRECTION_TRIGGER`);
+      } else {
+        const rendered = renderResearchTrigger(instrument, trigger);
+        if (flow[key] !== rendered.text) issues.push(`${instrument}:CONDITION_TEXT_DISAGREES_WITH_TRIGGER`);
+      }
       // This contract accepts qualitative observable triggers. Numeric trade
       // thresholds require a future, explicitly calculated chart-level schema.
       // Matching a number to any sample count or lookback is not a derivation.
@@ -90,18 +122,24 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
         issues.push(`${instrument}:UNSUPPORTED_NUMERIC_${key.toUpperCase()}`);
       }
       if (typeof flow[key] === "string" && (!/nasdaq|russell|kurs|preis|rendit|momentum|teilnahme|partizipation|liquid|rotation|marktbreit|breadth|participation|durchschnitt|ma(?:20|50|200)/i.test(flow[key]) ||
-        !/steig|fall|fäll|sink|dreh|erhol|verschlech|stabilis|bestätig|zurück|schwäch|verbess|unter|über|beschleun|zunehm|abnehm|aktuali|vorlieg|verfüg|halt|hält|ausweit|verlier|verliert|brech|brich|rück|korrektur|rally|abgabe|anstieg|ausbruch|scheiter|höher|tiefer|zuleg|gewinnt|nachgibt|nachgeben/i.test(flow[key]))) issues.push(`${instrument}:UNOBSERVABLE_${key.toUpperCase()}`);
+        !/aufwärts|abwärts|steig|fall|fäll|sink|dreh|erhol|verschlech|stabilis|bestätig|zurück|schwäch|verbess|unter|über|beschleun|zunehm|abnehm|aktuali|vorlieg|verfüg|halt|hält|ausweit|verlier|verliert|brech|brich|rück|korrektur|rally|abgabe|anstieg|ausbruch|scheiter|höher|tiefer|zuleg|gewinnt|nachgibt|nachgeben/i.test(flow[key]))) issues.push(`${instrument}:UNOBSERVABLE_${key.toUpperCase()}`);
     }
     for (const key of ["evidenceRefs", "confirmationRefs", "invalidationRefs"]) {
       if (!refs(flow[key])) issues.push(`${instrument}:INVALID_${key.toUpperCase()}`);
     }
     const brief = briefs.find(item => item.instrument === instrument);
     const selectedHistory = brief?.histories.find(study => study.id === flow.historyStudyId);
+    const factualProse = [flow.reasoning, flow.whyNow, flow.counterargument].filter(item => typeof item === "string").join(" ");
+    for (const issue of inspectHistoricalClaims(factualProse, selectedHistory?.meanVsBaseline)) issues.push(`${instrument}:${issue}`);
     if (brief?.histories.length) {
       if (!selectedHistory) issues.push(`${instrument}:OWN_HISTORICAL_STUDY_REQUIRED`);
       else if (!refs(flow.evidenceRefs) || !flow.evidenceRefs.includes(selectedHistory.sourceRef)) issues.push(`${instrument}:SELECTED_HISTORY_REFERENCE_REQUIRED`);
+      if (selectedHistory && flow.historyMeanVsBaseline !== selectedHistory.meanVsBaseline) issues.push(`${instrument}:HISTORICAL_COMPARISON_DISAGREES_WITH_DATA`);
       if (typeof flow.reasoning !== "string" || !/histor|vergleich|median|mittel|durchschnitt|folgerendit/i.test(flow.reasoning)) issues.push(`${instrument}:HISTORICAL_INTERPRETATION_REQUIRED`);
-    } else if (flow.historyStudyId !== "NONE") issues.push(`${instrument}:HISTORICAL_STUDY_UNAVAILABLE`);
+    } else {
+      if (flow.historyStudyId !== "NONE") issues.push(`${instrument}:HISTORICAL_STUDY_UNAVAILABLE`);
+      if (flow.historyMeanVsBaseline !== "UNKNOWN") issues.push(`${instrument}:HISTORICAL_COMPARISON_UNAVAILABLE`);
+    }
     const requiredGroups = brief?.cot.map(item => item.group) ?? [];
     if (!Array.isArray(flow.cotGroups) || flow.cotGroups.length !== requiredGroups.length || new Set(flow.cotGroups).size !== flow.cotGroups.length ||
       requiredGroups.some(group => !flow.cotGroups.includes(group))) issues.push(`${instrument}:AVAILABLE_COT_GROUPS_REQUIRED`);
@@ -138,6 +176,7 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
   // It cannot establish that an otherwise supplied number was interpreted correctly.
   const prose = [data.summary, data.asymmetry, ...(Array.isArray(data.counterarguments) ? data.counterarguments : []), ...(Array.isArray(data.limitations) ? data.limitations : []),
     ...data.flows.flatMap((flow: any) => [flow?.reasoning, flow?.whyNow, flow?.counterargument, flow?.confirmation, flow?.invalidation])].filter(item => typeof item === "string").join(" ");
+  if (inspectHistoricalClaims(prose).includes("INDEX_RETURNS_MISLABELED_AS_OPTION_RETURNS")) issues.push("INDEX_RETURNS_MISLABELED_AS_OPTION_RETURNS");
   for (const match of prose.matchAll(/([+-]?\d+(?:[.,]\d+)?)\s*%/g)) {
     const value = Number(match[1].replace(",", "."));
     if (!numbers.some(number => Math.abs(value - number) <= 0.051)) issues.push("UNSUPPORTED_PERCENTAGE");

@@ -57,8 +57,10 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     return item;
   });
   const payload = JSON.stringify({ contractVersion: SYNTHESIS_CONTRACT, snapshotTimestamp, task: input.context.task, question: text(input.context.question, 500),
+    marketBriefs: [briefs[0], briefs[2]].map(item => ({ priceRef: item.priceRef, cotRef: item.cotRef, reading: item.reading.slice(1) })),
     instrumentBriefs: briefs.map(item => ({ instrument: item.instrument, priceRef: item.priceRef,
-      historyChoices: item.histories.map(study => study.id), cotGroups: item.cot.map(group => group.group), cotRef: item.cotRef, reading: item.reading })),
+      historyChoices: item.histories.map(study => ({ id: study.id, meanVsBaseline: study.meanVsBaseline })),
+      cotGroups: item.cot.map(group => group.group), cotRef: item.cotRef, indexDirectionForThesis: item.instrument === "NASDAQ_PUT" ? "DOWN" : "UP" })),
     evidence: modelEvidence });
   const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, quality: {
     ...(value.quality ?? quality), timing: {
@@ -188,7 +190,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const normalized = normalizeSynthesisEnvelope(content);
     const derived = deriveSynthesisConclusion(normalized);
     const answerQuality = { ...quality, responseShape, normalizations: [
-      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS"] : []),
+      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS"] : []),
       ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
     content = derived.value;
     stage = "ANSWER_VALIDATION";
@@ -208,12 +210,16 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
           .map(flow => ({ instrument: text(flow.instrument,40), evidenceRefs: strings(flow.evidenceRefs,8),
             confirmationRefs: strings(flow.confirmationRefs,8), invalidationRefs: strings(flow.invalidationRefs,8),
             historyStudyId: text(flow.historyStudyId,100), cotGroups: strings(flow.cotGroups,2),
+            historyMeanVsBaseline: text(flow.historyMeanVsBaseline,20),
+            confirmationTrigger: text(flow.confirmationTrigger,50), invalidationTrigger: text(flow.invalidationTrigger,50),
             reasoning: text(flow.reasoning,1200), counterargument: text(flow.counterargument,1200) }))
       };
       const conditionFailure = issues.every(issue => /UNOBSERVABLE_(CONFIRMATION|INVALIDATION)$/.test(issue));
       const rejected: ResearchSynthesis = { ...unavailable(conditionFailure
         ? "Die KI hat geantwortet, aber ihre Bestätigungs- oder Widerlegungsbedingungen sind nicht eindeutig prüfbar. Deshalb wird keine Einstiegsaussage angezeigt."
         : issues.includes("THREE_INSTRUMENTS_REQUIRED") ? "Die KI hat keine vollständigen Einzelbewertungen für Nasdaq Put, Nasdaq Call und Russell Call geliefert. Die vorhandene Datenbasis bleibt verfügbar; keine KI-Einstiegsaussage übernommen."
+        : issues.some(issue => /COMPARISON_DISAGREES|RETURNS_MISLABELED/.test(issue)) ? "Die KI hat historische Indexrenditen oder deren Vergleich falsch eingeordnet. Die Antwort wurde nicht als Einstiegsaussage übernommen; die Quellzahlen bleiben verfügbar."
+        : issues.some(issue => /DIRECTION_TRIGGER|DISAGREES_WITH_TRIGGER/.test(issue)) ? "Die KI hat keine passende Richtungsbedingung gewählt. Keine KI-Einstiegsaussage übernommen; die Datenbasis bleibt verfügbar."
         : issues.some(issue => /HISTORICAL|HISTORY_REFERENCE|COT_GROUPS|COT_REFERENCE|MANAGER_INTERPRETATION|MONEY_INTERPRETATION/.test(issue))
           ? "Die KI hat Historie oder COT nicht vollständig den eigenen Instrumenten zugeordnet. Die Antwort wurde nicht als Einstiegsaussage übernommen; die Details stehen im kopierbaren Bericht."
           : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),
