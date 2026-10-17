@@ -26,14 +26,38 @@ export function inspectHistoricalClaims(prose: string, relation?: string): strin
   return issues;
 }
 
+/** Narrow regression checks for explicit present/past claims, not future hypotheses. */
+export function inspectPriceProse(prose: string, fiveDay: unknown, twentyDay: unknown): string[] {
+  if (typeof fiveDay !== "number" || typeof twentyDay !== "number") return [];
+  const sentences = prose.split(/[.!?]/u);
+  const issues: string[] = [];
+  for (const sentence of sentences) {
+    if (!/in den letzten (?:tagen|fünf tagen|5 tagen)|über (?:fünf|5) tage/iu.test(sentence)) continue;
+    if (/könnt|würde|falls|wenn|sollte|möglicherweise|hypothes|künftig|zukünftig/iu.test(sentence)) continue;
+    const pastUp = /(?:gestiegen|zugelegt|angestiegen)(?:\s+\p{L}+){0,2}\s+(?:ist|sind|hat|haben)|(?:ist|sind|hat|haben)(?:\s+\p{L}+){0,4}\s+(?:gestiegen|zugelegt|angestiegen)/iu.test(sentence);
+    const pastDown = /(?:gefallen|gesunken|zurückgegangen)(?:\s+\p{L}+){0,2}\s+(?:ist|sind|hat|haben)|(?:ist|sind|hat|haben)(?:\s+\p{L}+){0,4}\s+(?:gefallen|gesunken|zurückgegangen)/iu.test(sentence);
+    if (fiveDay < 0 && twentyDay < 0 && pastUp && !/nicht gestiegen|nicht zugelegt/iu.test(sentence)) issues.push("RECENT_PRICE_RISE_CONTRADICTS_OWN_RETURNS");
+    if (fiveDay > 0 && twentyDay > 0 && pastDown && !/nicht gefallen|nicht gesunken/iu.test(sentence)) issues.push("RECENT_PRICE_FALL_CONTRADICTS_OWN_RETURNS");
+  }
+  return [...new Set(issues)];
+}
+
 /** Convert complete named slots to the existing display format. Never invent a missing slot. */
-export function normalizeSynthesisEnvelope(value: unknown): unknown {
+export function normalizeSynthesisEnvelope(value: unknown, evidence?: SynthesisEvidence[]): unknown {
   const data = object(value);
   if (!Object.keys(SYNTHESIS_SLOTS).every(key => data[key] && typeof data[key] === "object" && !Array.isArray(data[key]))) return value;
   if ("flows" in data || Object.entries(SYNTHESIS_SLOTS).some(([key,instrument]) =>
     "instrument" in data[key] && data[key].instrument !== instrument)) return value;
   const flows = Object.entries(SYNTHESIS_SLOTS).map(([key,instrument]) => {
     const flow = { ...data[key], instrument };
+    if (evidence) {
+      const brief = buildInstrumentBriefs(evidence).find(item => item.instrument === instrument);
+      const study = brief?.histories.find(item => item.id === flow.historyStudyId);
+      // Source bindings are server facts, not model-authored interpretations.
+      flow.cotGroups = brief?.cot.map(item => item.group) ?? [];
+      flow.historyMeanVsBaseline = study?.meanVsBaseline ?? "UNKNOWN";
+      flow.evidenceRefs = [brief?.priceRef, ...(study ? [study.sourceRef] : []), ...(brief?.cot.length ? [brief.cotRef] : [])].filter((id): id is string => Boolean(id));
+    }
     for (const role of ["confirmation", "invalidation"] as const) {
       const trigger = flow[`${role}Trigger`];
       if (allowedResearchTriggers(instrument, role).includes(trigger)) {
@@ -129,6 +153,11 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
     }
     const brief = briefs.find(item => item.instrument === instrument);
     const selectedHistory = brief?.histories.find(study => study.id === flow.historyStudyId);
+    const ownPriceFacts = byId.get(instrument === "RUSSELL_CALL" ? "PRICE_RUSSELL_2000" : "PRICE_NASDAQ")?.data;
+    for (const issue of inspectPriceProse([flow.reasoning, flow.whyNow, flow.counterargument].filter(item => typeof item === "string").join(". "), ownPriceFacts?.momentum5D, ownPriceFacts?.momentum20D)) issues.push(`${instrument}:${issue}`);
+    if (instrument === "NASDAQ_PUT" && typeof selectedHistory?.meanPct === "number" && selectedHistory.meanPct > 0 && typeof flow.reasoning === "string" &&
+      /histor|folgerendit/iu.test(flow.reasoning) && /renditen[^.!?]{0,100}höher/iu.test(flow.reasoning) && /unterstützt diese these/iu.test(flow.reasoning) &&
+      !/gegenargument|ungünstig|widerspr|spricht gegen|risiko|nicht/iu.test(flow.reasoning)) issues.push(`${instrument}:POSITIVE_INDEX_HISTORY_USED_AS_PUT_SUPPORT`);
     const factualProse = [flow.reasoning, flow.whyNow, flow.counterargument].filter(item => typeof item === "string").join(" ");
     for (const issue of inspectHistoricalClaims(factualProse, selectedHistory?.meanVsBaseline)) issues.push(`${instrument}:${issue}`);
     if (brief?.histories.length) {
@@ -144,6 +173,19 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
     if (!Array.isArray(flow.cotGroups) || flow.cotGroups.length !== requiredGroups.length || new Set(flow.cotGroups).size !== flow.cotGroups.length ||
       requiredGroups.some(group => !flow.cotGroups.includes(group))) issues.push(`${instrument}:AVAILABLE_COT_GROUPS_REQUIRED`);
     if (requiredGroups.length) {
+      for (const sentence of factualProse.split(/[.!?]/u)) {
+        if (!/leveraged\s*money|hedgefonds/iu.test(sentence) || !/netto[ -]?short/iu.test(sentence) || !/erhöht|ausgebaut|vergrößert|reduziert|verkleinert/iu.test(sentence) || /nicht|könnt|falls|wenn|würde/iu.test(sentence)) continue;
+        const horizons = [
+          {matches: /(?:eine|einer|1|letzte|letzten)\s+woche|wochenvergleich/iu.test(sentence), key: "weeklyChange"},
+          {matches: /(?:vier|4)\s*wochen/iu.test(sentence), key: "change4W"},
+          {matches: /(?:dreizehn|13)\s*wochen/iu.test(sentence), key: "change13W"}
+        ].filter(item => item.matches);
+        if (horizons.length !== 1) { issues.push(`${instrument}:COT_CHANGE_REQUIRES_EXPLICIT_HORIZON`); continue; }
+        const group = brief?.cot.find(item => item.group === "LEVERAGED_MONEY");
+        const change = group?.[horizons[0].key as "weeklyChange" | "change4W" | "change13W"];
+        const larger = /erhöht|ausgebaut|vergrößert/iu.test(sentence);
+        if (typeof group?.netPosition === "number" && group.netPosition < 0 && typeof change === "number" && change !== 0 && (larger ? change > 0 : change < 0)) issues.push(`${instrument}:NET_SHORT_CHANGE_CONTRADICTS_SELECTED_HORIZON`);
+      }
       if (!refs(flow.evidenceRefs) || !flow.evidenceRefs.includes(brief!.cotRef)) issues.push(`${instrument}:COT_REFERENCE_REQUIRED`);
       const interpretation = [flow.reasoning, flow.whyNow, flow.counterargument].filter(item => typeof item === "string").join(" ");
       if (requiredGroups.includes("ASSET_MANAGER") && !/asset\s*manager|vermögensverwalter/i.test(interpretation)) issues.push(`${instrument}:ASSET_MANAGER_INTERPRETATION_REQUIRED`);

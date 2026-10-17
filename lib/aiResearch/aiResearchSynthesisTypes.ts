@@ -1,6 +1,6 @@
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
 import type { ResearchTrigger } from "./aiResearchTriggers";
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V10_FACTS_AND_TRIGGERS";
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V11_BOUND_FACTS";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";

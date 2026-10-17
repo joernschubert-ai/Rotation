@@ -1,3 +1,4 @@
+import { verifiedResearchMarketDate } from "./aiResearchSynthesisEvidence";
 import {
 loadHistoricalRegimeMarketData,
 } from "@/lib/historicalRegime/historicalRegimeProvider";
@@ -322,7 +323,8 @@ return pendingCalculation;
  * This is descriptive comparison, not point-in-time historical backtesting.
  */
 export async function loadAIResearchHistoricalEvidence(
-  snapshotTimestamp?: string
+  snapshotTimestamp?: string,
+  snapshot?: unknown
 ): Promise<AIResearchHistoricalEvidence> {
   const evidence = await loadCachedHistoricalEvidence();
   if (!snapshotTimestamp) return evidence;
@@ -348,9 +350,10 @@ export async function loadAIResearchHistoricalEvidence(
     const day = dateKey(value); return day !== null && day > snapshotDay;
   })) return unavailableEvidence("Historical dataset is later than the snapshot date; point-in-time comparison is unavailable.");
 
-  const timingNote = `Historical dataset as of ${evidence.asOfDate ?? "UNKNOWN"}; last historical day ${evidence.lastDate ?? "UNKNOWN"}; snapshot market date ${snapshotDay}. Daily matching does not establish intraday confirmation or publication-time availability.`;
+  const marketDay = (market: string) => verifiedResearchMarketDate(snapshot, market) ?? snapshotDay;
+  const timingNote = `Historical dataset as of ${evidence.asOfDate ?? "UNKNOWN"}; last historical day ${evidence.lastDate ?? "UNKNOWN"}; snapshot request date ${snapshotDay}; Nasdaq observation ${marketDay("NASDAQ")}, Russell observation ${marketDay("RUSSELL_2000")}. Daily matching does not establish intraday confirmation or publication-time availability.`;
   const currentStates = evidence.currentStates.map(state => {
-    const sameDay = dateKey(state.asOfDate) === snapshotDay;
+    const sameDay = dateKey(state.asOfDate) === marketDay(state.market);
     return { ...state, comparable: state.comparable && sameDay,
       limitations: [...state.limitations, timingNote,
         ...(sameDay ? [] : ["This state is not dated to the snapshot market day; do not treat it as a current-state match."])],
@@ -360,7 +363,7 @@ export async function loadAIResearchHistoricalEvidence(
   return {
     ...evidence,
     marketStudies: evidence.marketStudies?.map(study => ({ ...study,
-      currentMatch: study.currentMatch && study.asOfDate === snapshotDay,
+      currentMatch: study.currentMatch && study.asOfDate === marketDay(study.market),
       limitations: [...study.limitations, timingNote]
     })),
     status: evidence.status === "AVAILABLE" && matched < currentStates.length ? "PARTIAL" : evidence.status,

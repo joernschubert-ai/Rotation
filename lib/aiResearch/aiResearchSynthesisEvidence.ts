@@ -21,6 +21,20 @@ function iso(value: unknown): string | null {
   return typeof value === "string" && /(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value)) ? value : null;
 }
 
+/** Verified own index observation date, never inferred from a weekend calendar alone. */
+export function verifiedResearchMarketDate(value: unknown, market: string): string | null {
+  const snapshot = object(value), indices = object(snapshot.indices);
+  const index = market === "NASDAQ" ? "nasdaq" : market === "RUSSELL_2000" ? "russell" : market === "SP500" ? "sp500" : null;
+  if (!index) return null;
+  const quality = object(object(object(indices[index]).priceMetrics).dataQuality);
+  const stamp = iso(quality.currentObservationTimestamp) ?? iso(quality.lastValidBarTimestamp) ?? iso(quality.latestBarTimestamp);
+  const time = stamp ? Date.parse(stamp) : NaN, reference = Date.parse(snapshot.timestamp);
+  if (!Number.isFinite(time) || !Number.isFinite(reference) || time > reference || reference-time > 5*86400000 || quality.stale === true || quality.freshnessVerified !== true) return null;
+  const parts = new Intl.DateTimeFormat("en-US", {timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit"}).formatToParts(new Date(time));
+  const part = (name: string) => parts.find(item => item.type === name)?.value ?? "";
+  return part("year") + "-" + part("month") + "-" + part("day");
+}
+
 function priceEvidence(snapshot: Record<string, any>, market: SynthesisMarket, indexKey: string, momentumKey: string): SynthesisEvidence {
   const quote = object(object(snapshot.indices)[indexKey]);
   const bars = object(quote.priceMetrics);
@@ -39,10 +53,12 @@ function priceEvidence(snapshot: Record<string, any>, market: SynthesisMarket, i
   const quoteTimestamp = iso(quote.timestamp) ?? iso(quote.asOf) ?? iso(quote.quoteTimestamp);
   const snapshotTime = Date.parse(snapshot.timestamp);
   const quoteAgeHours = quoteTimestamp ? (snapshotTime - Date.parse(quoteTimestamp)) / 3600000 : null;
+  const observedTimestamp = iso(barsQuality.currentObservationTimestamp) ?? iso(barsQuality.lastValidBarTimestamp) ?? iso(barsQuality.latestBarTimestamp);
+  const observedMarketDate = verifiedResearchMarketDate(snapshot, market);
   return { id: `PRICE_${market}`, kind: "PRICE", market, available: current !== null || momentum5D !== null || momentum20D !== null,
     // Unknown quote time remains explicit; it does not silently become live data.
     entryDataReady: current !== null && momentum5D !== null && momentum20D !== null && (quoteAgeHours === null || quoteAgeHours >= 0 && quoteAgeHours <= 96),
-    data: { current, changeAsProvided: finite(quote.change), quoteTimestamp, quoteAgeHours,
+    data: { observedMarketDate, observedTimestamp, current, changeAsProvided: finite(quote.change), quoteTimestamp, quoteAgeHours,
       snapshotTimestampIsNotQuoteTimestamp: true, momentum5D, momentum20D,
       acceleration: quality.accelerationAvailable === true ? finite(measured.acceleration) ?? finite(momentum.acceleration) : null,
       accelerationDefinition: "MOMENTUM_5D_MINUS_MOMENTUM_20D_DIVIDED_BY_4",
@@ -75,6 +91,19 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
         interpretation: "Raw HYG/IEF is a price ratio, not an absolute stress threshold. Interpret its verified signal/ratioToMA50 and data quality." },
       gammaDiagnostics: { ...pick(snapshot.gamma, ["score", "effectiveGamma", "structuralGammaFloor"]), measurementStatus: "Producer model diagnostics; not independently verified dealer exposure" },
       rotation: pick(snapshot.rotation, ["score", "signal", "rsSmall", "rsEqual", "rsGrowth"]),
+      instrumentStructure: {
+        NASDAQ: { source: "NASDAQ100_PRIMARY_CONSTITUENT_BREADTH", phase: typeof snapshot.phase === "string" ? snapshot.phase : object(snapshot.phase).phase,
+          breadth: object(object(snapshot.structure).breadth), participation: finite(object(snapshot.participation).score), quality: finite(object(snapshot.marketQuality).score),
+          referenceDate: text(object(snapshot.breadthDataQuality).referenceDate, 10) },
+        RUSSELL_2000: (() => {
+          const own = object(object(object(snapshot.russell).meta).independentContext);
+          return { available: Object.keys(own).length > 0, source: text(own.source), phase: text(own.phase),
+            referenceDate: text(own.referenceDate, 10), coverage: finite(own.coverage),
+            breadth: Object.fromEntries(["b20", "b50", "b200"].map(key => [key, finite(object(object(own.breadth)[key]).value)])),
+            participation: finite(own.participation), quality: finite(own.quality), rotationConfirm: text(own.rotationConfirm),
+            missingOwnStructureDoesNotUseNasdaqFallback: true };
+        })(),
+      },
       breadth: Object.fromEntries(["b20", "b50", "b200"].map(key => { const value = object(object(snapshot.structure).breadth)[key]; return [key, finite(value) ?? finite(object(value).value)]; })),
       limitations: "Shared inputs overlap; App risk and sizing scores are not independent success probabilities. Gamma and liquidity can include model estimates.",
     } },
@@ -124,6 +153,10 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     asOf: historical?.asOfDate ?? null, states: states.map(state => pick(state, ["family", "market", "state", "asOfDate", "comparable"])), comparisons,
     selection: "Only groups matching the supplied dated states; non-current states are descriptive only. Overlapping index returns are not warrant returns or proven alpha.",
   } });
+  const ownMarketDate = (market: SynthesisMarket) => {
+    const date = evidence.find(item => item.id === `PRICE_${market}`)?.data.observedMarketDate;
+    return typeof date === "string" ? date : null;
+  };
   const studies = (historical?.marketStudies ?? []).filter(study => study.asOfDate <= marketDate);
   for (const market of ["NASDAQ", "RUSSELL_2000"] as const) {
     const ownStudies = studies.filter(study => study.market === market);
@@ -132,7 +165,8 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
       data: {
         statisticsColumns: ["horizonDays", "sampleSize", "meanReturn", "medianReturn", "p10Return", "p90Return", "positiveRate", "meanMaximumRise", "meanMaximumFall", "baselineSampleSize", "baselineMeanReturn", "excessMeanReturn", "nonOverlappingSampleSize", "nonOverlappingMeanReturn"],
         studies: ownStudies.map(study => ({ family: study.family, state: study.state, asOfDate: study.asOfDate,
-          currentMatch: study.currentMatch && study.asOfDate === marketDate, definition: study.definition,
+          currentMatch: study.currentMatch && study.asOfDate === ownMarketDate(market),
+          snapshotMarketDate: ownMarketDate(market), definition: study.definition,
           // Named fields remove the need for the model to decode an array column
           // before making its main comparison. All horizons remain below.
           focus20D: (() => {

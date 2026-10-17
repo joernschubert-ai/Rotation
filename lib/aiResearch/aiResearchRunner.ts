@@ -42,7 +42,7 @@ export async function runAIResearchFromHistory(
         .filter(item => item && typeof item.timestamp === "string" &&
           Number.isFinite(Date.parse(item.timestamp)) && Date.parse(item.timestamp) <= now)
         .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
-      return latest ? timed("historicalEvidenceMs", () => loadAIResearchHistoricalEvidence(latest.timestamp)) : undefined;
+      return latest ? timed("historicalEvidenceMs", () => loadAIResearchHistoricalEvidence(latest.timestamp, latest)) : undefined;
     });
     // Optional providers fail independently. History remains the required basis.
     // Promise.resolve also captures a provider that throws synchronously.

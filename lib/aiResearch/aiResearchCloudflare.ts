@@ -48,16 +48,17 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     if (item.kind === "LAYER") return { ...item,
       data: { category: item.data.category, state: item.data.state, heuristicNotIndependent: true } };
     // The named 20-day values now live in the instrument briefs. Keep the
-    // original statistics rows for ALL horizons, without a third copy.
+    // calculated 20-day comparisons live in marketBriefs; full tables remain in the report.
     if (item.kind === "HISTORY" && item.market && Array.isArray(item.data.studies)) return { ...item,
       data: { ...item.data, studies: item.data.studies.map((study: Record<string, unknown>) => {
-        const { focus20D, ...rest } = study;
-        return rest;
+        return { family: study.family, state: study.state, asOfDate: study.asOfDate, currentMatch: study.currentMatch };
       }) } };
     return item;
   });
   const payload = JSON.stringify({ contractVersion: SYNTHESIS_CONTRACT, snapshotTimestamp, task: input.context.task, question: text(input.context.question, 500),
-    marketBriefs: [briefs[0], briefs[2]].map(item => ({ priceRef: item.priceRef, cotRef: item.cotRef, reading: item.reading.slice(1) })),
+    marketBriefs: [briefs[0], briefs[2]].map(item => ({ priceRef: item.priceRef, cotRef: item.cotRef, price: item.price,
+      histories: item.histories.map(study => ({id: study.id, currentMatch: study.currentMatch, asOfDate: study.asOfDate, sampleSize: study.sampleSize,
+        comparisonFact: study.comparisonFact, medianPct: study.medianPct, p10Pct: study.p10Pct, p90Pct: study.p90Pct})), cot: item.cot })),
     instrumentBriefs: briefs.map(item => ({ instrument: item.instrument, priceRef: item.priceRef,
       historyChoices: item.histories.map(study => ({ id: study.id, meanVsBaseline: study.meanVsBaseline })),
       cotGroups: item.cot.map(group => group.group), cotRef: item.cotRef, indexDirectionForThesis: item.instrument === "NASDAQ_PUT" ? "DOWN" : "UP" })),
@@ -187,10 +188,10 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const rawObject = content && typeof content === "object" && !Array.isArray(content) ? content as Record<string, unknown> : {};
     const responseShape = { rootKeys: Object.keys(rawObject).slice(0,20).map(key => key.slice(0,80)),
       flowsIsArray: Array.isArray(rawObject.flows), flowCount: Array.isArray(rawObject.flows) ? rawObject.flows.length : null };
-    const normalized = normalizeSynthesisEnvelope(content);
+    const normalized = normalizeSynthesisEnvelope(content, evidence);
     const derived = deriveSynthesisConclusion(normalized);
     const answerQuality = { ...quality, responseShape, normalizations: [
-      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS"] : []),
+      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE"] : []),
       ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
     content = derived.value;
     stage = "ANSWER_VALIDATION";
