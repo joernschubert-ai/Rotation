@@ -58,6 +58,15 @@ export function normalizeSynthesisEnvelope(value: unknown, evidence?: SynthesisE
       flow.historyMeanVsBaseline = study?.meanVsBaseline ?? "UNKNOWN";
       flow.evidenceRefs = [brief?.priceRef, ...(study ? [study.sourceRef] : []), ...(brief?.cot.length ? [brief.cotRef] : [])].filter((id): id is string => Boolean(id));
     }
+    if (evidence) {
+      const brief = buildInstrumentBriefs(evidence).find(item => item.instrument === instrument);
+      const interpretations = object(flow.cotInterpretations);
+      const names: Record<string,string> = {ASSET_MANAGER: "Asset Manager", LEVERAGED_MONEY: "Leveraged Money"};
+      // Labels are server-owned; every interpretation must come from the model.
+      const paragraphs = (brief?.cot ?? []).filter(item => typeof interpretations[item.group] === "string")
+        .map(item => names[item.group] + ": " + interpretations[item.group]);
+      if (paragraphs.length && typeof flow.reasoning === "string") flow.reasoning += " COT-Einordnung: " + paragraphs.join(" ");
+    }
     for (const role of ["confirmation", "invalidation"] as const) {
       const trigger = flow[`${role}Trigger`];
       if (allowedResearchTriggers(instrument, role).includes(trigger)) {
@@ -158,6 +167,8 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
     if (instrument === "NASDAQ_PUT" && typeof selectedHistory?.meanPct === "number" && selectedHistory.meanPct > 0 && typeof flow.reasoning === "string" &&
       /histor|folgerendit/iu.test(flow.reasoning) && /renditen[^.!?]{0,100}höher/iu.test(flow.reasoning) && /unterstützt diese these/iu.test(flow.reasoning) &&
       !/gegenargument|ungünstig|widerspr|spricht gegen|risiko|nicht/iu.test(flow.reasoning)) issues.push(`${instrument}:POSITIVE_INDEX_HISTORY_USED_AS_PUT_SUPPORT`);
+    if (instrument === "NASDAQ_PUT" && typeof selectedHistory?.meanPct === "number" && selectedHistory.meanPct > 0 && typeof flow.reasoning === "string" &&
+      /historisch[^.!?]{0,90}unterstütz[^.!?]{0,50}(?:nasdaq[ -]?)?put/iu.test(flow.reasoning)) issues.push(`${instrument}:POSITIVE_INDEX_HISTORY_USED_AS_PUT_SUPPORT`);
     const factualProse = [flow.reasoning, flow.whyNow, flow.counterargument].filter(item => typeof item === "string").join(" ");
     for (const issue of inspectHistoricalClaims(factualProse, selectedHistory?.meanVsBaseline)) issues.push(`${instrument}:${issue}`);
     if (brief?.histories.length) {
@@ -170,6 +181,11 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
       if (flow.historyMeanVsBaseline !== "UNKNOWN") issues.push(`${instrument}:HISTORICAL_COMPARISON_UNAVAILABLE`);
     }
     const requiredGroups = brief?.cot.map(item => item.group) ?? [];
+    const cotInterpretations = object(flow.cotInterpretations);
+    for (const group of requiredGroups) {
+      if (!useful(cotInterpretations[group])) issues.push(`${instrument}:${group}_INTERPRETATION_FIELD_REQUIRED`);
+    }
+    if (Object.keys(cotInterpretations).some(group => !requiredGroups.includes(group))) issues.push(`${instrument}:UNKNOWN_COT_INTERPRETATION_GROUP`);
     if (!Array.isArray(flow.cotGroups) || flow.cotGroups.length !== requiredGroups.length || new Set(flow.cotGroups).size !== flow.cotGroups.length ||
       requiredGroups.some(group => !flow.cotGroups.includes(group))) issues.push(`${instrument}:AVAILABLE_COT_GROUPS_REQUIRED`);
     if (requiredGroups.length) {

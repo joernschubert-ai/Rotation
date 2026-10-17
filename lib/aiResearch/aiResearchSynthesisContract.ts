@@ -49,6 +49,12 @@ export function buildSynthesisSchema(evidence: SynthesisEvidence[]) {
     // The server binds sources and computes comparisons from the selected study.
     for (const field of ["evidenceRefs", "cotGroups", "historyMeanVsBaseline"]) delete flow.properties[field];
     flow.required = flow.required.filter((field: string) => !["evidenceRefs", "cotGroups", "historyMeanVsBaseline"].includes(field));
+    const groups = briefs.find(item => item.instrument === instrument)?.cot.map(item => item.group) ?? [];
+    if (groups.length) {
+      flow.properties.cotInterpretations = {type: "object", additionalProperties: false,
+        properties: Object.fromEntries(groups.map(group => [group, {type: "string", minLength: 25, maxLength: 450}])), required: groups};
+      flow.required.push("cotInterpretations");
+    }
     result.properties[slot] = flow;
   }
   delete result.properties.flows;
@@ -79,7 +85,7 @@ AKTUELLE KURSE: Die gelieferten 5- und 20-Tage-Renditen beschreiben bereits beob
 
 HISTORIE: Wähle genau eine tatsächlich vorhandene eigene historyStudyId; ohne Studie NONE. Der Server bindet deren Quellen und Vergleichszahlen. Positive historische INDEX-Folgerendite ist für einen Put ein Gegenargument, keine günstige Put-Rendite. Auch eine positive Rendite unter dem Vergleich bedeutet noch keinen fallenden Index. Erkläre in reasoning den Befund und seine Bedeutung für diese Richtung; berücksichtige Median und Gegenrisiken. currentMatch=false bleibt datierter Kontext, kein bestätigter heutiger Zustandsabgleich. Überlappende Beobachtungen und mehrere Familien sind keine unabhängige validierte Strategie. Keine Optionsrendite oder COT-konditionierte Performance berechnet.
 
-COT: Die Quelle ist TFF, nicht Legacy. Asset Manager und Leveraged Money mit Namen und tatsächlich gemessener Veränderung berücksichtigen. Netto-Bestand und Veränderung trennen. Nenne bei jeder Änderung den Zeitraum: eine Woche, vier Wochen oder 13 Wochen. Nutze weeklyFact/change4WFact/change13WFact exakt ihrer Bedeutung nach. Netto short mit positiver Wochenänderung heißt kleinerer Netto-Shortüberhang; kein Beweis separat abgebauter Brutto-Shorts. Bloße Netto-Shortposition begründet keinen Put-Vorteil; bloße Netto-Longposition keinen Call-Vorteil. Gruppenunterschiede erzwingen kein WATCH. Dealer sind keine synonymen Commercials, Leveraged Money nicht alle Großinvestoren. Veröffentlichungszeit unbekannt. Keine mehrwöchige Kurs-COT-Divergenz oder Wissensvorsprung behaupten, wenn kein zeitgleicher Test vorliegt.
+COT: Fülle cotInterpretations mit einer eigenen konkreten Interpretation je angefordertem Gruppenfeld. ASSET_MANAGER und LEVERAGED_MONEY sind getrennte Pflichtfelder, sofern vorhanden. Je Feld ein bis zwei kurze Sätze mit tatsächlicher Entwicklung und benanntem Zeitraum; kein bloßes Wiederholen des Gruppennamens. Die Anwendung zeigt deine Texte unter festen Gruppennamen. Die Quelle ist TFF, nicht Legacy. Asset Manager und Leveraged Money mit Namen und tatsächlich gemessener Veränderung berücksichtigen. Netto-Bestand und Veränderung trennen. Nenne bei jeder Änderung den Zeitraum: eine Woche, vier Wochen oder 13 Wochen. Nutze weeklyFact/change4WFact/change13WFact exakt ihrer Bedeutung nach. Netto short mit positiver Wochenänderung heißt kleinerer Netto-Shortüberhang; kein Beweis separat abgebauter Brutto-Shorts. Bloße Netto-Shortposition begründet keinen Put-Vorteil; bloße Netto-Longposition keinen Call-Vorteil. Gruppenunterschiede erzwingen kein WATCH. Dealer sind keine synonymen Commercials, Leveraged Money nicht alle Großinvestoren. Veröffentlichungszeit unbekannt. Keine mehrwöchige Kurs-COT-Divergenz oder Wissensvorsprung behaupten, wenn kein zeitgleicher Test vorliegt.
 
 BEWERTUNG: Frühe kleine STARTER_CANDIDATE sind vor vollständiger Kursbestätigung erlaubt, benötigen aber eine konkrete begründete These und Gegenargumente. App-Sperre verbietet keine unabhängige Hypothese; App-Freigabe beweist keinen Vorteil. CONFIRM braucht beobachtete eigene Richtungsbestätigung. Sonst WATCH/PREPARE; fehlende eigene Kurse erlauben keine Einstiegsaussage. Put und Call gleichzeitig als Kandidaten nur bei ausdrücklich getrennten künftigen Szenarien, niemals beide als gleichzeitige Handlungsaufforderung. Hoher Master bedeutet Risiko, hohe Participation konstruktive Qualität, Squeeze keine feste Richtung.
 

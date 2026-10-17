@@ -96,7 +96,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
     if (cached?.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
       if (cached.status === "SUCCESS" && validateSynthesis(cached.content, evidence)) return { ...cached, cached: true };
-      if (cached.status === "UNAVAILABLE" && cached.quality.issues.length) {
+      if (!allowGeneration && cached.status === "UNAVAILABLE" && cached.quality.issues.length) {
         if (allowGeneration) await storeRejectedDiagnosis(cached);
         return { ...cached, cached: true };
       }
@@ -117,7 +117,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const completed = await redis.get<ResearchSynthesis>(cacheKey);
     if (completed?.snapshotTimestamp === snapshotTimestamp && completed.quality?.contractVersion === SYNTHESIS_CONTRACT) {
       if (completed.status === "SUCCESS" && validateSynthesis(completed.content, evidence)) return { ...completed, cached: true };
-      if (completed.status === "UNAVAILABLE" && completed.quality.issues.length) {
+      if (!allowGeneration && completed.status === "UNAVAILABLE" && completed.quality.issues.length) {
         await storeRejectedDiagnosis(completed);
         return { ...completed, cached: true };
       }
@@ -191,7 +191,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const normalized = normalizeSynthesisEnvelope(content, evidence);
     const derived = deriveSynthesisConclusion(normalized);
     const answerQuality = { ...quality, responseShape, normalizations: [
-      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE"] : []),
+      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "COT_TEXT_FROM_REQUIRED_MODEL_FIELDS"] : []),
       ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
     content = derived.value;
     stage = "ANSWER_VALIDATION";
@@ -213,11 +213,13 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
             historyStudyId: text(flow.historyStudyId,100), cotGroups: strings(flow.cotGroups,2),
             historyMeanVsBaseline: text(flow.historyMeanVsBaseline,20),
             confirmationTrigger: text(flow.confirmationTrigger,50), invalidationTrigger: text(flow.invalidationTrigger,50),
-            reasoning: text(flow.reasoning,1200), counterargument: text(flow.counterargument,1200) }))
+            reasoning: text(flow.reasoning,1200), whyNow: text(flow.whyNow,1200), counterargument: text(flow.counterargument,1200),
+            cotInterpretations: Object.fromEntries(Object.entries(flow.cotInterpretations && typeof flow.cotInterpretations === "object" ? flow.cotInterpretations : {}).map(([group, value]) => [group, text(value,450)])) }))
       };
       const conditionFailure = issues.every(issue => /UNOBSERVABLE_(CONFIRMATION|INVALIDATION)$/.test(issue));
       const rejected: ResearchSynthesis = { ...unavailable(conditionFailure
         ? "Die KI hat geantwortet, aber ihre Bestätigungs- oder Widerlegungsbedingungen sind nicht eindeutig prüfbar. Deshalb wird keine Einstiegsaussage angezeigt."
+        : issues.some(issue => /INTERPRETATION_FIELD_REQUIRED$/.test(issue)) ? "Die KI hat eine angeforderte COT-Gruppeninterpretation ausgelassen. Keine Einstiegsaussage übernommen; die gemessenen COT-Daten bleiben verfügbar."
         : issues.includes("THREE_INSTRUMENTS_REQUIRED") ? "Die KI hat keine vollständigen Einzelbewertungen für Nasdaq Put, Nasdaq Call und Russell Call geliefert. Die vorhandene Datenbasis bleibt verfügbar; keine KI-Einstiegsaussage übernommen."
         : issues.some(issue => /COMPARISON_DISAGREES|RETURNS_MISLABELED/.test(issue)) ? "Die KI hat historische Indexrenditen oder deren Vergleich falsch eingeordnet. Die Antwort wurde nicht als Einstiegsaussage übernommen; die Quellzahlen bleiben verfügbar."
         : issues.some(issue => /DIRECTION_TRIGGER|DISAGREES_WITH_TRIGGER/.test(issue)) ? "Die KI hat keine passende Richtungsbedingung gewählt. Keine KI-Einstiegsaussage übernommen; die Datenbasis bleibt verfügbar."
@@ -225,7 +227,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
           ? "Die KI hat Historie oder COT nicht vollständig den eigenen Instrumenten zugeordnet. Die Antwort wurde nicht als Einstiegsaussage übernommen; die Details stehen im kopierbaren Bericht."
           : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),
         quality: { ...answerQuality, issues, rejectedConditions, rejectedResponse } };
-      // Cache rejected answers too; refreshing must not burn quota on the same frame.
+      // Keep rejection diagnostics for read-only GET; an authorized generation POST may retry under the existing quota and cooldown.
       stage = "REJECTED_ANSWER_CACHE_WRITE";
       const diagnosed = withTiming(rejected);
       await storeRejectedDiagnosis(diagnosed);
