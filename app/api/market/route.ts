@@ -20,7 +20,7 @@ historyEngine
 
 
 // Current S&P-500 constituent universe, retrieved daily from a public third-party list.
-const BREADTH_UNIVERSE_VERSION = "SP500_CONSTITUENT_BREADTH_SEPARATE_ETF_TRENDS_2026_10_17_V3";
+const BREADTH_UNIVERSE_VERSION = "NASDAQ100_PRIMARY_CONSTITUENT_BREADTH_2026_10_17_V1";
 const BREADTH_CONSTITUENTS_SOURCE = "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv";
 async function loadBreadthUniverseUncached(): Promise<string[]> {
   const response = await fetch(BREADTH_CONSTITUENTS_SOURCE, { cache: "no-store", signal: AbortSignal.timeout(5000) });
@@ -31,7 +31,8 @@ async function loadBreadthUniverseUncached(): Promise<string[]> {
   if (symbols.length < 490 || symbols.length > 520 || new Set(symbols).size !== symbols.length || symbols.some(s => !/^[A-Z][A-Z0-9-]{0,9}$/.test(s))) throw new Error("Invalid S&P-500 constituents");
   return symbols;
 }
-const loadBreadthUniverse = unstable_cache(loadBreadthUniverseUncached, ["sp500-constituents-v2"], { revalidate: 86400 });
+const loadSP500Constituents = unstable_cache(loadBreadthUniverseUncached, ["sp500-constituents-v2"], { revalidate: 86400 });
+async function loadBreadthUniverse(): Promise<string[]> { return loadNasdaqMembers(); }
 const EARLY_ETF_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","RSP","MTUM","QUAL","SMH","XBI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","SPHB","SPLV","IWO","IWN","USMV","XRT","SOXX","XLRE"];
 const SUPPLEMENTAL_ETF_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","XLRE","SMH","XBI","ARKK","MTUM","QUAL","IYR"];
 type BreadthBars = { closes: number[]; latest: number; source: string; sessionDate: string; timestamps?: number[] };
@@ -84,15 +85,16 @@ function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now
     b20: accepted.length ? above.b20 / accepted.length : null,
     b50: accepted.length ? above.b50 / accepted.length : null,
     b200: accepted.length ? above.b200 / accepted.length : null,
-    dataQuality: { universeVersion: BREADTH_UNIVERSE_VERSION, definition: "SP500_CURRENT_CONSTITUENTS_EQUAL_WEIGHT", constituentFingerprint: createHash("sha256").update([...symbols].sort().join(",")).digest("hex"), constituentCount: symbols.length, representsEntireUSMarket: false, minimumCoverage: 0.98, thresholdCalibration: "EXISTING_RULES_NOT_RECALIBRATED_FOR_THIS_UNIVERSE", countsAboveMovingAverage: above, constituentSource: BREADTH_CONSTITUENTS_SOURCE, constituentListOfficiallyVerified: false, referenceDate, constituentRefreshSeconds: 86400, historicalMembershipReconstructed: false, shareClassesCountSeparately: true, officialIndexBreadth: false, expected: symbols.length, valid: accepted.length, coverage: accepted.length / symbols.length, accepted, excluded, commonDenominator: true, smoothing: "NONE", latestBarFinality: "UNVERIFIED", freshnessLimitCalendarDays: 5 }
+    dataQuality: { universeVersion: BREADTH_UNIVERSE_VERSION, definition: "NASDAQ100_CURRENT_CONSTITUENTS_EQUAL_WEIGHT", constituentFingerprint: createHash("sha256").update([...symbols].sort().join(",")).digest("hex"), constituentCount: symbols.length, representsEntireUSMarket: false, minimumCoverage: 0.98, thresholdCalibration: "EXISTING_RULES_NOT_RECALIBRATED_FOR_THIS_UNIVERSE", countsAboveMovingAverage: above, constituentSource: NASDAQ_MEMBERS_SOURCE, constituentListOfficiallyVerified: false, referenceDate, constituentRefreshSeconds: 86400, historicalMembershipReconstructed: false, shareClassesCountSeparately: true, officialIndexBreadth: false, expected: symbols.length, valid: accepted.length, coverage: accepted.length / symbols.length, accepted, excluded, commonDenominator: true, smoothing: "NONE", latestBarFinality: "UNVERIFIED", freshnessLimitCalendarDays: 5 }
   };
 }
 
 async function loadBroadBreadth(symbols: string[]) {
-  const nasdaqSymbols = await loadNasdaqMembers();
+  const nasdaqSymbols = symbols;
+  const sp500Symbols = await loadSP500Constituents().catch(() => [] as string[]);
   const started = Date.now();
   const bars = new Map<string, BreadthBars>();
-  const fetchSymbols = [...new Set([...symbols, ...SUPPLEMENTAL_ETF_UNIVERSE, ...EARLY_ETF_UNIVERSE, ...nasdaqSymbols])];
+  const fetchSymbols = [...new Set([...symbols, ...SUPPLEMENTAL_ETF_UNIVERSE, ...EARLY_ETF_UNIVERSE, ...nasdaqSymbols, ...sp500Symbols])];
   let next = 0;
   await Promise.all(Array.from({ length: 24 }, async () => {
     while (next < fetchSymbols.length && Date.now() - started < 20000) {
@@ -114,9 +116,18 @@ async function loadBroadBreadth(symbols: string[]) {
     return window.length === 252 && window.every(value => Number.isFinite(value) && value > 0);
   });
   const nasdaq100 = summarizeNasdaqBreadth(nasdaqSymbols, aligned, referenceDate);
+  const sp500 = sp500Symbols.length ? summarizeBreadth(sp500Symbols, aligned) : null;
+  const marketContextSP500 = sp500 ? {
+    definition: "SP500_REFERENCE_ONLY", affectsEngineScores: false, referenceDate,
+    expected: sp500.dataQuality.expected, valid: sp500.dataQuality.valid, coverage: sp500.dataQuality.coverage,
+    percentages: sp500.dataQuality.coverage >= 0.98 ? { b20: sp500.b20! * 100, b50: sp500.b50! * 100, b200: sp500.b200! * 100 } : null,
+    constituentSource: BREADTH_CONSTITUENTS_SOURCE, excluded: sp500.dataQuality.excluded
+  } : { definition: "SP500_REFERENCE_ONLY", affectsEngineScores: false, status: "UNAVAILABLE" };
   return { ...main, nasdaq100, bars: aligned, dataQuality: { ...main.dataQuality,
     nasdaq100: nasdaq100,
-    advanceDecline: { definition: "SP500_CONSTITUENT_COUNTS", valid: adRows.length, advances, declines, net: advances - declines, netPercent: adRows.length ? 100 * (advances - declines) / adRows.length : null, legacyRawCountThresholdsRetained: true },
+    primaryEngineUniverse: "NASDAQ100",
+    marketContextSP500,
+    advanceDecline: { definition: "NASDAQ100_CONSTITUENT_COUNTS", valid: adRows.length, advances, declines, net: advances - declines, netPercent: adRows.length ? 100 * (advances - declines) / adRows.length : null, legacyRawCountThresholdsRetained: true },
     highsLows: { definition: "252_DAILY_CLOSE_EXTREMES_NOT_INTRADAY_HIGHS_LOWS", valid252: highLowValid.length, expected: symbols.length, coverage252: highLowValid.length / symbols.length },
     earlyETFTrend: summarizeEarlyETFTrend(EARLY_ETF_UNIVERSE, aligned, referenceDate),
     supplementalETFTrend: {
