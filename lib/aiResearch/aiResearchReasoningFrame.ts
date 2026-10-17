@@ -15,9 +15,9 @@ export function historyDirectionEffect(instrument: string, mean: unknown): Histo
   return mean * (instrument === "NASDAQ_PUT" ? -1 : 1) > 0 ? "SUPPORTS_DIRECTION" : "OPPOSES_DIRECTION";
 }
 export function cotHorizonFact(group: ReturnType<typeof buildInstrumentBriefs>[number]["cot"][number], horizon: unknown): string | null {
-  if (horizon === "WEEK") return "Eine Woche: " + group.weeklyFact;
-  if (horizon === "FOUR_WEEKS") return "Vier Wochen: " + group.change4WFact;
-  if (horizon === "THIRTEEN_WEEKS") return "13 Wochen: " + group.change13WFact;
+  if (horizon === "WEEK") return typeof group.weeklyFact === "string" ? "Eine Woche: " + group.weeklyFact : "Eine Woche: Veränderung nicht verfügbar.";
+  if (horizon === "FOUR_WEEKS") return typeof group.change4WFact === "string" ? "Vier Wochen: " + group.change4WFact : "Vier Wochen: Veränderung nicht verfügbar.";
+  if (horizon === "THIRTEEN_WEEKS") return typeof group.change13WFact === "string" ? "13 Wochen: " + group.change13WFact : "13 Wochen: Veränderung nicht verfügbar.";
   return null;
 }
 export function buildReasoningFrames(evidence: SynthesisEvidence[]) {
@@ -56,8 +56,8 @@ export function renderReviewedContext(instrument: string, timing: unknown, struc
   const names: Record<string,string> = {NASDAQ_PUT:"Nasdaq Put", NASDAQ_CALL:"Nasdaq Call", RUSSELL_CALL:"Russell Call"};
   const timingLabels: Record<string,string> = {
     ALREADY_MOVED:"Die bereits gelaufene Bewegung begrenzt nach Einschätzung der KI die frühe Gelegenheit.",
-    EARLY_DIVERGENCE:"Die KI sieht eine mögliche frühe Divergenz; ein statistischer Vorlauf ist damit nicht nachgewiesen.",
-    WAIT_FOR_TURN:"Die KI möchte eine eigene Kurswende abwarten; eine solche Wende wird hier nicht als bereits erfolgt behauptet.",
+    EARLY_DIVERGENCE:"Die KI nennt eine frühe Divergenzhypothese. Ohne bezeichneten zeitgleichen Verlaufvergleich ist keine beobachtete Divergenz festgestellt.",
+    WAIT_FOR_TURN:instrument === "NASDAQ_PUT" ? "Die KI wartet auf erneute eigene Abwärtsbestätigung, etwa nach einer scheiternden Erholung; deren Eintritt ist damit nicht behauptet." : "Die KI wartet auf eine eigene Aufwärtswende; diese wird hier nicht als bereits erfolgt behauptet.",
     DIRECTION_CONFIRMED:"Die KI ordnet die eigene Preisrichtung als bestätigt ein; die Richtungsprüfung erfolgt zusätzlich anhand der gelieferten Kurse.",
     DATA_INCOMPLETE:"Die KI hält die Datenbasis für diese These für unvollständig."
   };
@@ -71,7 +71,7 @@ export function renderReviewedContext(instrument: string, timing: unknown, struc
     PHASE:"Eigene Phase: "+(typeof own.phase==="string"?own.phase:"unbekannt")+"."
   };
   const risks: Record<string,string> = {
-    REBOUND:"Eine Erholung des eigenen Index würde gegen die Put-Richtung wirken. Positive historische Indexrenditen sind dabei Gegenkontext, keine Put-Renditen.",
+    REBOUND:"Eine Erholung des eigenen Index würde gegen die Put-Richtung wirken. Die tatsächliche historische Vergleichsstudie ist gesondert zu beurteilen.",
     FAILED_CONTINUATION:"Eine scheiternde Abwärtsfortsetzung mit eigener Kurserholung würde die Put-Hypothese schwächen.",
     FURTHER_DOWNSIDE:"Weitere Verluste des eigenen Index würden gegen die Call-Richtung wirken. Ein bloßer historischer Erholungsmittelwert schützt davor nicht.",
     FAILED_REBOUND:"Eine gescheiterte Erholung und erneute eigene Kursschwäche würden die Call-Hypothese schwächen.",
@@ -90,12 +90,34 @@ export function buildCompactResearchInput(evidence: SynthesisEvidence[]) {
       ownStructure:frame.ownStructure,
       history20DayStudies:frame.historyChoices.map(({directionEffect,...study})=>study),
       cotObservationAndChanges:frame.cot,
+      cotUseLimits:{role:"POSITIONING_CONTEXT_NOT_VALIDATED_DIRECTIONAL_SIGNAL",grossTransactionChangesKnown:false,
+        note:"Changes in net positioning do not by themselves establish a Put/Call advantage. Contrarian interpretations need a stated mechanism and relevant evidence; preserve uncertainty."},
     })),
     instrumentTasks:frames.map(frame=>({instrument:frame.instrument,market:frame.instrument==="RUSSELL_CALL"?"RUSSELL_2000":"NASDAQ",
-      desiredIndexDirection:frame.instrument==="NASDAQ_PUT"?"DOWN":"UP", riskChoices:frame.riskMechanisms})),
+      desiredIndexDirection:frame.instrument==="NASDAQ_PUT"?"DOWN":"UP", riskChoices:frame.riskMechanisms,
+      historicalDirectionFacts:frame.historyChoices.map(study=>({studyId:study.id,
+        meaning:study.directionEffect==="SUPPORTS_DIRECTION"?"Der historische Indexmittelwert passt zur gewünschten Instrumentrichtung, beweist aber keinen heutigen Vorteil.":study.directionEffect==="OPPOSES_DIRECTION"?"Der historische Indexmittelwert wirkt gegen die gewünschte Instrumentrichtung; andere begründete Faktoren müssten eine Gegenhypothese tragen.":"Aus dem historischen Indexmittelwert ist keine Richtungsaussage verfügbar."}))})),
     sharedContext:{credit:app.credit, volatility:app.volatility, crash:app.crash, squeeze:app.squeeze, appPermissions:app.flows,
       historicalComparisons:history.comparisons, historyAsOf:history.asOf,
       news:evidence.filter(item=>item.kind==="NEWS").map(item=>({id:item.id,...item.data}))},
     interpretationLimits:"Index returns, not options returns. COT changes are lagged context without validated directional rule. Headlines are not verified articles. No live chart zones or combined edge study supplied."
   };
+}
+
+/** Known shortcut claims only; this is not a complete semantic truth judge. */
+export function inspectPositioningInterpretation(instrument: string, prose: unknown, cotContext = false): string[] {
+  if (typeof prose !== "string") return [];
+  const issues: string[] = [];
+  for (const sentence of prose.split(/[.!?;]/u)) {
+    if (!cotContext && !/cot|netto|überhang|positionierung/iu.test(sentence)) continue;
+    const justifiedMechanism = /weil|vorausgesetzt|nur zusammen|zusammen mit|bei gleichzeitig|sofern|falls|wenn/iu.test(sentence);
+    const negatedShortcut = /kein(?:e|en)? (?:direktes? |automatisches? |belegtes? )?(?:signal|vorteil|chance)|nicht (?:allein|automatisch|zwangsläufig)|beweist (?:keinen|nicht)|lässt (?:sich )?keine/iu.test(sentence);
+    if (!justifiedMechanism && !negatedShortcut && /was[^.!?]{0,35}(?:chance für (?:einen? )?(?:put|call)|(?:für|gegen) (?:einen? )?(?:put|call)[^.!?]{0,25}spricht)/iu.test(sentence)) issues.push("COT_DIRECTIONAL_SHORTCUT_WITHOUT_MECHANISM");
+    const productOrExtensionArgument = /implizit|zeitwert|optionspreis|bereits gelaufen|schon gelaufen|kein gegenargument|nicht (?:als )?(?:risiko|gegenargument)/iu.test(sentence);
+    if (!productOrExtensionArgument) {
+      if (instrument !== "NASDAQ_PUT" && /(?:risiko|gegenargument)[^.!?]{0,55}(?:rallye|kurserholung|kursanstieg)|(?:rallye|kurserholung|kursanstieg)[^.!?]{0,40}(?:risiko|gegenargument)/iu.test(sentence)) issues.push("UPSIDE_ALONE_IS_NOT_CALL_RISK");
+      if (instrument === "NASDAQ_PUT" && /(?:risiko|gegenargument)[^.!?]{0,55}(?:kursrückgang|korrektur)|(?:kursrückgang|korrektur)[^.!?]{0,40}(?:risiko|gegenargument)/iu.test(sentence)) issues.push("DOWNSIDE_ALONE_IS_NOT_PUT_RISK");
+    }
+  }
+  return [...new Set(issues)];
 }

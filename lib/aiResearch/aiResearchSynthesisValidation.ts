@@ -1,4 +1,4 @@
-import { COT_HORIZONS, RISK_MECHANISMS, historyDirectionEffect, cotHorizonFact, aggregateReviewedFlows, TIMING_FOCUS, STRUCTURE_FOCUS, renderReviewedContext } from "./aiResearchReasoningFrame";
+import { COT_HORIZONS, RISK_MECHANISMS, historyDirectionEffect, cotHorizonFact, aggregateReviewedFlows, TIMING_FOCUS, STRUCTURE_FOCUS, renderReviewedContext, inspectPositioningInterpretation } from "./aiResearchReasoningFrame";
 import type { ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 import type { SynthesisEvidence } from "./aiResearchSynthesisEvidence";
 import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
@@ -213,10 +213,12 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
       if (!(typeof ownFiveDay === "number" && ownFiveDay * direction > 0)) issues.push(`${instrument}:TIMING_CONFIRMATION_WITHOUT_OWN_5D_DIRECTION`);
     }
     if (typeof flow.reasoning === "string" && /%|\bprozent/iu.test(flow.reasoning)) issues.push(`${instrument}:MODEL_MUST_NOT_REPEAT_NUMERIC_FACTS`);
+    for(const issue of inspectPositioningInterpretation(instrument,flow.reasoning)) issues.push(`${instrument}:${issue}`);
     const requiredGroups = brief?.cot.map(item => item.group) ?? [];
     const cotReview = object(flow.cotReview);
     for (const group of requiredGroups) {
       const review = object(cotReview[group]);
+      for(const issue of inspectPositioningInterpretation(instrument,review.interpretation,true)) issues.push(`${instrument}:${group}:${issue}`);
       const sourceGroup = brief?.cot.find(item=>item.group===group);
       const sourceFact = sourceGroup ? cotHorizonFact(sourceGroup,review.horizon) : null;
       if (sourceFact && typeof review.interpretation==="string" && normalize(sourceFact)===normalize(review.interpretation)) issues.push(`${instrument}:${group}_INTERPRETATION_ONLY_COPIES_FACT`);
