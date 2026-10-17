@@ -1,6 +1,8 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
+import { createHash } from "node:crypto";
 import { prepareObservedIndexSeries } from "@/lib/market/priceSeriesIntegrity";
 import { Redis } from "@upstash/redis";
 import type { Redis as RedisType } from "@upstash/redis";
@@ -17,34 +19,44 @@ historyEngine
 } from "@/lib/history/historyEngine";
 
 
-// Earliest user-supplied universes: separate ETF proxies and stock high/low sample.
-const LEGACY_BREADTH_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","XLRE","SMH","XBI","ARKK","MTUM","QUAL","IYR"];
-const LEGACY_BREADTH20_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","RSP","MTUM","QUAL","SMH","XBI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","SPHB","SPLV","IWO","IWN","MTUM","USMV","XRT","SOXX","XLRE"];
-const LEGACY_AD_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","XLRE"];
-const LEGACY_HIGH_LOW_UNIVERSE: string[] = ["AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","JPM","BAC","GS","MS","XOM","CVX","UNH","JNJ","PFE","HD","MCD","NKE","AMD","INTC","AVGO","CRM","ADBE","ORCL","WMT","COST","PG","DIS","NFLX","LIN","HON","CAT","BA","UPS","RTX","LOW","SBUX","GE","IBM","PLTR","SNOW","SHOP"];
-const BREADTH_UNIVERSE_VERSION = "LEGACY_ETF_PROXY_UNIVERSES_2026_10_17_V1";
-async function loadBreadthUniverse(): Promise<string[]> { return [...LEGACY_BREADTH_UNIVERSE]; }
-
+// Current S&P-500 constituent universe, retrieved daily from a public third-party list.
+const BREADTH_UNIVERSE_VERSION = "SP500_STOCK_BREADTH_WITH_SEPARATE_ETF_TRENDS_2026_10_17_V2";
+const BREADTH_CONSTITUENTS_SOURCE = "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv";
+async function loadBreadthUniverseUncached(): Promise<string[]> {
+  const response = await fetch(BREADTH_CONSTITUENTS_SOURCE, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+  if (!response.ok) throw new Error("S&P-500 constituent list unavailable");
+  const csv = await response.text();
+  if (!csv.startsWith("Symbol,Security,")) throw new Error("Invalid S&P-500 list format");
+  const symbols = csv.trim().split(/\r?\n/).slice(1).map(line => line.split(",")[0].trim().replace(/\./g, "-")).sort();
+  if (symbols.length < 490 || symbols.length > 520 || new Set(symbols).size !== symbols.length || symbols.some(s => !/^[A-Z][A-Z0-9-]{0,9}$/.test(s))) throw new Error("Invalid S&P-500 constituents");
+  return symbols;
+}
+const loadBreadthUniverse = unstable_cache(loadBreadthUniverseUncached, ["sp500-constituents-v2"], { revalidate: 86400 });
+const SUPPLEMENTAL_ETF_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","XLRE","SMH","XBI","ARKK","MTUM","QUAL","IYR"];
 type BreadthBars = { closes: number[]; latest: number; source: string; sessionDate: string };
 const breadthBarCache = new Map<string, { time: number; bars: BreadthBars }>();
 
-async function fetchBreadthBars(symbol: string): Promise<BreadthBars | null> {
+async function fetchBreadthBarsUncached(symbol: string): Promise<BreadthBars> {
   const cached = breadthBarCache.get(symbol);
   if (cached && Date.now() - cached.time < 15 * 60 * 1000) return cached.bars;
   try {
-    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y`, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 900 }, signal: AbortSignal.timeout(4000) } as RequestInit & { next: { revalidate: number } });
-    if (!response.ok) return null;
+    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y`, { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store", signal: AbortSignal.timeout(4000) });
+    if (!response.ok) throw new Error("Breadth prices unavailable");
     const result = (await response.json())?.chart?.result?.[0];
     const timestamps = result?.timestamp ?? [];
     const quotes = result?.indicators?.quote?.[0]?.close ?? [];
     // Retain gaps. Do not shift the moving-average window across missing bars.
     const closes = timestamps.map((_: number, i: number) => typeof quotes[i] === "number" && Number.isFinite(quotes[i]) && quotes[i] > 0 ? quotes[i] : NaN);
     const latest = Number(timestamps[timestamps.length - 1]) * 1000;
-    if (!Number.isFinite(latest)) return null;
+    if (!Number.isFinite(latest)) throw new Error("Invalid breadth timestamp");
     const bars = { closes, latest, source: "YAHOO_DAILY_BARS", sessionDate: new Date(latest).toISOString().slice(0, 10) };
     breadthBarCache.set(symbol, { time: Date.now(), bars });
     return bars;
-  } catch { return null; }
+  } catch { throw new Error("Breadth price fetch failed"); }
+}
+const fetchBreadthBarsCached = unstable_cache(fetchBreadthBarsUncached, ["sp500-breadth-daily-bars-v2"], { revalidate: 900 });
+async function fetchBreadthBars(symbol: string): Promise<BreadthBars | null> {
+  try { return await fetchBreadthBarsCached(symbol); } catch { return null; }
 }
 
 function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now = Date.now()) {
@@ -71,14 +83,14 @@ function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now
     b20: accepted.length ? above.b20 / accepted.length : null,
     b50: accepted.length ? above.b50 / accepted.length : null,
     b200: accepted.length ? above.b200 / accepted.length : null,
-    dataQuality: { universeVersion: BREADTH_UNIVERSE_VERSION, definition: "LEGACY_22_ETF_TREND_PROXY", constituentSource: "USER_UPLOADED_EARLIEST_ROUTE", referenceDate, representsIndividualStockBreadth: false, originalSmoothingRestored: false, historicalMembershipReconstructed: false, officialIndexBreadth: false, expected: symbols.length, valid: accepted.length, coverage: accepted.length / symbols.length, accepted, excluded, commonDenominator: true, smoothing: "NONE", latestBarFinality: "UNVERIFIED", freshnessLimitCalendarDays: 5 }
+    dataQuality: { universeVersion: BREADTH_UNIVERSE_VERSION, definition: "SP500_CURRENT_CONSTITUENTS_EQUAL_WEIGHT", constituentFingerprint: createHash("sha256").update([...symbols].sort().join(",")).digest("hex"), constituentCount: symbols.length, representsEntireUSMarket: false, minimumCoverage: 0.98, thresholdCalibration: "EXISTING_RULES_NOT_RECALIBRATED_FOR_THIS_UNIVERSE", countsAboveMovingAverage: above, constituentSource: BREADTH_CONSTITUENTS_SOURCE, constituentListOfficiallyVerified: false, referenceDate, constituentRefreshSeconds: 86400, historicalMembershipReconstructed: false, shareClassesCountSeparately: true, officialIndexBreadth: false, expected: symbols.length, valid: accepted.length, coverage: accepted.length / symbols.length, accepted, excluded, commonDenominator: true, smoothing: "NONE", latestBarFinality: "UNVERIFIED", freshnessLimitCalendarDays: 5 }
   };
 }
 
 async function loadBroadBreadth(symbols: string[]) {
   const started = Date.now();
   const bars = new Map<string, BreadthBars>();
-  const fetchSymbols = [...new Set([...symbols, ...LEGACY_BREADTH20_UNIVERSE, ...LEGACY_AD_UNIVERSE, ...LEGACY_HIGH_LOW_UNIVERSE])];
+  const fetchSymbols = [...new Set([...symbols, ...SUPPLEMENTAL_ETF_UNIVERSE])];
   let next = 0;
   await Promise.all(Array.from({ length: 24 }, async () => {
     while (next < fetchSymbols.length && Date.now() - started < 20000) {
@@ -89,17 +101,25 @@ async function loadBroadBreadth(symbols: string[]) {
   }));
   const main = summarizeBreadth(symbols, bars);
   const referenceDate = main.dataQuality.referenceDate;
-  const alignedBars = new Map([...bars].filter(([, value]) => value.sessionDate === referenceDate));
-  const summarizeGroup = (list: string[]) => summarizeBreadth(list, alignedBars);
-  const breadth20 = summarizeGroup(LEGACY_BREADTH20_UNIVERSE);
-  const advanceDecline = summarizeGroup(LEGACY_AD_UNIVERSE);
-  const highLow = summarizeGroup(LEGACY_HIGH_LOW_UNIVERSE);
-  const validSymbols = new Set([...breadth20.dataQuality.accepted, ...advanceDecline.dataQuality.accepted, ...highLow.dataQuality.accepted]);
-  return { ...main, bars: alignedBars, validSymbols, groups: { breadth20, advanceDecline, highLow }, dataQuality: { ...main.dataQuality,
-    inputs: {
-      breadth20: { definition: "LEGACY_29_ETF_ENTRY_PROXY", expected: LEGACY_BREADTH20_UNIVERSE.length, valid: breadth20.dataQuality.valid, coverage: breadth20.dataQuality.coverage, excluded: breadth20.dataQuality.excluded, symbols: LEGACY_BREADTH20_UNIVERSE, duplicateMTUMPreserved: true },
-      advanceDecline: { definition: "LEGACY_16_ETF_ADVANCE_DECLINE_PROXY", expected: LEGACY_AD_UNIVERSE.length, valid: advanceDecline.dataQuality.valid, coverage: advanceDecline.dataQuality.coverage, excluded: advanceDecline.dataQuality.excluded, symbols: LEGACY_AD_UNIVERSE },
-      highsLows: { definition: "LEGACY_STOCK_HIGH_LOW_SAMPLE", expected: LEGACY_HIGH_LOW_UNIVERSE.length, valid: highLow.dataQuality.valid, coverage: highLow.dataQuality.coverage, excluded: highLow.dataQuality.excluded, symbols: LEGACY_HIGH_LOW_UNIVERSE }
+  const aligned = new Map([...bars].filter(([, value]) => value.sessionDate === referenceDate));
+  const etf = summarizeBreadth(SUPPLEMENTAL_ETF_UNIVERSE, aligned);
+  const etfReady = etf.dataQuality.coverage >= 0.98;
+  const adRows = main.dataQuality.accepted.map(symbol => aligned.get(symbol)!).filter(row => row.closes.length >= 2);
+  const advances = adRows.filter(row => row.closes.at(-1)! > row.closes.at(-2)!).length;
+  const declines = adRows.filter(row => row.closes.at(-1)! < row.closes.at(-2)!).length;
+  const highLowValid = main.dataQuality.accepted.filter(symbol => {
+    const window = aligned.get(symbol)?.closes.slice(-252) ?? [];
+    return window.length === 252 && window.every(value => Number.isFinite(value) && value > 0);
+  });
+  return { ...main, bars: aligned, dataQuality: { ...main.dataQuality,
+    advanceDecline: { definition: "SP500_CONSTITUENT_COUNTS", valid: adRows.length, advances, declines, net: advances - declines, netPercent: adRows.length ? 100 * (advances - declines) / adRows.length : null, legacyRawCountThresholdsRetained: true },
+    highsLows: { definition: "252_DAILY_CLOSE_EXTREMES_NOT_INTRADAY_HIGHS_LOWS", valid252: highLowValid.length, expected: symbols.length, coverage252: highLowValid.length / symbols.length },
+    supplementalETFTrend: {
+      definition: "22_ETF_TREND_PROXY_SUPPLEMENT_ONLY", affectsEngineScores: false,
+      referenceDate, expected: SUPPLEMENTAL_ETF_UNIVERSE.length, valid: etf.dataQuality.valid,
+      coverage: etf.dataQuality.coverage, status: etfReady ? "AVAILABLE" : "UNAVAILABLE",
+      percentages: etfReady ? { b20: etf.b20! * 100, b50: etf.b50! * 100, b200: etf.b200! * 100 } : null,
+      symbols: SUPPLEMENTAL_ETF_UNIVERSE, excluded: etf.dataQuality.excluded
     }
   } };
 }
@@ -605,7 +625,7 @@ universe.map(s => fetchETF(s))
 
 results.forEach((closes)=>{
 
-if (closes.length < 252) return;
+if (closes.length < 252 || closes.slice(-252).some(value => !Number.isFinite(value) || value <= 0)) return;
 
 valid++;
 
@@ -2839,7 +2859,7 @@ const spLowerHigh = detectLowerHigh(spClosesFull);
 
 const broadBreadth = await loadBroadBreadth(breadthUniverse);
 // Refuse fabricated zero breadth when the data sample is mostly unavailable.
-if (broadBreadth.dataQuality.coverage < 0.80 || Object.values(broadBreadth.groups).some(group => group.dataQuality.coverage < 0.80) || broadBreadth.b20 === null || broadBreadth.b50 === null || broadBreadth.b200 === null) {
+if (broadBreadth.dataQuality.coverage < 0.98 || broadBreadth.b20 === null || broadBreadth.b50 === null || broadBreadth.b200 === null) {
   return NextResponse.json({ error: "Insufficient fresh breadth coverage", breadthDataQuality: broadBreadth.dataQuality }, { status: 503 });
 }
 const breadth200 = broadBreadth.b200;
@@ -2850,15 +2870,15 @@ calculateBreadthScore(breadth200, breadth50);
 /* HIGH LOW BREADTH */
 
 const highLowData =
-await calculateHighLowIndicator(async (symbol: string) => broadBreadth.validSymbols.has(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], LEGACY_HIGH_LOW_UNIVERSE);
+await calculateHighLowIndicator(async (symbol: string) => broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], breadthUniverse);
 
 /* ADVANCE DECLINE */
 
 const adData =
-await calculateAdvanceDecline(async (symbol: string) => broadBreadth.validSymbols.has(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], LEGACY_AD_UNIVERSE);
+await calculateAdvanceDecline(async (symbol: string) => broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], breadthUniverse);
 
 const breadth20Data =
-await calculateBreadth20(async (symbol: string) => broadBreadth.validSymbols.has(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], LEGACY_BREADTH20_UNIVERSE);
+{ breadth20: broadBreadth.b20, breadth20Signal: broadBreadth.b20 < 0.25 ? "panic" : broadBreadth.b20 < 0.4 ? "weak" : "neutral" };
 
 /* ================= INTERNAL MOMENTUM ================= */
 
