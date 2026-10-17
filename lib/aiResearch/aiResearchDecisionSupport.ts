@@ -38,15 +38,12 @@ export function buildAIResearchDecisionSupport(
   const snapshotTime = Date.parse(snapshotTimestamp);
   const stale = !Number.isFinite(snapshotTime) || snapshotTime > now || now - snapshotTime > 86400000;
   const state = assessment?.opportunityState ?? "WAIT";
-  const entryAllowed = ["EARLY_STARTER", "CONFIRM", "SCALE_IN"].includes(state);
-  let action = "Beobachten – kein neuer Einstieg";
-  if (entryAllowed && approved.length === 1) action = `${approved[0].instrument}: ${state === "EARLY_STARTER" ? "kleinen Modellstarter prüfen" : "Modellfreigabe prüfen"}`;
-  else if (entryAllowed && approved.length > 1) action = "Mehrere freigegebene Flows getrennt prüfen";
+  // Describe existing app permissions; research maturity does not revoke them.
+  let action = "Beobachten – kein freigegebener Einstieg";
+  if (approved.length === 1) action = approved[0].instrument + ": Modellfreigabe " + approved[0].modelSize + "%";
+  else if (approved.length > 1) action = "Freigegebene Modellanteile: " + approved.map(flow => flow.instrument + " " + flow.modelSize + "%").join(" · ");
   else if (state === "ARMED") action = "Einstieg vorbereiten – Freigabe abwarten";
   else if (state === "REDUCE") action = "Bestehendes Risiko überprüfen – nicht nachsetzen";
-  if (!entryAllowed && state !== "REDUCE" && approved.some(flow => flow.instrument === "Russell Call")) {
-    action = "Nasdaq abwarten; Russell-Call-Freigabe getrennt prüfen";
-  }
   if (stale) action = "Daten aktualisieren – Einstieg nicht beurteilen";
   const modelFreed = approved.length ? approved.map(flow => `${flow.instrument}: ${flow.modelSize}% Modellanteil`).join("; ") : "Kein Flow mit positiver Größe gemeinsam freigegeben.";
   return {
