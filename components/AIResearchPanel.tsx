@@ -178,6 +178,9 @@ export function AIResearchSynthesisSummary({ synthesis, snapshotTimestamp, suspe
         <h4 className="font-semibold text-[#ddd]">{instrumentNames[flow.instrument]}</h4>
         <p className="mt-1 text-[#c4d8e8]">{assessments[flow.assessment]}</p>
         <p className="mt-3 text-[#bbb]">{flow.reasoning}</p>
+        {flow.cotInterpretations && <div className="mt-3 space-y-2 text-[#aaa]">
+          {Object.entries(flow.cotInterpretations).map(([group, interpretation]) => <p key={group}><strong>{group === "ASSET_MANAGER" ? "Asset Manager" : "Leveraged Money"}:</strong> {interpretation}</p>)}
+        </div>}
         {flow.grounding && <div className="mt-3 space-y-2 rounded border border-slate-700 bg-slate-900/60 p-3 text-[11px] text-slate-400">
           <div className="font-semibold text-slate-300">Zahlen aus der Datenbasis</div>
           <p>Eigene Kursrendite: 5 Tage {pct(flow.grounding.price.momentum5D)} · 20 Tage {pct(flow.grounding.price.momentum20D)}</p>
