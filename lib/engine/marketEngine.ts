@@ -1,3 +1,4 @@
+import { buildNasdaqStructureContext } from "./nasdaqStructureContext";
 // /lib/engine/marketEngine.ts
 
 import { rotationEngine } from "./rotationEngine";
@@ -1072,6 +1073,11 @@ export function marketEngine(
     concentrationScore: Number(data.concentrationScore ?? 50)
   });
 
+  const nasdaqStructureContext = isHistoricalScenario ? null : buildNasdaqStructureContext(data, {
+    rotation, rotationDecay, liquidity, fragility: fragilityPre, phaseConfirmation,
+    internalDivergence, regimeSync: regimeSyncPre
+  });
+
   /* =====================================================
   FRAGILITY — FINAL
   ===================================================== */
@@ -1186,18 +1192,23 @@ export function marketEngine(
   ===================================================== */
 
   const putTiming = guardOwnPriceEntry(putTimingEngine({
-    structure,
-    breadth20,
-    breadth50,
-    breadth200,
+    structure: nasdaqStructureContext?.structure ?? structure,
+    breadth20: nasdaqStructureContext?.breadth20 ?? breadth20,
+    breadth50: nasdaqStructureContext?.breadth50 ?? breadth50,
+    breadth200: nasdaqStructureContext?.breadth200 ?? breadth200,
     fragility,
     vix,
     phase, phaseData, rotation, rotationConfirm, crash,
     earlyWarning, historyMetrics, priceMomentum: priceMomentumForIndex(priceMomentum, "ndx"),
-    participation, liquidity, dangerZone, marketDrivers,
-    regimeSync, breadthThrust, marketQuality, rotationDecay,
+    participation: nasdaqStructureContext?.participation ?? participation, liquidity, dangerZone, marketDrivers,
+    regimeSync, breadthThrust: nasdaqStructureContext?.breadthThrust ?? breadthThrust, marketQuality: nasdaqStructureContext?.marketQuality ?? marketQuality, rotationDecay,
     regimePersistence, gamma
   }), priceMomentum.ndx, "NASDAQ_PUT", isHistoricalScenario);
+
+  (putTiming as any).meta = { ...(putTiming as any).meta, instrumentBreadthContext: nasdaqStructureContext?.diagnostics ?? { available: false, reason: isHistoricalScenario ? "HISTORICAL_FIXTURE" : "NASDAQ_BREADTH_UNAVAILABLE" } };
+  if (!isHistoricalScenario && !nasdaqStructureContext) {
+    Object.assign(putTiming, { decision: "WAIT", timing: "WAIT", execution: "NONE", entryWindow: "CLOSED", summary: "Nasdaq-100 member breadth unavailable; no new entry approved" });
+  }
 
   /* Risk confirmation uses the completed risk components.
    * It is consumed by the decision layer, not Execution State.
@@ -1463,10 +1474,15 @@ export function marketEngine(
   const nasdaqCall = guardOwnPriceEntry(nasdaqEngine({
     ...data,
     phase, phaseData, crash, rotation, putTiming, earlyWarning,
-    historyMetrics, priceMomentum, marketQuality, participation,
-    breadthThrust, liquidity, regimeSync, executionState,
+    historyMetrics, priceMomentum, marketQuality: nasdaqStructureContext?.marketQuality ?? marketQuality, participation: nasdaqStructureContext?.participation ?? participation,
+    breadthThrust: nasdaqStructureContext?.breadthThrust ?? breadthThrust, liquidity, regimeSync, executionState,
     master, gamma
   }), priceMomentum.ndx, "NASDAQ_CALL", isHistoricalScenario);
+
+  (nasdaqCall as any).meta = { ...(nasdaqCall as any).meta, instrumentBreadthContext: nasdaqStructureContext?.diagnostics ?? { available: false, reason: "NASDAQ_BREADTH_UNAVAILABLE" } };
+  if (!isHistoricalScenario && !nasdaqStructureContext) {
+    Object.assign(nasdaqCall, { decision: "NONE", timing: "WAIT", execution: "NONE", entryWindow: "CLOSED", eligible: false, state: "NO_TRADE", summary: "Nasdaq-100 member breadth unavailable; no new entry approved" });
+  }
 
   /* =====================================================
   POSITIONING
