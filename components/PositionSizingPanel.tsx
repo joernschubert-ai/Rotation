@@ -72,11 +72,11 @@ function normalizeDirection(value: unknown): string | null {
 
   const normalized = value.trim().toUpperCase().replace(/\s+/g, "_");
 
-  if (["SHORT", "NET_SHORT", "BEARISH"].includes(normalized)) {
+  if (["SHORT", "LIGHT_SHORT", "NET_SHORT", "SHORT_INDEX", "BEARISH"].includes(normalized)) {
     return "SHORT";
   }
 
-  if (["LONG", "NET_LONG", "BULLISH"].includes(normalized)) {
+  if (["LONG", "LIGHT_LONG", "NET_LONG", "LONG_INDEX", "BULLISH"].includes(normalized)) {
     return "LONG";
   }
 
@@ -489,7 +489,7 @@ export default function PositionSizingPanel({
   const decisionDirection = normalizeDirection(decision?.direction);
   const allocationDirection = normalizeDirection(direction);
 
-  let alignment = "UNAVAILABLE";
+  let alignment = "RICHTUNG NICHT VERGLEICHBAR";
   let alignmentColor = "#777";
 
   if (allocationDirection === "NEUTRAL") {
@@ -648,10 +648,11 @@ export default function PositionSizingPanel({
         </div>
       </div>
 
-      <SectionTitle>EXECUTION SUMMARY</SectionTitle>
+      <SectionTitle>REGIME-KONTEXT</SectionTitle>
+      <p style={{fontSize: "11px", color: "#999", lineHeight: 1.5}}>Der Regime-Status ist die allgemeine Markteinschätzung. Instrumentfreigaben und Modellgrößen stehen unter Instrument Allocations; ein begrenzter Starter kann trotz WAIT freigegeben sein.</p>
       <MetricGrid minWidth={130}>
         <StateCard label="PHASE" value={phase} />
-        <StateCard label="EXECUTION" value={executionMode} />
+        <StateCard label="REGIME-AUSFÜHRUNG" value={executionMode} />
         <StateCard label="RISK STATE" value={riskState} />
         <StateCard label="TACTICAL BIAS" value={tacticalBias} />
       </MetricGrid>

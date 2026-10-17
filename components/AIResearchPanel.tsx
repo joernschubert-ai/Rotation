@@ -52,6 +52,14 @@ const labels: Record<string, string> = {
 };
 const label = (value?: string) => value ? labels[value] ?? value : "Unbekannt";
 
+/** Also corrects descriptions in cached reports without a new model call. */
+export function appPermissionSummary(support: AIResearchReport["decisionSupport"]): string {
+  if (!support) return "App-Auswertung noch nicht verfügbar";
+  const approved = support.flows.filter(flow => flow.eligible === true && typeof flow.modelSize === "number" && Number.isFinite(flow.modelSize) && flow.modelSize > 0 && flow.modelSize <= 100);
+  if (approved.length) return approved.map(flow => flow.instrument + ": Modellfreigabe " + flow.modelSize + "%").join(" · ");
+  return support.action || "Beobachten – kein freigegebener Einstieg";
+}
+
 /** Compact overview; app permissions and independent research remain distinct. */
 export function AIResearchOverview({ report, snapshotTimestamp, suspended = false }: {
   report: AIResearchReport; snapshotTimestamp?: string; suspended?: boolean;
@@ -69,7 +77,7 @@ export function AIResearchOverview({ report, snapshotTimestamp, suspended = fals
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-700/60 p-4 sm:px-5">
       <div><div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Unabhängige KI · Überblick</div>
         <h3 className="mt-1 text-lg font-semibold text-slate-100">{overviewTitle}</h3>
-        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-400">App: {current ? report.decisionSupport?.action ?? "Auswertung verfügbar" : "Einstiegsaussagen vorübergehend ausgesetzt"}</p>
+        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-400">App: {current ? appPermissionSummary(report.decisionSupport) : "Einstiegsaussagen vorübergehend ausgesetzt"}</p>
       </div>
       <div className="text-[10px] leading-relaxed text-slate-400">Marktstand {date(snapshotTimestamp)}<br />KI {date(synthesis?.generatedAt)}</div>
     </div>
@@ -121,7 +129,7 @@ export function AIResearchDecisionSummary({ report, snapshotTimestamp, suspended
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div className="text-[10px] uppercase tracking-widest text-[#888]">Research · Entscheidungshilfe</div>
-        <h3 className="mt-2 text-lg font-bold text-white">{unavailable ? "Daten prüfen – keine aktuelle Einstiegsaussage" : support?.action ?? "Entscheidungshilfe noch nicht verfügbar"}</h3>
+        <h3 className="mt-2 text-lg font-bold text-white">{unavailable ? "Daten prüfen – keine aktuelle Einstiegsaussage" : appPermissionSummary(support)}</h3>
       </div>
       <div className="text-[10px] leading-relaxed text-[#888]">Snapshot {date(timestamp)}<br />Research {date(report.generatedAt)}</div>
     </div>

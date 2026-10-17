@@ -649,6 +649,28 @@ marginTop: "3px"
 )}
 
 
+{/* Own Russell context only; never substitute the main Nasdaq breadth. */}
+<section aria-label="Russell Marktstruktur" style={{border: "1px solid #333", borderRadius: "6px", background: "#111820", padding: "12px", marginBottom: "14px"}}>
+  <div style={{fontSize: "11px", color: "#bbb", fontWeight: "bold", marginBottom: "10px"}}>RUSSELL · EIGENE MARKTSTRUKTUR</div>
+  {meta.independentContext ? <>
+    <div style={{fontSize: "15px", color: "#e2e8f0", fontWeight: "bold", marginBottom: "10px"}}>{({PHASE_1_EXPANSION: "Phase 1 · Expansion", PHASE_2_WARNING: "Phase 2 · Warnung", PHASE_3_DISTRIBUTION: "Phase 3 · Distribution", PHASE_4_RISK: "Phase 4 · Risiko", PHASE_5_BREAKDOWN: "Phase 5 · Zusammenbruch", PHASE_6_ACCELERATION: "Phase 6 · Beschleunigung", PHASE_7_CAPITULATION: "Phase 7 · Kapitulation"} as Record<string,string>)[meta.independentContext.phase] ?? "Phase nicht verfügbar"}</div>
+    <div style={{display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "6px"}}>
+      {(["b20", "b50", "b200"] as const).map((key, index) => {
+        const value = meta.independentContext.breadth?.[key]?.value;
+        return <div key={key} style={{border: "1px solid #293441", borderRadius: "4px", padding: "8px 3px", textAlign: "center"}}>
+          <div style={{fontSize: "10px", color: "#999"}}>{[20,50,200][index]} Tage</div>
+          <div style={{fontSize: "18px", fontWeight: "bold", color: "#e2e8f0", marginTop: "4px"}}>{typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("de-DE", {maximumFractionDigits: 0}) + "%" : "—"}</div>
+        </div>;
+      })}
+    </div>
+    <div style={{display: "flex", flexWrap: "wrap", gap: "8px 14px", marginTop: "10px", fontSize: "11px", color: "#bbb"}}>
+      <span>Participation {typeof meta.independentContext.participation === "number" ? meta.independentContext.participation : "—"}/100</span>
+      <span>Marktqualität {typeof meta.independentContext.quality === "number" ? meta.independentContext.quality : "—"}/100</span>
+    </div>
+    <p style={{fontSize: "10px", color: "#8995a4", lineHeight: 1.5, marginBottom: 0}}>Anteil der Aktien über ihrem jeweiligen gleitenden Durchschnitt. Small-Cap-Näherung aus IWM-Aktienbeständen. Kursstand {meta.independentContext.referenceDate ?? "unbekannt"} · Abdeckung {typeof meta.independentContext.coverage === "number" && Number.isFinite(meta.independentContext.coverage) ? (meta.independentContext.coverage * 100).toLocaleString("de-DE", {maximumFractionDigits: 2}) + "%" : "—"}. Eigene Russell-Phase; die Hauptphase beschreibt den Nasdaq-Kontext.</p>
+  </> : <p style={{fontSize: "11px", color: "#999", lineHeight: 1.5}}>Eigene Russell-Strukturdaten derzeit nicht verfügbar. Die Nasdaq-Breite wird hier nicht als Ersatz angezeigt.</p>}
+</section>
+
 {/* =================================================
 SETUP CHECK – ALWAYS VISIBLE
 ================================================= */}
