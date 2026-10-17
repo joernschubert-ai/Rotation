@@ -92,9 +92,10 @@ function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now
 async function loadBroadBreadth(symbols: string[]) {
   const nasdaqSymbols = symbols;
   const sp500Symbols = await loadSP500Constituents().catch(() => [] as string[]);
+  const russellHoldings = await loadRussellHoldings().catch(() => null);
   const started = Date.now();
   const bars = new Map<string, BreadthBars>();
-  const fetchSymbols = [...new Set([...symbols, ...SUPPLEMENTAL_ETF_UNIVERSE, ...EARLY_ETF_UNIVERSE, ...nasdaqSymbols, ...sp500Symbols])];
+  const fetchSymbols = [...new Set([...symbols, ...SUPPLEMENTAL_ETF_UNIVERSE, ...EARLY_ETF_UNIVERSE, ...nasdaqSymbols, ...sp500Symbols, ...(russellHoldings?.symbols ?? [])])];
   let next = 0;
   await Promise.all(Array.from({ length: 24 }, async () => {
     while (next < fetchSymbols.length && Date.now() - started < 20000) {
@@ -123,8 +124,10 @@ async function loadBroadBreadth(symbols: string[]) {
     percentages: sp500.dataQuality.coverage >= 0.98 ? { b20: sp500.b20! * 100, b50: sp500.b50! * 100, b200: sp500.b200! * 100 } : null,
     constituentSource: BREADTH_CONSTITUENTS_SOURCE, excluded: sp500.dataQuality.excluded
   } : { definition: "SP500_REFERENCE_ONLY", affectsEngineScores: false, status: "UNAVAILABLE" };
-  return { ...main, nasdaq100, bars: aligned, dataQuality: { ...main.dataQuality,
+  const russell2000 = summarizeRussellBreadth(russellHoldings, aligned, referenceDate);
+  return { ...main, nasdaq100, russell2000, bars: aligned, dataQuality: { ...main.dataQuality,
     nasdaq100: nasdaq100,
+    russell2000,
     primaryEngineUniverse: "NASDAQ100",
     marketContextSP500,
     advanceDecline: { definition: "NASDAQ100_CONSTITUENT_COUNTS", valid: adRows.length, advances, declines, net: advances - declines, netPercent: adRows.length ? 100 * (advances - declines) / adRows.length : null, legacyRawCountThresholdsRetained: true },
@@ -214,6 +217,48 @@ function summarizeNasdaqBreadth(symbols: string[], bars: Map<string, BreadthBars
   };
 }
 
+
+const RUSSELL_HOLDINGS_URL = "https://www.ishares.com/us/products/239710/ishares-russell-2000-etf/latest-holdings.csv";
+function parseHoldingsCSV(text: string): string[][] {
+  const out: string[][] = []; let row: string[] = [], field = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') { if (quoted && text[i + 1] === '"') { field += '"'; i++; } else quoted = !quoted; }
+    else if (!quoted && [",", "\r", "\n"].includes(c)) { row.push(field); field = ""; if (c !== ",") { if (c === "\r" && text[i + 1] === "\n") i++; out.push(row); row = []; } }
+    else field += c;
+  }
+  if (field || row.length) { row.push(field); out.push(row); }
+  if (quoted) throw new Error("Invalid holdings CSV");
+  return out;
+}
+async function loadRussellHoldingsUncached() {
+  const response = await fetch(RUSSELL_HOLDINGS_URL, { cache: "no-store", signal: AbortSignal.timeout(6000), headers: { "User-Agent": "Mozilla/5.0" } });
+  if (!response.ok) throw new Error("IWM holdings unavailable");
+  const rows = parseHoldingsCSV(await response.text());
+  const header = rows.findIndex(row => row[0] === "Ticker" && row.includes("Asset Class"));
+  if (header < 0) throw new Error("Invalid IWM holdings header");
+  const asset = rows[header].indexOf("Asset Class");
+  const symbols = [...new Set(rows.slice(header + 1).filter(row => row[asset] === "Equity").map(row => row[0].trim().replace(/[ .]/g, "-")).filter(symbol => /^[A-Z][A-Z0-9-]{0,11}$/.test(symbol)))].sort();
+  const rawDate = rows.find(row => row[0] === "Fund Holdings as of")?.[1];
+  const dateMatch = (rawDate ?? "").match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})$/);
+  const month = dateMatch ? ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(dateMatch[1]) : -1;
+  const stamp = dateMatch && month >= 0 ? Date.UTC(Number(dateMatch[3]), month, Number(dateMatch[2])) : NaN;
+  if (symbols.length < 1500 || symbols.length > 2300 || !Number.isFinite(stamp)) throw new Error("Invalid IWM equity holdings");
+  return { symbols, asOfDate: new Date(stamp).toISOString().slice(0, 10) };
+}
+const loadRussellHoldings = unstable_cache(loadRussellHoldingsUncached, ["iwm-equity-members-v1"], { revalidate: 86400 });
+function summarizeRussellBreadth(holdings: { symbols: string[]; asOfDate: string } | null, bars: Map<string, BreadthBars>, referenceDate: string | null) {
+  if (!holdings) return { dataQuality: { available: false, reason: "IWM_HOLDINGS_UNAVAILABLE" } };
+  const frame = summarizeNasdaqBreadth(holdings.symbols, bars, referenceDate);
+  const holdingsAgeDays = referenceDate ? (Date.parse(referenceDate) - Date.parse(holdings.asOfDate)) / 86400000 : Infinity;
+  const listFresh = holdingsAgeDays >= 0 && holdingsAgeDays <= 5;
+  return { ...frame, dataQuality: { ...frame.dataQuality,
+    universeVersion: "IWM_EQUITY_HOLDINGS_SMALLCAP_BREADTH_V1", definition: "IWM_EQUITY_HOLDINGS_SMALLCAP_PROXY",
+    constituentSource: RUSSELL_HOLDINGS_URL, sourceIsOfficial: true, officialIndexBreadth: false,
+    membershipIsOfficialRussellIndexRoster: false, holdingsAsOfDate: holdings.asOfDate, holdingsAgeDays,
+    minimumCoverage: 0.95, available: listFresh && frame.dataQuality.coverage >= 0.95 && frame.dataQuality.valid > 0 && frame.dataQuality.referenceDate === referenceDate,
+    reason: !listFresh ? "STALE_HOLDINGS" : frame.dataQuality.coverage < 0.95 ? "INSUFFICIENT_SMALLCAP_COVERAGE" : null } };
+}
 
 /* ================= MARKET CACHE ================= */
 
@@ -3933,7 +3978,7 @@ crashRiskRegime: crashRisk.regime,
 breadth20: breadth20Data.breadth20,
 breadth20Signal: breadth20Data.breadth20Signal,
 breadthDataQuality: broadBreadth.dataQuality,
-indexBreadth: { nasdaq100: broadBreadth.nasdaq100 },
+indexBreadth: { nasdaq100: broadBreadth.nasdaq100, russell2000: broadBreadth.russell2000 },
 
 liquidityScore: liquidityData.liquidityScore,
 liquidityRegime: liquidityData.liquidityRegime,
