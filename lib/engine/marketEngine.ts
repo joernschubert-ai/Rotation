@@ -47,7 +47,7 @@ import { historyEngine } from "../history/historyEngine";
 
 export function marketEngine(
   data: any,
-  options: { skipHistoricalReplay?: boolean } = {}
+  options: { skipHistoricalReplay?: boolean; internalRussellContext?: boolean } = {}
 ) {
   /* =====================================================
   HISTORICAL SCENARIO MODE
@@ -315,10 +315,11 @@ export function marketEngine(
   PRICE MOMENTUM / LEGACY DIVERGENCE
   ===================================================== */
 
-  const priceMomentumPre = priceMomentumEngine({
+  let priceMomentumPre = priceMomentumEngine({
     historyMetrics,
     indices: data.indices ?? {}
   });
+  if (options.internalRussellContext) priceMomentumPre = priceMomentumForIndex(priceMomentumPre, "rut") as typeof priceMomentumPre;
 
   const divergence = (() => {
     const breadth = finiteValue(structure?.breadth?.b50);
@@ -1104,7 +1105,7 @@ export function marketEngine(
    * Early consumers retain the independent preliminary price result.
    * Price scores and momentum use the same inputs in both passes.
    */
-  const priceMomentum = priceMomentumEngine({
+  let priceMomentum = priceMomentumEngine({
     historyMetrics,
     indices: data.indices ?? {},
     structure,
@@ -1114,15 +1115,53 @@ export function marketEngine(
     fragility
   });
 
+  if (options.internalRussellContext) priceMomentum = priceMomentumForIndex(priceMomentum, "rut") as typeof priceMomentum;
+
+  const russellFrame = data.indexBreadth?.russell2000;
+  const ownRussellAvailable = russellFrame?.dataQuality?.available === true &&
+    russellFrame.dataQuality.definition === "IWM_EQUITY_HOLDINGS_SMALLCAP_PROXY" &&
+    russellFrame.dataQuality.unit === "FRACTION" && russellFrame.dataQuality.coverage >= 0.95 &&
+    [russellFrame.b20, russellFrame.b50, russellFrame.b200].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1);
+  const russellHistorySource = Array.isArray(data.historyMetrics?.archiveHistory) ? data.historyMetrics.archiveHistory : Array.isArray(data.historyMetrics?.history) ? data.historyMetrics.history : Array.isArray(data.history) ? data.history : [];
+  const ownRussellHistory = russellHistorySource.map((entry: any) => entry?.russell?.meta?.independentContext?.historySnapshot).filter(Boolean);
+  const independentRussell: any = !isHistoricalScenario && !options.internalRussellContext && ownRussellAvailable ? marketEngine({
+    ...data, breadth20: russellFrame.b20, breadth50: russellFrame.b50, breadth200: russellFrame.b200,
+    advanceDecline: russellFrame.advanceDecline, advances: russellFrame.advances, declines: russellFrame.declines,
+    newHighs: russellFrame.newHighs, newLows: russellFrame.newLows,
+    breadthDataQuality: russellFrame.dataQuality, history: ownRussellHistory,
+    historyMetrics: historyEngine(ownRussellHistory, { universeVersion: russellFrame.dataQuality.universeVersion })
+  }, { skipHistoricalReplay: true, internalRussellContext: true }) : null;
+
   // Evaluate the final Russell candidate with completed quality and price context.
   // Preliminary Russell remains separate for earlier structural consumers.
-  const russell = guardOwnPriceEntry(russellEngine({
+  const russell = independentRussell?.russell ?? guardOwnPriceEntry(russellEngine({
     rsSmall: rotation.rsSmall, rsGrowth: rotation.rsGrowth,
     breadth50, breadth200, concentrationScore: data.concentrationScore,
     phase, phaseData, phaseConfirmation, crash, vix, historyMetrics,
     rotationDecay, rotationConfirm, participation, internalDivergence,
     marketQuality, priceMomentum, gamma
   }), priceMomentum.rut, "RUSSELL_CALL", isHistoricalScenario);
+  if (!isHistoricalScenario && !options.internalRussellContext && !independentRussell) {
+    Object.assign(russell, { decision: "NO_TRADE", state: "BLOCKED", summary: "Own small-cap breadth unavailable; no Nasdaq breadth substitution" });
+  }
+  if (independentRussell) {
+    (russell as any).meta = { ...(russell as any).meta, independentContext: {
+      source: russellFrame.dataQuality.definition, referenceDate: russellFrame.dataQuality.referenceDate,
+      holdingsAsOfDate: russellFrame.dataQuality.holdingsAsOfDate, coverage: russellFrame.dataQuality.coverage,
+      phase: independentRussell.phase, breadth: independentRussell.structure.breadth,
+      participation: independentRussell.participation.score, quality: independentRussell.marketQuality.score,
+      rotationConfirm: independentRussell.rotationConfirm.state,
+      historySnapshot: { timestamp: new Date().toISOString(), breadthDataQuality: { universeVersion: russellFrame.dataQuality.universeVersion },
+        calculationVersions: { participation: "STRONGEST_SHARED_LEADERSHIP_PENALTY", rotation: "STRUCTURAL_MODEL_2026_10_V3", liquidity: "STRUCTURAL_MODEL_2026_10_V3", fragility: "CORE_WITHOUT_DERIVED_QUALITY_OR_REPEATED_STRUCTURAL_OVERLAYS", rotationDecay: "STRUCTURAL_MODEL_2026_10_V3" },
+        structure: { breadth: { b20: Math.round(russellFrame.b20 * 100), b50: Math.round(russellFrame.b50 * 100), b200: Math.round(russellFrame.b200 * 100) }, advanceDecline: russellFrame.advanceDecline, highsLows: { highs: russellFrame.newHighs, lows: russellFrame.newLows } },
+        phase: { phase: independentRussell.phase }, participation: { score: independentRussell.participation.score },
+        rotation: { score: independentRussell.rotation.score }, liquidity: { score: independentRussell.liquidity.score },
+        fragility: { score: independentRussell.fragility.score }, crash: { score: independentRussell.crash.score, probability: independentRussell.crash.probability },
+        rotationDecay: { score: independentRussell.rotationDecay.score }, internalDivergence: { score: independentRussell.internalDivergence.score },
+        executionState: { riskState: independentRussell.executionState.riskState }, dangerZone: { score: independentRussell.dangerZone.score } }
+    } };
+  }
+
 
   /* =====================================================
   SYSTEM HEAT — FINAL
@@ -1503,6 +1542,7 @@ export function marketEngine(
   ===================================================== */
 
   const tradeStack = tradeStackEngine({
+    russellFlowOverride: independentRussell?.tradeStack?.russellCall,
     phase, putTiming, nasdaqCall, russell, priceMomentum,
     edgeState, master, marketQuality, phaseConfirmation,
     rotationConfirm, rotationDecay, executionState, regimeSync,
@@ -1526,6 +1566,7 @@ export function marketEngine(
   };
 
   const sizing = positionSizingV2({
+    russellSizingOverride: independentRussell?.sizing?.russellCall,
     master, crash, putTiming, russell, positioning,
     state: sizingState,
     systemHeat, earlyWarning, rotation, structure, edgeState,

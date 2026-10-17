@@ -595,6 +595,16 @@ export function positionSizingV2(engine: any) {
   }
 
   function sizeFlow(flow: FlowName, candidate: any): SizedFlow {
+    const own = engine?.russellSizingOverride;
+    if (flow === "RUSSELL_CALL" && own?.instrument === "RUSSELL_CALL") {
+      const approved = candidate?.eligible === true && !(candidate.blockReasons?.length > 0) && !tradeStackDirectionalConflict &&
+        own.eligible === true && own.direction === "LONG" && Number.isFinite(own.size) && own.size > 0 &&
+        engine?.crash?.panicState?.state !== "PANIC" && num(engine?.crash?.probability) <= 70;
+      const adjusted = approved ? Math.floor(own.size * Math.min(1, globalRiskMultiplier)) : 0;
+      return { ...own, instrument: "RUSSELL_CALL", direction: "LONG", eligible: approved && adjusted > 0,
+        size: adjusted, prePortfolioSize: adjusted, reason: approved ? own.reason : "Independent Russell or shared risk gate blocks entry",
+        diagnostics: { ...own.diagnostics, independentRussellContext: true, sharedRiskMultiplierApplied: globalRiskMultiplier } };
+    }
     const strength = clamp(num(candidate?.strength));
     const state = candidate?.state ?? "NEUTRAL";
     const direction = candidate?.direction ?? "NONE";

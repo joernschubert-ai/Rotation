@@ -262,6 +262,12 @@ export function tradeStackEngine(input: any) {
         acceleration: ndxAcceleration, state: ndxQuality.complete ? ndx.trend ?? priceState : "UNKNOWN", dataQuality: ndxQuality});
   }
   function evaluateRussellCall() {
+    const own = data.russellFlowOverride;
+    if (own?.instrument === "RUSSELL_CALL") {
+      const sharedPanic = data.crash?.panicState?.state === "PANIC" || numeric(data.crash?.probability) > 70;
+      return { ...own, eligible: own.eligible === true && !sharedPanic, strength: sharedPanic ? 0 : own.strength,
+        blockReasons: [...(own.blockReasons ?? []), ...(sharedPanic ? ["SHARED_SYSTEMIC_RISK"] : [])], independentRussellContext: true };
+    }
     const blocks = longBlocks(russellDecision);
     if (bearishRotation || (!bullishConfirmed && !bullishConfirming)) blocks.push("NO_BULLISH_ROTATION_CONFIRMATION");
     let strength = edgeOverlay(longBases[russellDecision] ?? 0);
