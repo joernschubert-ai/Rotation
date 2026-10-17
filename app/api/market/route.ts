@@ -89,9 +89,10 @@ function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now
 }
 
 async function loadBroadBreadth(symbols: string[]) {
+  const nasdaqSymbols = await loadNasdaqMembers();
   const started = Date.now();
   const bars = new Map<string, BreadthBars>();
-  const fetchSymbols = [...new Set([...symbols, ...SUPPLEMENTAL_ETF_UNIVERSE, ...EARLY_ETF_UNIVERSE])];
+  const fetchSymbols = [...new Set([...symbols, ...SUPPLEMENTAL_ETF_UNIVERSE, ...EARLY_ETF_UNIVERSE, ...nasdaqSymbols])];
   let next = 0;
   await Promise.all(Array.from({ length: 24 }, async () => {
     while (next < fetchSymbols.length && Date.now() - started < 20000) {
@@ -112,7 +113,9 @@ async function loadBroadBreadth(symbols: string[]) {
     const window = aligned.get(symbol)?.closes.slice(-252) ?? [];
     return window.length === 252 && window.every(value => Number.isFinite(value) && value > 0);
   });
-  return { ...main, bars: aligned, dataQuality: { ...main.dataQuality,
+  const nasdaq100 = summarizeNasdaqBreadth(nasdaqSymbols, aligned, referenceDate);
+  return { ...main, nasdaq100, bars: aligned, dataQuality: { ...main.dataQuality,
+    nasdaq100: nasdaq100,
     advanceDecline: { definition: "SP500_CONSTITUENT_COUNTS", valid: adRows.length, advances, declines, net: advances - declines, netPercent: adRows.length ? 100 * (advances - declines) / adRows.length : null, legacyRawCountThresholdsRetained: true },
     highsLows: { definition: "252_DAILY_CLOSE_EXTREMES_NOT_INTRADAY_HIGHS_LOWS", valid252: highLowValid.length, expected: symbols.length, coverage252: highLowValid.length / symbols.length },
     earlyETFTrend: summarizeEarlyETFTrend(EARLY_ETF_UNIVERSE, aligned, referenceDate),
@@ -158,6 +161,45 @@ function summarizeEarlyETFTrend(symbols: string[], bars: Map<string, BreadthBars
     direction20: delta20Pp === null ? "UNKNOWN" : delta20Pp < 0 ? "DECLINING" : delta20Pp > 0 ? "IMPROVING" : "UNCHANGED",
     direction50: delta50Pp === null ? "UNKNOWN" : delta50Pp < 0 ? "DECLINING" : delta50Pp > 0 ? "IMPROVING" : "UNCHANGED",
     symbols, excluded: symbols.filter(symbol => !valid.includes(symbol))
+  };
+}
+
+
+const NASDAQ_MEMBERS_SOURCE = "https://en.wikipedia.org/wiki/List_of_NASDAQ-100_companies";
+async function loadNasdaqMembersUncached(): Promise<string[]> {
+  const response = await fetch(NASDAQ_MEMBERS_SOURCE, { cache: "no-store", signal: AbortSignal.timeout(5000), headers: { "User-Agent": "RotationResearch/1.0 (public market breadth)" } });
+  if (!response.ok) throw new Error("Nasdaq-100 member list unavailable");
+  const html = await response.text();
+  const table = (html.match(/<table\b[\s\S]*?<\/table>/gi) ?? []).find(table => /Ticker/.test(table) && /Company/.test(table));
+  if (!table) throw new Error("Nasdaq-100 member table unavailable");
+  const symbols = [...table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+    .map(row => (row[1].match(/<td\b[^>]*>([\s\S]*?)<\/td>/i)?.[1] ?? "").replace(/<[^>]*>/g, "").replace(/&#160;|&nbsp;/g, " ").trim())
+    .filter(symbol => /^[A-Z][A-Z0-9.-]{0,9}$/.test(symbol)).map(symbol => symbol.replace(/\./g, "-")).sort();
+  if (symbols.length < 95 || symbols.length > 110 || new Set(symbols).size !== symbols.length) throw new Error("Invalid Nasdaq-100 constituent list");
+  return symbols;
+}
+const loadNasdaqMembers = unstable_cache(loadNasdaqMembersUncached, ["ndx-constituents-v1"], { revalidate: 86400 });
+
+function summarizeNasdaqBreadth(symbols: string[], bars: Map<string, BreadthBars>, referenceDate: string | null) {
+  const aligned = new Map([...bars].filter(([, row]) => row.sessionDate === referenceDate));
+  const result = summarizeBreadth(symbols, aligned);
+  const validRows = result.dataQuality.accepted.map(symbol => aligned.get(symbol)!);
+  const advances = validRows.filter(row => row.closes.at(-1)! > row.closes.at(-2)!).length;
+  const declines = validRows.filter(row => row.closes.at(-1)! < row.closes.at(-2)!).length;
+  const annual = validRows.filter(row => row.closes.length >= 252 && row.closes.slice(-252).every(value => Number.isFinite(value) && value > 0));
+  const highs = annual.filter(row => row.closes.at(-1)! >= Math.max(...row.closes.slice(-252, -1))).length;
+  const lows = annual.filter(row => row.closes.at(-1)! <= Math.min(...row.closes.slice(-252, -1))).length;
+  return {
+    b20: result.b20, b50: result.b50, b200: result.b200,
+    advanceDecline: advances - declines, advances, declines, newHighs: highs, newLows: lows,
+    dataQuality: { ...result.dataQuality, universeVersion: "NASDAQ100_CURRENT_MEMBERS_BREADTH_V1",
+      definition: "NASDAQ100_CURRENT_CONSTITUENTS_EQUAL_WEIGHT", constituentSource: NASDAQ_MEMBERS_SOURCE,
+      referenceDate, unit: "FRACTION", sourceIsOfficial: false,
+      available: result.dataQuality.coverage >= 0.98 && result.dataQuality.valid > 0 && result.dataQuality.referenceDate === referenceDate,
+      highLowValid252: annual.length, highLowExpected: symbols.length,
+      highLowCoverage: annual.length / symbols.length, historicalMembershipReconstructed: false,
+      countsAboveMovingAverage: result.dataQuality.countsAboveMovingAverage,
+      constituentListOfficiallyVerified: false }
   };
 }
 
@@ -3880,6 +3922,7 @@ crashRiskRegime: crashRisk.regime,
 breadth20: breadth20Data.breadth20,
 breadth20Signal: breadth20Data.breadth20Signal,
 breadthDataQuality: broadBreadth.dataQuality,
+indexBreadth: { nasdaq100: broadBreadth.nasdaq100 },
 
 liquidityScore: liquidityData.liquidityScore,
 liquidityRegime: liquidityData.liquidityRegime,
