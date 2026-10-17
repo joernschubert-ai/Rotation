@@ -20,7 +20,7 @@ historyEngine
 
 
 // Current S&P-500 constituent universe, retrieved daily from a public third-party list.
-const BREADTH_UNIVERSE_VERSION = "SP500_STOCK_BREADTH_WITH_SEPARATE_ETF_TRENDS_2026_10_17_V2";
+const BREADTH_UNIVERSE_VERSION = "SP500_CONSTITUENT_BREADTH_SEPARATE_ETF_TRENDS_2026_10_17_V3";
 const BREADTH_CONSTITUENTS_SOURCE = "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv";
 async function loadBreadthUniverseUncached(): Promise<string[]> {
   const response = await fetch(BREADTH_CONSTITUENTS_SOURCE, { cache: "no-store", signal: AbortSignal.timeout(5000) });
@@ -32,8 +32,9 @@ async function loadBreadthUniverseUncached(): Promise<string[]> {
   return symbols;
 }
 const loadBreadthUniverse = unstable_cache(loadBreadthUniverseUncached, ["sp500-constituents-v2"], { revalidate: 86400 });
+const EARLY_ETF_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","RSP","MTUM","QUAL","SMH","XBI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","SPHB","SPLV","IWO","IWN","USMV","XRT","SOXX","XLRE"];
 const SUPPLEMENTAL_ETF_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","XLRE","SMH","XBI","ARKK","MTUM","QUAL","IYR"];
-type BreadthBars = { closes: number[]; latest: number; source: string; sessionDate: string };
+type BreadthBars = { closes: number[]; latest: number; source: string; sessionDate: string; timestamps?: number[] };
 const breadthBarCache = new Map<string, { time: number; bars: BreadthBars }>();
 
 async function fetchBreadthBarsUncached(symbol: string): Promise<BreadthBars> {
@@ -49,12 +50,12 @@ async function fetchBreadthBarsUncached(symbol: string): Promise<BreadthBars> {
     const closes = timestamps.map((_: number, i: number) => typeof quotes[i] === "number" && Number.isFinite(quotes[i]) && quotes[i] > 0 ? quotes[i] : NaN);
     const latest = Number(timestamps[timestamps.length - 1]) * 1000;
     if (!Number.isFinite(latest)) throw new Error("Invalid breadth timestamp");
-    const bars = { closes, latest, source: "YAHOO_DAILY_BARS", sessionDate: new Date(latest).toISOString().slice(0, 10) };
+    const bars = { closes, latest, timestamps: timestamps as number[], source: "YAHOO_DAILY_BARS", sessionDate: new Date(latest).toISOString().slice(0, 10) };
     breadthBarCache.set(symbol, { time: Date.now(), bars });
     return bars;
   } catch { throw new Error("Breadth price fetch failed"); }
 }
-const fetchBreadthBarsCached = unstable_cache(fetchBreadthBarsUncached, ["sp500-breadth-daily-bars-v2"], { revalidate: 900 });
+const fetchBreadthBarsCached = unstable_cache(fetchBreadthBarsUncached, ["sp500-breadth-daily-bars-v3-dated"], { revalidate: 900 });
 async function fetchBreadthBars(symbol: string): Promise<BreadthBars | null> {
   try { return await fetchBreadthBarsCached(symbol); } catch { return null; }
 }
@@ -90,7 +91,7 @@ function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now
 async function loadBroadBreadth(symbols: string[]) {
   const started = Date.now();
   const bars = new Map<string, BreadthBars>();
-  const fetchSymbols = [...new Set([...symbols, ...SUPPLEMENTAL_ETF_UNIVERSE])];
+  const fetchSymbols = [...new Set([...symbols, ...SUPPLEMENTAL_ETF_UNIVERSE, ...EARLY_ETF_UNIVERSE])];
   let next = 0;
   await Promise.all(Array.from({ length: 24 }, async () => {
     while (next < fetchSymbols.length && Date.now() - started < 20000) {
@@ -114,6 +115,7 @@ async function loadBroadBreadth(symbols: string[]) {
   return { ...main, bars: aligned, dataQuality: { ...main.dataQuality,
     advanceDecline: { definition: "SP500_CONSTITUENT_COUNTS", valid: adRows.length, advances, declines, net: advances - declines, netPercent: adRows.length ? 100 * (advances - declines) / adRows.length : null, legacyRawCountThresholdsRetained: true },
     highsLows: { definition: "252_DAILY_CLOSE_EXTREMES_NOT_INTRADAY_HIGHS_LOWS", valid252: highLowValid.length, expected: symbols.length, coverage252: highLowValid.length / symbols.length },
+    earlyETFTrend: summarizeEarlyETFTrend(EARLY_ETF_UNIVERSE, aligned, referenceDate),
     supplementalETFTrend: {
       definition: "22_ETF_TREND_PROXY_SUPPLEMENT_ONLY", affectsEngineScores: false,
       referenceDate, expected: SUPPLEMENTAL_ETF_UNIVERSE.length, valid: etf.dataQuality.valid,
@@ -123,6 +125,42 @@ async function loadBroadBreadth(symbols: string[]) {
     }
   } };
 }
+
+// Supplementary short-term trend, never substituted for constituent breadth.
+function summarizeEarlyETFTrend(symbols: string[], bars: Map<string, BreadthBars>, referenceDate: string | null) {
+  const candidates = symbols.filter(symbol => {
+    const row = bars.get(symbol);
+    return row?.sessionDate === referenceDate && row.closes.length >= 55 && row.closes.slice(-55).every(value => typeof value === "number" && Number.isFinite(value) && value > 0) && (row.timestamps?.length ?? 0) === row.closes.length;
+  });
+  const comparisonDates = candidates.map(symbol => {
+    const row = bars.get(symbol)!;
+    return new Date(row.timestamps![row.timestamps!.length - 6] * 1000).toISOString().slice(0, 10);
+  });
+  const comparisonDate = [...new Set(comparisonDates)].sort((a, b) => comparisonDates.filter(d => d === b).length - comparisonDates.filter(d => d === a).length)[0] ?? null;
+  const valid = candidates.filter((_, i) => comparisonDates[i] === comparisonDate);
+  const coverage = valid.length / symbols.length;
+  const pct = (period: 20 | 50, offset: number) => valid.length ? 100 * valid.filter(symbol => {
+    const closes = bars.get(symbol)!.closes;
+    const end = closes.length - offset;
+    return closes[end - 1] > closes.slice(end - period, end).reduce((sum, value) => sum + value, 0) / period;
+  }).length / valid.length : null;
+  const ready = coverage >= 0.98;
+  const current20 = ready ? pct(20, 0) : null, prior20 = ready ? pct(20, 5) : null;
+  const current50 = ready ? pct(50, 0) : null, prior50 = ready ? pct(50, 5) : null;
+  const delta20Pp = current20 !== null && prior20 !== null ? current20 - prior20 : null;
+  const delta50Pp = current50 !== null && prior50 !== null ? current50 - prior50 : null;
+  return {
+    definition: "ORIGINAL_SHORT_TERM_ETF_TRENDS_DEDUPLICATED", affectsEngineScores: false,
+    modelValidatedEarlyEntrySignal: false, directionIsDescriptiveOnly: true,
+    referenceDate, comparisonDate, lookbackSessions: 5, expected: symbols.length, valid: valid.length, coverage,
+    status: ready ? "AVAILABLE" : "UNAVAILABLE", unit: "PERCENT_AND_PERCENTAGE_POINTS",
+    current20, prior20, delta20Pp, current50, prior50, delta50Pp,
+    direction20: delta20Pp === null ? "UNKNOWN" : delta20Pp < 0 ? "DECLINING" : delta20Pp > 0 ? "IMPROVING" : "UNCHANGED",
+    direction50: delta50Pp === null ? "UNKNOWN" : delta50Pp < 0 ? "DECLINING" : delta50Pp > 0 ? "IMPROVING" : "UNCHANGED",
+    symbols, excluded: symbols.filter(symbol => !valid.includes(symbol))
+  };
+}
+
 
 /* ================= MARKET CACHE ================= */
 
