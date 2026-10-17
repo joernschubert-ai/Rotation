@@ -1,3 +1,4 @@
+import { buildReasoningFrames } from "./aiResearchReasoningFrame";
 import { createHash, randomBytes } from "node:crypto";
 import { Redis } from "@upstash/redis";
 import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
@@ -55,13 +56,13 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       }) } };
     return item;
   });
+  const frames = buildReasoningFrames(evidence);
   const payload = JSON.stringify({ contractVersion: SYNTHESIS_CONTRACT, snapshotTimestamp, task: input.context.task, question: text(input.context.question, 500),
-    marketBriefs: [briefs[0], briefs[2]].map(item => ({ priceRef: item.priceRef, cotRef: item.cotRef, price: item.price,
-      histories: item.histories.map(study => ({id: study.id, currentMatch: study.currentMatch, asOfDate: study.asOfDate, sampleSize: study.sampleSize,
-        comparisonFact: study.comparisonFact, medianPct: study.medianPct, p10Pct: study.p10Pct, p90Pct: study.p90Pct})), cot: item.cot })),
-    instrumentBriefs: briefs.map(item => ({ instrument: item.instrument, priceRef: item.priceRef,
-      historyChoices: item.histories.map(study => ({ id: study.id, meanVsBaseline: study.meanVsBaseline })),
-      cotGroups: item.cot.map(group => group.group), cotRef: item.cotRef, indexDirectionForThesis: item.instrument === "NASDAQ_PUT" ? "DOWN" : "UP" })),
+    marketFacts: [frames[0], frames[2]].map(({instrument, riskMechanisms, historyChoices, ...facts}) => ({
+      market: instrument === "RUSSELL_CALL" ? "RUSSELL_2000" : "NASDAQ", ...facts,
+      historyChoices: historyChoices.map(({directionEffect, ...study}) => study) })),
+    instrumentReviews: frames.map(item => ({instrument: item.instrument, market: item.instrument === "RUSSELL_CALL" ? "RUSSELL_2000" : "NASDAQ",
+      historyChoices: item.historyChoices.map(study => ({id: study.id, directionEffect: study.directionEffect})), riskMechanisms: item.riskMechanisms })),
     evidence: modelEvidence });
   const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, quality: {
     ...(value.quality ?? quality), timing: {
@@ -191,7 +192,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const normalized = normalizeSynthesisEnvelope(content, evidence);
     const derived = deriveSynthesisConclusion(normalized);
     const answerQuality = { ...quality, responseShape, normalizations: [
-      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "COT_TEXT_FROM_REQUIRED_MODEL_FIELDS"] : []),
+      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "DATED_COT_FACTS_AND_MODEL_REVIEW", "OVERVIEW_FROM_REVIEWED_INSTRUMENTS"] : []),
       ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
     content = derived.value;
     stage = "ANSWER_VALIDATION";
@@ -210,6 +211,11 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
           .filter((flow): flow is Record<string, unknown> => Boolean(flow && typeof flow === "object" && !Array.isArray(flow)))
           .map(flow => ({ instrument: text(flow.instrument,40), evidenceRefs: strings(flow.evidenceRefs,8),
             confirmationRefs: strings(flow.confirmationRefs,8), invalidationRefs: strings(flow.invalidationRefs,8),
+            structuredReview: {historyEffect: text(flow.historyEffect,40), opportunityMechanism: text(flow.opportunityMechanism,40), riskMechanism: text(flow.riskMechanism,40),
+              cotReview: Object.fromEntries(["ASSET_MANAGER", "LEVERAGED_MONEY"].map(group => {
+                const review = flow.cotReview && typeof flow.cotReview === "object" ? (flow.cotReview as Record<string, any>)[group] : null;
+                return [group, {horizon: text(review?.horizon,40), interpretation: text(review?.interpretation,650)}];
+              })) },
             historyStudyId: text(flow.historyStudyId,100), cotGroups: strings(flow.cotGroups,2),
             historyMeanVsBaseline: text(flow.historyMeanVsBaseline,20),
             confirmationTrigger: text(flow.confirmationTrigger,50), invalidationTrigger: text(flow.invalidationTrigger,50),

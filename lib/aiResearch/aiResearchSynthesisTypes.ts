@@ -1,6 +1,6 @@
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
 import type { ResearchTrigger } from "./aiResearchTriggers";
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V12_COT_FIELDS";
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V13_DIRECTIONAL_REVIEW";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -17,6 +17,10 @@ export interface ResearchSynthesisContent {
     evidenceRefs: string[];
     confirmationRefs: string[];
     invalidationRefs: string[];
+    historyEffect?: "SUPPORTS_DIRECTION" | "OPPOSES_DIRECTION" | "NEUTRAL" | "UNKNOWN";
+    opportunityMechanism?: "CONTINUATION" | "REVERSAL" | "NONE";
+    riskMechanism?: string;
+    cotReview?: Partial<Record<"ASSET_MANAGER" | "LEVERAGED_MONEY", {horizon: "WEEK" | "FOUR_WEEKS" | "THIRTEEN_WEEKS"; interpretation: string}>>;
     cotInterpretations?: Partial<Record<"ASSET_MANAGER" | "LEVERAGED_MONEY", string>>;
     historyStudyId?: string;
     cotGroups?: string[];
@@ -67,7 +71,7 @@ export interface ResearchSynthesis {
       counterarguments: string[];
       limitations: string[];
       references: Array<{ instrument: string; evidenceRefs: string[]; confirmationRefs: string[]; invalidationRefs: string[];
-        historyStudyId?: string; cotGroups?: string[]; reasoning?: string; whyNow?: string; counterargument?: string; cotInterpretations?: Partial<Record<"ASSET_MANAGER" | "LEVERAGED_MONEY", string>>;
+        structuredReview?: Record<string, unknown>; historyStudyId?: string; cotGroups?: string[]; reasoning?: string; whyNow?: string; counterargument?: string; cotInterpretations?: Partial<Record<"ASSET_MANAGER" | "LEVERAGED_MONEY", string>>;
         historyMeanVsBaseline?: string; confirmationTrigger?: string; invalidationTrigger?: string }>;
     };
     inputSummary?: {
