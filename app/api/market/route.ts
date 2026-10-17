@@ -17,17 +17,19 @@ historyEngine
 } from "@/lib/history/historyEngine";
 
 
-// Versioned equity sample, not an official index constituent list.
-const BROAD_EQUITY_UNIVERSE: string[] = ["AAPL","MSFT","NVDA","AMZN","META","GOOGL","AVGO","TSLA","BRK-B","JPM","LLY","V","XOM","UNH","MA","PG","COST","JNJ","HD","ABBV","MRK","KO","PEP","ADBE","NFLX","AMD","CVX","WMT","BAC","TMO","CRM","DIS","LIN","MCD","CSCO","ACN","ABT","DHR","WFC","TXN","INTU","QCOM","AMGN","IBM","PM","CAT","NOW","GE","RTX","SPGI","DE","ETN","PH","TT","EMR","ROK","PCAR","CMI","OTIS","FAST","PWR","URI","JCI","LHX","ITW","GS","MS","BLK","SCHW","AXP","C","USB","PNC","TFC","BK","AIG","MET","CB","TRV","AFL","SBUX","LOW","TJX","BKNG","MAR","YUM","CMG","ORLY","ROST","DHI","ISRG","BSX","SYK","VRTX","REGN","CI","HUM","MDT","BMY","GILD","MU","KLAC","LRCX","AMAT","ADI","MCHP","NXPI","SNPS","CDNS","ANET","PANW","CRWD","DDOG","MDB","TEAM","SLB","EOG","MPC","PSX","VLO","NEM","FCX","MLM","NUE","DD","UPS","FDX","DAL","UAL","CSX","NSC","JBHT","ODFL","LUV","DOCU","XYZ","SHOP","ROKU","UPST","AFRM","SNOW","NET","COIN","PLTR","NEE","DUK","SO","EXC","AEP","SRE","XEL","PEG","ED","D","PLD","AMT","EQIX","O","SPG","CCI","WELL","DLR","VICI","PSA","FITB","RF","HBAN","KEY","ZION","CMA","MTB","FHN","EWBC","LEN","PHM","NVR","TOL","KBH","MTH","BLD","TREX","MAS","WHR","TGT","DG","DLTR","ULTA","BBY","KMX","AZO","EBAY","ETSY","W","ZS","OKTA","HUBS","ESTC","DOCN","BILL","TWLO","U","PATH","FSLY","AKAM","DT","CFLT","IOT","GTLB","AI","S","CYBR","ZI","MRNA","DNA","ALNY","EXAS","TECH","SRPT","CRSP","NTLA","WCC","GWW","SITE","CNM","SSD","AIT","LPX","UFPI","BCC","CHRW","EXPD","MATX","KEX","SAIA","ARCB","XPO","RYAAY","ALK","AAL","OXY","DVN","FANG","HES","BKR","HAL","COP","CTRA","MRO","APA","APD","ECL","IFF","SHW","BALL","PKG","IP","CF","MOS","ALB","HPQ","DELL","STX","WDAY","NTAP","CTSH","VRSN","GEN","PAYX","TYL","SOFI","IONQ","ASTS","RKLB","CAVA","CELH","DUOL","APP","HIMS","RIOT"];
-const BREADTH_UNIVERSE_VERSION = "BROAD_EQUITY_SAMPLE_2026_10_13_V2";
-type BreadthBars = { closes: number[]; latest: number; source: string };
+// Universe copied exactly from the user's legacy route, including ETF entries and UAL's original double weight.
+const LEGACY_BREADTH_UNIVERSE: string[] = ["AAPL","MSFT","NVDA","AMZN","META","GOOGL","AVGO","TSLA","BRK-B","JPM","LLY","V","XOM","UNH","MA","PG","COST","JNJ","HD","ABBV","MRK","KO","PEP","ADBE","NFLX","AMD","CVX","WMT","BAC","TMO","CRM","DIS","LIN","MCD","CSCO","ACN","ABT","DHR","WFC","TXN","INTU","QCOM","AMGN","IBM","PM","CAT","NOW","GE","RTX","SPGI","DE","ETN","PH","TT","EMR","ROK","PCAR","CMI","OTIS","FAST","PWR","URI","JCI","LHX","ITW","GS","MS","BLK","SCHW","AXP","C","USB","PNC","TFC","BK","AIG","MET","CB","TRV","AFL","SBUX","LOW","TJX","BKNG","MAR","YUM","CMG","ORLY","ROST","DHI","ISRG","BSX","SYK","VRTX","REGN","CI","HUM","MDT","BMY","GILD","MU","KLAC","LRCX","AMAT","ADI","MCHP","NXPI","SNPS","CDNS","ANET","PANW","CRWD","DDOG","MDB","TEAM","SLB","EOG","MPC","PSX","VLO","NEM","FCX","MLM","NUE","DD","UPS","FDX","DAL","UAL","CSX","NSC","JBHT","ODFL","LUV","UAL","DOCU","SQ","SHOP","ROKU","UPST","AFRM","SNOW","NET","COIN","PLTR","RSP","MDY","IJH","IWM","QQEW","NEE","DUK","SO","EXC","AEP","SRE","XEL","PEG","ED","D","PLD","AMT","EQIX","O","SPG","CCI","WELL","DLR","VICI","PSA","FITB","RF","HBAN","KEY","ZION","CMA","MTB","FHN","PACW","EWBC","LEN","PHM","NVR","TOL","KBH","MTH","BLD","TREX","MAS","WHR","TGT","DG","DLTR","ULTA","BBY","KMX","AZO","EBAY","ETSY","W","ZS","OKTA","HUBS","ESTC","DOCN","SMAR","BILL","TWLO","U","PATH","FSLY","AKAM","DT","CFLT","IOT","GTLB","AI","S","CYBR","ZI","MRNA","DNA","XBI","IBB","ALNY","EXAS","TECH","SRPT","CRSP","NTLA","WCC","GWW","SITE","CNM","SSD","AIT","LPX","UFPI","BCC","WIRE","CHRW","EXPD","MATX","KEX","SAIA","ARCB","XPO","RYAAY","ALK","AAL","OXY","DVN","FANG","HES","BKR","HAL","COP","CTRA","MRO","APA","APD","ECL","IFF","SHW","BALL","PKG","IP","CF","MOS","ALB","HPQ","DELL","STX","WDAY","NTAP","CTSH","VRSN","GEN","PAYX","TYL","SOFI","IONQ","ASTS","RKLB","CAVA","CELH","DUOL","APP","HIMS","RIOT"];
+const BREADTH_UNIVERSE_VERSION = "LEGACY_MIXED_SAMPLE_RESTORED_2026_10_17_V1";
+async function loadBreadthUniverse(): Promise<string[]> { return [...LEGACY_BREADTH_UNIVERSE]; }
+
+type BreadthBars = { closes: number[]; latest: number; source: string; sessionDate: string };
 const breadthBarCache = new Map<string, { time: number; bars: BreadthBars }>();
 
 async function fetchBreadthBars(symbol: string): Promise<BreadthBars | null> {
   const cached = breadthBarCache.get(symbol);
   if (cached && Date.now() - cached.time < 15 * 60 * 1000) return cached.bars;
   try {
-    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y`, { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store" });
+    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y`, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 900 }, signal: AbortSignal.timeout(4000) } as RequestInit & { next: { revalidate: number } });
     if (!response.ok) return null;
     const result = (await response.json())?.chart?.result?.[0];
     const timestamps = result?.timestamp ?? [];
@@ -36,7 +38,7 @@ async function fetchBreadthBars(symbol: string): Promise<BreadthBars | null> {
     const closes = timestamps.map((_: number, i: number) => typeof quotes[i] === "number" && Number.isFinite(quotes[i]) && quotes[i] > 0 ? quotes[i] : NaN);
     const latest = Number(timestamps[timestamps.length - 1]) * 1000;
     if (!Number.isFinite(latest)) return null;
-    const bars = { closes, latest, source: "YAHOO_DAILY_BARS" };
+    const bars = { closes, latest, source: "YAHOO_DAILY_BARS", sessionDate: new Date(latest).toISOString().slice(0, 10) };
     breadthBarCache.set(symbol, { time: Date.now(), bars });
     return bars;
   } catch { return null; }
@@ -45,9 +47,12 @@ async function fetchBreadthBars(symbol: string): Promise<BreadthBars | null> {
 function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now = Date.now()) {
   const accepted: string[] = [], excluded: Record<string, string> = {};
   const above = { b20: 0, b50: 0, b200: 0 };
+  const dates = [...bars.values()].map(bar => bar.sessionDate);
+  const referenceDate = [...new Set(dates)].sort((a, b) => dates.filter(d => d === b).length - dates.filter(d => d === a).length || b.localeCompare(a))[0] ?? null;
   for (const symbol of symbols) {
     const data = bars.get(symbol);
     if (!data) { excluded[symbol] = "UNAVAILABLE"; continue; }
+    if (data.sessionDate !== referenceDate) { excluded[symbol] = "DIFFERENT_SESSION_DATE"; continue; }
     // Calendar-day allowance includes weekends and ordinary exchange holidays.
     if (now - data.latest > 5 * 86400000 || data.latest > now + 86400000) { excluded[symbol] = "STALE_OR_FUTURE_BAR"; continue; }
     const window = data.closes.slice(-200);
@@ -63,21 +68,22 @@ function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now
     b20: accepted.length ? above.b20 / accepted.length : null,
     b50: accepted.length ? above.b50 / accepted.length : null,
     b200: accepted.length ? above.b200 / accepted.length : null,
-    dataQuality: { universeVersion: BREADTH_UNIVERSE_VERSION, definition: "EQUAL_WEIGHT_BROAD_EQUITY_SAMPLE", officialIndexBreadth: false, expected: symbols.length, valid: accepted.length, coverage: accepted.length / symbols.length, accepted, excluded, commonDenominator: true, smoothing: "NONE", latestBarFinality: "UNVERIFIED", freshnessLimitCalendarDays: 5 }
+    dataQuality: { universeVersion: BREADTH_UNIVERSE_VERSION, definition: "LEGACY_MIXED_EQUITY_ETF_SAMPLE", constituentSource: "USER_UPLOADED_LEGACY_ROUTE", referenceDate, universeEntries: symbols.length, uniqueSymbols: new Set(symbols).size, duplicateEntriesPreserved: true, historicalMembershipReconstructed: false, officialIndexBreadth: false, expected: symbols.length, valid: accepted.length, coverage: accepted.length / symbols.length, accepted, excluded, commonDenominator: true, smoothing: "NONE", latestBarFinality: "UNVERIFIED", freshnessLimitCalendarDays: 5 }
   };
 }
 
-async function loadBroadBreadth() {
+async function loadBroadBreadth(symbols: string[]) {
+  const started = Date.now();
   const bars = new Map<string, BreadthBars>();
   let next = 0;
-  await Promise.all(Array.from({ length: 8 }, async () => {
-    while (next < BROAD_EQUITY_UNIVERSE.length) {
-      const symbol = BROAD_EQUITY_UNIVERSE[next++];
+  await Promise.all(Array.from({ length: 24 }, async () => {
+    while (next < symbols.length && Date.now() - started < 20000) {
+      const symbol = symbols[next++];
       const data = await fetchBreadthBars(symbol);
       if (data) bars.set(symbol, data);
     }
   }));
-  return { ...summarizeBreadth(BROAD_EQUITY_UNIVERSE, bars), bars };
+  return { ...summarizeBreadth(symbols, bars), bars };
 }
 
 /* ================= MARKET CACHE ================= */
@@ -486,9 +492,9 @@ breadthDivergence: divergence
 
 /* ================= % STOCKS ABOVE 20 DMA ================= */
 
-async function calculateBreadth20(fetchETF:any){
+async function calculateBreadth20(fetchETF:any, universe: string[]){
 
-const universe = BROAD_EQUITY_UNIVERSE;
+
 
 let above20 = 0;
 let valid = 0;
@@ -526,9 +532,9 @@ breadth20Signal: signal
 
 /* ================= ADVANCE DECLINE LINE ================= */
 
-async function calculateAdvanceDecline(fetchETF:any) {
+async function calculateAdvanceDecline(fetchETF:any, universe: string[]) {
 
-const universe = BROAD_EQUITY_UNIVERSE;
+
 
 let advances = 0;
 let declines = 0;
@@ -567,9 +573,9 @@ adSignal: signal
 
 /* ================= NEW HIGHS / NEW LOWS ================= */
 
-async function calculateHighLowIndicator(fetchETF: (symbol: string) => Promise<number[]>) {
+async function calculateHighLowIndicator(fetchETF: (symbol: string) => Promise<number[]>, universe: string[]) {
 
-const universe = BROAD_EQUITY_UNIVERSE;
+
 
 let newHighs = 0;
 let newLows = 0;
@@ -2287,7 +2293,7 @@ change: percentChange(current, previous),
 
 });
 
-const breadthUniverse = BROAD_EQUITY_UNIVERSE;
+const breadthUniverse = await loadBreadthUniverse();
 
 async function fetchETF(symbol: string) {
 
@@ -2813,7 +2819,7 @@ const spAbove50 = spMA50 ? spCurrent > spMA50 : false;
 
 const spLowerHigh = detectLowerHigh(spClosesFull);
 
-const broadBreadth = await loadBroadBreadth();
+const broadBreadth = await loadBroadBreadth(breadthUniverse);
 // Refuse fabricated zero breadth when the data sample is mostly unavailable.
 if (broadBreadth.dataQuality.coverage < 0.80 || broadBreadth.b20 === null || broadBreadth.b50 === null || broadBreadth.b200 === null) {
   return NextResponse.json({ error: "Insufficient fresh breadth coverage", breadthDataQuality: broadBreadth.dataQuality }, { status: 503 });
@@ -2826,12 +2832,12 @@ calculateBreadthScore(breadth200, breadth50);
 /* HIGH LOW BREADTH */
 
 const highLowData =
-await calculateHighLowIndicator(async (symbol: string) => broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : []);
+await calculateHighLowIndicator(async (symbol: string) => broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], breadthUniverse);
 
 /* ADVANCE DECLINE */
 
 const adData =
-await calculateAdvanceDecline(async (symbol: string) => broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : []);
+await calculateAdvanceDecline(async (symbol: string) => broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], breadthUniverse);
 
 const breadth20Data =
 { breadth20: broadBreadth.b20, breadth20Signal: broadBreadth.b20 < 0.25 ? "panic" : broadBreadth.b20 < 0.4 ? "weak" : "neutral" };
