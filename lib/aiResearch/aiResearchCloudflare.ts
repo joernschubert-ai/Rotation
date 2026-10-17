@@ -1,4 +1,4 @@
-import { buildReasoningFrames } from "./aiResearchReasoningFrame";
+import { buildCompactResearchInput } from "./aiResearchReasoningFrame";
 import { createHash, randomBytes } from "node:crypto";
 import { Redis } from "@upstash/redis";
 import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
@@ -44,26 +44,8 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       cotReportDates: [...new Set(evidence.filter(item => item.kind === "COT").flatMap(item => (item.data.summaries as Array<{ reportDate?: string }>).map(summary => summary.reportDate ?? "")).filter(Boolean))],
       historicalAsOf: report.historicalEvidence?.asOfDate ?? null, newsCount: evidence.filter(item => item.kind === "NEWS").length,
     } };
-  // Avoid duplicate layer prose; full source statistics and all horizons remain.
-  const modelEvidence = evidence.map(item => {
-    if (item.kind === "LAYER") return { ...item,
-      data: { category: item.data.category, state: item.data.state, heuristicNotIndependent: true } };
-    // The named 20-day values now live in the instrument briefs. Keep the
-    // calculated 20-day comparisons live in marketBriefs; full tables remain in the report.
-    if (item.kind === "HISTORY" && item.market && Array.isArray(item.data.studies)) return { ...item,
-      data: { ...item.data, studies: item.data.studies.map((study: Record<string, unknown>) => {
-        return { family: study.family, state: study.state, asOfDate: study.asOfDate, currentMatch: study.currentMatch };
-      }) } };
-    return item;
-  });
-  const frames = buildReasoningFrames(evidence);
-  const payload = JSON.stringify({ contractVersion: SYNTHESIS_CONTRACT, snapshotTimestamp, task: input.context.task, question: text(input.context.question, 500),
-    marketFacts: [frames[0], frames[2]].map(({instrument, riskMechanisms, historyChoices, ...facts}) => ({
-      market: instrument === "RUSSELL_CALL" ? "RUSSELL_2000" : "NASDAQ", ...facts,
-      historyChoices: historyChoices.map(({directionEffect, ...study}) => study) })),
-    instrumentReviews: frames.map(item => ({instrument: item.instrument, market: item.instrument === "RUSSELL_CALL" ? "RUSSELL_2000" : "NASDAQ",
-      historyChoices: item.historyChoices.map(study => ({id: study.id, directionEffect: study.directionEffect})), riskMechanisms: item.riskMechanisms })),
-    evidence: modelEvidence });
+  const payload = JSON.stringify({contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
+    question:text(input.context.question,500),...buildCompactResearchInput(evidence)});
   const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, quality: {
     ...(value.quality ?? quality), timing: {
       preparationMs: execution.preparationMs ?? null,
@@ -192,7 +174,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const normalized = normalizeSynthesisEnvelope(content, evidence);
     const derived = deriveSynthesisConclusion(normalized);
     const answerQuality = { ...quality, responseShape, normalizations: [
-      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "DATED_COT_FACTS_AND_MODEL_REVIEW", "OVERVIEW_FROM_REVIEWED_INSTRUMENTS"] : []),
+      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "DATED_COT_FACTS_AND_MODEL_REVIEW", "OVERVIEW_FROM_REVIEWED_INSTRUMENTS", "DIRECTION_AND_CONTEXT_FROM_MEASURED_FACTS"] : []),
       ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
     content = derived.value;
     stage = "ANSWER_VALIDATION";
@@ -211,7 +193,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
           .filter((flow): flow is Record<string, unknown> => Boolean(flow && typeof flow === "object" && !Array.isArray(flow)))
           .map(flow => ({ instrument: text(flow.instrument,40), evidenceRefs: strings(flow.evidenceRefs,8),
             confirmationRefs: strings(flow.confirmationRefs,8), invalidationRefs: strings(flow.invalidationRefs,8),
-            structuredReview: {historyEffect: text(flow.historyEffect,40), opportunityMechanism: text(flow.opportunityMechanism,40), riskMechanism: text(flow.riskMechanism,40),
+            structuredReview: {timingFocus: text(flow.timingFocus,40), structureFocus: text(flow.structureFocus,40), historyEffect: text(flow.historyEffect,40), opportunityMechanism: text(flow.opportunityMechanism,40), riskMechanism: text(flow.riskMechanism,40),
               cotReview: Object.fromEntries(["ASSET_MANAGER", "LEVERAGED_MONEY"].map(group => {
                 const review = flow.cotReview && typeof flow.cotReview === "object" ? (flow.cotReview as Record<string, any>)[group] : null;
                 return [group, {horizon: text(review?.horizon,40), interpretation: text(review?.interpretation,650)}];

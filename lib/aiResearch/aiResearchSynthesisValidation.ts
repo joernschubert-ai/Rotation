@@ -1,4 +1,4 @@
-import { COT_HORIZONS, RISK_MECHANISMS, historyDirectionEffect, cotHorizonFact, aggregateReviewedFlows } from "./aiResearchReasoningFrame";
+import { COT_HORIZONS, RISK_MECHANISMS, historyDirectionEffect, cotHorizonFact, aggregateReviewedFlows, TIMING_FOCUS, STRUCTURE_FOCUS, renderReviewedContext } from "./aiResearchReasoningFrame";
 import type { ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 import type { SynthesisEvidence } from "./aiResearchSynthesisEvidence";
 import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
@@ -54,6 +54,14 @@ export function normalizeSynthesisEnvelope(value: unknown, evidence?: SynthesisE
     if (evidence) {
       const brief = buildInstrumentBriefs(evidence).find(item => item.instrument === instrument);
       const study = brief?.histories.find(item => item.id === flow.historyStudyId);
+      flow.historyEffect = historyDirectionEffect(instrument, study?.meanPct);
+      const fiveDay = brief?.price.momentum5D;
+      flow.opportunityMechanism = flow.assessment === "WATCH" || flow.assessment === "REDUCE" || typeof fiveDay !== "number" || fiveDay === 0 ? "NONE"
+        : fiveDay * (instrument === "NASDAQ_PUT" ? -1 : 1) > 0 ? "CONTINUATION" : "REVERSAL";
+      const renderedContext=renderReviewedContext(instrument,flow.timingFocus,flow.structureFocus,flow.riskMechanism,evidence);
+      flow.whyNow=renderedContext.whyNow;flow.counterargument=renderedContext.counterargument;
+      flow.confirmationTrigger=instrument==="NASDAQ_PUT"?"FAILED_REBOUND":"STRENGTH_WITH_PARTICIPATION";
+      flow.invalidationTrigger=instrument==="NASDAQ_PUT"?"STRENGTH_WITH_PARTICIPATION":"FAILED_REBOUND";
       // Source bindings are server facts, not model-authored interpretations.
       flow.cotGroups = brief?.cot.map(item => item.group) ?? [];
       flow.historyMeanVsBaseline = study?.meanVsBaseline ?? "UNKNOWN";
@@ -167,6 +175,8 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
     }
     const brief = briefs.find(item => item.instrument === instrument);
     const selectedHistory = brief?.histories.find(study => study.id === flow.historyStudyId);
+    if (!(TIMING_FOCUS as readonly unknown[]).includes(flow.timingFocus)) issues.push(`${instrument}:INVALID_TIMING_FOCUS`);
+    if (!(STRUCTURE_FOCUS as readonly unknown[]).includes(flow.structureFocus)) issues.push(`${instrument}:INVALID_STRUCTURE_FOCUS`);
     const ownPriceFacts = byId.get(instrument === "RUSSELL_CALL" ? "PRICE_RUSSELL_2000" : "PRICE_NASDAQ")?.data;
     for (const issue of inspectPriceProse([flow.reasoning, flow.whyNow, flow.counterargument].filter(item => typeof item === "string").join(". "), ownPriceFacts?.momentum5D, ownPriceFacts?.momentum20D)) issues.push(`${instrument}:${issue}`);
     if (instrument === "NASDAQ_PUT" && typeof selectedHistory?.meanPct === "number" && selectedHistory.meanPct > 0 && typeof flow.reasoning === "string" &&
@@ -189,7 +199,6 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
     const riskMechanisms = RISK_MECHANISMS[instrument as keyof typeof RISK_MECHANISMS] as readonly string[];
     if (!riskMechanisms.includes(flow.riskMechanism)) issues.push(`${instrument}:INVALID_RISK_MECHANISM`);
     if (!["CONTINUATION", "REVERSAL", "NONE"].includes(flow.opportunityMechanism)) issues.push(`${instrument}:INVALID_OPPORTUNITY_MECHANISM`);
-    if (["STARTER_CANDIDATE", "CONFIRM"].includes(flow.assessment) && flow.opportunityMechanism === "NONE") issues.push(`${instrument}:CANDIDATE_WITHOUT_OPPORTUNITY_HYPOTHESIS`);
     const ownFiveDay = ownPriceFacts?.momentum5D;
     if (typeof ownFiveDay === "number" && ownFiveDay !== 0 && ["CONTINUATION", "REVERSAL"].includes(flow.opportunityMechanism)) {
       const sign = instrument === "NASDAQ_PUT" ? -1 : 1;
@@ -199,10 +208,19 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
     if (typeof flow.whyNow === "string" && !/phase|breite|breadth|teilnahme|partizipation|participation|qualität|quality|durchschnitt|ma50|ma200/iu.test(flow.whyNow)) issues.push(`${instrument}:OWN_STRUCTURE_REQUIRED_IN_WHY_NOW`);
     if (typeof flow.whyNow === "string" && !(instrument === "RUSSELL_CALL" ? /russell/iu : /nasdaq/iu).test(flow.whyNow)) issues.push(`${instrument}:OWN_INSTRUMENT_REQUIRED_IN_WHY_NOW`);
     if (instrument !== "NASDAQ_PUT" && typeof flow.counterargument === "string" && /short[ -]?squeeze/iu.test(flow.counterargument) && !/kein gegenargument|nicht (?:als )?(?:gegenargument|risiko)|volatilität|volatilitäts|zeitwert|bereits|schon gelaufen/iu.test(flow.counterargument)) issues.push(`${instrument}:UPSIDE_SQUEEZE_IS_NOT_CALL_COUNTERARGUMENT`);
+    if (flow.timingFocus === "DIRECTION_CONFIRMED") {
+      const direction = instrument === "NASDAQ_PUT" ? -1 : 1;
+      if (!(typeof ownFiveDay === "number" && ownFiveDay * direction > 0)) issues.push(`${instrument}:TIMING_CONFIRMATION_WITHOUT_OWN_5D_DIRECTION`);
+    }
+    if (typeof flow.reasoning === "string" && /%|\bprozent/iu.test(flow.reasoning)) issues.push(`${instrument}:MODEL_MUST_NOT_REPEAT_NUMERIC_FACTS`);
     const requiredGroups = brief?.cot.map(item => item.group) ?? [];
     const cotReview = object(flow.cotReview);
     for (const group of requiredGroups) {
       const review = object(cotReview[group]);
+      const sourceGroup = brief?.cot.find(item=>item.group===group);
+      const sourceFact = sourceGroup ? cotHorizonFact(sourceGroup,review.horizon) : null;
+      if (sourceFact && typeof review.interpretation==="string" && normalize(sourceFact)===normalize(review.interpretation)) issues.push(`${instrument}:${group}_INTERPRETATION_ONLY_COPIES_FACT`);
+      if (typeof review.interpretation==="string" && /%|\bprozent/iu.test(review.interpretation)) issues.push(`${instrument}:MODEL_MUST_NOT_REPEAT_NUMERIC_FACTS`);
       if (!(COT_HORIZONS as readonly unknown[]).includes(review.horizon) || !useful(review.interpretation)) issues.push(`${instrument}:${group}_DATED_CHANGE_REVIEW_REQUIRED`);
       if (typeof review.interpretation === "string" && !/veränder|zunehm|abnehm|größer|kleiner|gestieg|gesunk|verbess|verschlech|aufbau|abbau|reduz|erhöh|rückgang|zuwachs|verring|unverändert|fehlt|nicht verfügbar/iu.test(review.interpretation)) issues.push(`${instrument}:${group}_CHANGE_INTERPRETATION_REQUIRED`);
     }
@@ -251,6 +269,8 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
       if (typeof flow.reasoning === "string" && /^(tradestack und positionsmodell geben diesen flow frei|no_long_entry_decision|no trade|im snapshot freigegeben)[.!\s]*$/i.test(flow.reasoning.trim())) issues.push(`${instrument}:APP_PERMISSION_IS_NOT_RESEARCH_REASONING`);
     }
   }
+  const thesisTexts=data.flows.map((flow:any)=>typeof flow?.reasoning==="string"?normalize(flow.reasoning):"").filter(Boolean);
+  if(new Set(thesisTexts).size!==thesisTexts.length) issues.push("IDENTICAL_INSTRUMENT_THESES");
   const whyNowTexts = data.flows.map((flow: any) => typeof flow?.whyNow === "string" ? normalize(flow.whyNow) : "").filter(Boolean);
   if (new Set(whyNowTexts).size !== whyNowTexts.length) issues.push("IDENTICAL_INSTRUMENT_WHY_NOW");
   const overview = aggregateReviewedFlows(data.flows);

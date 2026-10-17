@@ -1,6 +1,6 @@
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
 import type { ResearchTrigger } from "./aiResearchTriggers";
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V13_DIRECTIONAL_REVIEW";
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V14_COMPACT_THESES";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -17,6 +17,8 @@ export interface ResearchSynthesisContent {
     evidenceRefs: string[];
     confirmationRefs: string[];
     invalidationRefs: string[];
+    timingFocus?: "ALREADY_MOVED" | "EARLY_DIVERGENCE" | "WAIT_FOR_TURN" | "DIRECTION_CONFIRMED" | "DATA_INCOMPLETE";
+    structureFocus?: "BREADTH" | "PARTICIPATION" | "PHASE" | "QUALITY";
     historyEffect?: "SUPPORTS_DIRECTION" | "OPPOSES_DIRECTION" | "NEUTRAL" | "UNKNOWN";
     opportunityMechanism?: "CONTINUATION" | "REVERSAL" | "NONE";
     riskMechanism?: string;
