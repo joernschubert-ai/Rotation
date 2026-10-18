@@ -1,3 +1,4 @@
+import { CHECK_CONTRACT, CHECK_PROMPT, CHECK_SCHEMA, buildComprehensionCheck, gradeComprehensionCheck } from "./aiResearchComprehensionCheck";
 import { buildCompactResearchInput } from "./aiResearchReasoningFrame";
 import { createHash, randomBytes } from "node:crypto";
 import { Redis } from "@upstash/redis";
@@ -5,12 +6,13 @@ import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
 import type { ResearchSynthesis, ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 
 import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
-import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, normalizeSynthesisEnvelope, SYNTHESIS_CONTRACT } from "./aiResearchSynthesisValidation";
+import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, normalizeSynthesisEnvelope, SYNTHESIS_CONTRACT as PRODUCTION_CONTRACT } from "./aiResearchSynthesisValidation";
 import { buildSynthesisSchema, RESEARCH_SYSTEM_PROMPT } from "./aiResearchSynthesisContract";
 import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
 export { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 export { validateSynthesis } from "./aiResearchSynthesisValidation";
 
+const SYNTHESIS_CONTRACT = CHECK_CONTRACT;
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const PREFIX = "rotation:research:cf:v1";
 // Keep the quota namespace unchanged so the deployment cannot reset daily limits.
@@ -35,7 +37,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   if (!Number.isFinite(age) || age < 0 || age > 86400000) return unavailable("Der Snapshot ist nicht aktuell genug für eine neue KI-Einschätzung.");
   const evidence = buildSynthesisEvidence(input, report);
   const briefs = buildInstrumentBriefs(evidence);
-  const responseSchema = buildSynthesisSchema(evidence);
+  const responseSchema = CHECK_SCHEMA;
   const quality = { contractVersion: SYNTHESIS_CONTRACT, issues: [] as string[], instrumentBriefs: briefs, availableEvidenceIds: evidence.filter(item => item.available).map(item => item.id),
     missingOwnPriceMarkets: evidence.filter(item => item.kind === "PRICE" && item.entryDataReady !== true).map(item => item.market ?? item.id), semanticTruthVerified: false as const,
     inputSummary: {
@@ -44,8 +46,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       cotReportDates: [...new Set(evidence.filter(item => item.kind === "COT").flatMap(item => (item.data.summaries as Array<{ reportDate?: string }>).map(summary => summary.reportDate ?? "")).filter(Boolean))],
       historicalAsOf: report.historicalEvidence?.asOfDate ?? null, newsCount: evidence.filter(item => item.kind === "NEWS").length,
     } };
-  const payload = JSON.stringify({contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
-    question:text(input.context.question,500),...buildCompactResearchInput(evidence)});
+  const payload = JSON.stringify(buildComprehensionCheck());
   const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, quality: {
     ...(value.quality ?? quality), timing: {
       preparationMs: execution.preparationMs ?? null,
@@ -77,6 +78,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   };
   try {
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
+    if(cached?.quality?.contractVersion===CHECK_CONTRACT) return {...cached,snapshotTimestamp,cached:true};
     if (cached?.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
       if (cached.status === "SUCCESS" && validateSynthesis(cached.content, evidence)) return { ...cached, cached: true };
       if (!allowGeneration && cached.status === "UNAVAILABLE" && cached.quality.issues.length) {
@@ -133,7 +135,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${MODEL}`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, cache: "no-store", signal: AbortSignal.timeout(providerTimeoutMs),
       body: JSON.stringify({ max_tokens: 1800, temperature: 0.2, response_format: { type: "json_schema", json_schema: responseSchema }, messages: [
-        { role: "system", content: RESEARCH_SYSTEM_PROMPT },
+        { role: "system", content: CHECK_PROMPT },
         { role: "user", content: payload },
       ] }),
     });
@@ -171,74 +173,22 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const rawObject = content && typeof content === "object" && !Array.isArray(content) ? content as Record<string, unknown> : {};
     const responseShape = { rootKeys: Object.keys(rawObject).slice(0,20).map(key => key.slice(0,80)),
       flowsIsArray: Array.isArray(rawObject.flows), flowCount: Array.isArray(rawObject.flows) ? rawObject.flows.length : null };
-    const normalized = normalizeSynthesisEnvelope(content, evidence);
-    const derived = deriveSynthesisConclusion(normalized);
-    const answerQuality = { ...quality, responseShape, normalizations: [
-      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "DATED_COT_FACTS_AND_MODEL_REVIEW", "OVERVIEW_FROM_REVIEWED_INSTRUMENTS", "DIRECTION_AND_CONTEXT_FROM_MEASURED_FACTS"] : []),
-      ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
-    content = derived.value;
-    stage = "ANSWER_VALIDATION";
-    const issues = inspectSynthesis(content, evidence);
-    if (issues.length) {
-      const candidate = content && typeof content === "object" ? content as Record<string, unknown> : {};
-      const rejectedConditions = (Array.isArray(candidate.flows) ? candidate.flows : []).slice(0,3)
-        .filter((flow): flow is Record<string, unknown> => Boolean(flow && typeof flow === "object" && !Array.isArray(flow)))
-        .map(flow => ({ instrument: text(flow.instrument,40), confirmation: text(flow.confirmation,1200), invalidation: text(flow.invalidation,1200) }));
-      const strings = (value: unknown, limit: number): string[] => Array.isArray(value)
-        ? value.slice(0,limit).filter(item => typeof item === "string").map(item => text(item,1200)) : [];
-      const rejectedResponse = {
-        summary: text(candidate.summary,1200), asymmetry: text(candidate.asymmetry,1200),
-        counterarguments: strings(candidate.counterarguments,5), limitations: strings(candidate.limitations,5),
-        references: (Array.isArray(candidate.flows) ? candidate.flows : []).slice(0,3)
-          .filter((flow): flow is Record<string, unknown> => Boolean(flow && typeof flow === "object" && !Array.isArray(flow)))
-          .map(flow => ({ instrument: text(flow.instrument,40), evidenceRefs: strings(flow.evidenceRefs,8),
-            confirmationRefs: strings(flow.confirmationRefs,8), invalidationRefs: strings(flow.invalidationRefs,8),
-            structuredReview: {reasoningParts: flow.reasoningParts, timingFocus: text(flow.timingFocus,40), structureFocus: text(flow.structureFocus,40), historyEffect: text(flow.historyEffect,40), opportunityMechanism: text(flow.opportunityMechanism,40), riskMechanism: text(flow.riskMechanism,40),
-              cotReview: Object.fromEntries(["ASSET_MANAGER", "LEVERAGED_MONEY"].map(group => {
-                const review = flow.cotReview && typeof flow.cotReview === "object" ? (flow.cotReview as Record<string, any>)[group] : null;
-                return [group, {horizon: text(review?.horizon,40), interpretation: text(review?.interpretation,650)}];
-              })) },
-            historyStudyId: text(flow.historyStudyId,100), cotGroups: strings(flow.cotGroups,2),
-            historyMeanVsBaseline: text(flow.historyMeanVsBaseline,20),
-            confirmationTrigger: text(flow.confirmationTrigger,50), invalidationTrigger: text(flow.invalidationTrigger,50),
-            reasoning: text(flow.reasoning,1200), whyNow: text(flow.whyNow,1200), counterargument: text(flow.counterargument,1200),
-            cotInterpretations: Object.fromEntries(Object.entries(flow.cotInterpretations && typeof flow.cotInterpretations === "object" ? flow.cotInterpretations : {}).map(([group, value]) => [group, text(value,450)])) }))
-      };
-      const conditionFailure = issues.every(issue => /UNOBSERVABLE_(CONFIRMATION|INVALIDATION)$/.test(issue));
-      const rejected: ResearchSynthesis = { ...unavailable(conditionFailure
-        ? "Die KI hat geantwortet, aber ihre Bestätigungs- oder Widerlegungsbedingungen sind nicht eindeutig prüfbar. Deshalb wird keine Einstiegsaussage angezeigt."
-        : issues.some(issue => /INTERPRETATION_FIELD_REQUIRED$/.test(issue)) ? "Die KI hat eine angeforderte COT-Gruppeninterpretation ausgelassen. Keine Einstiegsaussage übernommen; die gemessenen COT-Daten bleiben verfügbar."
-        : issues.some(issue=>/COT_DIRECTIONAL_SHORTCUT|UPSIDE_ALONE|DOWNSIDE_ALONE/.test(issue)) ? "Die KI hat aus Positionierungsdaten einen nicht ausreichend begründeten Richtungsvorteil abgeleitet oder Chance und Gegenrisiko vertauscht. Keine Einstiegsaussage übernommen; die Messwerte bleiben verfügbar."
-        : issues.some(issue=>issue.includes("COT_OVERHANG_DIRECTION_CONTRADICTS")) ? "Die KI hat eine COT-Veränderung entgegen den gelieferten Daten beschrieben. Keine Einstiegsaussage übernommen; die Messwerte bleiben verfügbar."
-        : issues.some(issue=>/ARGUMENT_REQUIRED|_ARGUMENT$|IDENTICAL_SUPPORT|OBSERVED_DOWN_TREND/.test(issue)) ? "Die KI hat Unterstützung, Gegenargument und frühe Gelegenheit nicht ausreichend anhand der eigenen Daten getrennt. Keine Einstiegsaussage übernommen; die Details stehen im Bericht."
-        : issues.includes("IDENTICAL_INSTRUMENT_THESES") ? "Die KI hat für unterschiedliche Instrumente dieselbe allgemeine Begründung geliefert. Eine eigenständige Abwägung fehlt; deshalb keine KI-Einstiegsaussage übernommen."
-        : issues.includes("THREE_INSTRUMENTS_REQUIRED") ? "Die KI hat keine vollständigen Einzelbewertungen für Nasdaq Put, Nasdaq Call und Russell Call geliefert. Die vorhandene Datenbasis bleibt verfügbar; keine KI-Einstiegsaussage übernommen."
-        : issues.some(issue => /COMPARISON_DISAGREES|RETURNS_MISLABELED/.test(issue)) ? "Die KI hat historische Indexrenditen oder deren Vergleich falsch eingeordnet. Die Antwort wurde nicht als Einstiegsaussage übernommen; die Quellzahlen bleiben verfügbar."
-        : issues.some(issue => /DIRECTION_TRIGGER|DISAGREES_WITH_TRIGGER/.test(issue)) ? "Die KI hat keine passende Richtungsbedingung gewählt. Keine KI-Einstiegsaussage übernommen; die Datenbasis bleibt verfügbar."
-        : issues.some(issue => /HISTORICAL|HISTORY_REFERENCE|COT_GROUPS|COT_REFERENCE|MANAGER_INTERPRETATION|MONEY_INTERPRETATION/.test(issue))
-          ? "Die KI hat Historie oder COT nicht vollständig den eigenen Instrumenten zugeordnet. Die Antwort wurde nicht als Einstiegsaussage übernommen; die Details stehen im kopierbaren Bericht."
-          : "KI-Antwort unvollständig oder widersprüchlich: keine KI-Einstiegsaussage übernommen. Die App-Auswertung bleibt verfügbar."),
-        quality: { ...answerQuality, issues, rejectedConditions, rejectedResponse } };
-      // Keep rejection diagnostics for read-only GET; an authorized generation POST may retry under the existing quota and cooldown.
-      stage = "REJECTED_ANSWER_CACHE_WRITE";
-      const diagnosed = withTiming(rejected);
-      await storeRejectedDiagnosis(diagnosed);
-      await redis.set(cacheKey, diagnosed, { ex: 900 });
-      return diagnosed;
-    }
-    // Only attach measured facts after the model's source selections passed.
-    // Do not fill, alter or upgrade any model assessment or its prose.
-    const approved = content as ResearchSynthesisContent;
-    const grounded: ResearchSynthesisContent = { ...approved, flows: approved.flows.map(flow => {
-      const brief = briefs.find(item => item.instrument === flow.instrument)!;
-      return { ...flow, grounding: { history: brief.histories.find(study => study.id === flow.historyStudyId) ?? null,
-        cot: brief.cot, price: brief.price } };
-    }) };
-    const result: ResearchSynthesis = { status: "SUCCESS", model: MODEL, generatedAt: new Date().toISOString(), snapshotTimestamp, cached: false, message: "Unabhängige KI-Interpretation; Quellenzuordnung geprüft, Zahlen aus der Datenbasis ergänzt. Wirtschaftliche Richtigkeit nicht bewiesen.", content: grounded, quality: answerQuality };
-    stage = "APPROVED_ANSWER_CACHE_WRITE";
-    const diagnosed = withTiming(result);
-    await redis.set(cacheKey, diagnosed, { ex: 900 });
-    return diagnosed;
+    // Temporary diagnostic: never convert this synthetic task into a trade assessment.
+    const check = gradeComprehensionCheck(content);
+    const diagnostic: ResearchSynthesis = {
+      generatedAt:new Date().toISOString(),
+      ...unavailable(check.passed
+        ? "Verständnistest bestanden: Die KI hat sechs einfache Richtungs- und Positionsfragen korrekt beantwortet. Dies ist noch keine Marktanalyse oder Einstiegsfreigabe. Bitte den vollständigen Bericht zur Prüfung kopieren."
+        : "Verständnistest nicht bestanden: Die KI verarbeitet bereits einfache Richtungs- oder Positionsfragen fehlerhaft. Keine Marktanalyse oder Einstiegsaussage erzeugt. Bitte den vollständigen Bericht kopieren; nicht erneut aktualisieren."),
+      quality: {...quality, responseShape, issues: [check.passed ? "DIAGNOSTIC_PASS_NOT_A_MARKET_ANALYSIS" : "DIAGNOSTIC_FAIL",...check.issues],
+        rejectedResponse: {summary:"Synthetischer Verständnistest, keine aktuelle Marktanalyse",asymmetry:"Nicht untersucht",counterarguments:[],limitations:["Sechs einfache Fragen belegen keine Prognosequalität."],references:[{
+          instrument:"DIAGNOSTIC_ONLY",evidenceRefs:[],confirmationRefs:[],invalidationRefs:[],
+          structuredReview:{answers:check.answers,expected:check.expected,passed:check.passed,testContract:CHECK_CONTRACT}}]}}
+    };
+    const diagnosedCheck=withTiming(diagnostic);
+    await storeRejectedDiagnosis(diagnosedCheck);
+    await redis.set(cacheKey,diagnosedCheck,{ex:900});
+    return diagnosedCheck;
   } catch (error) {
     // Do not expose exception messages: providers may include request URLs or credentials.
     const name = error && typeof error === "object" && "name" in error ? String(error.name) : "";
