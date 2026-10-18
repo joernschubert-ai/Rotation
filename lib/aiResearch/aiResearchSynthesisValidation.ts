@@ -64,6 +64,8 @@ export function normalizeSynthesisEnvelope(value: unknown, evidence?: SynthesisE
     "instrument" in data[key] && data[key].instrument !== instrument)) return value;
   const flows = Object.entries(SYNTHESIS_SLOTS).map(([key,instrument]) => {
     const flow = { ...data[key], instrument };
+    const parts=object(flow.reasoningParts);
+    if (Object.keys(parts).length) flow.reasoning=[parts.supporting,parts.opposing,parts.earlyOpportunity].filter(item=>typeof item==="string").join(" ");
     if (evidence) {
       const brief = buildInstrumentBriefs(evidence).find(item => item.instrument === instrument);
       const study = brief?.histories.find(item => item.id === flow.historyStudyId);
@@ -190,7 +192,12 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
     const selectedHistory = brief?.histories.find(study => study.id === flow.historyStudyId);
     if (!(TIMING_FOCUS as readonly unknown[]).includes(flow.timingFocus)) issues.push(`${instrument}:INVALID_TIMING_FOCUS`);
     if (!(STRUCTURE_FOCUS as readonly unknown[]).includes(flow.structureFocus)) issues.push(`${instrument}:INVALID_STRUCTURE_FOCUS`);
+    const parts=object(flow.reasoningParts);
+    for(const key of ["supporting","opposing","earlyOpportunity"]) if(!useful(parts[key],25)||parts[key].length>350) issues.push(`${instrument}:MISSING_OR_OVERSIZED_${key.toUpperCase()}_ARGUMENT`);
+    if(typeof parts.earlyOpportunity==="string" && (!(instrument==="RUSSELL_CALL"?/russell/iu:/nasdaq/iu).test(parts.earlyOpportunity)||!/breite|breadth|teilnahme|participation|phase|qualität/iu.test(parts.earlyOpportunity))) issues.push(`${instrument}:OWN_STRUCTURE_ARGUMENT_REQUIRED`);
+    if(typeof parts.supporting==="string"&&typeof parts.opposing==="string"&&normalize(parts.supporting)===normalize(parts.opposing)) issues.push(`${instrument}:IDENTICAL_SUPPORT_AND_OPPOSITION`);
     const ownPriceFacts = byId.get(instrument === "RUSSELL_CALL" ? "PRICE_RUSSELL_2000" : "PRICE_NASDAQ")?.data;
+    if(instrument==="NASDAQ_PUT"&&typeof ownPriceFacts?.momentum5D==="number"&&ownPriceFacts.momentum5D<0&&typeof ownPriceFacts?.momentum20D==="number"&&ownPriceFacts.momentum20D<0&&/aktuelle?\w* trend[^.!?]{0,80}gegen eine put/iu.test(flow.reasoning??"")) issues.push(`${instrument}:OBSERVED_DOWN_TREND_MISLABELED_AGAINST_PUT`);
     for (const issue of inspectPriceProse([flow.reasoning, flow.whyNow, flow.counterargument].filter(item => typeof item === "string").join(". "), ownPriceFacts?.momentum5D, ownPriceFacts?.momentum20D)) issues.push(`${instrument}:${issue}`);
     if (instrument === "NASDAQ_PUT" && typeof selectedHistory?.meanPct === "number" && selectedHistory.meanPct > 0 && typeof flow.reasoning === "string" &&
       /histor|folgerendit/iu.test(flow.reasoning) && /renditen[^.!?]{0,100}höher/iu.test(flow.reasoning) && /unterstützt diese these/iu.test(flow.reasoning) &&

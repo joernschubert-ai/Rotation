@@ -193,7 +193,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
           .filter((flow): flow is Record<string, unknown> => Boolean(flow && typeof flow === "object" && !Array.isArray(flow)))
           .map(flow => ({ instrument: text(flow.instrument,40), evidenceRefs: strings(flow.evidenceRefs,8),
             confirmationRefs: strings(flow.confirmationRefs,8), invalidationRefs: strings(flow.invalidationRefs,8),
-            structuredReview: {timingFocus: text(flow.timingFocus,40), structureFocus: text(flow.structureFocus,40), historyEffect: text(flow.historyEffect,40), opportunityMechanism: text(flow.opportunityMechanism,40), riskMechanism: text(flow.riskMechanism,40),
+            structuredReview: {reasoningParts: flow.reasoningParts, timingFocus: text(flow.timingFocus,40), structureFocus: text(flow.structureFocus,40), historyEffect: text(flow.historyEffect,40), opportunityMechanism: text(flow.opportunityMechanism,40), riskMechanism: text(flow.riskMechanism,40),
               cotReview: Object.fromEntries(["ASSET_MANAGER", "LEVERAGED_MONEY"].map(group => {
                 const review = flow.cotReview && typeof flow.cotReview === "object" ? (flow.cotReview as Record<string, any>)[group] : null;
                 return [group, {horizon: text(review?.horizon,40), interpretation: text(review?.interpretation,650)}];
@@ -210,6 +210,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
         : issues.some(issue => /INTERPRETATION_FIELD_REQUIRED$/.test(issue)) ? "Die KI hat eine angeforderte COT-Gruppeninterpretation ausgelassen. Keine Einstiegsaussage übernommen; die gemessenen COT-Daten bleiben verfügbar."
         : issues.some(issue=>/COT_DIRECTIONAL_SHORTCUT|UPSIDE_ALONE|DOWNSIDE_ALONE/.test(issue)) ? "Die KI hat aus Positionierungsdaten einen nicht ausreichend begründeten Richtungsvorteil abgeleitet oder Chance und Gegenrisiko vertauscht. Keine Einstiegsaussage übernommen; die Messwerte bleiben verfügbar."
         : issues.some(issue=>issue.includes("COT_OVERHANG_DIRECTION_CONTRADICTS")) ? "Die KI hat eine COT-Veränderung entgegen den gelieferten Daten beschrieben. Keine Einstiegsaussage übernommen; die Messwerte bleiben verfügbar."
+        : issues.some(issue=>/ARGUMENT_REQUIRED|_ARGUMENT$|IDENTICAL_SUPPORT|OBSERVED_DOWN_TREND/.test(issue)) ? "Die KI hat Unterstützung, Gegenargument und frühe Gelegenheit nicht ausreichend anhand der eigenen Daten getrennt. Keine Einstiegsaussage übernommen; die Details stehen im Bericht."
         : issues.includes("IDENTICAL_INSTRUMENT_THESES") ? "Die KI hat für unterschiedliche Instrumente dieselbe allgemeine Begründung geliefert. Eine eigenständige Abwägung fehlt; deshalb keine KI-Einstiegsaussage übernommen."
         : issues.includes("THREE_INSTRUMENTS_REQUIRED") ? "Die KI hat keine vollständigen Einzelbewertungen für Nasdaq Put, Nasdaq Call und Russell Call geliefert. Die vorhandene Datenbasis bleibt verfügbar; keine KI-Einstiegsaussage übernommen."
         : issues.some(issue => /COMPARISON_DISAGREES|RETURNS_MISLABELED/.test(issue)) ? "Die KI hat historische Indexrenditen oder deren Vergleich falsch eingeordnet. Die Antwort wurde nicht als Einstiegsaussage übernommen; die Quellzahlen bleiben verfügbar."

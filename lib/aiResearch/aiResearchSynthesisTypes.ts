@@ -1,6 +1,6 @@
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
 import type { ResearchTrigger } from "./aiResearchTriggers";
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V16_OWN_THESES_COT_CHECK";
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V17_SEPARATE_ARGUMENTS";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -10,6 +10,7 @@ export interface ResearchSynthesisContent {
     instrument: "NASDAQ_PUT" | "NASDAQ_CALL" | "RUSSELL_CALL";
     assessment: "WATCH" | "PREPARE" | "STARTER_CANDIDATE" | "CONFIRM" | "REDUCE";
     reasoning: string;
+    reasoningParts?: { supporting: string; opposing: string; earlyOpportunity: string };
     whyNow: string;
     counterargument: string;
     confirmation: string;
