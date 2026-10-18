@@ -43,6 +43,19 @@ export function inspectPriceProse(prose: string, fiveDay: unknown, twentyDay: un
   return [...new Set(issues)];
 }
 
+/** Narrow factual check: explicit overhang size must agree with selected dated fact. */
+export function inspectCOTFactDirection(prose: unknown, fact: string | null): string[] {
+  if (typeof prose !== "string" || !fact) return [];
+  const expected = /überhang größer/iu.test(fact) ? "größer" : /überhang kleiner/iu.test(fact) ? "kleiner" : null;
+  if (!expected) return [];
+  for (const sentence of prose.split(/[.!?;]/u)) {
+    if (/falls|wenn|würde|könnte|nicht größer|nicht kleiner/iu.test(sentence)) continue;
+    const claim = sentence.match(/(?:netto[ -]?)?(?:short|long)überhang(?:[ -]veränderung)?(?:\s+\p{L}+){0,4}?\s+(größer|kleiner)/iu);
+    if (claim && claim[1].toLowerCase() !== expected) return ["COT_OVERHANG_DIRECTION_CONTRADICTS_SELECTED_FACT"];
+  }
+  return [];
+}
+
 /** Convert complete named slots to the existing display format. Never invent a missing slot. */
 export function normalizeSynthesisEnvelope(value: unknown, evidence?: SynthesisEvidence[]): unknown {
   const data = object(value);
@@ -221,6 +234,7 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
       for(const issue of inspectPositioningInterpretation(instrument,review.interpretation,true)) issues.push(`${instrument}:${group}:${issue}`);
       const sourceGroup = brief?.cot.find(item=>item.group===group);
       const sourceFact = sourceGroup ? cotHorizonFact(sourceGroup,review.horizon) : null;
+      for (const issue of inspectCOTFactDirection(review.interpretation, sourceFact)) issues.push(`${instrument}:${group}:${issue}`);
       if (sourceFact && typeof review.interpretation==="string" && normalize(sourceFact)===normalize(review.interpretation)) issues.push(`${instrument}:${group}_INTERPRETATION_ONLY_COPIES_FACT`);
       if (typeof review.interpretation==="string" && /%|\bprozent/iu.test(review.interpretation)) issues.push(`${instrument}:MODEL_MUST_NOT_REPEAT_NUMERIC_FACTS`);
       if (!(COT_HORIZONS as readonly unknown[]).includes(review.horizon) || !useful(review.interpretation)) issues.push(`${instrument}:${group}_DATED_CHANGE_REVIEW_REQUIRED`);
