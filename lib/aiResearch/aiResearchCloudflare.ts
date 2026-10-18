@@ -46,7 +46,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       cotReportDates: [...new Set(evidence.filter(item => item.kind === "COT").flatMap(item => (item.data.summaries as Array<{ reportDate?: string }>).map(summary => summary.reportDate ?? "")).filter(Boolean))],
       historicalAsOf: report.historicalEvidence?.asOfDate ?? null, newsCount: evidence.filter(item => item.kind === "NEWS").length,
     } };
-  const payload = JSON.stringify(buildComprehensionCheck());
+  const payload = JSON.stringify(buildComprehensionCheck(evidence));
   const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, quality: {
     ...(value.quality ?? quality), timing: {
       preparationMs: execution.preparationMs ?? null,
@@ -78,7 +78,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   };
   try {
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
-    if(cached?.quality?.contractVersion===CHECK_CONTRACT) return {...cached,snapshotTimestamp,cached:true};
+    if(cached?.quality?.contractVersion===CHECK_CONTRACT&&cached.snapshotTimestamp===snapshotTimestamp) return {...cached,snapshotTimestamp,cached:true};
     if (cached?.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
       if (cached.status === "SUCCESS" && validateSynthesis(cached.content, evidence)) return { ...cached, cached: true };
       if (!allowGeneration && cached.status === "UNAVAILABLE" && cached.quality.issues.length) {
@@ -174,14 +174,14 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const responseShape = { rootKeys: Object.keys(rawObject).slice(0,20).map(key => key.slice(0,80)),
       flowsIsArray: Array.isArray(rawObject.flows), flowCount: Array.isArray(rawObject.flows) ? rawObject.flows.length : null };
     // Temporary diagnostic: never convert this synthetic task into a trade assessment.
-    const check = gradeComprehensionCheck(content);
+    const check = gradeComprehensionCheck(content,evidence);
     const diagnostic: ResearchSynthesis = {
       generatedAt:new Date().toISOString(),
       ...unavailable(check.passed
-        ? "Verständnistest bestanden: Die KI hat sechs einfache Richtungs- und Positionsfragen korrekt beantwortet. Dies ist noch keine Marktanalyse oder Einstiegsfreigabe. Bitte den vollständigen Bericht zur Prüfung kopieren."
-        : "Verständnistest nicht bestanden: Die KI verarbeitet bereits einfache Richtungs- oder Positionsfragen fehlerhaft. Keine Marktanalyse oder Einstiegsaussage erzeugt. Bitte den vollständigen Bericht kopieren; nicht erneut aktualisieren."),
+        ? "Nasdaq-Gegenprobe: Die Faktenfragen sind korrekt beantwortet; die freie Abwägung steht im vollständigen Bericht zur inhaltlichen Prüfung. Noch keine KI-Einstiegsfreigabe."
+        : "Nasdaq-Gegenprobe nicht bestanden: Faktenzuordnung oder Abwägungsformat fehlerhaft. Bitte den vollständigen Bericht kopieren; nicht erneut aktualisieren."),
       quality: {...quality, responseShape, issues: [check.passed ? "DIAGNOSTIC_PASS_NOT_A_MARKET_ANALYSIS" : "DIAGNOSTIC_FAIL",...check.issues],
-        rejectedResponse: {summary:"Synthetischer Verständnistest, keine aktuelle Marktanalyse",asymmetry:"Nicht untersucht",counterarguments:[],limitations:["Sechs einfache Fragen belegen keine Prognosequalität."],references:[{
+        rejectedResponse: {summary:"Kleine Gegenprobe mit echten Nasdaq-Fakten, keine Einstiegsempfehlung",asymmetry:"Nicht untersucht",counterarguments:[],limitations:["Korrekte Faktenantworten und Textlänge beweisen keine gute freie Interpretation oder Prognosequalität."],references:[{
           instrument:"DIAGNOSTIC_ONLY",evidenceRefs:[],confirmationRefs:[],invalidationRefs:[],
           structuredReview:{answers:check.answers,expected:check.expected,passed:check.passed,testContract:CHECK_CONTRACT}}]}}
     };
