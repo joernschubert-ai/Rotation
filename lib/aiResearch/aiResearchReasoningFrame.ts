@@ -81,27 +81,28 @@ export function renderReviewedContext(instrument: string, timing: unknown, struc
   return {whyNow:names[instrument]+": Von der KI gewählter Anlass: "+(timingLabels[String(timing)]??"Unbekannt.")+" Faktenbezug: "+(references[String(structureFocus)]??"Unbekannt."),
     counterargument:"Von der KI gewähltes Gegenszenario: "+(risks[String(risk)]??"Unbekannt.")};
 }
+/** Each task carries its own measured context; no second competing history table. */
 export function buildCompactResearchInput(evidence: SynthesisEvidence[]) {
-  const frames=buildReasoningFrames(evidence), briefs=buildInstrumentBriefs(evidence);
-  const app=record(evidence.find(item=>item.id==="APP")?.data), history=record(evidence.find(item=>item.id==="HISTORY")?.data);
-  return {
-    markets:[frames[0],frames[2]].map((frame,index)=>({
-      market:index===0?"NASDAQ":"RUSSELL_2000", currentIndexReturnsPct:briefs[index===0?0:2].price,
-      ownStructure:frame.ownStructure,
-      history20DayStudies:frame.historyChoices.map(({directionEffect,...study})=>study),
-      cotObservationAndChanges:frame.cot,
-      cotUseLimits:{role:"POSITIONING_CONTEXT_NOT_VALIDATED_DIRECTIONAL_SIGNAL",grossTransactionChangesKnown:false,
-        note:"Changes in net positioning do not by themselves establish a Put/Call advantage. Contrarian interpretations need a stated mechanism and relevant evidence; preserve uncertainty."},
-    })),
-    instrumentTasks:frames.map(frame=>({instrument:frame.instrument,market:frame.instrument==="RUSSELL_CALL"?"RUSSELL_2000":"NASDAQ",
-      desiredIndexDirection:frame.instrument==="NASDAQ_PUT"?"DOWN":"UP", riskChoices:frame.riskMechanisms,
-      historicalDirectionFacts:frame.historyChoices.map(study=>({studyId:study.id,
-        meaning:study.directionEffect==="SUPPORTS_DIRECTION"?"Der historische Indexmittelwert passt zur gewünschten Instrumentrichtung, beweist aber keinen heutigen Vorteil.":study.directionEffect==="OPPOSES_DIRECTION"?"Der historische Indexmittelwert wirkt gegen die gewünschte Instrumentrichtung; andere begründete Faktoren müssten eine Gegenhypothese tragen.":"Aus dem historischen Indexmittelwert ist keine Richtungsaussage verfügbar."}))})),
-    sharedContext:{credit:app.credit, volatility:app.volatility, crash:app.crash, squeeze:app.squeeze, appPermissions:app.flows,
-      historicalComparisons:history.comparisons, historyAsOf:history.asOf,
-      news:evidence.filter(item=>item.kind==="NEWS").map(item=>({id:item.id,...item.data}))},
-    interpretationLimits:"Index returns, not options returns. COT changes are lagged context without validated directional rule. Headlines are not verified articles. No live chart zones or combined edge study supplied."
-  };
+ const frames=buildReasoningFrames(evidence),briefs=buildInstrumentBriefs(evidence);
+ const app=record(evidence.find(item=>item.id==="APP")?.data);
+ const history=record(evidence.find(item=>item.id==="HISTORY")?.data);
+ const comparisons=Array.isArray(history.comparisons)?history.comparisons:[];
+ const columns=[...new Set(comparisons.flatMap((item:Record<string,unknown>)=>Object.keys(item)))];
+ return {
+  instrumentTasks:frames.map((frame,index)=>({
+   instrument:frame.instrument,
+   desiredIndexDirection:frame.instrument==="NASDAQ_PUT"?"DOWN":"UP",
+   currentIndexReturnsPct:briefs[index].price,
+   ownStructure:frame.ownStructure,
+   history20DayStudies:frame.historyChoices,
+   cotObservationAndChanges:frame.cot,
+   riskChoices:frame.riskMechanisms
+  })),
+  sharedContext:{credit:app.credit,volatility:app.volatility,crash:app.crash,squeeze:app.squeeze,
+   additionalHistoricalContext:{role:"Additional descriptive multi-horizon context, not a replacement for selected own instrument study",asOf:history.asOf,columns,rows:comparisons.map((item:Record<string,unknown>)=>columns.map(key=>item[key]??null))},
+   news:evidence.filter(item=>item.kind==="NEWS").map(item=>({id:item.id,...item.data}))},
+  interpretationLimits:"Only the selected own historical study is used. All own study choices and supplied COT horizons are preserved. Index means are descriptive, overlapping observations are not independent. COT net changes do not establish gross transactions, motives or a proven trading rule. News headlines are not verified articles. No option valuation or validated asymmetric edge supplied. App permissions are intentionally separate from independent research."
+ };
 }
 
 /** Known shortcut claims only; this is not a complete semantic truth judge. */

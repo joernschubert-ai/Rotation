@@ -196,6 +196,12 @@ export function inspectSynthesis(value: unknown, evidence: SynthesisEvidence[]):
     for(const key of ["supporting","opposing","earlyOpportunity"]) if(!useful(parts[key],25)||parts[key].length>350) issues.push(`${instrument}:MISSING_OR_OVERSIZED_${key.toUpperCase()}_ARGUMENT`);
     if(typeof parts.earlyOpportunity==="string" && (!(instrument==="RUSSELL_CALL"?/russell/iu:/nasdaq/iu).test(parts.earlyOpportunity)||!/breite|breadth|teilnahme|participation|phase|qualität/iu.test(parts.earlyOpportunity))) issues.push(`${instrument}:OWN_STRUCTURE_ARGUMENT_REQUIRED`);
     if(typeof parts.supporting==="string"&&typeof parts.opposing==="string"&&normalize(parts.supporting)===normalize(parts.opposing)) issues.push(`${instrument}:IDENTICAL_SUPPORT_AND_OPPOSITION`);
+    for(const key of ["supporting","opposing"]) {
+      const argument=parts[key];
+      if(typeof argument==="string"&&/^ein (?:aufwärts|abwärts)trend stützt die (?:call|put)[ -]richtung[.!\s]*$/iu.test(argument.trim())) issues.push(`${instrument}:GENERIC_DIRECTION_LESSON_NOT_ANALYSIS`);
+    }
+    if(typeof parts.earlyOpportunity==="string"&&/wenn[^.!?]{0,100}(?:günstige struktur|phase ?3 distribution)/iu.test(parts.earlyOpportunity)&&/heute noch ein früher vorteil denkbar/iu.test(parts.earlyOpportunity)) issues.push(`${instrument}:GENERIC_CONDITIONAL_STRUCTURE_NOT_ANALYSIS`);
+    if(typeof selectedHistory?.meanPct==="number"&&selectedHistory.meanPct>0&&/negative spätere indexmittelwerte/iu.test(flow.reasoning??"")) issues.push(`${instrument}:HISTORICAL_MEAN_SIGN_CONTRADICTS_SELECTED_STUDY`);
     const ownPriceFacts = byId.get(instrument === "RUSSELL_CALL" ? "PRICE_RUSSELL_2000" : "PRICE_NASDAQ")?.data;
     if(instrument==="NASDAQ_PUT"&&typeof ownPriceFacts?.momentum5D==="number"&&ownPriceFacts.momentum5D<0&&typeof ownPriceFacts?.momentum20D==="number"&&ownPriceFacts.momentum20D<0&&/aktuelle?\w* trend[^.!?]{0,80}gegen eine put/iu.test(flow.reasoning??"")) issues.push(`${instrument}:OBSERVED_DOWN_TREND_MISLABELED_AGAINST_PUT`);
     for (const issue of inspectPriceProse([flow.reasoning, flow.whyNow, flow.counterargument].filter(item => typeof item === "string").join(". "), ownPriceFacts?.momentum5D, ownPriceFacts?.momentum20D)) issues.push(`${instrument}:${issue}`);
