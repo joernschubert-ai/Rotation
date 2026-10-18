@@ -134,7 +134,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     providerStartedAt = Date.now();
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${MODEL}`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, cache: "no-store", signal: AbortSignal.timeout(providerTimeoutMs),
-      body: JSON.stringify({ max_tokens: 1800, temperature: 0.2, response_format: { type: "json_schema", json_schema: responseSchema }, messages: [
+      body: JSON.stringify({ max_tokens: 1800, temperature: 0.2, messages: [
         { role: "system", content: CHECK_PROMPT },
         { role: "user", content: payload },
       ] }),
@@ -169,7 +169,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     if (body.success !== true) return unavailable("Cloudflare konnte keine vollständige KI-Antwort liefern.");
     const raw = body.result?.response;
     let content: unknown;
-    try { content = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { content = null; }
+    try { content = raw; } catch { content = null; }
     const rawObject = content && typeof content === "object" && !Array.isArray(content) ? content as Record<string, unknown> : {};
     const responseShape = { rootKeys: Object.keys(rawObject).slice(0,20).map(key => key.slice(0,80)),
       flowsIsArray: Array.isArray(rawObject.flows), flowCount: Array.isArray(rawObject.flows) ? rawObject.flows.length : null };
@@ -178,10 +178,10 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const diagnostic: ResearchSynthesis = {
       generatedAt:new Date().toISOString(),
       ...unavailable(check.passed
-        ? "Nasdaq-Gegenprobe: Die Faktenfragen sind korrekt beantwortet; die freie Abwägung steht im vollständigen Bericht zur inhaltlichen Prüfung. Noch keine KI-Einstiegsfreigabe."
-        : "Nasdaq-Gegenprobe nicht bestanden: Faktenzuordnung oder Abwägungsformat fehlerhaft. Bitte den vollständigen Bericht kopieren; nicht erneut aktualisieren."),
+        ? "Gebündelter Vergleich ohne erzwungenes JSON: Faktenantworten formal korrekt. Die drei freien Instrumentanalysen stehen im vollständigen Bericht zur inhaltlichen Prüfung. Keine KI-Einstiegsfreigabe."
+        : "Gebündelter Vergleich ohne erzwungenes JSON: Mindestens eine Faktenantwort oder ein Abschnitt fehlt oder widerspricht den Daten. Freie Antwort im vollständigen Bericht; bitte nicht erneut aktualisieren."),
       quality: {...quality, responseShape, issues: [check.passed ? "DIAGNOSTIC_PASS_NOT_A_MARKET_ANALYSIS" : "DIAGNOSTIC_FAIL",...check.issues],
-        rejectedResponse: {summary:"Kleine Gegenprobe mit echten Nasdaq-Fakten, keine Einstiegsempfehlung",asymmetry:"Nicht untersucht",counterarguments:[],limitations:["Korrekte Faktenantworten und Textlänge beweisen keine gute freie Interpretation oder Prognosequalität."],references:[{
+        rejectedResponse: {summary:"Numerische und sprachliche Fakten sowie drei freie Instrumentanalysen im selben Aufruf",asymmetry:"Nicht untersucht",counterarguments:[],limitations:["Korrekte Faktenantworten und Textlänge beweisen keine gute freie Interpretation oder Prognosequalität."],references:[{
           instrument:"DIAGNOSTIC_ONLY",evidenceRefs:[],confirmationRefs:[],invalidationRefs:[],
           structuredReview:{answers:check.answers,expected:check.expected,passed:check.passed,testContract:CHECK_CONTRACT}}]}}
     };
