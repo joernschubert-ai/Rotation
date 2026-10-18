@@ -1,3 +1,4 @@
+import type { ResearchChartContext } from "./aiResearchChartContext";
 /* =====================================================
 AI RESEARCH - HISTORICAL EVIDENCE TYPES
 ===================================================== */
@@ -214,6 +215,7 @@ HISTORICAL EVIDENCE DATASET
 ===================================================== */
 
 export interface AIResearchHistoricalEvidence {
+chartContext?: ResearchChartContext;
 /** Independent multi-market studies; original Nasdaq tables remain unchanged. */
 marketStudies?: AIHistoricalMarketStudy[];
 coverage?: {

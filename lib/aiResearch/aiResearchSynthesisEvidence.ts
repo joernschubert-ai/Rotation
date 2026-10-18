@@ -1,9 +1,10 @@
+import { compactFormationContext } from "./aiResearchFormations";
 import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
 
 export type SynthesisMarket = "NASDAQ" | "RUSSELL_2000" | "SP500";
 export interface SynthesisEvidence {
   id: string;
-  kind: "APP" | "PRICE" | "LAYER" | "COT" | "HISTORY" | "NEWS";
+  kind: "APP" | "PRICE" | "LAYER" | "COT" | "HISTORY" | "NEWS" | "CHART";
   market?: SynthesisMarket;
   available: boolean;
   entryDataReady?: boolean;
@@ -189,6 +190,19 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
           }) })),
         interpretation: "Own-index 5/20/60 aligned-observation outcomes. Mean, median and tails are descriptive, not calibrated forecasts. Maximum rise/fall use daily closes including entry zero; reverse their directional meaning for PUT. Non-overlapping subset is not independent validation. No COT-conditioned or combined-factor edge has been established. Do not infer non-existent options-market activity from app permissions."
       } });
+  }
+  const charts=historical?.chartContext;
+  for(const market of ["NASDAQ","RUSSELL_2000"] as const){
+    const chart=market==="NASDAQ"?charts?.nasdaq:charts?.russell;
+    const available=!!chart?.asOfDate && chart.asOfDate<=marketDate && reference-Date.parse(chart.asOfDate+"T00:00:00Z")<=5*86400000 && chart.momentum.state!=="INSUFFICIENT_DATA";
+    evidence.push({id:"CHART_"+market,kind:"CHART",market,available,entryDataReady:false,data:chart?{
+      asOfDate:chart.asOfDate,basis:chart.basis,snapshotMarketDate:ownMarketDate(market),sameObservedDate:chart.asOfDate===ownMarketDate(market),
+      timing:"COMPLETED_DAILY_CLOSE_CONTEXT_NOT_INTRADAY",momentum:chart.momentum,
+      lastClose:chart.lastClose,drawdownFrom252SessionHighClosePct:chart.drawdownFrom252SessionHighClosePct,
+      movingAverages:chart.movingAverages,observations:chart.observations,formations:chart.formations?compactFormationContext(chart.formations):null,
+      highCloseZone:chart.zones.high,lowCloseZone:chart.zones.low,
+      limitations:"Close-based context only. Momentum state is NOT an app phase or confirmed turn. No independent confirmations from repeated price indicators. Supplied P&F targets are conditional price projections, not options asymmetry or calibrated probability."
+    }:{missing:true}});
   }
   const sources = report.sources.filter(source => {
     const time = iso(source.publishedAt);

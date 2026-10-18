@@ -1,3 +1,4 @@
+import { buildChartContext, completedDailyCutoff } from "./aiResearchChartContext";
 import { verifiedResearchMarketDate } from "./aiResearchSynthesisEvidence";
 import {
 loadHistoricalRegimeMarketData,
@@ -82,6 +83,7 @@ const CACHE_TTL_MS =
 interface CachedEvidence {
 value: AIResearchHistoricalEvidence;
 expiresAt: number;
+dailyCutoff: string;
 }
 
 let cachedEvidence: CachedEvidence | null = null;
@@ -144,6 +146,9 @@ loadHistoricalRegimeRatesData(),
 ]);
 if (marketLoad.status === "rejected") throw new Error("Historical index provider failed.");
 const marketData = marketLoad.value;
+let chartContext: ReturnType<typeof buildChartContext>|undefined;
+const chartWarnings:string[]=[];
+try{chartContext=buildChartContext(marketData, completedDailyCutoff(new Date()));}catch{chartWarnings.push("Chart calculation unavailable; existing historical studies remain independent.");}
 
 const market =
 alignHistoricalRegimeMarketData(
@@ -161,13 +166,13 @@ const coverage: NonNullable<AIResearchHistoricalEvidence["coverage"]> = {
   omittedModules: ["COT-conditioned outcomes", "ETF leadership/divergence episode controls", "CPI/NFCI/real-yield vintage studies", "historical constituent breadth", "chart-zone studies"]
 };
 if (market.count === 0) return {
-  ...unavailableEvidence("Historical market alignment returned no observations; inspect source coverage."), coverage
+  ...unavailableEvidence("Historical market alignment returned no observations; inspect source coverage."), coverage, chartContext
 };
 const marketStudies = buildHistoricalMarketStudies(market.days);
 const partial = (warning: string): AIResearchHistoricalEvidence => ({
   ...unavailableEvidence(warning), status: marketStudies.length ? "PARTIAL" : "NOT_AVAILABLE",
   asOfDate: market.lastDate, firstDate: market.firstDate, lastDate: market.lastDate,
-  marketStudies, coverage
+  marketStudies, coverage, chartContext, diagnostics:{...unavailableEvidence(warning).diagnostics,warnings:[warning,...chartWarnings]}
 });
 // A rates outage must not suppress independent index/rotation studies.
 if (ratesLoad.status === "rejected") return partial("Rates provider unavailable; independent market studies remain available.");
@@ -250,7 +255,7 @@ return partial(
 );
 }
 
-return evidence;
+return {...evidence, chartContext, diagnostics:{...evidence.diagnostics,warnings:[...evidence.diagnostics.warnings,...chartWarnings]}};
 } catch {
   return partial("Legacy Price/VIX or rates calculation failed; independent market studies remain available.");
 }
@@ -266,7 +271,7 @@ const now = Date.now();
 
 if (
 cachedEvidence &&
-cachedEvidence.expiresAt > now
+cachedEvidence.expiresAt > now && cachedEvidence.dailyCutoff === completedDailyCutoff(new Date(now))
 ) {
 return cachedEvidence.value;
 }
@@ -294,6 +299,7 @@ evidence.status === "PARTIAL"
 ) {
 cachedEvidence = {
 value: evidence,
+dailyCutoff: completedDailyCutoff(new Date()),
 expiresAt:
 Date.now() + CACHE_TTL_MS,
 };
@@ -362,6 +368,7 @@ export async function loadAIResearchHistoricalEvidence(
   const matched = currentStates.filter(state => state.comparable).length;
   return {
     ...evidence,
+    chartContext: evidence.chartContext && [evidence.chartContext.nasdaq.asOfDate,evidence.chartContext.russell.asOfDate].every(day=>day===null||day<=completedDailyCutoff(new Date(timestamp))) ? evidence.chartContext : undefined,
     marketStudies: evidence.marketStudies?.map(study => ({ ...study,
       currentMatch: study.currentMatch && study.asOfDate === marketDay(study.market),
       limitations: [...study.limitations, timingNote]

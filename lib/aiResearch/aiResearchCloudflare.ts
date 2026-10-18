@@ -1,4 +1,4 @@
-import { CHECK_CONTRACT, CHECK_PROMPT, CHECK_SCHEMA, buildComprehensionCheck, gradeComprehensionCheck } from "./aiResearchComprehensionCheck";
+import { reviewInstrumentFlows, contentForFlows, describeProviderResponse } from "./aiResearchLiveQwen";
 import { buildCompactResearchInput } from "./aiResearchReasoningFrame";
 import { createHash, randomBytes } from "node:crypto";
 import { Redis } from "@upstash/redis";
@@ -6,14 +6,13 @@ import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
 import type { ResearchSynthesis, ResearchSynthesisContent } from "./aiResearchSynthesisTypes";
 
 import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
-import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, normalizeSynthesisEnvelope, SYNTHESIS_CONTRACT as PRODUCTION_CONTRACT } from "./aiResearchSynthesisValidation";
-import { buildSynthesisSchema, RESEARCH_SYSTEM_PROMPT } from "./aiResearchSynthesisContract";
+import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, normalizeSynthesisEnvelope, SYNTHESIS_CONTRACT } from "./aiResearchLiveQwen";
+import { buildLiveInput, LIVE_RESEARCH_PROMPT as RESEARCH_SYSTEM_PROMPT } from "./aiResearchLiveQwen";
 import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
 export { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
-export { validateSynthesis } from "./aiResearchSynthesisValidation";
+export { validateSynthesis } from "./aiResearchLiveQwen";
 
-const SYNTHESIS_CONTRACT = CHECK_CONTRACT;
-const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
 const PREFIX = "rotation:research:cf:v1";
 // Keep the quota namespace unchanged so the deployment cannot reset daily limits.
 const DAILY_LIMIT = 20;
@@ -37,7 +36,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   if (!Number.isFinite(age) || age < 0 || age > 86400000) return unavailable("Der Snapshot ist nicht aktuell genug für eine neue KI-Einschätzung.");
   const evidence = buildSynthesisEvidence(input, report);
   const briefs = buildInstrumentBriefs(evidence);
-  const responseSchema = CHECK_SCHEMA;
+
   const quality = { contractVersion: SYNTHESIS_CONTRACT, issues: [] as string[], instrumentBriefs: briefs, availableEvidenceIds: evidence.filter(item => item.available).map(item => item.id),
     missingOwnPriceMarkets: evidence.filter(item => item.kind === "PRICE" && item.entryDataReady !== true).map(item => item.market ?? item.id), semanticTruthVerified: false as const,
     inputSummary: {
@@ -46,7 +45,8 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       cotReportDates: [...new Set(evidence.filter(item => item.kind === "COT").flatMap(item => (item.data.summaries as Array<{ reportDate?: string }>).map(summary => summary.reportDate ?? "")).filter(Boolean))],
       historicalAsOf: report.historicalEvidence?.asOfDate ?? null, newsCount: evidence.filter(item => item.kind === "NEWS").length,
     } };
-  const payload = JSON.stringify(buildComprehensionCheck(evidence));
+  const payload = JSON.stringify({contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
+    question:text(input.context.question,500),...buildLiveInput(evidence)});
   const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, quality: {
     ...(value.quality ?? quality), timing: {
       preparationMs: execution.preparationMs ?? null,
@@ -78,7 +78,6 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   };
   try {
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
-    if(cached?.quality?.contractVersion===CHECK_CONTRACT&&cached.snapshotTimestamp===snapshotTimestamp) return {...cached,snapshotTimestamp,cached:true};
     if (cached?.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
       if (cached.status === "SUCCESS" && validateSynthesis(cached.content, evidence)) return { ...cached, cached: true };
       if (!allowGeneration && cached.status === "UNAVAILABLE" && cached.quality.issues.length) {
@@ -134,8 +133,8 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     providerStartedAt = Date.now();
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${MODEL}`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, cache: "no-store", signal: AbortSignal.timeout(providerTimeoutMs),
-      body: JSON.stringify({ max_tokens: 1800, temperature: 0.2, messages: [
-        { role: "system", content: CHECK_PROMPT },
+      body: JSON.stringify({ max_tokens: 2200, temperature: 0.2, messages: [
+        { role: "system", content: RESEARCH_SYSTEM_PROMPT },
         { role: "user", content: payload },
       ] }),
     });
@@ -167,28 +166,44 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const body = await response.json();
     providerFinishedAt = Date.now();
     if (body.success !== true) return unavailable("Cloudflare konnte keine vollständige KI-Antwort liefern.");
-    const raw = body.result?.response;
+    const raw = body.result?.choices?.[0]?.message?.content ?? body.result?.response;
     let content: unknown;
     try { content = raw; } catch { content = null; }
     const rawObject = content && typeof content === "object" && !Array.isArray(content) ? content as Record<string, unknown> : {};
     const responseShape = { rootKeys: Object.keys(rawObject).slice(0,20).map(key => key.slice(0,80)),
       flowsIsArray: Array.isArray(rawObject.flows), flowCount: Array.isArray(rawObject.flows) ? rawObject.flows.length : null };
-    // Temporary diagnostic: never convert this synthetic task into a trade assessment.
-    const check = gradeComprehensionCheck(content,evidence);
-    const diagnostic: ResearchSynthesis = {
-      generatedAt:new Date().toISOString(),
-      ...unavailable(check.passed
-        ? "Gebündelter Vergleich ohne erzwungenes JSON: Faktenantworten formal korrekt. Die drei freien Instrumentanalysen stehen im vollständigen Bericht zur inhaltlichen Prüfung. Keine KI-Einstiegsfreigabe."
-        : "Gebündelter Vergleich ohne erzwungenes JSON: Mindestens eine Faktenantwort oder ein Abschnitt fehlt oder widerspricht den Daten. Freie Antwort im vollständigen Bericht; bitte nicht erneut aktualisieren."),
-      quality: {...quality, responseShape, issues: [check.passed ? "DIAGNOSTIC_PASS_NOT_A_MARKET_ANALYSIS" : "DIAGNOSTIC_FAIL",...check.issues],
-        rejectedResponse: {summary:"Numerische und sprachliche Fakten sowie drei freie Instrumentanalysen im selben Aufruf",asymmetry:"Nicht untersucht",counterarguments:[],limitations:["Korrekte Faktenantworten und Textlänge beweisen keine gute freie Interpretation oder Prognosequalität."],references:[{
-          instrument:"DIAGNOSTIC_ONLY",evidenceRefs:[],confirmationRefs:[],invalidationRefs:[],
-          structuredReview:{answers:check.answers,expected:check.expected,passed:check.passed,testContract:CHECK_CONTRACT}}]}}
-    };
-    const diagnosedCheck=withTiming(diagnostic);
-    await storeRejectedDiagnosis(diagnosedCheck);
-    await redis.set(cacheKey,diagnosedCheck,{ex:900});
-    return diagnosedCheck;
+    const normalized = normalizeSynthesisEnvelope(content, evidence);
+    const derived = deriveSynthesisConclusion(normalized);
+    const answerQuality = { ...quality, providerText: text(raw,12000), responseShape, normalizations: [
+      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "DATED_COT_FACTS_AND_MODEL_REVIEW", "OVERVIEW_FROM_REVIEWED_INSTRUMENTS", "DIRECTION_AND_CONTEXT_FROM_MEASURED_FACTS"] : []),
+      ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
+    content = derived.value;
+    stage = "ANSWER_VALIDATION";
+    const reviewed=reviewInstrumentFlows(content,evidence,true);
+    const providerDiagnostics=describeProviderResponse(body);
+    if(providerDiagnostics.finishReason==="length"){
+      const flows=(content as ResearchSynthesisContent|undefined)?.flows??[];
+      const lastInstrument=flows[flows.length-1]?.instrument;
+      for(const review of reviewed.reviews)if(review.instrument===lastInstrument){review.status="WITHHELD";review.issues.push("PROVIDER_OUTPUT_LIMIT_REACHED");}
+      reviewed.issues.push("PROVIDER_OUTPUT_LIMIT_REACHED");
+      const kept=reviewed.reviews.filter(r=>r.status==="CHECKED").map(r=>r.draft!);
+      reviewed.content=kept.length?contentForFlows(kept):undefined;
+    }
+    const accepted=reviewed.content;
+    const grounded=accepted?{...accepted,flows:accepted.flows.map(flow=>{
+      const brief=briefs.find(b=>b.instrument===flow.instrument)!;
+      return {...flow,grounding:{history:brief.histories.find(h=>h.id===flow.historyStudyId)??null,cot:brief.cot,price:brief.price}};
+    })}:undefined;
+    const withheld=reviewed.reviews.filter(r=>r.status!=="CHECKED").length;
+    const result:ResearchSynthesis={status:grounded?"SUCCESS":"UNAVAILABLE",model:MODEL,generatedAt:new Date().toISOString(),snapshotTimestamp,cached:false,
+      message:grounded?(withheld?"Teilweise ausgewertet: Einzelne Instrumentaussagen sind zurückgehalten und gesondert gekennzeichnet. App-Freigaben bleiben unverändert.":"Keine bekannten Prüfprobleme gefunden. Dies beweist weder wirtschaftliche Richtigkeit noch einen Handelsvorteil."):
+      "Die KI hat geantwortet; ihre Instrumentaussagen sind zur Prüfung zurückgehalten. Originaltexte und Hinweise bleiben sichtbar. Keine KI-Einstiegsaussage übernommen.",
+      content:grounded,instrumentReviews:reviewed.reviews,quality:{...answerQuality,providerDiagnostics,issues:reviewed.issues}};
+    stage=grounded?"APPROVED_ANSWER_CACHE_WRITE":"REJECTED_ANSWER_CACHE_WRITE";
+    const diagnosed=withTiming(result);
+    if(!grounded)await storeRejectedDiagnosis(diagnosed);
+    await redis.set(cacheKey,diagnosed,{ex:900});
+    return diagnosed;
   } catch (error) {
     // Do not expose exception messages: providers may include request URLs or credentials.
     const name = error && typeof error === "object" && "name" in error ? String(error.name) : "";

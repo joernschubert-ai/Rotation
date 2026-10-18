@@ -1,6 +1,6 @@
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
 import type { ResearchTrigger } from "./aiResearchTriggers";
-export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V18_DATA_FIRST_INSTRUMENT_PACKETS";
+export const SYNTHESIS_CONTRACT = "QWEN_LIVE_FORMATION_FRAME_V13";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -14,6 +14,8 @@ export interface ResearchSynthesisContent {
     whyNow: string;
     counterargument: string;
     confirmation: string;
+    confirmationDirection?: "UP" | "DOWN";
+    invalidationDirection?: "UP" | "DOWN";
     invalidation: string;
     evidenceRefs: string[];
     confirmationRefs: string[];
@@ -49,8 +51,11 @@ export interface ResearchSynthesis {
   cached: boolean;
   message: string;
   content?: ResearchSynthesisContent;
+  instrumentReviews?: Array<{instrument: "NASDAQ_PUT" | "NASDAQ_CALL" | "RUSSELL_CALL"; status: "CHECKED" | "WITHHELD" | "MISSING"; issues: string[]; draft?: ResearchSynthesisContent["flows"][number]}>;
   quality?: {
     contractVersion: string;
+    providerText?: string;
+    providerDiagnostics?: {finishReason: string | null; completionTokens: number | null; promptTokens: number | null; responseCharacters: number; outputLimitReported: boolean};
     issues: string[];
     availableEvidenceIds: string[];
     missingOwnPriceMarkets: string[];
