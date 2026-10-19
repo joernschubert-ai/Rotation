@@ -40,9 +40,9 @@ import { fragilityEngine } from "./fragilityEngine";
 import { squeezeEngine } from "./squeezeEngine";
 import { participationEngine } from "./participationEngine";
 import { priceMomentumEngine, priceMomentumForIndex } from "./priceMomentumEngine";
-import { engineDataIssues, guardOwnPriceEntry } from "./marketInputIntegrity";
+import { engineDataIssues, guardOwnPriceEntry, guardVolatilityContext } from "./marketInputIntegrity";
 import { gammaEngine } from "./gammaEngine";
-import { historicalReplay } from "../history/historicalReplay";
+import { historicalReplay } from "./historicalReplay";
 import { historyEngine } from "../history/historyEngine";
 
 export function marketEngine(
@@ -1664,7 +1664,7 @@ export function marketEngine(
   RETURN
   ===================================================== */
 
-  return {
+  return guardVolatilityContext({
     crash,
     phase,
     phaseData,
@@ -1727,5 +1727,5 @@ export function marketEngine(
     historicalScenarioId: isHistoricalScenario
       ? data.scenarioId
       : undefined
-  };
+  }, data);
 }

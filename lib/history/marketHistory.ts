@@ -217,6 +217,7 @@ SAVE
 export async function saveMarketSnapshot(
   snapshot: any
 ): Promise<void> {
+  if(snapshot?.volatilityDataQuality?.entryBlocked===true) throw new Error("Context-only volatility frame is not a regular market snapshot");
   if (
     process.env.NODE_ENV === "development"
   ) {

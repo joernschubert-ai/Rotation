@@ -188,6 +188,7 @@ export function createMarketSnapshot({
 
   return {
     timestamp: new Date().toISOString(),
+    volatilityDataQuality: engine.volatilityDataQuality ?? map.volatilityDataQuality ?? null,
 
     // Persist coverage and universe identity alongside the daily measurements.
     breadthDataQuality,
