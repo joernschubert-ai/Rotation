@@ -1,3 +1,4 @@
+import { fetchCOTWithCache } from "./aiResearchCOTCache";
 // lib/aiResearch/aiResearchCOTProvider.ts
 
 import type {
@@ -1504,7 +1505,7 @@ warnings,
 MAIN PROVIDER
 ===================================================== */
 
-export async function fetchCOTData(
+async function fetchCOTDataDirect(
 input:
 FetchCOTInput = {}
 ): Promise<FetchCOTResult> {
@@ -1898,3 +1899,5 @@ warnings,
 },
 };
 }
+
+export async function fetchCOTData(input:FetchCOTInput={}):Promise<FetchCOTResult>{return fetchCOTWithCache(input,fetchCOTDataDirect);}

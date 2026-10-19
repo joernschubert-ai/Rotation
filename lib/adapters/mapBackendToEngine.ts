@@ -218,6 +218,8 @@ export function mapBackendToEngine(data: any) {
     breadthDataQuality,
     indexBreadth: data.indexBreadth ?? null,
 
+    volatilityDataQuality: data.volatilityDataQuality ?? null,
+
     marketLiquidityScore:
       finiteNumber(data.marketLiquidityScore),
 

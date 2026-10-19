@@ -1,3 +1,5 @@
+import { buildInstrumentPriceReferences } from "./aiResearchPriceReferences";
+import { buildWeightingContexts, type WeightingContext } from "./aiResearchWeighting";
 import { reviewInstrumentFlows, contentForFlows, describeProviderResponse } from "./aiResearchLiveQwen";
 import { buildCompactResearchInput } from "./aiResearchReasoningFrame";
 import { createHash, randomBytes } from "node:crypto";
@@ -28,7 +30,11 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   let providerFinishedAt: number | null = null;
   let providerTimeoutMs = 0;
   const snapshotTimestamp = text(input.snapshot?.timestamp, 40);
-  const unavailable = (message: string): ResearchSynthesis => ({ status: "UNAVAILABLE", model: MODEL, snapshotTimestamp, cached: false, message });
+  let weightingContexts:WeightingContext[]=[];
+  let priceReferences:ReturnType<typeof buildInstrumentPriceReferences>=[];
+  const cotDataQuality=input.positioning?.dataQuality;
+  const unavailable = (message: string): ResearchSynthesis => ({ status: "UNAVAILABLE", model: MODEL, snapshotTimestamp, cached: false, message, weightingContexts, priceReferences, cotDataQuality });
+  priceReferences=buildInstrumentPriceReferences(buildSynthesisEvidence(input,report),snapshotTimestamp);
   const token = process.env.CLOUDFLARE_API_TOKEN;
   const account = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (!token || !account || !/^[a-f0-9]{32}$/i.test(account)) return unavailable("Cloudflare ist noch nicht vollständig eingerichtet. Die regelbasierte Auswertung bleibt verfügbar.");
@@ -36,6 +42,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   if (!Number.isFinite(age) || age < 0 || age > 86400000) return unavailable("Der Snapshot ist nicht aktuell genug für eine neue KI-Einschätzung.");
   const evidence = buildSynthesisEvidence(input, report);
   const briefs = buildInstrumentBriefs(evidence);
+  weightingContexts=buildWeightingContexts(evidence,snapshotTimestamp);
 
   const quality = { contractVersion: SYNTHESIS_CONTRACT, issues: [] as string[], instrumentBriefs: briefs, availableEvidenceIds: evidence.filter(item => item.available).map(item => item.id),
     missingOwnPriceMarkets: evidence.filter(item => item.kind === "PRICE" && item.entryDataReady !== true).map(item => item.market ?? item.id), semanticTruthVerified: false as const,
@@ -47,7 +54,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     } };
   const payload = JSON.stringify({contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
     question:text(input.context.question,500),...buildLiveInput(evidence)});
-  const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, quality: {
+  const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, weightingContexts, priceReferences, cotDataQuality, quality: {
     ...(value.quality ?? quality), timing: {
       preparationMs: execution.preparationMs ?? null,
       synthesisMs: Date.now() - synthesisStartedAt,
@@ -79,10 +86,10 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   try {
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
     if (cached?.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
-      if (cached.status === "SUCCESS" && validateSynthesis(cached.content, evidence)) return { ...cached, cached: true };
+      if (cached.status === "SUCCESS" && validateSynthesis(cached.content, evidence)) return { ...cached, cached: true, weightingContexts, priceReferences, cotDataQuality };
       if (!allowGeneration && cached.status === "UNAVAILABLE" && cached.quality.issues.length) {
         if (allowGeneration) await storeRejectedDiagnosis(cached);
-        return { ...cached, cached: true };
+        return { ...cached, cached: true, weightingContexts, priceReferences, cotDataQuality };
       }
     }
     if (!allowGeneration) {
@@ -90,7 +97,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       const rejected = await redis.get<ResearchSynthesis>(diagnosticKey);
       if (rejected?.status === "UNAVAILABLE" && rejected.snapshotTimestamp === snapshotTimestamp &&
         rejected.quality?.contractVersion === SYNTHESIS_CONTRACT && rejected.quality.issues?.length) {
-        return { ...rejected, cached: true };
+        return { ...rejected, cached: true, weightingContexts, priceReferences, cotDataQuality };
       }
       return unavailable("Noch keine KI-Analyse für diesen Snapshot gespeichert. In der App Research aktualisieren.");
     }
@@ -100,10 +107,10 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     stage = "CACHE_RECHECK";
     const completed = await redis.get<ResearchSynthesis>(cacheKey);
     if (completed?.snapshotTimestamp === snapshotTimestamp && completed.quality?.contractVersion === SYNTHESIS_CONTRACT) {
-      if (completed.status === "SUCCESS" && validateSynthesis(completed.content, evidence)) return { ...completed, cached: true };
+      if (completed.status === "SUCCESS" && validateSynthesis(completed.content, evidence)) return { ...completed, cached: true, weightingContexts, priceReferences, cotDataQuality };
       if (!allowGeneration && completed.status === "UNAVAILABLE" && completed.quality.issues.length) {
         await storeRejectedDiagnosis(completed);
-        return { ...completed, cached: true };
+        return { ...completed, cached: true, weightingContexts, priceReferences, cotDataQuality };
       }
     }
     // Reject an exhausted budget before quota admission, without consuming an attempt.
@@ -175,7 +182,8 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const normalized = normalizeSynthesisEnvelope(content, evidence);
     const derived = deriveSynthesisConclusion(normalized);
     const answerQuality = { ...quality, providerText: text(raw,12000), responseShape, normalizations: [
-      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "CONDITION_TEXT_FROM_SELECTED_DIRECTION_TRIGGERS", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "DATED_COT_FACTS_AND_MODEL_REVIEW", "OVERVIEW_FROM_REVIEWED_INSTRUMENTS", "DIRECTION_AND_CONTEXT_FROM_MEASURED_FACTS"] : []),
+      ...((normalized as ResearchSynthesisContent|undefined)?.flows?.some(flow=>flow.weightedReview?.source==='SHARED_INDEX_CONTEXT')?["MODEL_MARKET_READING_TO_SERVER_INSTRUMENT_CONTRIBUTIONS"]:[]),
+      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "QUALITATIVE_CONDITIONS_FROM_INSTRUMENT_AND_ASSESSMENT_NOT_MODEL", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "DATED_COT_FACTS_AND_MODEL_REVIEW", "OVERVIEW_FROM_REVIEWED_INSTRUMENTS", "DIRECTION_AND_CONTEXT_FROM_MEASURED_FACTS"] : []),
       ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
     content = derived.value;
     stage = "ANSWER_VALIDATION";
@@ -195,8 +203,9 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       return {...flow,grounding:{history:brief.histories.find(h=>h.id===flow.historyStudyId)??null,cot:brief.cot,price:brief.price}};
     })}:undefined;
     const withheld=reviewed.reviews.filter(r=>r.status!=="CHECKED").length;
+    const hasNotes=grounded?.flows.some(flow=>Boolean(flow.interpretationNotes?.length));
     const result:ResearchSynthesis={status:grounded?"SUCCESS":"UNAVAILABLE",model:MODEL,generatedAt:new Date().toISOString(),snapshotTimestamp,cached:false,
-      message:grounded?(withheld?"Teilweise ausgewertet: Einzelne Instrumentaussagen sind zurückgehalten und gesondert gekennzeichnet. App-Freigaben bleiben unverändert.":"Keine bekannten Prüfprobleme gefunden. Dies beweist weder wirtschaftliche Richtigkeit noch einen Handelsvorteil."):
+      message:grounded?(withheld?"Teilweise ausgewertet: Einzelne Instrumentaussagen sind zurückgehalten und gesondert gekennzeichnet. App-Freigaben bleiben unverändert.":hasNotes?"Auswertung verfügbar mit gekennzeichneten Vorbehalten. Textthese und tatsächlich beurteilte Gewichtungsbeiträge getrennt lesen.":"Keine bekannten Prüfprobleme gefunden. Dies beweist weder wirtschaftliche Richtigkeit noch einen Handelsvorteil."):
       "Die KI hat geantwortet; ihre Instrumentaussagen sind zur Prüfung zurückgehalten. Originaltexte und Hinweise bleiben sichtbar. Keine KI-Einstiegsaussage übernommen.",
       content:grounded,instrumentReviews:reviewed.reviews,quality:{...answerQuality,providerDiagnostics,issues:reviewed.issues}};
     stage=grounded?"APPROVED_ANSWER_CACHE_WRITE":"REJECTED_ANSWER_CACHE_WRITE";

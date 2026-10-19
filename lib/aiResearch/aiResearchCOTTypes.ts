@@ -428,7 +428,17 @@ COT RESEARCH DATA
 * persistence research.
 */
 
+export interface COTDataQuality {
+ policy:string;
+ status:'FETCHED'|'RECENT_CACHE'|'LAST_VALID_FALLBACK'|'UNAVAILABLE';
+ lastSuccessfulFetchAt:string|null;
+ observationDate:string|null;
+ fallbackUsed:boolean;
+ providerAttempted:boolean;
+ message:string;
+}
 export interface AIResearchCOTData {
+dataQuality?:COTDataQuality;
 
 generatedAt:
 string;

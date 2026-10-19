@@ -1,3 +1,4 @@
+import { buildFormationHistory, type FormationHistory } from "./aiResearchFormationHistory";
 import { buildFormationContext } from "./aiResearchFormations";
 import { buildMomentumContext } from "./aiResearchMomentumContext";
 export type ChartPoint = { date: string; close: number };
@@ -44,9 +45,11 @@ export function buildOwnChartContext(symbol:string,raw:ChartPoint[],asOfDate:str
  const width=(end:number)=>{if(end<20)return null;const values=closes.slice(end-20,end);return pct(Math.max(...values),Math.min(...values));};
  const currentWidth=width(n),previousWidth=width(n-20);
  const max252=n>=252?Math.max(...closes.slice(-252)):null;
+ let formationHistory:FormationHistory|null=null;let formationHistoryError:string|null=null;
+ try { formationHistory=buildFormationHistory(points); } catch { formationHistoryError="Historical formation study unavailable"; }
  return {
   symbol,asOfDate:points[n-1]?.date??null,requestedCutoff:asOfDate,status:n>=200?'AVAILABLE':n>=21?'PARTIAL':'INSUFFICIENT_DATA',observationCount:n,
-  basis:'DAILY_CLOSE_ONLY' as const,lastClose:last,momentum:buildMomentumContext(closes),formations:buildFormationContext(points),
+  basis:'DAILY_CLOSE_ONLY' as const,lastClose:last,momentum:buildMomentumContext(closes),formations:buildFormationContext(points),formationHistory,
   return5SessionsPct:rounded(n>5?pct(last!,closes[n-6]):null),return20SessionsPct:rounded(n>20?pct(last!,closes[n-21]):null),
   movingAverages:[ma(20),ma(50),ma(200)],prior20,prior63,prior252,
   drawdownFrom252SessionHighClosePct:rounded(last!==null&&max252!==null?pct(last,max252):null),
@@ -55,7 +58,7 @@ export function buildOwnChartContext(symbol:string,raw:ChartPoint[],asOfDate:str
    failedPrior20CloseBreakout:failedUp,failedPrior20CloseBreakdown:failedDown,
    closeRange20SessionsPct:rounded(currentWidth),previous20SessionRangePct:rounded(previousWidth),
    narrowerCloseRange:currentWidth!==null&&previousWidth!==null?currentWidth<previousWidth:null},
-  diagnostics:{rejectedObservations:rejected,duplicateObservations:duplicates},
+  diagnostics:{rejectedObservations:rejected,duplicateObservations:duplicates,formationHistoryError},
   limitations:['Close-derived zones are descriptive references, not validated support/resistance or trading signals.','No OHLC, intraday, volume, ATR, candle patterns or all-time-high claim. Only explicitly labelled conditional P&F projections, no guaranteed targets.','Fixed tolerances and lookbacks are definitions, not optimized or statistically validated edges.','Touch episodes require at least three sessions without a near-zone touch between episodes.','No future observations used; daily dates do not establish intraday entry availability.'],
  };
 }
@@ -63,7 +66,7 @@ export function buildOwnChartContext(symbol:string,raw:ChartPoint[],asOfDate:str
 export function buildChartContext(data:{nasdaq:{points:ChartPoint[]};russell:{points:ChartPoint[]}},asOfDate:string){
  const nasdaq=buildOwnChartContext('^NDX',data.nasdaq.points,asOfDate);
  const russell=buildOwnChartContext('^RUT',data.russell.points,asOfDate);
- return {version:'DAILY_CLOSE_FORMATION_CONTEXT_V3',cutoff:asOfDate,nasdaq,russell,
+ return {version:'DAILY_CLOSE_FORMATION_RESEARCH_V4',cutoff:asOfDate,nasdaq,russell,
   predictiveEdgeValidated:false,automaticExecution:false,
   note:'Independent own-index observations; Russell is not gated by Nasdaq. No AI model call.'};
 }

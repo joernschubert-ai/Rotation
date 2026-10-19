@@ -1,6 +1,9 @@
+import type { COTDataQuality } from "./aiResearchCOTTypes";
+import type { InstrumentPriceReferences } from "./aiResearchPriceReferences";
+import type { WeightingContext, WeightedReview } from "./aiResearchWeighting";
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
 import type { ResearchTrigger } from "./aiResearchTriggers";
-export const SYNTHESIS_CONTRACT = "QWEN_LIVE_FORMATION_FRAME_V13";
+export const SYNTHESIS_CONTRACT = "QWEN_SOURCE_STATE_REVIEW_V23";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -8,12 +11,17 @@ export interface ResearchSynthesisContent {
   asymmetry: string;
   flows: Array<{
     instrument: "NASDAQ_PUT" | "NASDAQ_CALL" | "RUSSELL_CALL";
+    weightedReview?: WeightedReview;
+    interpretationNotes?: string[];
+    originalAssessment?: string;
+    assessmentExplanation?: string;
     assessment: "WATCH" | "PREPARE" | "STARTER_CANDIDATE" | "CONFIRM" | "REDUCE";
     reasoning: string;
     reasoningParts?: { supporting: string; opposing: string; earlyOpportunity: string };
     whyNow: string;
     counterargument: string;
     confirmation: string;
+    conditionOrigin?: "SERVER_INSTRUMENT_AND_ASSESSMENT";
     confirmationDirection?: "UP" | "DOWN";
     invalidationDirection?: "UP" | "DOWN";
     invalidation: string;
@@ -45,6 +53,9 @@ export interface ResearchSynthesisContent {
 
 export interface ResearchSynthesis {
   status: "SUCCESS" | "UNAVAILABLE";
+  weightingContexts?: WeightingContext[];
+  priceReferences?: InstrumentPriceReferences[];
+  cotDataQuality?:COTDataQuality;
   model: string;
   generatedAt?: string;
   snapshotTimestamp: string;

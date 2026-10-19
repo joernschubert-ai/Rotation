@@ -1,3 +1,4 @@
+import { compactFormationHistory } from "./aiResearchFormationHistory";
 import { compactFormationContext } from "./aiResearchFormations";
 import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
 
@@ -76,6 +77,7 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
   const reference = Date.parse(snapshot.timestamp);
   const evidence: SynthesisEvidence[] = [
     { id: "APP", kind: "APP", available: true, data: {
+      snapshotTimestamp: snapshot.timestamp,
       phase: typeof snapshot.phase === "string" ? snapshot.phase : pick(snapshot.phase, ["phase", "regimeState", "subPhase", "confidence"]),
       master: pick(snapshot.master, ["score", "signal", "mode", "regime"]),
       flows: report.decisionSupport?.flows.map(flow => ({ instrument: flow.instrument, eligible: flow.eligible, modelSize: flow.modelSize, execution: text(flow.execution), reason: text(flow.reason) })),
@@ -84,6 +86,7 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
       participation: pick(snapshot.participation, ["score", "state"]), liquidity: pick(snapshot.liquidity, ["score", "state"]),
       fragility: pick(snapshot.fragility, ["score", "state"]), marketQuality: pick(snapshot.marketQuality, ["score", "state"]),
       crash: pick(snapshot.crash, ["score", "probability"]), squeeze: pick(snapshot.squeeze, ["risk", "state", "squeezeType"]),
+      volatilityDataQuality: { ...pick(snapshot.volatilityDataQuality,["policy","available","asOfDate","asOfTimestamp","fallbackUsed","entryBlocked"]), interpretation:"Dated observed values may be used when a provider endpoint is empty. Keep the observation date; do not call them live quotes. A valid dated fallback is not itself an entry block." },
       volatility: { vix: finite(object(object(snapshot.indices).vix).current),
         vixTermRatio: finite(object(snapshot.indices).vixTermRatio), termDefinition: "VIX / VIX3M; below one is contango",
         volOfVolRatio: finite(object(snapshot.indices).volOfVolRatio) },
@@ -126,7 +129,7 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     const leveraged = safe.find(item => item.group === "LEVERAGED_MONEY");
     const sign = (value: number | null | undefined) => typeof value === "number" && Number.isFinite(value) ? Math.sign(value) : null;
     evidence.push({ id: `COT_${market}`, kind: "COT", market, available: safe.length > 0,
-      data: { publicationTimeKnown: false, laggedContextOnly: true, summaries: safe.slice(0, 2).map(item => pick(item, ["reportDate", "group", "bias", "netPosition", "weeklyChange", "change4W", "change13W", "change26W", "percentile", "zScore"])), missingOrStale: safe.length === 0,
+      data: { dataQuality:input.positioning?.dataQuality??null, publicationTimeKnown: false, laggedContextOnly: true, summaries: safe.slice(0, 2).map(item => pick(item, ["reportDate", "group", "bias", "netPosition", "weeklyChange", "change4W", "change13W", "change26W", "percentile", "zScore"])), missingOrStale: safe.length === 0,
         groupComparison: {
           bothGroupsPresent: Boolean(asset && leveraged),
           sameObservationDate: Boolean(asset && leveraged && asset.reportDate === leveraged.reportDate),
@@ -197,9 +200,9 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     const available=!!chart?.asOfDate && chart.asOfDate<=marketDate && reference-Date.parse(chart.asOfDate+"T00:00:00Z")<=5*86400000 && chart.momentum.state!=="INSUFFICIENT_DATA";
     evidence.push({id:"CHART_"+market,kind:"CHART",market,available,entryDataReady:false,data:chart?{
       asOfDate:chart.asOfDate,basis:chart.basis,snapshotMarketDate:ownMarketDate(market),sameObservedDate:chart.asOfDate===ownMarketDate(market),
-      timing:"COMPLETED_DAILY_CLOSE_CONTEXT_NOT_INTRADAY",momentum:chart.momentum,
-      lastClose:chart.lastClose,drawdownFrom252SessionHighClosePct:chart.drawdownFrom252SessionHighClosePct,
-      movingAverages:chart.movingAverages,observations:chart.observations,formations:chart.formations?compactFormationContext(chart.formations):null,
+      timing:"COMPLETED_DAILY_CLOSE_CONTEXT_NOT_INTRADAY",momentum:{state:chart.momentum.state,fast:chart.momentum.fast,slow:chart.momentum.slow,intermediate:chart.momentum.intermediate,stateChangedIn5Sessions:chart.momentum.stateChangedIn5Sessions},
+      prior20:chart.prior20,prior63:chart.prior63,prior252:chart.prior252,lastClose:chart.lastClose,drawdownFrom252SessionHighClosePct:chart.drawdownFrom252SessionHighClosePct,
+      movingAverages:chart.movingAverages.map(m=>({period:m.period,closeAverage:m.closeAverage,distancePct:m.distancePct,slope5SessionsPct:m.slope5SessionsPct})),observations:chart.observations,formations:chart.formations?compactFormationContext(chart.formations):null,formationHistory:chart.formationHistory&&chart.formations?compactFormationHistory(chart.formationHistory,chart.formations):null,
       highCloseZone:chart.zones.high,lowCloseZone:chart.zones.low,
       limitations:"Close-based context only. Momentum state is NOT an app phase or confirmed turn. No independent confirmations from repeated price indicators. Supplied P&F targets are conditional price projections, not options asymmetry or calibrated probability."
     }:{missing:true}});
@@ -207,8 +210,8 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
   const sources = report.sources.filter(source => {
     const time = iso(source.publishedAt);
     return time !== null && Date.parse(time) <= reference && reference - Date.parse(time) <= 7 * 86400000;
-  }).slice(0, 6);
+  }).slice(0, 12);
   sources.forEach((source, index) => evidence.push({ id: `NEWS_${index}`, kind: "NEWS", available: true,
-    data: { ...pick(source, ["title", "summary", "publishedAt", "publisher"]), fullArticleVerified: false } }));
+    data: { ...pick(source, ["title", "summary", "publishedAt", "publisher"]), url: text(source.url, 1200), fullArticleVerified: false } }));
   return evidence;
 }
