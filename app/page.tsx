@@ -147,6 +147,12 @@ export default function Home() {
         snapshot,
       });
 
+      if (mappedWithHistory.volatilityDataQuality?.entryBlocked === true) {
+        setResearchSnapshotTimestamp(null);
+        setSaveError(mappedWithHistory.volatilityDataQuality.message);
+        return;
+      }
+
       try {
         const saveRes = await fetch("/api/history", {
           method: "POST",
@@ -310,6 +316,12 @@ export default function Home() {
           </button>
         </div>
       </header>
+
+      {loadedMarket.map.volatilityDataQuality?.fallbackUsed === true && (
+        <div role="status" className="mb-4 border border-amber-800 p-3 text-sm text-amber-200">
+          {loadedMarket.map.volatilityDataQuality.message}
+        </div>
+      )}
 
       {loadError && (
         <div role="alert" className="mb-4 border border-red-800 p-3 text-sm text-red-300">
