@@ -1,29 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-import { loadHistoricalRegimeMarketData } from
-"@/lib/historicalRegime/historicalRegimeProvider";
-import { alignHistoricalRegimeMarketData } from
-"@/lib/historicalRegime/historicalRegimeAlignment";
-import { loadHistoricalRegimeRatesData } from
-"@/lib/historicalRegime/historicalRegimeRatesProvider";
-import { alignHistoricalRegimeRates } from
-"@/lib/historicalRegime/historicalRegimeRatesAlignment";
-import { loadHistoricalRegimeMacroVintageData } from
-"@/lib/historicalRegime/historicalRegimeMacroVintageProvider";
-import { alignHistoricalMacroVintage } from
-"@/lib/historicalRegime/historicalRegimeMacroVintageAlignment";
-import { loadHistoricalRegimeBreadthData } from
-"@/lib/historicalRegime/historicalRegimeBreadthProvider";
-import { buildHistoricalMacroFeatures } from
-"@/lib/historicalRegime/historicalRegimeMacroFeatures";
-import { buildHistoricalRegimeFeatures } from
-"@/lib/historicalRegime/historicalRegimeFeatures";
-import { buildHistoricalRegimeOutcomes } from
-"@/lib/historicalRegime/historicalRegimeOutcomes";
-import { buildHistoricalRegimeFeatureSet } from
-"@/lib/historicalRegime/historicalRegimeFeatureSet";
-import { buildHistoricalRegimeDistributions } from
-"@/lib/historicalRegime/historicalRegimeDistributions";
+import { loadHistoricalRegimeMarketData } from "@/lib/historicalRegime/historicalRegimeProvider";
+import { alignHistoricalRegimeMarketData } from "@/lib/historicalRegime/historicalRegimeAlignment";
+import { loadHistoricalRegimeRatesData } from "@/lib/historicalRegime/historicalRegimeRatesProvider";
+import { alignHistoricalRegimeRates } from "@/lib/historicalRegime/historicalRegimeRatesAlignment";
+import { loadHistoricalRegimeMacroVintageData } from "@/lib/historicalRegime/historicalRegimeMacroVintageProvider";
+import { alignHistoricalMacroVintage } from "@/lib/historicalRegime/historicalRegimeMacroVintageAlignment";
+import { loadHistoricalRegimeBreadthData } from "@/lib/historicalRegime/historicalRegimeBreadthProvider";
+import { buildHistoricalMacroFeatures } from "@/lib/historicalRegime/historicalRegimeMacroFeatures";
+import { buildHistoricalRegimeFeatures } from "@/lib/historicalRegime/historicalRegimeFeatures";
+import { buildHistoricalRegimeOutcomes } from "@/lib/historicalRegime/historicalRegimeOutcomes";
+import { buildHistoricalRegimeFeatureSet } from "@/lib/historicalRegime/historicalRegimeFeatureSet";
+import { buildHistoricalRegimeDistributions } from "@/lib/historicalRegime/historicalRegimeDistributions";
 
 import {
 buildHistoricalRegimeConditionalOutcomes,
@@ -32,226 +20,114 @@ type HistoricalConditionalCondition,
 } from "@/lib/historicalRegime/historicalRegimeConditionalOutcomes";
 
 /* =====================================================
-GENERAL HELPERS
+HELPERS
 ===================================================== */
 
-function isFiniteNumber(
-value: unknown,
-): value is number {
-return typeof value === "number" &&
-Number.isFinite(value);
+function finite(value: unknown): value is number {
+return typeof value === "number" && Number.isFinite(value);
 }
 
-function round(
-value: number | null,
-digits = 4,
-): number | null {
-return isFiniteNumber(value)
-? Number(value.toFixed(digits))
-: null;
+function round(value: number | null, digits = 4): number | null {
+return finite(value) ? Number(value.toFixed(digits)) : null;
 }
 
-function summarizeAvailability(
-rows: Array<Record<string, unknown>>,
-key: string,
-) {
-const available = rows.filter(
-(row) => isFiniteNumber(row[key]),
-).length;
-
+function availability(rows: Record<string, unknown>[], key: string) {
+const available = rows.filter(row => finite(row[key])).length;
 return {
 available,
 missing: rows.length - available,
-coverage:
-rows.length > 0
-? round(100 * available / rows.length, 2)
-: 0,
+coverage: rows.length ? round(100 * available / rows.length, 2) : 0,
 };
 }
 
-function normalizeFeatureRow(
-row: Record<string, unknown>,
-) {
-const result: Record<string, unknown> = {
-date: row.date,
-};
-
-const numericKeys = [
-"cpi",
-"coreCpi",
-"nfci",
-"real10Y",
-"cpiYoY",
-"coreCpiYoY",
-"cpiChange3M",
-"cpiChange6M",
-"coreCpiChange3M",
-"coreCpiChange6M",
-"nfciChange4W",
-"nfciChange12W",
-"real10YChange20D",
-"real10YChange60D",
-"fedFunds",
-"treasury2Y",
-"treasury10Y",
-"treasury10Y2YSpread",
-"fedFundsChange20D",
-"treasury2YChange20D",
-"treasury10YChange20D",
+const MACRO_NUMERIC_KEYS = [
+"cpi", "coreCpi", "nfci", "real10Y", "cpiYoY",
+"coreCpiYoY", "cpiChange3M", "cpiChange6M",
+"coreCpiChange3M", "coreCpiChange6M",
+"nfciChange4W", "nfciChange12W",
+"real10YChange20D", "real10YChange60D",
+"fedFunds", "treasury2Y", "treasury10Y",
+"treasury10Y2YSpread", "fedFundsChange20D",
+"treasury2YChange20D", "treasury10YChange20D",
 "treasury10Y2YSpreadChange20D",
 ];
 
-for (const key of numericKeys) {
-result[key] = round(
-isFiniteNumber(row[key])
-? row[key]
-: null,
-);
-}
-
-const provenanceKeys = [
-"cpiSourceDate",
-"coreCpiSourceDate",
-"nfciSourceDate",
-"real10YSourceDate",
-"cpiRealtimeStart",
-"coreCpiRealtimeStart",
-"nfciRealtimeStart",
-"real10YRealtimeStart",
+const PROVENANCE_KEYS = [
+"cpiSourceDate", "coreCpiSourceDate",
+"nfciSourceDate", "real10YSourceDate",
+"cpiRealtimeStart", "coreCpiRealtimeStart",
+"nfciRealtimeStart", "real10YRealtimeStart",
 ];
 
-for (const key of provenanceKeys) {
+function findSample(rows: Record<string, unknown>[], date: string) {
+const row = rows.find(item => item.date === date);
+if (!row) return null;
+
+const result: Record<string, unknown> = { date };
+
+for (const key of MACRO_NUMERIC_KEYS) {
+result[key] = round(finite(row[key]) ? row[key] : null);
+}
+
+for (const key of PROVENANCE_KEYS) {
 result[key] = row[key] ?? null;
 }
 
 return result;
 }
 
-function findSample(
-rows: Array<Record<string, unknown>>,
-date: string,
+function calculateMacroChecks(
+rows: Record<string, unknown>[],
+alignment: ReturnType<typeof alignHistoricalMacroVintage>,
 ) {
-const row = rows.find(
-(item) => item.date === date,
-);
+const checks: Record<string, boolean> = {
+featureCountMatchesAlignment: rows.length === alignment.count,
+firstDateMatches: rows[0]?.date === alignment.firstDate,
+lastDateMatches: rows[rows.length - 1]?.date === alignment.lastDate,
+chronological: rows.every((row, i) =>
+i === 0 || String(rows[i - 1].date) < String(row.date)),
+rawCpiCoverage: availability(rows, "cpi").available > 0,
+rawCoreCpiCoverage: availability(rows, "coreCpi").available > 0,
+rawNfciCoverage: availability(rows, "nfci").available > 0,
+rawReal10YCoverage: availability(rows, "real10Y").available > 0,
+rateCoverage:
+availability(rows, "fedFunds").available > 0 &&
+availability(rows, "treasury2Y").available > 0 &&
+availability(rows, "treasury10Y").available > 0,
+spreadConsistency: rows.every(row => {
+const a = row.treasury10Y;
+const b = row.treasury2Y;
+const c = row.treasury10Y2YSpread;
+return !finite(a) || !finite(b) || !finite(c) ||
+Math.abs(a - b - c) < 0.000001;
+}),
+provenanceNotAfterMarketDate: rows.every(row =>
+PROVENANCE_KEYS.every(key =>
+row[key] == null || String(row[key]) <= String(row.date))),
+};
 
-return row
-? normalizeFeatureRow(row)
-: null;
-}
-
-function calculateChecks(
-rows: Array<Record<string, unknown>>,
-alignment: ReturnType<
-typeof alignHistoricalMacroVintage
->,
-) {
-const checks: Record<string, boolean> = {};
-
-checks.featureCountMatchesAlignment =
-rows.length === alignment.count;
-
-checks.firstDateMatches =
-rows[0]?.date === alignment.firstDate;
-
-checks.lastDateMatches =
-rows[rows.length - 1]?.date ===
-alignment.lastDate;
-
-checks.chronological = rows.every(
-(row, index) =>
-index === 0 ||
-String(rows[index - 1].date) <
-String(row.date),
-);
-
-checks.rawCpiCoverage =
-summarizeAvailability(rows, "cpi").available > 0;
-
-checks.rawCoreCpiCoverage =
-summarizeAvailability(rows, "coreCpi").available > 0;
-
-checks.rawNfciCoverage =
-summarizeAvailability(rows, "nfci").available > 0;
-
-checks.rawReal10YCoverage =
-summarizeAvailability(rows, "real10Y").available > 0;
-
-checks.rateCoverage =
-summarizeAvailability(rows, "fedFunds").available > 0 &&
-summarizeAvailability(rows, "treasury2Y").available > 0 &&
-summarizeAvailability(rows, "treasury10Y").available > 0;
-
-checks.spreadConsistency = rows.every((row) => {
-const treasury10Y = row.treasury10Y;
-const treasury2Y = row.treasury2Y;
-const spread = row.treasury10Y2YSpread;
-
-if (
-!isFiniteNumber(treasury10Y) ||
-!isFiniteNumber(treasury2Y) ||
-!isFiniteNumber(spread)
-) {
-return true;
-}
-
-return Math.abs(
-treasury10Y - treasury2Y - spread,
-) < 0.000001;
-});
-
-checks.provenanceNotAfterMarketDate =
-rows.every((row) => {
-const marketDate = String(row.date);
-
-const keys = [
-"cpiSourceDate",
-"coreCpiSourceDate",
-"nfciSourceDate",
-"real10YSourceDate",
-"cpiRealtimeStart",
-"coreCpiRealtimeStart",
-"nfciRealtimeStart",
-"real10YRealtimeStart",
-];
-
-return keys.every((key) => {
-const value = row[key];
-
-return value == null ||
-String(value) <= marketDate;
-});
-});
-
-checks.all =
-Object.values(checks).every(Boolean);
-
-return checks;
+return {
+...checks,
+all: Object.values(checks).every(Boolean),
+};
 }
 
 /* =====================================================
-FEATURE TYPES
+FEATURE TYPES AND THRESHOLDS
 ===================================================== */
 
-type FeatureSet = ReturnType<
-typeof buildHistoricalRegimeFeatureSet
->;
-
+type FeatureSet = ReturnType<typeof buildHistoricalRegimeFeatureSet>;
 type FeatureDay = FeatureSet["days"][number];
 
-type ThresholdKey =
-| "nasdaqDistanceMA200P90"
-| "russellVsNasdaq20DP10"
-| "real10YChange60DP75"
-| "breadth50P10"
-| "breadth50P25"
-| "breadth200P10"
-| "breadth200P25";
-
-type Thresholds = Record<
-ThresholdKey,
-number | null
->;
+type Thresholds = {
+nasdaqDistanceMA200P90: number | null;
+russellVsNasdaq20DP10: number | null;
+real10YChange60DP75: number | null;
+breadth50P10: number | null;
+breadth50P25: number | null;
+breadth200P10: number | null;
+breadth200P25: number | null;
+};
 
 type ThresholdSampleCounts = {
 nasdaqDistanceMA200: number;
@@ -261,409 +137,184 @@ breadth50: number;
 breadth200: number;
 };
 
-type FeatureSelector = (
-day: FeatureDay,
-) => number | null;
+function percentile(values: number[], p: number): number | null {
+if (!values.length) return null;
 
-const FEATURE_SELECTORS = {
-nasdaqDistanceMA200: (
-day: FeatureDay,
-) => day.market.nasdaqDistanceMA200,
+const sorted = [...values].sort((a, b) => a - b);
+const position = (sorted.length - 1) * p;
+const low = Math.floor(position);
+const high = Math.ceil(position);
 
-russellVsNasdaq20D: (
-day: FeatureDay,
-) => day.market.russellVsNasdaq20D,
-
-real10YChange60D: (
-day: FeatureDay,
-) => day.macro.real10YChange60D,
-
-breadth50: (
-day: FeatureDay,
-) => day.breadth?.breadth50 ?? null,
-
-breadth200: (
-day: FeatureDay,
-) => day.breadth?.breadth200 ?? null,
-} satisfies Record<string, FeatureSelector>;
-
-/* =====================================================
-PERCENTILES
-===================================================== */
-
-function calculatePercentile(
-values: number[],
-percentile: number,
-): number | null {
-if (values.length === 0) return null;
-
-const sorted = [...values].sort(
-(a, b) => a - b,
-);
-
-if (sorted.length === 1) {
-return sorted[0];
+return sorted[low] +
+(sorted[high] - sorted[low]) * (position - low);
 }
 
-const position =
-(sorted.length - 1) * percentile;
-
-const lower = Math.floor(position);
-const upper = Math.ceil(position);
-
-if (lower === upper) {
-return sorted[lower];
-}
-
-const weight = position - lower;
-
-return sorted[lower] +
-(sorted[upper] - sorted[lower]) * weight;
-}
-
-function extractFeatureValues(
+function numericValues(
 days: FeatureDay[],
-selector: FeatureSelector,
+selector: (day: FeatureDay) => number | null,
 ): number[] {
-return days
-.map(selector)
-.filter(isFiniteNumber);
+return days.map(selector).filter(finite);
 }
 
-function calculateThresholds(
-days: FeatureDay[],
-): {
-thresholds: Thresholds;
-thresholdSampleCounts: ThresholdSampleCounts;
-} {
-const nasdaq = extractFeatureValues(
-days,
-FEATURE_SELECTORS.nasdaqDistanceMA200,
-);
+function calculateThresholds(days: FeatureDay[]) {
+const nasdaq = numericValues(days, d => d.market.nasdaqDistanceMA200);
+const russell = numericValues(days, d => d.market.russellVsNasdaq20D);
+const real10Y = numericValues(days, d => d.macro.real10YChange60D);
+const breadth50 = numericValues(days, d => d.breadth?.breadth50 ?? null);
+const breadth200 = numericValues(days, d => d.breadth?.breadth200 ?? null);
 
-const russell = extractFeatureValues(
-days,
-FEATURE_SELECTORS.russellVsNasdaq20D,
-);
+const thresholds: Thresholds = {
+nasdaqDistanceMA200P90: percentile(nasdaq, 0.9),
+russellVsNasdaq20DP10: percentile(russell, 0.1),
+real10YChange60DP75: percentile(real10Y, 0.75),
+breadth50P10: percentile(breadth50, 0.1),
+breadth50P25: percentile(breadth50, 0.25),
+breadth200P10: percentile(breadth200, 0.1),
+breadth200P25: percentile(breadth200, 0.25),
+};
 
-const real10Y = extractFeatureValues(
-days,
-FEATURE_SELECTORS.real10YChange60D,
-);
-
-const breadth50 = extractFeatureValues(
-days,
-FEATURE_SELECTORS.breadth50,
-);
-
-const breadth200 = extractFeatureValues(
-days,
-FEATURE_SELECTORS.breadth200,
-);
-
-return {
-thresholds: {
-nasdaqDistanceMA200P90:
-calculatePercentile(nasdaq, 0.9),
-
-russellVsNasdaq20DP10:
-calculatePercentile(russell, 0.1),
-
-real10YChange60DP75:
-calculatePercentile(real10Y, 0.75),
-
-breadth50P10:
-calculatePercentile(breadth50, 0.1),
-
-breadth50P25:
-calculatePercentile(breadth50, 0.25),
-
-breadth200P10:
-calculatePercentile(breadth200, 0.1),
-
-breadth200P25:
-calculatePercentile(breadth200, 0.25),
-},
-
-thresholdSampleCounts: {
+const thresholdSampleCounts: ThresholdSampleCounts = {
 nasdaqDistanceMA200: nasdaq.length,
 russellVsNasdaq20D: russell.length,
 real10YChange60D: real10Y.length,
 breadth50: breadth50.length,
 breadth200: breadth200.length,
-},
 };
+
+return { thresholds, thresholdSampleCounts };
 }
 
 /* =====================================================
-CONDITIONAL COMBINATIONS
+FIFTEEN ORIGINAL SIGNAL DEFINITIONS
 ===================================================== */
 
-function createCondition(
+const DEFINITIONS = [
+["nasdaq-above-ma200-p90", "Nasdaq distance MA200 >= P90"],
+["russell-vs-nasdaq-p10", "Russell vs Nasdaq 20D <= P10"],
+["real10y-rising-p75", "Real10Y 60D change >= P75"],
+["vix-rising-20d", "VIX 20D change > 0"],
+["breadth50-weak-p10", "Breadth50 <= P10"],
+["breadth50-weak-p25", "Breadth50 <= P25"],
+["breadth200-weak-p10", "Breadth200 <= P10"],
+["breadth200-weak-p25", "Breadth200 <= P25"],
+["nasdaq-extended-breadth50-weak", "Nasdaq extended + Breadth50 weak (P25)"],
+["nasdaq-extended-breadth200-weak", "Nasdaq extended + Breadth200 weak (P25)"],
+["russell-weak-breadth50-weak", "Russell relative weakness + Breadth50 weak (P25)"],
+["breadth50-weak-vix-rising", "Breadth50 weak (P25) + VIX rising"],
+["breadth200-weak-vix-rising", "Breadth200 weak (P25) + VIX rising"],
+["breadth50-weak-real10y-rising", "Breadth50 weak (P25) + Real10Y rising"],
+["combined-structural-stress", "Nasdaq extended + Russell weak + Real10Y rising + VIX rising"],
+] as const;
+
+type SignalId = typeof DEFINITIONS[number][0];
+
+function condition(
 id: string,
 label: string,
 feature: HistoricalConditionalCondition["feature"],
 operator: HistoricalConditionalCondition["operator"],
 value: number,
 ): HistoricalConditionalCondition {
-return {
-id,
-label,
-feature,
-operator,
-value,
-};
+return { id, label, feature, operator, value };
 }
 
-function buildCombinationsFromThresholds(
-thresholds: Thresholds,
-): HistoricalConditionalCombination[] {
-const combinations:
-HistoricalConditionalCombination[] = [];
+function buildCombinations(thresholds: Thresholds): HistoricalConditionalCombination[] {
+const n = finite(thresholds.nasdaqDistanceMA200P90)
+? condition("nasdaq-distance-ma200-p90", "Nasdaq distance to MA200 >= P90",
+"market.nasdaqDistanceMA200", "gte", thresholds.nasdaqDistanceMA200P90)
+: null;
 
-const nasdaqExtended =
-thresholds.nasdaqDistanceMA200P90 === null
-? null
-: createCondition(
-"nasdaq-distance-ma200-p90",
-"Nasdaq distance to MA200 >= P90",
-"market.nasdaqDistanceMA200",
-"gte",
-thresholds.nasdaqDistanceMA200P90,
-);
+const r = finite(thresholds.russellVsNasdaq20DP10)
+? condition("russell-vs-nasdaq-p10", "Russell vs Nasdaq 20D <= P10",
+"market.russellVsNasdaq20D", "lte", thresholds.russellVsNasdaq20DP10)
+: null;
 
-const russellWeak =
-thresholds.russellVsNasdaq20DP10 === null
-? null
-: createCondition(
-"russell-vs-nasdaq-p10",
-"Russell vs Nasdaq 20D <= P10",
-"market.russellVsNasdaq20D",
-"lte",
-thresholds.russellVsNasdaq20DP10,
-);
+const y = finite(thresholds.real10YChange60DP75)
+? condition("real10y-change-60d-p75", "Real10Y 60D change >= P75",
+"macro.real10YChange60D", "gte", thresholds.real10YChange60DP75)
+: null;
 
-const real10YRising =
-thresholds.real10YChange60DP75 === null
-? null
-: createCondition(
-"real10y-change-60d-p75",
-"Real10Y 60D change >= P75",
-"macro.real10YChange60D",
-"gte",
-thresholds.real10YChange60DP75,
-);
+const v = condition("vix-change-20d-positive", "VIX 20D change > 0",
+"market.vixChange20D", "gt", 0);
 
-const vixRising = createCondition(
-"vix-change-20d-positive",
-"VIX 20D change > 0",
-"market.vixChange20D",
-"gt",
-0,
-);
+const b10 = finite(thresholds.breadth50P10)
+? condition("breadth50-p10", "Breadth50 <= historical P10",
+"breadth.breadth50", "lte", thresholds.breadth50P10)
+: null;
 
-const breadth50P10 =
-thresholds.breadth50P10 === null
-? null
-: createCondition(
-"breadth50-p10",
-"Breadth50 <= historical P10",
-"breadth.breadth50",
-"lte",
-thresholds.breadth50P10,
-);
+const b25 = finite(thresholds.breadth50P25)
+? condition("breadth50-p25", "Breadth50 <= historical P25",
+"breadth.breadth50", "lte", thresholds.breadth50P25)
+: null;
 
-const breadth50P25 =
-thresholds.breadth50P25 === null
-? null
-: createCondition(
-"breadth50-p25",
-"Breadth50 <= historical P25",
-"breadth.breadth50",
-"lte",
-thresholds.breadth50P25,
-);
+const c10 = finite(thresholds.breadth200P10)
+? condition("breadth200-p10", "Breadth200 <= historical P10",
+"breadth.breadth200", "lte", thresholds.breadth200P10)
+: null;
 
-const breadth200P10 =
-thresholds.breadth200P10 === null
-? null
-: createCondition(
-"breadth200-p10",
-"Breadth200 <= historical P10",
-"breadth.breadth200",
-"lte",
-thresholds.breadth200P10,
-);
+const c25 = finite(thresholds.breadth200P25)
+? condition("breadth200-p25", "Breadth200 <= historical P25",
+"breadth.breadth200", "lte", thresholds.breadth200P25)
+: null;
 
-const breadth200P25 =
-thresholds.breadth200P25 === null
-? null
-: createCondition(
-"breadth200-p25",
-"Breadth200 <= historical P25",
-"breadth.breadth200",
-"lte",
-thresholds.breadth200P25,
-);
+const groups: Array<Array<HistoricalConditionalCondition | null>> = [
+[n], [r], [y], [v], [b10], [b25], [c10], [c25],
+[n, b25], [n, c25], [r, b25], [b25, v],
+[c25, v], [b25, y], [n, r, y, v],
+];
 
-function add(
-id: string,
-label: string,
-conditions: Array<
-HistoricalConditionalCondition | null
->,
-) {
-if (conditions.some(
-(condition) => condition === null,
-)) {
-return;
-}
+return DEFINITIONS.flatMap(([id, label], index) => {
+const entries = groups[index];
+if (entries.some(entry => entry === null)) return [];
 
-combinations.push({
+return [{
 id,
 label,
-conditions:
-conditions as HistoricalConditionalCondition[],
+conditions: entries as HistoricalConditionalCondition[],
+}];
 });
 }
 
-add(
-"nasdaq-above-ma200-p90",
-"Nasdaq distance MA200 >= P90",
-[nasdaqExtended],
-);
-
-add(
-"russell-vs-nasdaq-p10",
-"Russell vs Nasdaq 20D <= P10",
-[russellWeak],
-);
-
-add(
-"real10y-rising-p75",
-"Real10Y 60D change >= P75",
-[real10YRising],
-);
-
-add(
-"vix-rising-20d",
-"VIX 20D change > 0",
-[vixRising],
-);
-
-add(
-"breadth50-weak-p10",
-"Breadth50 <= P10",
-[breadth50P10],
-);
-
-add(
-"breadth50-weak-p25",
-"Breadth50 <= P25",
-[breadth50P25],
-);
-
-add(
-"breadth200-weak-p10",
-"Breadth200 <= P10",
-[breadth200P10],
-);
-
-add(
-"breadth200-weak-p25",
-"Breadth200 <= P25",
-[breadth200P25],
-);
-
-add(
-"nasdaq-extended-breadth50-weak",
-"Nasdaq extended + Breadth50 weak (P25)",
-[nasdaqExtended, breadth50P25],
-);
-
-add(
-"nasdaq-extended-breadth200-weak",
-"Nasdaq extended + Breadth200 weak (P25)",
-[nasdaqExtended, breadth200P25],
-);
-
-add(
-"russell-weak-breadth50-weak",
-"Russell relative weakness + Breadth50 weak (P25)",
-[russellWeak, breadth50P25],
-);
-
-add(
-"breadth50-weak-vix-rising",
-"Breadth50 weak (P25) + VIX rising",
-[breadth50P25, vixRising],
-);
-
-add(
-"breadth200-weak-vix-rising",
-"Breadth200 weak (P25) + VIX rising",
-[breadth200P25, vixRising],
-);
-
-add(
-"breadth50-weak-real10y-rising",
-"Breadth50 weak (P25) + Real10Y rising",
-[breadth50P25, real10YRising],
-);
-
-add(
-"combined-structural-stress",
-"Nasdaq extended + Russell weak + Real10Y rising + VIX rising",
-[
-nasdaqExtended,
-russellWeak,
-real10YRising,
-vixRising,
-],
-);
-
-return combinations;
+function featureValue(
+day: FeatureDay,
+feature: HistoricalConditionalCondition["feature"],
+): number | null {
+switch (feature) {
+case "market.nasdaqDistanceMA200": return day.market.nasdaqDistanceMA200;
+case "market.russellVsNasdaq20D": return day.market.russellVsNasdaq20D;
+case "market.vixChange20D": return day.market.vixChange20D;
+case "macro.real10YChange60D": return day.macro.real10YChange60D;
+case "breadth.breadth50": return day.breadth?.breadth50 ?? null;
+case "breadth.breadth200": return day.breadth?.breadth200 ?? null;
+default: return null;
+}
 }
 
-function buildConditionalCombinations(
-featureSet: FeatureSet,
-) {
-const calculated = calculateThresholds(
-featureSet.days,
-);
+function matches(day: FeatureDay, combination: HistoricalConditionalCombination) {
+return combination.conditions.length > 0 &&
+combination.conditions.every(c => {
+const value = featureValue(day, c.feature);
+if (!finite(value)) return false;
 
-return {
-...calculated,
-combinations:
-buildCombinationsFromThresholds(
-calculated.thresholds,
-),
-};
+switch (c.operator) {
+case "gt": return value > c.value;
+case "gte": return value >= c.value;
+case "lt": return value < c.value;
+case "lte": return value <= c.value;
+case "eq": return value === c.value;
+default: return false;
+}
+});
 }
 
 /* =====================================================
-WALK-FORWARD TYPES
+OUTCOMES AND STATISTICS
 ===================================================== */
 
-const WALK_FORWARD_MIN_TRAINING_DAYS = 756;
-
 type OutcomeKey =
-| "forward20D"
-| "forward60D"
-| "mfe20D"
-| "mae20D"
-| "mfe60D"
-| "mae60D";
-
-type ReturnStats = {
-count: number;
-mean: number | null;
-median: number | null;
-positiveShare: number | null;
-negativeShare: number | null;
-minimum: number | null;
-maximum: number | null;
-};
+| "forward20D" | "forward60D"
+| "mfe20D" | "mae20D"
+| "mfe60D" | "mae60D";
 
 type Observation = {
 index: number;
@@ -676,216 +327,7 @@ mfe60D: number | null;
 mae60D: number | null;
 };
 
-type PeriodDefinition = {
-id: string;
-label: string;
-start: string;
-end: string;
-};
-
-const PERIODS: PeriodDefinition[] = [
-{
-id: "2014-2019",
-label: "2014–2019",
-start: "2014-01-01",
-end: "2019-12-31",
-},
-{
-id: "2020-2022",
-label: "2020–2022",
-start: "2020-01-01",
-end: "2022-12-31",
-},
-{
-id: "2023-2026",
-label: "2023–2026",
-start: "2023-01-01",
-end: "2026-12-31",
-},
-];
-
-const COMBINATION_DEFINITIONS = [
-["nasdaq-above-ma200-p90",
-"Nasdaq distance MA200 >= P90"],
-["russell-vs-nasdaq-p10",
-"Russell vs Nasdaq 20D <= P10"],
-["real10y-rising-p75",
-"Real10Y 60D change >= P75"],
-["vix-rising-20d",
-"VIX 20D change > 0"],
-["breadth50-weak-p10",
-"Breadth50 <= P10"],
-["breadth50-weak-p25",
-"Breadth50 <= P25"],
-["breadth200-weak-p10",
-"Breadth200 <= P10"],
-["breadth200-weak-p25",
-"Breadth200 <= P25"],
-["nasdaq-extended-breadth50-weak",
-"Nasdaq extended + Breadth50 weak (P25)"],
-["nasdaq-extended-breadth200-weak",
-"Nasdaq extended + Breadth200 weak (P25)"],
-["russell-weak-breadth50-weak",
-"Russell relative weakness + Breadth50 weak (P25)"],
-["breadth50-weak-vix-rising",
-"Breadth50 weak (P25) + VIX rising"],
-["breadth200-weak-vix-rising",
-"Breadth200 weak (P25) + VIX rising"],
-["breadth50-weak-real10y-rising",
-"Breadth50 weak (P25) + Real10Y rising"],
-["combined-structural-stress",
-"Nasdaq extended + Russell weak + Real10Y rising + VIX rising"],
-] as const;
-
-type CombinationId =
-typeof COMBINATION_DEFINITIONS[number][0];
-
-type Episode = {
-startIndex: number;
-endIndex: number;
-startDate: string;
-endDate: string;
-signalDays: number;
-};
-
-/* =====================================================
-WALK-FORWARD CONDITION EVALUATION
-===================================================== */
-
-function getConditionValue(
-day: FeatureDay,
-feature: HistoricalConditionalCondition["feature"],
-): number | null {
-switch (feature) {
-case "market.nasdaqDistanceMA200":
-return day.market.nasdaqDistanceMA200;
-
-case "market.russellVsNasdaq20D":
-return day.market.russellVsNasdaq20D;
-
-case "macro.real10YChange60D":
-return day.macro.real10YChange60D;
-
-case "market.vixChange20D":
-return day.market.vixChange20D;
-
-case "breadth.breadth50":
-return day.breadth?.breadth50 ?? null;
-
-case "breadth.breadth200":
-return day.breadth?.breadth200 ?? null;
-
-default:
-return null;
-}
-}
-
-function evaluateCondition(
-day: FeatureDay,
-condition: HistoricalConditionalCondition,
-): boolean {
-const value = getConditionValue(
-day,
-condition.feature,
-);
-
-if (!isFiniteNumber(value)) {
-return false;
-}
-
-switch (condition.operator) {
-case "gt":
-return value > condition.value;
-
-case "gte":
-return value >= condition.value;
-
-case "lt":
-return value < condition.value;
-
-case "lte":
-return value <= condition.value;
-
-case "eq":
-return value === condition.value;
-
-default:
-return false;
-}
-}
-
-function evaluateCombination(
-day: FeatureDay,
-combination: HistoricalConditionalCombination,
-): boolean {
-return combination.conditions.length > 0 &&
-combination.conditions.every(
-(condition) =>
-evaluateCondition(day, condition),
-);
-}
-
-/* =====================================================
-STATISTICS
-===================================================== */
-
-function calculateStats(
-observations: Observation[],
-key: OutcomeKey,
-): ReturnStats {
-const values = observations
-.map((observation) => observation[key])
-.filter(isFiniteNumber)
-.sort((a, b) => a - b);
-
-if (values.length === 0) {
-return {
-count: 0,
-mean: null,
-median: null,
-positiveShare: null,
-negativeShare: null,
-minimum: null,
-maximum: null,
-};
-}
-
-const positive = values.filter(
-(value) => value > 0,
-).length;
-
-const negative = values.filter(
-(value) => value < 0,
-).length;
-
-const sum = values.reduce(
-(total, value) => total + value,
-0,
-);
-
-return {
-count: values.length,
-mean: round(sum / values.length),
-median: round(
-calculatePercentile(values, 0.5),
-),
-positiveShare: round(
-positive / values.length * 100,
-2,
-),
-negativeShare: round(
-negative / values.length * 100,
-2,
-),
-minimum: round(values[0]),
-maximum: round(values[values.length - 1]),
-};
-}
-
-function createObservation(
-day: FeatureDay,
-index: number,
-): Observation {
+function observation(day: FeatureDay, index: number): Observation {
 return {
 index,
 date: day.date,
@@ -898,881 +340,558 @@ mae60D: day.outcome.mae60D,
 };
 }
 
-function summarizeOutcomes(
-observations: Observation[],
-) {
+function stats(rows: Observation[], key: OutcomeKey) {
+const values = rows.map(row => row[key]).filter(finite).sort((a, b) => a - b);
+const count = values.length;
+
+if (!count) {
 return {
-forward20D:
-calculateStats(observations, "forward20D"),
-forward60D:
-calculateStats(observations, "forward60D"),
-mfe20D:
-calculateStats(observations, "mfe20D"),
-mae20D:
-calculateStats(observations, "mae20D"),
-mfe60D:
-calculateStats(observations, "mfe60D"),
-mae60D:
-calculateStats(observations, "mae60D"),
+count: 0, mean: null, median: null,
+positiveShare: null, negativeShare: null,
+minimum: null, maximum: null,
 };
 }
 
-function countNonOverlappingEpisodes(
-indices: number[],
-horizon: number,
-): number {
-let count = 0;
-let lastIndex = Number.NEGATIVE_INFINITY;
-
-for (const index of indices) {
-if (index - lastIndex >= horizon) {
-count++;
-lastIndex = index;
+return {
+count,
+mean: round(values.reduce((a, b) => a + b, 0) / count),
+median: round(percentile(values, 0.5)),
+positiveShare: round(100 * values.filter(v => v > 0).length / count, 2),
+negativeShare: round(100 * values.filter(v => v < 0).length / count, 2),
+minimum: round(values[0]),
+maximum: round(values[count - 1]),
+};
 }
+
+function outcomes(rows: Observation[]) {
+return {
+forward20D: stats(rows, "forward20D"),
+forward60D: stats(rows, "forward60D"),
+mfe20D: stats(rows, "mfe20D"),
+mae20D: stats(rows, "mae20D"),
+mfe60D: stats(rows, "mfe60D"),
+mae60D: stats(rows, "mae60D"),
+};
+}
+
+function nonOverlapping(rows: Observation[], key: "forward20D" | "forward60D", horizon: number) {
+let count = 0;
+let last = -Infinity;
+
+for (const row of rows) {
+if (!finite(row[key])) continue;
+if (row.index - last < horizon) continue;
+count++;
+last = row.index;
 }
 
 return count;
 }
 
-/* =====================================================
-NEW: CONTIGUOUS SIGNAL EPISODES
+type Episode = {
+startIndex: number;
+endIndex: number;
+startDate: string;
+endDate: string;
+signalDays: number;
+};
 
-An episode consists of consecutive signal days.
-The first signal day is the episode entry.
+function episodes(rows: Observation[]): Episode[] {
+const result: Episode[] = [];
 
-A period boundary does not reset an episode.
-This prevents artificial new entries on Jan 1.
-===================================================== */
+for (const row of rows) {
+const last = result[result.length - 1];
 
-function buildEpisodes(
-observations: Observation[],
-): Episode[] {
-const episodes: Episode[] = [];
-
-for (const observation of observations) {
-const previous =
-episodes[episodes.length - 1];
-
-if (
-previous &&
-observation.index ===
-previous.endIndex + 1
-) {
-previous.endIndex = observation.index;
-previous.endDate = observation.date;
-previous.signalDays++;
+if (last && row.index === last.endIndex + 1) {
+last.endIndex = row.index;
+last.endDate = row.date;
+last.signalDays++;
 } else {
-episodes.push({
-startIndex: observation.index,
-endIndex: observation.index,
-startDate: observation.date,
-endDate: observation.date,
+result.push({
+startIndex: row.index,
+endIndex: row.index,
+startDate: row.date,
+endDate: row.date,
 signalDays: 1,
 });
 }
 }
 
-return episodes;
-}
-
-function firstEpisodeObservations(
-episodes: Episode[],
-days: FeatureDay[],
-): Observation[] {
-return episodes.map(
-(episode) =>
-createObservation(
-days[episode.startIndex],
-episode.startIndex,
-),
-);
+return result;
 }
 
 /* =====================================================
-NEW: BENCHMARK AND PERIOD VALIDATION
+PERIODS AND BENCHMARK
 ===================================================== */
 
-function inPeriod(
-date: string,
-period: PeriodDefinition,
-): boolean {
-return date >= period.start &&
-date <= period.end;
-}
+const PERIODS = [
+{ id: "2014-2019", label: "2014–2019", start: "2014-01-01", end: "2019-12-31" },
+{ id: "2020-2022", label: "2020–2022", start: "2020-01-01", end: "2022-12-31" },
+{ id: "2023-2026", label: "2023–2026", start: "2023-01-01", end: "2026-12-31" },
+] as const;
 
-function filterPeriod(
-observations: Observation[],
-period: PeriodDefinition,
-): Observation[] {
-return observations.filter(
-(observation) =>
-inPeriod(observation.date, period),
-);
+function periodRows(rows: Observation[], start: string, end: string) {
+return rows.filter(row => row.date >= start && row.date <= end);
 }
 
 function compareHorizon(
-signal: ReturnStats,
-benchmark: ReturnStats,
+signal: ReturnType<typeof stats>,
+benchmark: ReturnType<typeof stats>,
 ) {
 return {
 signalCount: signal.count,
 benchmarkCount: benchmark.count,
-
 signalMean: signal.mean,
 benchmarkMean: benchmark.mean,
-
 meanDifferencePercentagePoints:
-signal.mean !== null &&
-benchmark.mean !== null
-? round(signal.mean - benchmark.mean)
-: null,
-
+signal.mean !== null && benchmark.mean !== null
+? round(signal.mean - benchmark.mean) : null,
 signalMedian: signal.median,
 benchmarkMedian: benchmark.median,
-
 medianDifferencePercentagePoints:
-signal.median !== null &&
-benchmark.median !== null
-? round(
-signal.median -
-benchmark.median,
-)
-: null,
-
-signalNegativeShare:
-signal.negativeShare,
-
-benchmarkNegativeShare:
-benchmark.negativeShare,
-
+signal.median !== null && benchmark.median !== null
+? round(signal.median - benchmark.median) : null,
+signalNegativeShare: signal.negativeShare,
+benchmarkNegativeShare: benchmark.negativeShare,
 negativeShareDifferencePoints:
-signal.negativeShare !== null &&
-benchmark.negativeShare !== null
-? round(
-signal.negativeShare -
-benchmark.negativeShare,
-2,
-)
-: null,
+signal.negativeShare !== null && benchmark.negativeShare !== null
+? round(signal.negativeShare - benchmark.negativeShare, 2) : null,
 };
 }
 
-function buildComparison(
-signals: Observation[],
-benchmark: Observation[],
-) {
-const signal20 = calculateStats(
-signals,
-"forward20D",
-);
-
-const signal60 = calculateStats(
-signals,
-"forward60D",
-);
-
-const benchmark20 = calculateStats(
-benchmark,
-"forward20D",
-);
-
-const benchmark60 = calculateStats(
-benchmark,
-"forward60D",
-);
-
+function compare(signal: Observation[], benchmark: Observation[]) {
 return {
-forward20D:
-compareHorizon(signal20, benchmark20),
-
-forward60D:
-compareHorizon(signal60, benchmark60),
+forward20D: compareHorizon(
+stats(signal, "forward20D"),
+stats(benchmark, "forward20D"),
+),
+forward60D: compareHorizon(
+stats(signal, "forward60D"),
+stats(benchmark, "forward60D"),
+),
 };
 }
 
-function buildPeriodValidation(
-signals: Observation[],
-episodeStarts: Observation[],
+/* =====================================================
+NEW: COMPACT RESEARCH STATUS
+
+This is a descriptive screening classification,
+NOT a calibrated trading signal.
+
+Minimum counts are conservative research gates,
+not statistically optimized thresholds.
+===================================================== */
+
+type ResearchStatus =
+| "INSUFFICIENT_SAMPLE"
+| "MIXED_EVIDENCE"
+| "FURTHER_VALIDATION_REQUIRED";
+
+function classifyResearchStatus(
+episodeCount: number,
+completed20D: number,
+representedPeriods: number,
+meanDifference20D: number | null,
+meanDifference60D: number | null,
+): ResearchStatus {
+if (
+episodeCount < 20 ||
+completed20D < 20 ||
+representedPeriods < 3
+) {
+return "INSUFFICIENT_SAMPLE";
+}
+
+if (
+meanDifference20D === null ||
+meanDifference60D === null
+) {
+return "INSUFFICIENT_SAMPLE";
+}
+
+if (
+Math.sign(meanDifference20D) !==
+Math.sign(meanDifference60D)
+) {
+return "MIXED_EVIDENCE";
+}
+
+return "FURTHER_VALIDATION_REQUIRED";
+}
+
+/* =====================================================
+VALIDATION + SUMMARY
+===================================================== */
+
+function buildValidation(
+days: FeatureDay[],
+matched: Map<SignalId, Observation[]>,
 benchmark: Observation[],
 ) {
-return PERIODS.map((period) => {
-const periodSignals =
-filterPeriod(signals, period);
+const detailedResults = DEFINITIONS.map(([id, label]) => {
+const signals = matched.get(id) ?? [];
+const groups = episodes(signals);
 
-const periodEpisodes =
-filterPeriod(episodeStarts, period);
+const starts = groups.map(group =>
+observation(days[group.startIndex], group.startIndex));
 
-const periodBenchmark =
-filterPeriod(benchmark, period);
+const periodResults = PERIODS.map(period => {
+const s = periodRows(signals, period.start, period.end);
+const e = periodRows(starts, period.start, period.end);
+const b = periodRows(benchmark, period.start, period.end);
 
 return {
 id: period.id,
 label: period.label,
 start: period.start,
 end: period.end,
-
-signalDays: periodSignals.length,
-
-episodeStarts:
-periodEpisodes.length,
-
-signalOutcomes:
-summarizeOutcomes(periodSignals),
-
-episodeStartOutcomes:
-summarizeOutcomes(periodEpisodes),
-
-signalVsBenchmark:
-buildComparison(
-periodSignals,
-periodBenchmark,
-),
-
-episodeStartVsBenchmark:
-buildComparison(
-periodEpisodes,
-periodBenchmark,
-),
+signalDays: s.length,
+episodeStarts: e.length,
+signalOutcomes: outcomes(s),
+episodeStartOutcomes: outcomes(e),
+signalVsBenchmark: compare(s, b),
+episodeStartVsBenchmark: compare(e, b),
 };
 });
-}
-
-/* =====================================================
-NEW: VALIDATION SUMMARY
-===================================================== */
-
-function buildValidation(
-days: FeatureDay[],
-matched: Map<
-CombinationId,
-Observation[]
->,
-benchmark: Observation[],
-) {
-const benchmarkOutcomes =
-summarizeOutcomes(benchmark);
-
-const results =
-COMBINATION_DEFINITIONS.map(
-([id, label]) => {
-const signals = matched.get(id) ?? [];
-
-const episodes =
-buildEpisodes(signals);
-
-const episodeStarts =
-firstEpisodeObservations(
-episodes,
-days,
-);
-
-const completed20D =
-signals.filter(
-(observation) =>
-isFiniteNumber(
-observation.forward20D,
-),
-);
-
-const completed60D =
-signals.filter(
-(observation) =>
-isFiniteNumber(
-observation.forward60D,
-),
-);
-
-const completedEpisode20D =
-episodeStarts.filter(
-(observation) =>
-isFiniteNumber(
-observation.forward20D,
-),
-);
-
-const completedEpisode60D =
-episodeStarts.filter(
-(observation) =>
-isFiniteNumber(
-observation.forward60D,
-),
-);
 
 return {
 id,
 label,
-
 diagnostics: {
 matchedDays: signals.length,
-
-completed20D:
-completed20D.length,
-
-completed60D:
-completed60D.length,
-
-pending20D:
-signals.length -
-completed20D.length,
-
-pending60D:
-signals.length -
-completed60D.length,
-
-contiguousEpisodes:
-episodes.length,
-
-completedEpisodeStarts20D:
-completedEpisode20D.length,
-
-completedEpisodeStarts60D:
-completedEpisode60D.length,
-
-pendingEpisodeStarts20D:
-episodes.length -
-completedEpisode20D.length,
-
-pendingEpisodeStarts60D:
-episodes.length -
-completedEpisode60D.length,
-
-firstEpisodeDate:
-episodes[0]?.startDate ?? null,
-
-lastEpisodeDate:
-episodes[
-episodes.length - 1
-]?.startDate ?? null,
-
-longestEpisodeDays:
-episodes.length > 0
-? Math.max(
-...episodes.map(
-(episode) =>
-episode.signalDays,
-),
-)
-: 0,
+completed20D: signals.filter(x => finite(x.forward20D)).length,
+completed60D: signals.filter(x => finite(x.forward60D)).length,
+pending20D: signals.filter(x => !finite(x.forward20D)).length,
+pending60D: signals.filter(x => !finite(x.forward60D)).length,
+contiguousEpisodes: groups.length,
+completedEpisodeStarts20D: starts.filter(x => finite(x.forward20D)).length,
+completedEpisodeStarts60D: starts.filter(x => finite(x.forward60D)).length,
+pendingEpisodeStarts20D: starts.filter(x => !finite(x.forward20D)).length,
+pendingEpisodeStarts60D: starts.filter(x => !finite(x.forward60D)).length,
+firstEpisodeDate: groups[0]?.startDate ?? null,
+lastEpisodeDate: groups[groups.length - 1]?.startDate ?? null,
+longestEpisodeDays: groups.length
+? Math.max(...groups.map(x => x.signalDays)) : 0,
 },
-
-signalOutcomes:
-summarizeOutcomes(signals),
-
-episodeStartOutcomes:
-summarizeOutcomes(
-episodeStarts,
-),
-
-signalVsBenchmark:
-buildComparison(
-signals,
-benchmark,
-),
-
-episodeStartVsBenchmark:
-buildComparison(
-episodeStarts,
-benchmark,
-),
-
-periods:
-buildPeriodValidation(
-signals,
-episodeStarts,
-benchmark,
-),
+signalOutcomes: outcomes(signals),
+episodeStartOutcomes: outcomes(starts),
+signalVsBenchmark: compare(signals, benchmark),
+episodeStartVsBenchmark: compare(starts, benchmark),
+periods: periodResults,
 };
-},
-);
+});
 
 const checks = {
-resultCountMatchesDefinitions:
-results.length ===
-COMBINATION_DEFINITIONS.length,
+resultCountMatchesDefinitions: detailedResults.length === DEFINITIONS.length,
+episodeCountsValid: detailedResults.every(r =>
+r.diagnostics.contiguousEpisodes <= r.diagnostics.matchedDays),
+completedOutcomesValid: detailedResults.every(r =>
+r.diagnostics.completed20D <= r.diagnostics.matchedDays &&
+r.diagnostics.completed60D <= r.diagnostics.matchedDays),
+episodeOutcomeCountsValid: detailedResults.every(r =>
+r.diagnostics.completedEpisodeStarts20D <= r.diagnostics.contiguousEpisodes &&
+r.diagnostics.completedEpisodeStarts60D <= r.diagnostics.contiguousEpisodes),
+periodSignalCountsConsistent: detailedResults.every(r =>
+r.periods.reduce((sum, p) => sum + p.signalDays, 0) === r.diagnostics.matchedDays),
+periodEpisodeCountsConsistent: detailedResults.every(r =>
+r.periods.reduce((sum, p) => sum + p.episodeStarts, 0) === r.diagnostics.contiguousEpisodes),
+};
 
-episodeCountsValid:
-results.every(
-(result) =>
-result.diagnostics
-.contiguousEpisodes <=
-result.diagnostics.matchedDays,
-),
+const summaryResults = detailedResults.map(result => {
+const d = result.diagnostics;
+const c20 = result.episodeStartVsBenchmark.forward20D;
+const c60 = result.episodeStartVsBenchmark.forward60D;
 
-completedOutcomesValid:
-results.every(
-(result) =>
-result.diagnostics.completed20D <=
-result.diagnostics.matchedDays &&
-result.diagnostics.completed60D <=
-result.diagnostics.matchedDays,
-),
+const periods = result.periods.map(period => ({
+id: period.id,
+signalDays: period.signalDays,
+episodeStarts: period.episodeStarts,
+completed20D: period.episodeStartOutcomes.forward20D.count,
+completed60D: period.episodeStartOutcomes.forward60D.count,
+mean20D: period.episodeStartOutcomes.forward20D.mean,
+median20D: period.episodeStartOutcomes.forward20D.median,
+negativeShare20D: period.episodeStartOutcomes.forward20D.negativeShare,
+mean60D: period.episodeStartOutcomes.forward60D.mean,
+benchmarkMean20D: period.episodeStartVsBenchmark.forward20D.benchmarkMean,
+excessMean20D: period.episodeStartVsBenchmark.forward20D.meanDifferencePercentagePoints,
+excessMean60D: period.episodeStartVsBenchmark.forward60D.meanDifferencePercentagePoints,
+}));
 
-episodeOutcomeCountsValid:
-results.every(
-(result) =>
-result.diagnostics
-.completedEpisodeStarts20D <=
-result.diagnostics.contiguousEpisodes &&
-result.diagnostics
-.completedEpisodeStarts60D <=
-result.diagnostics.contiguousEpisodes,
-),
+const representedPeriods =
+periods.filter(p => p.completed20D > 0).length;
 
-periodSignalCountsConsistent:
-results.every(
-(result) =>
-result.periods.reduce(
-(sum, period) =>
-sum + period.signalDays,
-0,
-) === result.diagnostics.matchedDays,
+return {
+id: result.id,
+label: result.label,
+researchStatus: classifyResearchStatus(
+d.contiguousEpisodes,
+d.completedEpisodeStarts20D,
+representedPeriods,
+c20.meanDifferencePercentagePoints,
+c60.meanDifferencePercentagePoints,
 ),
+matchedDays: d.matchedDays,
+contiguousEpisodes: d.contiguousEpisodes,
+completed20D: d.completedEpisodeStarts20D,
+completed60D: d.completedEpisodeStarts60D,
+pending20D: d.pendingEpisodeStarts20D,
+pending60D: d.pendingEpisodeStarts60D,
+firstEpisodeDate: d.firstEpisodeDate,
+lastEpisodeDate: d.lastEpisodeDate,
+episode20D: {
+mean: result.episodeStartOutcomes.forward20D.mean,
+median: result.episodeStartOutcomes.forward20D.median,
+negativeShare: result.episodeStartOutcomes.forward20D.negativeShare,
+mfeMean: result.episodeStartOutcomes.mfe20D.mean,
+maeMean: result.episodeStartOutcomes.mae20D.mean,
+benchmarkMean: c20.benchmarkMean,
+excessMean: c20.meanDifferencePercentagePoints,
+excessMedian: c20.medianDifferencePercentagePoints,
+negativeShareDifference: c20.negativeShareDifferencePoints,
+},
+episode60D: {
+mean: result.episodeStartOutcomes.forward60D.mean,
+median: result.episodeStartOutcomes.forward60D.median,
+negativeShare: result.episodeStartOutcomes.forward60D.negativeShare,
+mfeMean: result.episodeStartOutcomes.mfe60D.mean,
+maeMean: result.episodeStartOutcomes.mae60D.mean,
+benchmarkMean: c60.benchmarkMean,
+excessMean: c60.meanDifferencePercentagePoints,
+},
+representedPeriods,
+periods,
+};
+});
 
-periodEpisodeCountsConsistent:
-results.every(
-(result) =>
-result.periods.reduce(
-(sum, period) =>
-sum + period.episodeStarts,
-0,
-) ===
-result.diagnostics.contiguousEpisodes,
-),
+const summaryChecks = {
+allSignalsPresent: summaryResults.length === DEFINITIONS.length,
+noInvalidCounts: summaryResults.every(r =>
+r.completed20D <= r.contiguousEpisodes &&
+r.completed60D <= r.contiguousEpisodes),
+allPeriodsPresent: summaryResults.every(r => r.periods.length === PERIODS.length),
+allEpisodesAccountedFor: summaryResults.every(r =>
+r.periods.reduce((sum, p) => sum + p.episodeStarts, 0) === r.contiguousEpisodes),
 };
 
 return {
 methodology: {
-episodeDefinition:
-"Consecutive signal trading days form one episode",
-
-episodeEntry:
-"First signal day of each contiguous episode",
-
-episodeExit:
-"First subsequent trading day without the condition",
-
-episodeReturn:
-"Forward Nasdaq return measured from episode entry, not exit",
-
-benchmark:
-"All walk-forward evaluation days with completed outcomes",
-
-benchmarkMatching:
-"Same calendar evaluation period, not matched on market regime",
-
-comparison:
-"Signal and episode-start returns versus unconditional Nasdaq baseline",
-
-periods:
-"Calendar cohorts 2014-2019, 2020-2022, 2023-2026",
-
-incompleteOutcomes:
-"Excluded from return statistics, retained in signal diagnostics",
-
-independence:
-"Contiguous episodes reduce repeated signals but do not establish statistical independence",
-
-predictiveUse:
-"Exploratory; signal definitions not independently selected or calibrated",
+episodeDefinition: "Consecutive signal trading days form one episode",
+episodeEntry: "First signal day of each contiguous episode",
+episodeExit: "First subsequent trading day without the condition",
+episodeReturn: "Forward Nasdaq return from episode entry",
+benchmark: "All walk-forward evaluation days with completed outcomes",
+benchmarkMatching: "Same calendar evaluation period, not matched on market regime",
+comparison: "Episode-start returns versus unconditional Nasdaq baseline",
+periods: "Calendar cohorts 2014-2019, 2020-2022, 2023-2026",
+incompleteOutcomes: "Excluded from statistics, retained in diagnostics",
+independence: "Contiguous episodes do not establish statistical independence",
+predictiveUse: "Exploratory; not independently validated or calibrated",
 },
-
 benchmark: {
 evaluatedDays: benchmark.length,
-outcomes: benchmarkOutcomes,
-
-periods: PERIODS.map((period) => {
-const observations =
-filterPeriod(
-benchmark,
-period,
-);
-
+outcomes: outcomes(benchmark),
+periods: PERIODS.map(period => {
+const rows = periodRows(benchmark, period.start, period.end);
 return {
 id: period.id,
 label: period.label,
-days: observations.length,
-outcomes:
-summarizeOutcomes(observations),
+days: rows.length,
+outcomes: outcomes(rows),
 };
 }),
 },
-
-results,
-
+results: detailedResults,
 checks: {
 ...checks,
-all:
-Object.values(checks).every(Boolean),
+all: Object.values(checks).every(Boolean),
+},
+summary: {
+methodology: {
+unit: "Nasdaq percentage returns and percentage-point benchmark differences",
+signalUnit: "First day of each contiguous signal episode",
+researchStatus: "Descriptive research screening only; not a trade recommendation",
+minimumResearchGate: "20 completed episode starts across all three calendar cohorts",
+multipleTesting: "Fifteen hypotheses explored; selection bias remains possible",
+independence: "Episode outcome windows may still overlap",
+benchmark: "Unconditional Nasdaq forward returns in the same calendar cohort",
+periodBoundary: "Episodes are not reset at calendar boundaries",
+horizon: "20 and 60 trading days",
+},
+totalSignals: summaryResults.length,
+benchmark: {
+evaluatedDays: benchmark.length,
+completed20D: stats(benchmark, "forward20D").count,
+completed60D: stats(benchmark, "forward60D").count,
+mean20D: stats(benchmark, "forward20D").mean,
+mean60D: stats(benchmark, "forward60D").mean,
+negativeShare20D: stats(benchmark, "forward20D").negativeShare,
+},
+results: summaryResults,
+checks: {
+...summaryChecks,
+all: Object.values(summaryChecks).every(Boolean),
+},
 },
 };
 }
 
 /* =====================================================
-WALK-FORWARD ENGINE
-
-Expanding threshold window through T-1.
-Forward outcomes are never training inputs.
+WALK-FORWARD
 ===================================================== */
 
-function buildWalkForwardConditionalOutcomes(
-featureSet: FeatureSet,
-minimumTrainingDays =
-WALK_FORWARD_MIN_TRAINING_DAYS,
-) {
+const MIN_TRAINING_DAYS = 756;
+
+function buildWalkForward(featureSet: FeatureSet) {
 const days = featureSet.days;
 
 const chronological = days.every(
-(day, index) =>
-index === 0 ||
-days[index - 1].date < day.date,
+(d, i) => i === 0 || days[i - 1].date < d.date,
 );
 
 if (!chronological) {
-throw new Error(
-"Walk-forward requires chronological feature days.",
-);
+throw new Error("Walk-forward requires chronological feature days.");
 }
 
-const matched = new Map<
-CombinationId,
-Observation[]
->();
-
-for (const [id] of COMBINATION_DEFINITIONS) {
-matched.set(id, []);
-}
+const matched = new Map<SignalId, Observation[]>();
+for (const [id] of DEFINITIONS) matched.set(id, []);
 
 const benchmark: Observation[] = [];
 
-let evaluatedDays = 0;
-let daysWithCompleteThresholds = 0;
-let daysWithIncompleteThresholds = 0;
-
-let firstEvaluationDate: string | null = null;
-let lastEvaluationDate: string | null = null;
-
-let firstCompleteThresholdDate:
-string | null = null;
-
-let lastCompleteThresholdDate:
-string | null = null;
-
+let complete = 0;
+let incomplete = 0;
+let firstComplete: string | null = null;
+let lastComplete: string | null = null;
 let latestThresholds: Thresholds | null = null;
+let latestCounts: ThresholdSampleCounts | null = null;
 
-let latestThresholdSampleCounts:
-ThresholdSampleCounts | null = null;
+for (let i = MIN_TRAINING_DAYS; i < days.length; i++) {
+const current = days[i];
+const training = days.slice(0, i);
+const calculated = calculateThresholds(training);
 
-for (
-let index = minimumTrainingDays;
-index < days.length;
-index++
-) {
-const currentDay = days[index];
+latestThresholds = calculated.thresholds;
+latestCounts = calculated.thresholdSampleCounts;
 
-/*
-* Only observations strictly before T
-* enter the percentile calculation.
-*/
-
-const trainingDays = days.slice(
-0,
-index,
-);
-
-const {
-thresholds,
-thresholdSampleCounts,
-} = calculateThresholds(
-trainingDays,
-);
-
-latestThresholds = thresholds;
-
-latestThresholdSampleCounts =
-thresholdSampleCounts;
-
-evaluatedDays++;
-
-firstEvaluationDate ??=
-currentDay.date;
-
-lastEvaluationDate =
-currentDay.date;
-
-const complete =
-Object.values(thresholds).every(
-isFiniteNumber,
-);
-
-if (complete) {
-daysWithCompleteThresholds++;
-
-firstCompleteThresholdDate ??=
-currentDay.date;
-
-lastCompleteThresholdDate =
-currentDay.date;
+if (Object.values(calculated.thresholds).every(finite)) {
+complete++;
+firstComplete ??= current.date;
+lastComplete = current.date;
 } else {
-daysWithIncompleteThresholds++;
+incomplete++;
 }
 
-const observation =
-createObservation(
-currentDay,
-index,
-);
+const obs = observation(current, i);
+benchmark.push(obs);
 
-benchmark.push(observation);
-
-const combinations =
-buildCombinationsFromThresholds(
-thresholds,
-);
-
-for (const combination of combinations) {
-if (
-evaluateCombination(
-currentDay,
-combination,
-)
-) {
-matched.get(
-combination.id as CombinationId,
-)?.push(observation);
+for (const combination of buildCombinations(calculated.thresholds)) {
+if (matches(current, combination)) {
+matched.get(combination.id as SignalId)?.push(obs);
 }
 }
 }
 
-const results =
-COMBINATION_DEFINITIONS.map(
-([id, label]) => {
-const observations =
-matched.get(id) ?? [];
+const evaluatedDays = benchmark.length;
 
-const indices = observations.map(
-(observation) =>
-observation.index,
-);
+const results = DEFINITIONS.map(([id, label]) => {
+const rows = matched.get(id) ?? [];
 
 return {
 id,
 label,
-
-matchedDays:
-observations.length,
-
-firstMatchDate:
-observations[0]?.date ?? null,
-
-lastMatchDate:
-observations[
-observations.length - 1
-]?.date ?? null,
-
-...summarizeOutcomes(observations),
-
-independentEpisodes20D:
-countNonOverlappingEpisodes(
-indices.filter(
-(index) =>
-isFiniteNumber(
-days[index].outcome.forward20D,
-),
-),
-20,
-),
-
-independentEpisodes60D:
-countNonOverlappingEpisodes(
-indices.filter(
-(index) =>
-isFiniteNumber(
-days[index].outcome.forward60D,
-),
-),
-60,
-),
+matchedDays: rows.length,
+firstMatchDate: rows[0]?.date ?? null,
+lastMatchDate: rows[rows.length - 1]?.date ?? null,
+...outcomes(rows),
+independentEpisodes20D: nonOverlapping(rows, "forward20D", 20),
+independentEpisodes60D: nonOverlapping(rows, "forward60D", 60),
 };
-},
-);
+});
 
-const validation = buildValidation(
-days,
-matched,
-benchmark,
-);
+const validation = buildValidation(days, matched, benchmark);
 
 const checks = {
 chronological,
-
-trainingWindowAvailable:
-days.length > minimumTrainingDays,
-
-evaluatedDaysConsistent:
-evaluatedDays ===
-Math.max(
-0,
-days.length - minimumTrainingDays,
-),
-
-thresholdDayCountsConsistent:
-daysWithCompleteThresholds +
-daysWithIncompleteThresholds ===
-evaluatedDays,
-
+trainingWindowAvailable: days.length > MIN_TRAINING_DAYS,
+evaluatedDaysConsistent: evaluatedDays === Math.max(0, days.length - MIN_TRAINING_DAYS),
+thresholdDayCountsConsistent: complete + incomplete === evaluatedDays,
 noEvaluationBeforeWarmup:
-firstEvaluationDate === null ||
-firstEvaluationDate ===
-days[minimumTrainingDays]?.date,
-
-resultCountMatchesDefinitions:
-results.length ===
-COMBINATION_DEFINITIONS.length,
-
-noMatchesExceedEvaluatedDays:
-results.every(
-(result) =>
-result.matchedDays <= evaluatedDays,
-),
-
-validationPassed:
-validation.checks.all,
+!evaluatedDays || benchmark[0].date === days[MIN_TRAINING_DAYS].date,
+resultCountMatchesDefinitions: results.length === DEFINITIONS.length,
+noMatchesExceedEvaluatedDays: results.every(r => r.matchedDays <= evaluatedDays),
+validationPassed: validation.checks.all,
+summaryPassed: validation.summary.checks.all,
 };
 
 return {
 methodology: {
-thresholdMethod:
-"Expanding walk-forward percentiles",
-
-minimumTrainingDays,
-
-thresholdInformationCutoff:
-"Previous trading day T-1",
-
-currentDayIncludedInTraining:
-false,
-
-outcomeUsage:
-"Forward returns used only for evaluation",
-
-intendedUse:
-"Historical out-of-sample threshold evaluation",
-
-predictiveUse:
-"Exploratory; not independently validated or calibrated",
-
-breadthScale:
-"Ratios from 0 to 1",
-
-missingBreadthPolicy:
-"Missing breadth never satisfies a breadth condition",
-
-episodeMethod:
-"Greedy non-overlapping signal windows; independence not established",
-
-percentiles:
-"P10/P25/P75/P90 calculated from prior observations only",
+thresholdMethod: "Expanding walk-forward percentiles",
+minimumTrainingDays: MIN_TRAINING_DAYS,
+thresholdInformationCutoff: "Previous trading day T-1",
+currentDayIncludedInTraining: false,
+outcomeUsage: "Forward returns used only for evaluation",
+intendedUse: "Historical out-of-sample threshold evaluation",
+predictiveUse: "Exploratory; not independently validated or calibrated",
+breadthScale: "Ratios from 0 to 1",
+missingBreadthPolicy: "Missing breadth never satisfies a breadth condition",
+episodeMethod: "Greedy non-overlapping signal windows; independence not established",
+percentiles: "P10/P25/P75/P90 calculated from prior observations only",
 },
-
 diagnostics: {
 inputDays: days.length,
 evaluatedDays,
-
-skippedWarmupDays:
-Math.min(
-days.length,
-minimumTrainingDays,
-),
-
-firstEvaluationDate,
-lastEvaluationDate,
-
-daysWithCompleteThresholds,
-daysWithIncompleteThresholds,
-
-firstCompleteThresholdDate,
-lastCompleteThresholdDate,
-
+skippedWarmupDays: Math.min(days.length, MIN_TRAINING_DAYS),
+firstEvaluationDate: benchmark[0]?.date ?? null,
+lastEvaluationDate: benchmark[benchmark.length - 1]?.date ?? null,
+daysWithCompleteThresholds: complete,
+daysWithIncompleteThresholds: incomplete,
+firstCompleteThresholdDate: firstComplete,
+lastCompleteThresholdDate: lastComplete,
 latestThresholds,
-latestThresholdSampleCounts,
+latestThresholdSampleCounts: latestCounts,
 },
-
 checks: {
 ...checks,
-all:
-Object.values(checks).every(Boolean),
+all: Object.values(checks).every(Boolean),
 },
-
 results,
-
 validation,
 };
 }
 
 /* =====================================================
-API ROUTE
+API
 ===================================================== */
 
-export async function GET() {
+export async function GET(request: NextRequest) {
 try {
-const [
-marketData,
-ratesData,
-macroVintageData,
-breadthData,
-] = await Promise.all([
+const summaryOnly =
+request.nextUrl.searchParams.get("view") === "summary";
+
+const [marketData, ratesData, macroVintageData, breadthData] =
+await Promise.all([
 loadHistoricalRegimeMarketData(),
 loadHistoricalRegimeRatesData(),
 loadHistoricalRegimeMacroVintageData(),
 loadHistoricalRegimeBreadthData(),
 ]);
 
-/* 1. MARKET ALIGNMENT */
-
 const marketAlignment =
-alignHistoricalRegimeMarketData(
-marketData,
-);
-
-/* 2. RATES ALIGNMENT */
+alignHistoricalRegimeMarketData(marketData);
 
 const ratesAlignment =
-alignHistoricalRegimeRates(
-marketAlignment,
-ratesData,
-);
-
-/* 3. MACRO VINTAGE ALIGNMENT */
+alignHistoricalRegimeRates(marketAlignment, ratesData);
 
 const macroAlignment =
-alignHistoricalMacroVintage(
-marketAlignment,
-macroVintageData,
-);
-
-/* 4. MACRO FEATURES */
+alignHistoricalMacroVintage(marketAlignment, macroVintageData);
 
 const macroFeatureDataset =
-buildHistoricalMacroFeatures(
-macroAlignment,
-ratesAlignment.days,
-);
-
-/* 5. MARKET FEATURES */
+buildHistoricalMacroFeatures(macroAlignment, ratesAlignment.days);
 
 const marketFeatureDataset =
-buildHistoricalRegimeFeatures(
-ratesAlignment.days,
-);
-
-/* 6. FORWARD OUTCOMES */
+buildHistoricalRegimeFeatures(ratesAlignment.days);
 
 const outcomeDataset =
-buildHistoricalRegimeOutcomes(
-marketAlignment.days,
-);
-
-/* 7. FEATURE SET */
+buildHistoricalRegimeOutcomes(marketAlignment.days);
 
 const historicalFeatureSet =
 buildHistoricalRegimeFeatureSet(
@@ -1782,87 +901,81 @@ outcomeDataset,
 breadthData.days,
 );
 
-/* 8. DISTRIBUTIONS */
+const historicalWalkForward =
+buildWalkForward(historicalFeatureSet);
+
+const rows = macroFeatureDataset.days as Record<string, unknown>[];
+const macroChecks = calculateMacroChecks(rows, macroAlignment);
+
+const historicalFeatureSetChecks = {
+marketFeatureCountMatchesAlignment:
+marketFeatureDataset.length === marketAlignment.count,
+macroFeatureCountMatchesAlignment:
+macroFeatureDataset.days.length === macroAlignment.count,
+outcomeCountMatchesMarketAlignment:
+outcomeDataset.length === marketAlignment.count,
+breadthProviderNotEmpty: breadthData.count > 0,
+breadthChronological: breadthData.diagnostics.chronological,
+breadthCoverageAvailable:
+breadthData.diagnostics.breadth50AvailableCount > 0 &&
+breadthData.diagnostics.breadth200AvailableCount > 0,
+joinedFeatureSetNotEmpty: historicalFeatureSet.count > 0,
+chronological: historicalFeatureSet.diagnostics.chronological,
+noDuplicateMarketDates:
+historicalFeatureSet.diagnostics.duplicateMarketDates === 0,
+noDuplicateMacroDates:
+historicalFeatureSet.diagnostics.duplicateMacroDates === 0,
+noDuplicateBreadthDates:
+historicalFeatureSet.diagnostics.duplicateBreadthDates === 0,
+noDuplicateOutcomeDates:
+historicalFeatureSet.diagnostics.duplicateOutcomeDates === 0,
+};
+
+const allChecks =
+macroChecks.all &&
+Object.values(historicalFeatureSetChecks).every(Boolean) &&
+historicalWalkForward.checks.all;
+
+/*
+* COMPACT OUTPUT
+*
+* No deeply nested full historical JSON.
+* One copy is sufficient for analysis.
+*/
+
+if (summaryOnly) {
+return NextResponse.json({
+ok: allChecks,
+report: "HISTORICAL_VALIDATION_SUMMARY",
+historicalStart: marketAlignment.firstDate,
+historicalEnd: marketAlignment.lastDate,
+walkForward: {
+diagnostics: historicalWalkForward.diagnostics,
+checks: historicalWalkForward.checks,
+},
+summary: historicalWalkForward.validation.summary,
+});
+}
+
+/*
+* ORIGINAL FULL OUTPUT
+*/
 
 const historicalDistributions =
-buildHistoricalRegimeDistributions(
-historicalFeatureSet,
-);
+buildHistoricalRegimeDistributions(historicalFeatureSet);
 
-/* 9. RETROSPECTIVE OUTCOMES */
-
-const {
-combinations:
-historicalConditionalCombinations,
-
-thresholds:
-historicalConditionalThresholds,
-
-thresholdSampleCounts:
-historicalThresholdSampleCounts,
-} = buildConditionalCombinations(
-historicalFeatureSet,
-);
+const retrospectiveThresholds =
+calculateThresholds(historicalFeatureSet.days);
 
 const historicalConditionalOutcomes =
 buildHistoricalRegimeConditionalOutcomes(
 historicalFeatureSet,
-historicalConditionalCombinations,
+buildCombinations(retrospectiveThresholds.thresholds),
 );
 
-/* 10. WALK-FORWARD + VALIDATION */
-
-const historicalWalkForward =
-buildWalkForwardConditionalOutcomes(
-historicalFeatureSet,
+const featureAvailability = Object.fromEntries(
+MACRO_NUMERIC_KEYS.map(key => [key, availability(rows, key)]),
 );
-
-/* EXISTING MACRO FEATURE OUTPUT */
-
-const rows =
-macroFeatureDataset.days as Array<
-Record<string, unknown>
->;
-
-const featureKeys = [
-"cpi",
-"coreCpi",
-"nfci",
-"real10Y",
-"cpiYoY",
-"coreCpiYoY",
-"cpiChange3M",
-"cpiChange6M",
-"coreCpiChange3M",
-"coreCpiChange6M",
-"nfciChange4W",
-"nfciChange12W",
-"real10YChange20D",
-"real10YChange60D",
-"fedFunds",
-"treasury2Y",
-"treasury10Y",
-"treasury10Y2YSpread",
-"fedFundsChange20D",
-"treasury2YChange20D",
-"treasury10YChange20D",
-"treasury10Y2YSpreadChange20D",
-];
-
-const featureAvailability =
-Object.fromEntries(
-featureKeys.map(
-(key) => [
-key,
-summarizeAvailability(
-rows,
-key,
-),
-],
-),
-);
-
-/* SAMPLE DATES */
 
 const sampleDates = [
 marketAlignment.firstDate,
@@ -1873,82 +986,14 @@ marketAlignment.firstDate,
 "2024-04-01",
 "2026-10-02",
 marketAlignment.lastDate,
-].filter(
-(date): date is string =>
-typeof date === "string",
-);
+].filter((date): date is string => typeof date === "string");
 
-const samples = [
-...new Set(sampleDates),
-].map((date) => ({
+const samples = [...new Set(sampleDates)].map(date => ({
 date,
 feature: findSample(rows, date),
 }));
 
-/* EXISTING CHECKS */
-
-const checks = calculateChecks(
-rows,
-macroAlignment,
-);
-
-const historicalFeatureSetChecks = {
-marketFeatureCountMatchesAlignment:
-marketFeatureDataset.length ===
-marketAlignment.count,
-
-macroFeatureCountMatchesAlignment:
-macroFeatureDataset.days.length ===
-macroAlignment.count,
-
-outcomeCountMatchesMarketAlignment:
-outcomeDataset.length ===
-marketAlignment.count,
-
-breadthProviderNotEmpty:
-breadthData.count > 0,
-
-breadthChronological:
-breadthData.diagnostics.chronological,
-
-breadthCoverageAvailable:
-breadthData.diagnostics
-.breadth50AvailableCount > 0 &&
-breadthData.diagnostics
-.breadth200AvailableCount > 0,
-
-joinedFeatureSetNotEmpty:
-historicalFeatureSet.count > 0,
-
-chronological:
-historicalFeatureSet.diagnostics
-.chronological,
-
-noDuplicateMarketDates:
-historicalFeatureSet.diagnostics
-.duplicateMarketDates === 0,
-
-noDuplicateMacroDates:
-historicalFeatureSet.diagnostics
-.duplicateMacroDates === 0,
-
-noDuplicateBreadthDates:
-historicalFeatureSet.diagnostics
-.duplicateBreadthDates === 0,
-
-noDuplicateOutcomeDates:
-historicalFeatureSet.diagnostics
-.duplicateOutcomeDates === 0,
-};
-
-const allChecks =
-checks.all &&
-Object.values(
-historicalFeatureSetChecks,
-).every(Boolean) &&
-historicalWalkForward.checks.all;
-
-const response = {
+return NextResponse.json({
 ok: allChecks,
 
 source: {
@@ -1956,15 +1001,11 @@ marketProvider: "Yahoo Finance",
 ratesProvider: "FRED",
 macroProvider: "FRED",
 breadthProvider: "Yahoo Finance",
-macroMode:
-"revision-aware output_type=1",
+macroMode: "revision-aware output_type=1",
 },
 
-historicalStart:
-marketAlignment.firstDate,
-
-historicalEnd:
-marketAlignment.lastDate,
+historicalStart: marketAlignment.firstDate,
+historicalEnd: marketAlignment.lastDate,
 
 market: {
 count: marketAlignment.count,
@@ -1976,30 +1017,16 @@ macroAlignment: {
 count: macroAlignment.count,
 firstDate: macroAlignment.firstDate,
 lastDate: macroAlignment.lastDate,
-
 fullyCoveredCount:
-macroAlignment.diagnostics
-.allSeriesAvailableCount,
-
+macroAlignment.diagnostics.allSeriesAvailableCount,
 futureReleaseLeakage:
-macroAlignment.diagnostics
-.futureReleaseLeakageCount,
+macroAlignment.diagnostics.futureReleaseLeakageCount,
 },
 
 ratesAlignment: {
 count: ratesAlignment.days.length,
-
-firstDate:
-ratesAlignment.days.length > 0
-? ratesAlignment.days[0].date
-: null,
-
-lastDate:
-ratesAlignment.days.length > 0
-? ratesAlignment.days[
-ratesAlignment.days.length - 1
-].date
-: null,
+firstDate: ratesAlignment.days[0]?.date ?? null,
+lastDate: ratesAlignment.days[ratesAlignment.days.length - 1]?.date ?? null,
 },
 
 breadth: {
@@ -2007,127 +1034,72 @@ count: breadthData.count,
 firstDate: breadthData.firstDate,
 lastDate: breadthData.lastDate,
 universeSize: breadthData.universeSize,
-uniqueUniverseSize:
-breadthData.uniqueUniverseSize,
+uniqueUniverseSize: breadthData.uniqueUniverseSize,
 diagnostics: breadthData.diagnostics,
 },
 
 features: {
 count: rows.length,
-
-firstDate:
-rows.length > 0
-? rows[0].date
-: null,
-
-lastDate:
-rows.length > 0
-? rows[rows.length - 1].date
-: null,
+firstDate: rows[0]?.date ?? null,
+lastDate: rows[rows.length - 1]?.date ?? null,
 },
 
 featureAvailability,
 
 marketFeatures: {
 count: marketFeatureDataset.length,
-
-firstDate:
-marketFeatureDataset.length > 0
-? marketFeatureDataset[0].date
-: null,
-
-lastDate:
-marketFeatureDataset.length > 0
-? marketFeatureDataset[
-marketFeatureDataset.length - 1
-].date
-: null,
+firstDate: marketFeatureDataset[0]?.date ?? null,
+lastDate: marketFeatureDataset[marketFeatureDataset.length - 1]?.date ?? null,
 },
 
 outcomes: {
 count: outcomeDataset.length,
-
-firstDate:
-outcomeDataset.length > 0
-? outcomeDataset[0].date
-: null,
-
-lastDate:
-outcomeDataset.length > 0
-? outcomeDataset[
-outcomeDataset.length - 1
-].date
-: null,
+firstDate: outcomeDataset[0]?.date ?? null,
+lastDate: outcomeDataset[outcomeDataset.length - 1]?.date ?? null,
 },
 
 historicalFeatureSet: {
 count: historicalFeatureSet.count,
-firstDate:
-historicalFeatureSet.firstDate,
-lastDate:
-historicalFeatureSet.lastDate,
-diagnostics:
-historicalFeatureSet.diagnostics,
-checks:
-historicalFeatureSetChecks,
+firstDate: historicalFeatureSet.firstDate,
+lastDate: historicalFeatureSet.lastDate,
+diagnostics: historicalFeatureSet.diagnostics,
+checks: historicalFeatureSetChecks,
 },
 
 historicalDistributions,
 
 historicalConditionalOutcomes: {
 methodology: {
-thresholdMethod:
-"Full-sample descriptive percentiles",
-
-intendedUse:
-"Retrospective exploratory analysis",
-
-predictiveUse:
-"Not validated; use walk-forward thresholds before predictive claims",
-
-breadthScale:
-"Ratios from 0 to 1",
-
-missingBreadthPolicy:
-"Missing breadth does not satisfy a condition",
+thresholdMethod: "Full-sample descriptive percentiles",
+intendedUse: "Retrospective exploratory analysis",
+predictiveUse: "Not validated; use walk-forward thresholds before predictive claims",
+breadthScale: "Ratios from 0 to 1",
+missingBreadthPolicy: "Missing breadth does not satisfy a condition",
 },
-
-thresholds:
-historicalConditionalThresholds,
-
-thresholdSampleCounts:
-historicalThresholdSampleCounts,
-
-results:
-historicalConditionalOutcomes,
+thresholds: retrospectiveThresholds.thresholds,
+thresholdSampleCounts: retrospectiveThresholds.thresholdSampleCounts,
+results: historicalConditionalOutcomes,
 },
 
 historicalWalkForward,
 
 checks: {
-macro: checks,
+macro: macroChecks,
 all: allChecks,
 },
 
 samples,
-};
-
-return NextResponse.json(response);
+});
 } catch (error) {
-console.error(
-"Historical macro features test failed:",
-error,
-);
+console.error("Historical macro features test failed:", error);
 
 return NextResponse.json(
 {
 ok: false,
-error:
-error instanceof Error
-? error.message
-: String(error),
+error: error instanceof Error ? error.message : String(error),
 },
 { status: 500 },
 );
 }
 }
+

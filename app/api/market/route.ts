@@ -1,3 +1,4 @@
+import { selectVolatilityContext } from "@/lib/market/volatilityContext";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
@@ -8,6 +9,7 @@ import { Redis } from "@upstash/redis";
 import type { Redis as RedisType } from "@upstash/redis";
 
 // Must exist before GET performs its first index fetch.
+const volatilityDailyObservations = new WeakMap<number[], {symbol:string;timestamps:number[];closes:number[]}>();
 const indexObservationQuality = new WeakMap<number[], Record<string, any>>();
 
 import {
@@ -2580,6 +2582,7 @@ data.chart.result[0].indicators.quote[0].close ?? [];
 
 const prepared = prepareObservedIndexSeries(data.chart.result[0], symbol);
 indexObservationQuality.set(prepared.closes, prepared.quality);
+if (["^VIX","^VIX3M","^VIX9D"].includes(symbol)) volatilityDailyObservations.set(prepared.closes,{symbol,timestamps:data.chart.result[0].timestamp??[],closes:prepared.closes});
 return prepared.closes;
 
 } catch (e) {
@@ -3029,7 +3032,12 @@ breadth200
 
 const creditData = await calculateCreditSpread(fetchETF);
 
-const vixCloses = await fetchIndex("^VIX","5d");
+const rawVixCloses = await fetchIndex("^VIX","1mo");
+const rawVix3mCloses = await fetchIndex("^VIX3M","1mo");
+const rawVix9dCloses = await fetchIndex("^VIX9D","1mo");
+const volatilityContext = selectVolatilityContext([rawVixCloses,rawVix3mCloses,rawVix9dCloses].map(closes=>volatilityDailyObservations.get(closes)).filter((v):v is {symbol:string;timestamps:number[];closes:number[]}=>Boolean(v)));
+const previousCrashBeforeVolatilityContext = previousCrashProbability;
+const vixCloses = volatilityContext.series["^VIX"];
 const dxyCloses = await fetchIndex("DX-Y.NYB","5d");
 
 const dxy =
@@ -3055,7 +3063,7 @@ moveCloses[moveCloses.length - 1] : 0;
 
 /* ================= VOLATILITY TERM STRUCTURE ================= */
 
-const vix3mCloses = await fetchIndex("^VIX3M","5d");
+const vix3mCloses = volatilityContext.series["^VIX3M"];
 const vix = vixCloses.length ? vixCloses[vixCloses.length - 1] : 0;
 const vix5DayAverage =
 movingAverageLast(vixCloses,5);
@@ -3072,7 +3080,7 @@ vix,
 vix3m
 );
 
-const vix9dCloses = await fetchIndex("^VIX9D","5d");
+const vix9dCloses = volatilityContext.series["^VIX9D"];
 
 const vix9d =
 vix9dCloses.length ?
@@ -3126,6 +3134,9 @@ spClosesFull
 );
 
 marketData["^VIX"] = {
+asOfDate:volatilityContext.quality.asOfDate,
+timestamp:volatilityContext.quality.asOfTimestamp,
+dataQuality:volatilityContext.quality,
 current: vix,
 change: vixCloses.length > 1
 ? ((vix - vixCloses[vixCloses.length - 2]) /
@@ -3824,7 +3835,8 @@ const newsSentiment = await fetchNewsSentiment();
 
 console.log("SAVING SNAPSHOT...");
 
-await saveRegimeSnapshot(snapshot);
+if (!volatilityContext.quality.entryBlocked) await saveRegimeSnapshot(snapshot);
+else console.log("VOLATILITY CONTEXT ONLY: regular regime snapshot not saved");
 
 console.log("LOADING HISTORY...");
 
@@ -3857,6 +3869,7 @@ spMomentumRegime: spMomentum.regime,
 internalMomentumScore: internalMomentum.score,
 internalMomentumRegime: internalMomentum.regime,
 
+volatilityDataQuality: volatilityContext.quality,
 vixTermRatio: vixTermRatio.ratio,
 vixTermRatioRegime: vixTermRatio.regime,
 
@@ -4032,9 +4045,9 @@ dataQuality: {
 indexObservationPolicy: "GAPS_WITH_SAME_DATE_QUOTES_V2",
 auxiliaryIndices: {
   move: indexObservationQuality.get(moveCloses) ?? null,
-  vix: indexObservationQuality.get(vixCloses) ?? null,
-  vix3m: indexObservationQuality.get(vix3mCloses) ?? null,
-  vix9d: indexObservationQuality.get(vix9dCloses) ?? null
+  vix: { ...volatilityContext.quality, symbol:"^VIX", latestEndpointAvailable:volatilityContext.quality.sourceEndpoints.find(s=>s.symbol==="^VIX")?.available??false, source:"ALIGNED_OBSERVED_VOLATILITY_CONTEXT_NOT_LIVE" },
+  vix3m: { ...volatilityContext.quality, symbol:"^VIX3M", latestEndpointAvailable:volatilityContext.quality.sourceEndpoints.find(s=>s.symbol==="^VIX3M")?.available??false, source:"ALIGNED_OBSERVED_VOLATILITY_CONTEXT_NOT_LIVE" },
+  vix9d: { ...volatilityContext.quality, symbol:"^VIX9D", latestEndpointAvailable:volatilityContext.quality.sourceEndpoints.find(s=>s.symbol==="^VIX9D")?.available??false, source:"ALIGNED_OBSERVED_VOLATILITY_CONTEXT_NOT_LIVE" }
 },
 futuresAvailable:
 es.length > 0 && nq.length > 0 && rty.length > 0,
@@ -4047,7 +4060,7 @@ regimeHistory: history,
 historyMetrics
 };
 
-await saveMarketState({
+if (!volatilityContext.quality.entryBlocked) await saveMarketState({
 previousCrashProbability,
 futuresSnapshot: {
 es: es[es.length - 1],
@@ -4078,11 +4091,12 @@ if (
 responseData.futures?.["ES=F"]?.price !== null &&
 responseData.futures?.["NQ=F"]?.price !== null
 ) {
-cachedResponse = responseData;
+if (!volatilityContext.quality.entryBlocked) cachedResponse = responseData;
 }
 // previousCrashProbability = responseData.crashProbability;
 
-lastFetchTime = Date.now();
+if (volatilityContext.quality.entryBlocked) { cachedResponse = null; previousCrashProbability = previousCrashBeforeVolatilityContext; lastFetchTime = 0; }
+else lastFetchTime = Date.now();
 
 return NextResponse.json(responseData);
 
