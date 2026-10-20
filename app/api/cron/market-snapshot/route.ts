@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { GET as getMarketData } from "@/app/api/market/route";
 
 import { mapBackendToEngine } from "@/lib/adapters/mapBackendToEngine";
 import { validateEngineData } from "@/lib/engine/validateEngineData";
@@ -26,11 +27,11 @@ export async function GET(request: Request) {
       );
     }
 
-    const origin = new URL(request.url).origin;
-    const marketResponse = await fetch(`${origin}/api/market`, {
-      method: "GET",
-      cache: "no-store",
-    });
+    // Reuse the server-side handler without an HTTP round trip through
+    // deployment protection, redirects or a login page. Do not forward secrets.
+    const marketResponse = await getMarketData(
+      new Request(new URL("/api/market", request.url))
+    );
 
     if (!marketResponse.ok) {
       throw new Error(
@@ -38,6 +39,9 @@ export async function GET(request: Request) {
       );
     }
 
+    if (!marketResponse.headers.get("content-type")?.includes("application/json")) {
+      throw new Error("Market handler returned a non-JSON response");
+    }
     const marketData = await marketResponse.json();
     const mapped = mapBackendToEngine(marketData);
     if (!mapped) {
