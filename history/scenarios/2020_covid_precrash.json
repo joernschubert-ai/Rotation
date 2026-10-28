@@ -1,0 +1,88 @@
+{
+"id": "2020_COVID_PRE_CRASH",
+"date": "2020-02-19",
+"year": 2020,
+"title": "COVID Pre-Crash Fragility",
+"description": "Market near highs but increasing structural fragility before the COVID crash.",
+
+"expected": {
+"phase": "PHASE_3_DISTRIBUTION",
+"mode": "NEUTRAL",
+"signal": "NEUTRAL",
+"minRisk": 45,
+"maxRisk": 70
+},
+
+"market": {
+"vix": 14,
+"breadth50": 62,
+"breadth200": 66,
+"vixTermRatio": 1.06
+},
+
+"rotation": {
+"score": 55,
+"rsSmall": 0.98,
+"rsEqual": 0.99,
+"rsGrowth": 1.04
+},
+
+"participation": {
+"score": 55
+},
+
+"breadthThrust": {
+"score": 50
+},
+
+"liquidity": {
+"score": 72
+},
+
+"fragility": {
+"score": 62
+},
+
+"rotationDecay": {
+"score": 48
+},
+
+"internalDivergence": {
+"score": 52
+},
+
+"regimeSync": {
+"score": 48
+},
+
+"concentrationScore": 62,
+
+"crash": {
+"score": 28,
+"probability": 22
+},
+
+"phaseConfirmation": {
+"confidence": 58,
+"confirmed": false
+},
+
+"historyMetrics": {
+"breadthTrend": -3,
+"breadthAcceleration": -1,
+"participationDecay": 10,
+"leadershipDecay": -2,
+"crashTrend": 2,
+"relativeBreadthWeakness": 7,
+"institutionalPressure": 65,
+"phasePersistence": 45,
+"daysInPhase": 8,
+"averageBreadth": 66,
+"averageParticipation": 61,
+"averageRotation": 58,
+"averageLiquidity": 70,
+"averageFragility": 48,
+"acceleratingWeakness": true,
+"persistentDistribution": true
+}
+}

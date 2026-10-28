@@ -1,0 +1,80 @@
+{
+"id": "2022_bear_market",
+"date": "2022-06-13",
+"year": 2022,
+"title": "2022 Inflation Bear Market",
+"description": "Confirmed bear market driven by inflation, tightening liquidity, broad internal deterioration and persistent structural weakness.",
+"expected": {
+"phase": "PHASE_5_BREAKDOWN",
+"mode": "CRASH",
+"signal": "PUT",
+"minRisk": 65,
+"maxRisk": 100
+},
+"market": {
+"vix": 34.0,
+"breadth50": 24,
+"breadth200": 31,
+"vixTermRatio": 1.12
+},
+"rotation": {
+"score": 22,
+"rsSmall": 0.942,
+"rsEqual": 0.955,
+"rsGrowth": 0.982
+},
+"participation": {
+"score": 27
+},
+"breadthThrust": {
+"score": 18
+},
+"liquidity": {
+"score": 29
+},
+"fragility": {
+"score": 88
+},
+"rotationDecay": {
+"score": 86
+},
+"internalDivergence": {
+"score": 91
+},
+"regimeSync": {
+"score": 18
+},
+"concentrationScore": 48,
+"crash": {
+"score": 76,
+"probability": 68
+},
+"phaseConfirmation": {
+"confidence": 92,
+"confirmed": true
+},
+"putTiming": {
+"score": 10
+},
+"historyMetrics": {
+"phasePersistence": 88,
+"daysInPhase": 74,
+"participationDecay": 38,
+"breadthTrend": -14,
+"breadthAcceleration": -5,
+"leadershipDecay": -12,
+"crashTrend": 12,
+"relativeBreadthWeakness": 28,
+"institutionalPressure": 92,
+"marketCharacter": "BEAR",
+"averageBreadth": 34,
+"averageParticipation": 31,
+"averageRotation": 28,
+"averageLiquidity": 35,
+"averageFragility": 82,
+"acceleratingWeakness": true,
+"regimePersistence": 88,
+"persistentDistribution": true,
+"prolongedBearRegime": true
+}
+}

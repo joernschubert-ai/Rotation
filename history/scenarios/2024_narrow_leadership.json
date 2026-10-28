@@ -1,0 +1,80 @@
+{
+"id": "2024_narrow_leadership",
+"date": "2024-06-21",
+"year": 2024,
+"title": "2024 Mega-Cap Narrow Leadership",
+"description": "Major indices remain strong while market leadership concentrates heavily in mega-cap growth and AI stocks. Equal-weight and small-cap participation lag, creating hidden structural fragility.",
+"expected": {
+"phase": "PHASE_3_DISTRIBUTION",
+"mode": "NEUTRAL",
+"signal": "NEUTRAL",
+"minRisk": 40,
+"maxRisk": 64
+},
+"market": {
+"vix": 13.2,
+"breadth50": 54,
+"breadth200": 63,
+"vixTermRatio": 0.91
+},
+"rotation": {
+"score": 46,
+"rsSmall": 0.964,
+"rsEqual": 0.972,
+"rsGrowth": 1.072
+},
+"participation": {
+"score": 47
+},
+"breadthThrust": {
+"score": 44
+},
+"liquidity": {
+"score": 74
+},
+"fragility": {
+"score": 66
+},
+"rotationDecay": {
+"score": 64
+},
+"internalDivergence": {
+"score": 78
+},
+"regimeSync": {
+"score": 39
+},
+"concentrationScore": 88,
+"crash": {
+"score": 32,
+"probability": 22
+},
+"phaseConfirmation": {
+"confidence": 76,
+"confirmed": true
+},
+"putTiming": {
+"score": 4
+},
+"historyMetrics": {
+"phasePersistence": 68,
+"daysInPhase": 52,
+"participationDecay": 18,
+"breadthTrend": -5,
+"breadthAcceleration": -2,
+"leadershipDecay": -11,
+"crashTrend": 3,
+"relativeBreadthWeakness": 18,
+"institutionalPressure": 74,
+"marketCharacter": "DISTRIBUTION",
+"averageBreadth": 59,
+"averageParticipation": 53,
+"averageRotation": 46,
+"averageLiquidity": 72,
+"averageFragility": 61,
+"acceleratingWeakness": true,
+"regimePersistence": 72,
+"persistentDistribution": true,
+"prolongedBearRegime": false
+}
+}

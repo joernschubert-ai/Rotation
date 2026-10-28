@@ -1,0 +1,89 @@
+{
+"id": "2017_BROAD_EXPANSION",
+"date": "2017-11-01",
+"year": 2017,
+"title": "Broad Institutional Expansion",
+"description": "Low volatility, strong breadth, healthy participation and broad market leadership.",
+
+"expected": {
+"phase": "PHASE_1_EXPANSION",
+"mode": "LONG",
+"signal": "CALL",
+"minRisk": 0,
+"maxRisk": 35
+},
+
+"market": {
+"vix": 11.2,
+"breadth50": 78,
+"breadth200": 72,
+"vixTermRatio": 1.08
+},
+
+"rotation": {
+"score": 74,
+"rsSmall": 1.01,
+"rsEqual": 1.01,
+"rsGrowth": 1.02
+},
+
+"participation": {
+"score": 76
+},
+
+"breadthThrust": {
+"score": 72
+},
+
+"liquidity": {
+"score": 78
+},
+
+"fragility": {
+"score": 20
+},
+
+"rotationDecay": {
+"score": 10
+},
+
+"internalDivergence": {
+"score": 15
+},
+
+"regimeSync": {
+"score": 82
+},
+
+"concentrationScore": 30,
+
+"crash": {
+"score": 8,
+"probability": 5
+},
+
+"phaseConfirmation": {
+"confidence": 88,
+"confirmed": true
+},
+
+"historyMetrics": {
+"breadthTrend": 5,
+"breadthAcceleration": 2,
+"participationDecay": 2,
+"leadershipDecay": 0,
+"crashTrend": 0,
+"relativeBreadthWeakness": 2,
+"institutionalPressure": 20,
+"phasePersistence": 60,
+"daysInPhase": 30,
+"averageBreadth": 75,
+"averageParticipation": 74,
+"averageRotation": 72,
+"averageLiquidity": 76,
+"averageFragility": 22,
+"acceleratingWeakness": false,
+"persistentDistribution": false,
+"prolongedBearRegime": false
+}
+}

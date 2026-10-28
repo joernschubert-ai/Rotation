@@ -1,0 +1,69 @@
+{
+"id": "2020_POST_COVID_RECOVERY",
+"date": "2020-06-15",
+"year": 2020,
+"title": "Post-COVID Liquidity Recovery",
+"description": "Powerful recovery supported by extraordinary liquidity but with incomplete structural participation.",
+
+"expected": {
+"phase": "PHASE_2_WARNING",
+"mode": "LONG",
+"signal": "CALL",
+"minRisk": 20,
+"maxRisk": 50
+},
+
+"market": {
+"vix": 32,
+"breadth50": 68,
+"breadth200": 55,
+"vixTermRatio": 0.95
+},
+
+"rotation": {
+"score": 65,
+"rsSmall": 1.03,
+"rsEqual": 1.01,
+"rsGrowth": 1.02
+},
+
+"participation": {
+"score": 66
+},
+
+"breadthThrust": {
+"score": 78
+},
+
+"liquidity": {
+"score": 92
+},
+
+"fragility": {
+"score": 45
+},
+
+"rotationDecay": {
+"score": 22
+},
+
+"internalDivergence": {
+"score": 28
+},
+
+"regimeSync": {
+"score": 62
+},
+
+"concentrationScore": 48,
+
+"crash": {
+"score": 32,
+"probability": 18
+},
+
+"phaseConfirmation": {
+"confidence": 75,
+"confirmed": true
+}
+}
