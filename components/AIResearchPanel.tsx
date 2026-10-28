@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { AIResearchSourceReview } from "./AIResearchSourceReview";
+import { AIResearchAppFacts } from "./AIResearchAppFacts";
 import type { AIResearchReport, AIResearchResult } from "@/lib/aiResearch/aiResearchTypes";
 import { SYNTHESIS_CONTRACT } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 import type { ResearchSynthesis } from "@/lib/aiResearch/aiResearchSynthesisTypes";
@@ -69,13 +71,15 @@ export function AIResearchOverview({ report, snapshotTimestamp, suspended = fals
   const current = !suspended && Number.isFinite(age) && age >= 0 && age <= 86400000;
   const content = current && synthesis && synthesis.snapshotTimestamp === snapshotTimestamp && synthesis.status === "SUCCESS" &&
     synthesis.quality?.contractVersion === SYNTHESIS_CONTRACT ? synthesis.content : undefined;
+  const narrative=current&&synthesis?.status==='SUCCESS'&&synthesis.snapshotTimestamp===snapshotTimestamp&&synthesis.quality?.contractVersion===SYNTHESIS_CONTRACT?synthesis.narrative:undefined;
+  const sourceReview=current&&synthesis&&synthesis.snapshotTimestamp===snapshotTimestamp&&synthesis.quality?.contractVersion===SYNTHESIS_CONTRACT?synthesis.sourceReview:undefined;
   const names = { NASDAQ_PUT: "Nasdaq Put", NASDAQ_CALL: "Nasdaq Call", RUSSELL_CALL: "Russell Call" };
   const states = { WATCH: "Beobachten", PREPARE: "Vorbereiten", STARTER_CANDIDATE: "Früher Kandidat", CONFIRM: "Bestätigung prüfen", REDUCE: "Risiko prüfen" };
   const titles = { WATCH_ONLY: "Vorerst beobachten", PREPARATION: "Einstiege vorbereiten", CANDIDATES: "Frühe Chancen getrennt prüfen", RISK_REVIEW: "Risiken neu bewerten" };
   const reviews=current&&synthesis?.snapshotTimestamp===snapshotTimestamp&&synthesis?.quality?.contractVersion===SYNTHESIS_CONTRACT?synthesis?.instrumentReviews??[]:[];
   const partial=Boolean(content&&reviews.some(r=>r.status!=="CHECKED"));
   const hasCaveats=Boolean(content?.flows.some(flow=>flow.interpretationNotes?.length));
-  const overviewTitle = !current ? "Aktuellen Marktstand abgleichen" : partial ? "KI-Auswertung teilweise zurückgehalten" : content ? titles[content.conclusion]+(hasCaveats?" · mit Vorbehalt":"") : reviews.length ? "KI-Antwort zur Prüfung zurückgehalten" : "KI-Einschätzung noch nicht verfügbar";
+  const overviewTitle = sourceReview ? "App-Befunde und getrennte KI-Abwägung" : narrative ? "App-Fakten und ungeprüfte KI-Interpretation" : !current ? "Aktuellen Marktstand abgleichen" : partial ? "KI-Auswertung teilweise zurückgehalten" : content ? titles[content.conclusion]+(hasCaveats?" · mit Vorbehalt":"") : reviews.length ? "KI-Antwort zur Prüfung zurückgehalten" : "KI-Einschätzung noch nicht verfügbar";
   return <section aria-label="Research Überblick" className="overflow-hidden rounded-xl border border-slate-700 bg-gradient-to-br from-slate-900 via-[#101820] to-[#101114]">
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-700/60 p-4 sm:px-5">
       <div><div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Unabhängige KI · Überblick</div>
@@ -85,11 +89,18 @@ export function AIResearchOverview({ report, snapshotTimestamp, suspended = fals
       <div className="text-[10px] leading-relaxed text-slate-400">Marktstand {date(snapshotTimestamp)}<br />KI {date(synthesis?.generatedAt)}</div>
     </div>
     {current&&synthesis?.cotDataQuality&&<p role="status" className={`border-b border-slate-700/60 px-4 py-2 text-xs sm:px-5 ${synthesis.cotDataQuality.fallbackUsed||synthesis.cotDataQuality.status==='UNAVAILABLE'?'text-amber-200':'text-slate-400'}`}>COT: {synthesis.cotDataQuality.message} Beobachtungsdatum: {synthesis.cotDataQuality.observationDate??'nicht verfügbar'}. {synthesis.cotDataQuality.lastSuccessfulFetchAt&&<>Letzter erfolgreicher Abruf: {date(synthesis.cotDataQuality.lastSuccessfulFetchAt)}.</>} Das Beobachtungsdatum ist kein bestätigter Veröffentlichungstermin.</p>}
-    {!content && current && <p role="status" className="border-b border-slate-700/60 px-4 py-3 text-xs leading-relaxed text-amber-200 sm:px-5">{synthesis?.status === "SUCCESS" ? "Die KI-Antwort gehört zu einer früheren Auswertung. Research bitte aktualisieren." : synthesis?.message ?? "Noch keine KI-Einschätzung verfügbar."}</p>}
+    {!content && !narrative && !sourceReview && current && <p role="status" className="border-b border-slate-700/60 px-4 py-3 text-xs leading-relaxed text-amber-200 sm:px-5">{synthesis?.status === "SUCCESS" ? "Die KI-Antwort gehört zu einer früheren Auswertung. Research bitte aktualisieren." : synthesis?.message ?? "Noch keine KI-Einschätzung verfügbar."}</p>}
+    {current&&synthesis&&synthesis.snapshotTimestamp===snapshotTimestamp&&<ResearchFactOverview synthesis={synthesis} />}
+    {current&&synthesis&&synthesis.snapshotTimestamp===snapshotTimestamp&&synthesis.domainConcepts&&<ResearchDomainConcepts concepts={synthesis.domainConcepts} />}
+    {current&&synthesis?.domainConcepts?.interpretationFrame&&<ResearchInterpretationFrame frame={synthesis.domainConcepts.interpretationFrame} />}
+    {report.appFacts&&<AIResearchAppFacts facts={report.appFacts} />}
+    {sourceReview&&<AIResearchSourceReview review={sourceReview} />}
+    {narrative&&<ResearchNarrativeText narrative={narrative} />}
     <div className="grid grid-cols-1 gap-px bg-slate-700/40 sm:grid-cols-3">
       {(["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const).map(instrument => {
         const app = report.decisionSupport?.flows.find(flow => flow.instrument === instrument || flow.instrument === names[instrument]);
         const ai = content?.flows.find(flow => flow.instrument === instrument);
+        const sourceChoice=sourceReview?.view?.find(row=>row.instrument===instrument);
         const brief = current ? synthesis?.quality?.instrumentBriefs?.find(item => item.instrument === instrument) : undefined;
         const review=reviews.find(item=>item.instrument===instrument);
         const rejected = review?review.status!=="CHECKED":synthesis?.status === "UNAVAILABLE" && Boolean(synthesis.quality?.issues.length);
@@ -97,9 +108,9 @@ export function AIResearchOverview({ report, snapshotTimestamp, suspended = fals
         const color = candidate ? "text-amber-200" : ai?.assessment === "REDUCE" ? "text-rose-300" : ai?.assessment === "PREPARE" ? "text-sky-300" : "text-slate-300";
         return <div key={instrument} className="bg-[#111a23] p-4 sm:p-5">
           <div className="text-xs font-semibold text-slate-100">{names[instrument]}</div>
-          <div className={`mt-2 text-base font-semibold ${color}`}>{ai ? states[ai.assessment] : rejected && current ? "Nicht übernommen" : "Auswertung ausstehend"}</div>
+          <div className={`mt-2 text-base font-semibold ${color}`}>{ai ? states[ai.assessment] : sourceChoice ? "Quellenwahl verfügbar" : narrative ? "Einordnung im KI-Text" : rejected && current ? "Nicht übernommen" : "Auswertung ausstehend"}</div>
           <div className="mt-1 text-[10px] text-slate-500">Unabhängige KI-Einschätzung</div>
-          <p className="mt-3 text-xs leading-relaxed text-slate-400">{ai?.whyNow ?? (!current ? "Nach dem Abgleich erneut prüfen." : rejected ? "Diese Instrumentaussage ist nicht übernommen. Originaltext und Prüfhinweise stehen unten offen zur Einsicht." : "Begründung und Status stehen in den Details.")}</p>
+          <p className="mt-3 text-xs leading-relaxed text-slate-400">{ai?.whyNow ?? (sourceChoice ? "Belegte Zustandsangaben und gewählte Quellen stehen oben. Die freie KI-Abwägung ist getrennt und ungeprüft; keine neue Einstiegserlaubnis." : narrative ? "Die unabhängige Interpretation steht oben im vollständigen KI-Text. Kein automatisch abgeleitetes Instrumenturteil." : !current ? "Nach dem Abgleich erneut prüfen." : rejected ? "Diese Instrumentaussage ist nicht übernommen. Originaltext und Prüfhinweise stehen unten offen zur Einsicht." : "Begründung und Status stehen in den Details.")}</p>
           {ai?.assessmentExplanation&&<p className="mt-2 text-xs text-slate-400">{ai.assessmentExplanation}</p>}
           {Boolean(ai?.interpretationNotes?.length)&&<div className="mt-2 text-xs text-amber-200"><p className="font-semibold">Einordnung mit Vorbehalt</p>{ai?.interpretationNotes?.slice(0,2).map(note=><p key={note} className="mt-1">{note}</p>)}</div>}
           <ResearchPriceReferenceCard references={current?synthesis?.priceReferences?.find(r=>r.instrument===instrument):undefined}/>
@@ -173,6 +184,8 @@ export function AIResearchSynthesisSummary({ synthesis, snapshotTimestamp, suspe
   const age = snapshotTimestamp ? Date.now() - Date.parse(snapshotTimestamp) : NaN;
   const current = !suspended && Number.isFinite(age) && age >= 0 && age <= 86400000 && synthesis?.snapshotTimestamp === snapshotTimestamp;
   const content = current && synthesis?.status === "SUCCESS" && synthesis.quality?.contractVersion === SYNTHESIS_CONTRACT ? synthesis.content : undefined;
+  const narrative=current&&synthesis?.status==='SUCCESS'&&synthesis.quality?.contractVersion===SYNTHESIS_CONTRACT?synthesis.narrative:undefined;
+  if(narrative||(current&&synthesis?.sourceReview&&synthesis.quality?.contractVersion===SYNTHESIS_CONTRACT))return null; // Already visible, expanded, in the overview above.
   const conclusion = { WATCH_ONLY: "Vorerst beobachten", PREPARATION: "Einstiege vorbereiten", CANDIDATES: "Einstiegskandidaten getrennt prüfen", RISK_REVIEW: "Instrumentrisiken neu prüfen" };
   const instrumentNames = { NASDAQ_PUT: "Nasdaq Put", NASDAQ_CALL: "Nasdaq Call", RUSSELL_CALL: "Russell Call" };
   const assessments = { WATCH: "Beobachten", PREPARE: "Vorbereiten", STARTER_CANDIDATE: "Früher Einstiegskandidat", CONFIRM: "Bestätigung prüfen", REDUCE: "Risikogedanken prüfen" };
@@ -215,7 +228,7 @@ export function AIResearchSynthesisSummary({ synthesis, snapshotTimestamp, suspe
         <p className="mt-2 text-[#aaa]"><strong className="text-[#ccc]">{flow.assessment==="REDUCE"?"Risikogedanken verwerfen:":"Verwerfen:"}</strong> {flow.invalidation}</p>
       </div>)}</div>
       <Detail title="Gemeinsame Gegenargumente und Grenzen"><List items={content.counterarguments} /><List items={content.limitations} /></Detail>
-      <p className="mt-4 text-[10px] leading-relaxed text-[#888]">Cloudflare · {synthesis?.model?.includes("qwen") ? "Qwen3" : synthesis?.model ?? "KI"} · erstellt {date(synthesis?.generatedAt)}{synthesis?.cached ? " · gespeichert wiederverwendet" : ""}. KI-Kandidaten sind keine App-Freigaben. Die Modellanteile oben bleiben unverändert; wirtschaftliche Richtigkeit und Handelsvorteil sind nicht bewiesen.</p>
+      <p className="mt-4 text-[10px] leading-relaxed text-[#888]">Cloudflare · {synthesis?.model?.includes("gemma") ? "Gemma 4" : synthesis?.model?.includes("qwen") ? "Qwen3" : synthesis?.model ?? "KI"} · erstellt {date(synthesis?.generatedAt)}{synthesis?.cached ? " · gespeichert wiederverwendet" : ""}. KI-Kandidaten sind keine App-Freigaben. Die Modellanteile oben bleiben unverändert; wirtschaftliche Richtigkeit und Handelsvorteil sind nicht bewiesen.</p>
     </> : <p className="mt-3 text-xs text-[#999]">{!current ? "Aktuelle KI-Einschätzung ausgesetzt, bis Marktstand und Research abgeglichen sind." : synthesis?.status === "SUCCESS" ? "Die gespeicherte KI-Antwort verwendet noch die bisherige Prüfung. Research bitte aktualisieren." : synthesis?.message ?? "Noch keine KI-Einschätzung verfügbar. Angezeigt wird die regelbasierte App-Auswertung."}</p>}
     {current && synthesis?.quality?.contractVersion===SYNTHESIS_CONTRACT && <AIResearchReviewNotes synthesis={synthesis} />}
   </section>;
@@ -286,6 +299,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     {snapshotMismatch && <p role="status" className="border border-amber-900 p-3 text-xs text-amber-200">Research und Dashboard verwenden unterschiedliche Snapshots. Die Einstiegsaussage ist ausgesetzt. Bitte den Marktstand erneut aktualisieren.</p>}
     {!report && marketReady && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
     {report && <>
+      <ResearchSequenceStatus synthesis={report.aiSynthesis} />
       <AIResearchOverview report={report} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       <ResearchWeightingPanel synthesis={report.aiSynthesis} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       <ResearchChartPanel context={report.historicalEvidence?.chartContext} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
@@ -428,6 +442,33 @@ function FormationHistoryPanel({history}:{history?:import("@/lib/aiResearch/aiRe
  </details>;
 }
 
+export function ResearchSequenceStatus({synthesis}:{synthesis?:ResearchSynthesis}){
+ const expert=synthesis?.cotAnalysis,previous=synthesis?.status==='UNAVAILABLE'?synthesis.previousSuccessful:undefined;
+ const names:Record<string,string>={NASDAQ:'Nasdaq-100',RUSSELL_2000:'Russell 2000',NASDAQ_PUT:'Nasdaq Put',NASDAQ_CALL:'Nasdaq Call',RUSSELL_CALL:'Russell Call'};
+ return <>
+  {synthesis&&<section className="rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-xs text-slate-300">
+   <h3 className="font-semibold text-white">COT-Faktenbasis der Gesamtauswertung</h3>
+   <p className="mt-2">{expert?'Ein ergänzender separater COT-Fachbericht ist vorhanden.':'COT wird über berechnete Fakten und Fachkarten ausgewertet. Dafür ist kein separater KI-COT-Bericht erforderlich.'} Neue Modellaufrufe in diesem Vorgang: {synthesis.modelRequestsUsed??0}.</p>
+   {expert&&<details className="mt-3"><summary className="cursor-pointer">Getrennte COT-Auswertung · erstellt {date(expert.generatedAt)}</summary>
+    {Object.entries(expert.markets).map(([market,v])=><div key={market} className="mt-3 border-t border-slate-700 pt-3"><strong>{names[market]??market} · Positionen vom {v.observationDate}</strong>
+     <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[440px] text-left text-[11px]"><caption className="mb-2 text-left text-slate-400">Berechnete COT-Fakten · Nettokontrakte; Veränderungen sind keine Kursprognosen</caption><thead><tr>{['Gruppe','Nettozustand','1 Woche','4 Wochen','13 Wochen'].map(t=><th key={t} className="p-2">{t}</th>)}</tr></thead><tbody>{(v.facts??[]).map(g=><tr key={g.group} className="border-t border-slate-700"><td className="p-2">{g.group==='ASSET_MANAGER'?'Asset Manager':'Leveraged Money'}</td><td className="p-2">{g.netPosition?.toLocaleString('de-DE')??'—'} · {g.netState==='NET_LONG'?'netto long':g.netState==='NET_SHORT'?'netto short':g.netState==='FLAT'?'ausgeglichen':'unbekannt'}</td>{[1,4,13].map(weeks=>{const h=g.horizons.find(h=>h.weeks===weeks);return <td key={weeks} className="p-2" title={h?.fact}>{h?.delta===null||h?.delta===undefined?'—':(h.delta>0?'+':'')+h.delta.toLocaleString('de-DE')}</td>;})}</tr>)}</tbody></table></div>
+     <p className="mt-2 text-slate-400">Positive Nettoänderung = Verschiebung in Richtung Long; negative = Richtung Short. Der Nettozustand kann dabei weiter short bzw. long bleiben.</p>
+     <p className="mt-3 font-semibold">KI-Einordnung</p><p className="mt-2">{v.reason}</p><p className="mt-2">{v.divergence}</p><p className="mt-2 text-slate-400">{v.limitation}</p>{(v.notes??[]).map(note=><p key={note} className="mt-2 text-amber-200">{note}</p>)}</div>)}
+    <p className="mt-3 text-slate-400">Dieser Fachbericht sieht nur datierte COT-Positionen, keine Kurse oder Nachrichten. Keine eigenständige Einstiegsfreigabe.</p>
+   </details>}
+  </section>}
+  {synthesis?.status==='SUCCESS'&&synthesis.indexScenarios&&Object.keys(synthesis.indexScenarios).length>0&&<section className="rounded-xl border border-slate-700 p-4 text-xs text-slate-300"><h3 className="font-semibold text-white">KI · Fortsetzung oder mögliche Wende?</h3><p className="mt-2 text-slate-400">Bedingte Hypothesen vor der Instrumentbewertung; kein nachgewiesener Vorlauf oder neuer App-Einstieg. Kursbedingungen werden aus den Daten ergänzt.</p>{Object.entries(synthesis.indexScenarios).map(([market,scenario])=><div key={market} className="mt-4"><strong>{names[market]??market}</strong>{scenario.basis&&<p className="mt-2 text-slate-400">{scenario.basis}</p>}{(scenario.notes??[]).map(note=><p key={note} className="mt-2 text-amber-200">{note}</p>)}<div className="mt-2 grid gap-3 md:grid-cols-2"><div className="border border-slate-700 p-3"><strong>Fortsetzung</strong><p className="mt-2">{scenario.continuation}</p>{scenario.continuationCondition&&<p className="mt-3 text-sky-200">Geprüfte Kursbedingung: {scenario.continuationCondition}</p>}</div><div className="border border-slate-700 p-3"><strong>Mögliche Wende</strong><p className="mt-2">{scenario.reversal}</p>{scenario.reversalCondition&&<p className="mt-3 text-sky-200">Geprüfte Kursbedingung: {scenario.reversalCondition}</p>}</div></div></div>)}</section>}
+  {previous&&<section className="rounded-xl border border-amber-800 bg-amber-950/20 p-4 text-xs text-slate-300">
+   <h3 className="font-semibold text-amber-200">Letzte erfolgreiche KI-Auswertung bleibt erhalten</h3>
+   <p className="mt-2">Aktuelle Analyse nicht verfügbar: {synthesis?.message}</p>
+   <p className="mt-2">Früherer Marktstand {date(previous.snapshotTimestamp)} · KI-Bericht {date(previous.generatedAt)}. Archivierter Stand; die alten Aussagen wurden mit dem aktuellen Markt nicht erneut geprüft.</p>
+   {previous.sourceReview&&<AIResearchSourceReview review={previous.sourceReview} archived />}
+   {previous.narrative&&<ResearchNarrativeText narrative={previous.narrative} archived />}
+   <p className="mt-3">{previous.content?.summary}</p>
+   <div className="mt-3 grid gap-3 md:grid-cols-3">{previous.content?.flows.map(flow=><div key={flow.instrument} className="border border-amber-900 p-3"><strong>{names[flow.instrument]??flow.instrument}</strong><p className="mt-2">{flow.reasoning}</p><p className="mt-2">{flow.whyNow}</p><p className="mt-2 text-slate-400">Gegenargument: {flow.counterargument}</p></div>)}</div>
+  </section>}
+ </>;
+}
 export function ResearchWeightingPanel({synthesis,suspended=false}:{synthesis?:import('@/lib/aiResearch/aiResearchSynthesisTypes').ResearchSynthesis;suspended?:boolean}){
  const contexts=synthesis?.weightingContexts;
  if(!contexts?.length)return null;
@@ -438,7 +479,7 @@ export function ResearchWeightingPanel({synthesis,suspended=false}:{synthesis?:i
  return <section className="rounded border border-slate-700 bg-[#101820] p-4 text-xs text-slate-300">
   <h3 className="font-semibold text-slate-100">Research · feste Ausgangsgewichte</h3>
   <p className="mt-2 text-slate-400">Marktstruktur 35 % · Chart 35 % · COT 10 % · Historie 15 % · Nachrichten 5 %</p>
-  <p className="mt-2 text-slate-400">Die KI beurteilt jeden Datenblock einmal je Index. Aufwärtsgerichtete Hinweise stützen den Call und sprechen gegen den Put; abwärtsgerichtete umgekehrt. Die App rechnet mit festen Gewichten. Fehlende Anteile bleiben offen. Keine Erfolgswahrscheinlichkeit, Positionsgröße oder zusätzliche Einstiegsfreigabe.</p>
+  <p className="mt-2 text-slate-400">Die festen Ausgangsgewichte und Datenabdeckung bleiben sichtbar. Der freie KI-Text wird nicht automatisch in Blockurteile oder Gewichtspunkte übersetzt; ein fehlender Saldo bedeutet keine neutrale Marktlage. Keine Erfolgswahrscheinlichkeit, Positionsgröße oder zusätzliche Einstiegsfreigabe.</p>
   {suspended?<p className="mt-3 text-amber-200">Gewichtete Beurteilung bis zum Snapshot-Abgleich ausgesetzt.</p>:<details className="mt-3"><summary className="cursor-pointer font-semibold">Beiträge und Nachrichtenbezug je Instrument</summary>
    <div className="mt-3 grid gap-3 xl:grid-cols-3">{contexts.map(context=>{
     const review=synthesis?.content?.flows.find(f=>f.instrument===context.instrument)?.weightedReview;
@@ -483,3 +524,63 @@ export function ResearchPriceReferenceCard({references}:{references?:NonNullable
   <p className="mt-2 text-[10px] text-slate-500">Tagesschlussbasis. Bedingte Hinweise, keine garantierten Widerstände, Kursziele oder Einstiegsfreigaben. Marken stammen aus den Daten, nicht aus frei gewählten KI-Zahlen.</p>
  </div>;
 }
+
+export function ResearchNarrativeText({narrative,archived=false}:{narrative:NonNullable<ResearchSynthesis['narrative']>;archived?:boolean}){
+ return <section className="border-y border-slate-700/60 p-4 sm:p-5" aria-label={archived?'Archivierte freie KI-Analyse':'Freie unabhängige KI-Analyse'}>
+  <h3 className="text-sm font-semibold text-sky-200">{archived?'Früherer KI-Text · ungeprüft':'Ungeprüfte KI-Zusatzinterpretation · Originaltext'}</h3>
+  <p className="mt-2 text-[11px] text-slate-400">Originaltext der KI. Zahlenkarten und App-Freigaben werden separat dargestellt; kein automatisch klassifiziertes Instrumenturteil oder Gewichtungssaldo.</p>
+  {narrative.truncated&&<p role="status" className="mt-3 text-xs text-amber-200">Die Antwort hat die Ausgabelänge erreicht und kann am Ende unvollständig sein.</p>}
+  {narrative.audit&&<div role="status" className="mt-3 border border-amber-800 p-3 text-xs text-amber-100">
+    <p className="font-semibold">{narrative.audit.findings.length?'Prüfung: konkrete Widersprüche oder Vollständigkeitshinweise gefunden':'Begrenzte Prüfung: keine erfassten Widersprüche gefunden'}</p>
+    <p className="mt-2">{narrative.audit.scope}</p>
+    {narrative.audit.findings.map((finding,index)=><div key={index} className="mt-3"><p>{finding.correction}</p>{finding.quote&&<p className="mt-1 text-slate-400">Beanstandete KI-Aussage: {finding.quote}</p>}</div>)}
+  </div>}
+  <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-200">{narrative.text}</div>
+  <p className="mt-4 text-[11px] text-slate-400">Inhaltliche Richtigkeit und Vorhersagevorteil sind nicht automatisch bestätigt.</p>
+ </section>;
+}
+
+/** Source-derived facts remain visible independently of model prose or inference status. */
+export function ResearchFactOverview({synthesis}:{synthesis:ResearchSynthesis}){
+ const briefs=synthesis.quality?.instrumentBriefs??[];
+ const number=(n:number|null|undefined)=>typeof n==='number'&&Number.isFinite(n)?n.toLocaleString('de-DE',{maximumFractionDigits:2}):'nicht verfügbar';
+ return <section aria-label="Berechnete Faktenbasis" className="border-b border-slate-700 p-4 sm:p-5">
+  <h3 className="text-sm font-semibold text-slate-100">Berechnete Faktenbasis</h3>
+  <p className="mt-2 text-xs text-slate-400">Aus den gelieferten Daten berechnet, unabhängig vom KI-Text. Keine Prognose oder Einstiegsfreigabe. Quellenrichtigkeit und Börsenkalender sind damit nicht unabhängig geprüft.</p>
+  <div className="mt-3 grid gap-4 sm:grid-cols-2">{(['NASDAQ_CALL','RUSSELL_CALL'] as const).map(instrument=>{
+   const b=briefs.find(x=>x.instrument===instrument);const ref=synthesis.priceReferences?.find(x=>x.instrument===instrument);
+   if(!b&&!ref)return <p key={instrument} className="text-xs text-slate-400">{instrument==='NASDAQ_CALL'?'Nasdaq-100':'Russell 2000'}: Faktenbasis nicht verfügbar.</p>;
+   const levels=[...(ref?.upLevels??[]),...(ref?.downLevels??[])].filter(x=>/^MA(20|50|200)$/.test(x.id));
+   return <div key={instrument} className="space-y-2 text-xs text-slate-300">
+    <h4 className="font-semibold">{instrument==='NASDAQ_CALL'?'Nasdaq-100 · für Put und Call':'Russell 2000'}</h4>
+    <p>Chartschluss {ref?.asOfDate??'nicht verfügbar'}: {number(ref?.lastClose)} Indexpunkte. Separater Snapshotkurs: {number(b?.price.current)}.</p>
+    <p>5 Sitzungen {pct(b?.price.momentum5D)} · 20 Sitzungen {pct(b?.price.momentum20D)}</p>
+    {levels.map(l=><p key={l.id}>Schlusskurs {typeof ref?.lastClose==='number'?(ref.lastClose>l.price?'über':ref.lastClose<l.price?'unter':'auf'):'Relation unbekannt'} {l.id}: {number(l.price)} Punkte ({l.asOfDate}).</p>)}
+    {b?.cot.map(g=><div key={g.group}><p>{g.group==='LEVERAGED_MONEY'?'Leveraged Money':g.group==='ASSET_MANAGER'?'Asset Manager':g.group}, {g.reportDate}: netto {number(g.netPosition)} Kontrakte.</p><p>1 Woche: {g.weeklyFact??'nicht verfügbar'} 4 Wochen Nettoänderung: {number(g.change4W)} Kontrakte. {g.change4WFact??'nicht verfügbar'} 13 Wochen: {g.change13WFact??'nicht verfügbar'}</p></div>)}
+    {b?.histories.filter(h=>h.currentMatch).map(h=><p key={h.id}>Historie {h.family}, Stand {h.asOfDate}: folgende 20 Sitzungen im Mittel {pct(h.meanPct)}, Basis {pct(h.baselineMeanPct)}, Differenz {pct(h.excessMeanPp,true)}; p10/p90 {pct(h.p10Pct)} / {pct(h.p90Pct)}. {h.sampleSize} Fälle, möglicherweise überlappend.</p>)}
+    <p className="text-slate-500">Durchschnitte sind Referenzen, keine bewiesene Unterstützung. Historische Indexrenditen sind keine erwarteten Optionsrenditen. COT ist datierter Positionskontext.</p>
+   </div>;
+  })}</div>
+ </section>;
+}
+
+
+
+export function ResearchInterpretationFrame({frame}:{frame:NonNullable<NonNullable<ResearchSynthesis['domainConcepts']>['interpretationFrame']>}){
+ return <section className="border-b border-slate-700 p-4 sm:p-5" aria-label="Fachlicher Interpretationsrahmen">
+ <h3 className="text-sm font-semibold text-sky-200">Fachlicher Interpretationsrahmen · berechnet</h3>
+ <p className="mt-2 text-xs text-slate-400">Diese Fakten und bedingten Wirkungen werden aus den gelieferten Daten aufbereitet und der KI ebenfalls übergeben. Die KI wägt sie frei ab; sie muss die Zahlen nicht wiederholen. Kein berechnetes Gesamturteil oder Einstiegssignal.</p>
+ <div className="mt-3 grid gap-4 sm:grid-cols-2">{frame.indices.map(index=><section key={index.market} className="space-y-3 text-xs leading-relaxed text-slate-300"><h4 className="font-semibold">{index.market==='NASDAQ'?'Nasdaq-100':'Russell 2000'}</h4>{index.cards.filter(c=>c.kind!=='PNF').map(c=><p key={c.id}><span className="text-slate-500">[{c.id}] {c.asOfDate??'Stand unbekannt'} · </span>{c.text}</p>)}<details><summary className="cursor-pointer text-sky-200">Formaler P&amp;F-Status</summary>{index.cards.filter(c=>c.kind==='PNF').map(c=><p key={c.id} className="mt-2"><span className="text-slate-500">[{c.id}] {c.asOfDate??'Stand unbekannt'} · </span>{c.text}</p>)}</details></section>)}</div>
+ <div className="mt-4 space-y-3 text-xs leading-relaxed text-slate-300">{frame.instruments.map(c=><p key={c.id}><strong>{c.instrument==='NASDAQ_PUT'?'Nasdaq Put':c.instrument==='NASDAQ_CALL'?'Nasdaq Call':'Russell Call'}:</strong> {c.text}</p>)}</div>
+ </section>;
+}
+
+export function ResearchDomainConcepts({concepts}:{concepts:NonNullable<ResearchSynthesis['domainConcepts']>}){
+ return <details className="border-b border-slate-700 p-4 sm:p-5"><summary className="cursor-pointer text-sm font-semibold text-sky-200">Fachliche Vor-Auswertung · Marktkonstellationen, P&F, COT und Historie</summary>
+ <p className="mt-3 text-xs text-slate-400">Regelgebundene Befunde aus den gelieferten Daten. Hier stehen alle Einzelprüfungen; die KI erhält eine gekürzte Auswahl für ihre freie Abwägung. Keine Gesamtmarktentscheidung oder automatische Handelsfreigabe.</p>
+ {Object.values(concepts.indices).map(index=><section key={index.market} className="mt-4 space-y-2 text-xs leading-relaxed text-slate-300"><h4 className="font-semibold">{index.market==='NASDAQ'?'Nasdaq-100':'Russell 2000'} · {index.asOfDate??'Stand unbekannt'}</h4>
+ {index.findings.map(f=><p key={f.id}><span className="text-slate-500">[{f.id}] {f.asOfDate??'Stand unbekannt'} · </span>{f.text}</p>)}
+ <details><summary className="cursor-pointer">Preisbedingungen und bereits erfüllte Zustände</summary>{index.conditions.map(p=><p key={p.id} className="mt-2"><span className="text-slate-500">[{p.id}] </span>{p.text}</p>)}</details></section>)}
+ <p className="mt-4 text-xs text-slate-500">{concepts.limits.join(' ')}</p></details>;
+}
+
