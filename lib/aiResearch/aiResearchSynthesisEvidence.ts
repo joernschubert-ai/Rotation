@@ -71,6 +71,31 @@ function priceEvidence(snapshot: Record<string, any>, market: SynthesisMarket, i
     } };
 }
 
+/** Distinct observed own-market dates, same known universe; snapshots are read-only. */
+function ownStructuralObservations(input: AIResearchInput, market: SynthesisMarket) {
+  const latest=object(input.snapshot), cutoff=Date.parse(latest.timestamp);
+  const own=(frame:Record<string,any>):Record<string,any> => market==='NASDAQ' ? {source:'NASDAQ100_PRIMARY_CONSTITUENT_BREADTH',referenceDate:object(frame.breadthDataQuality).referenceDate,breadth:object(frame.structure).breadth,phase:typeof frame.phase==='string'?frame.phase:object(frame.phase).phase,rotationConfirm:object(frame.rotationConfirm).state,universe:object(frame.breadthDataQuality).universeVersion} : (()=>{
+    const context=object(object(object(frame.russell).meta).independentContext);
+    const quality=object(object(object(frame.breadthDataQuality).russell2000).dataQuality);
+    return {...context,universe:quality.universeVersion};
+  })();
+  const current=own(latest), byDate=new Map<string,Record<string,unknown>>();
+  if(typeof current.universe!=='string'||!current.universe)return [];
+  for(const frame of [...(Array.isArray(input.history)?input.history:[]),latest].map(object).sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp))){
+    const time=Date.parse(frame.timestamp);if(!Number.isFinite(time)||time>cutoff)continue;
+    const context=own(frame), date=verifiedResearchMarketDate(frame,market);
+    const expected=market==='NASDAQ'?'NASDAQ100_PRIMARY_CONSTITUENT_BREADTH':'IWM_EQUITY_HOLDINGS_SMALLCAP_PROXY';
+    if(!date||context.referenceDate!==date||context.source!==expected||context.universe!==current.universe)continue;
+    const index=object(object(frame.indices)[market==='NASDAQ'?'nasdaq':'russell']), close=finite(index.value);
+    if(close===null||close<=0)continue;
+    const breadth=object(context.breadth), scalar=(x:unknown)=>finite(x)??finite(object(x).value);
+    const latestVersions=object(latest.calculationVersions), frameVersions=object(frame.calculationVersions);
+    const rotationComparable=['rotation','participation','liquidity','fragility'].every(key=>typeof latestVersions[key]==='string'&&latestVersions[key]===frameVersions[key]);
+    byDate.set(date,{date,close,b20:scalar(breadth.b20),b50:scalar(breadth.b50),b200:scalar(breadth.b200),phase:text(context.phase),rotationConfirm:text(context.rotationConfirm),comparable:true,rotationComparable});
+  }
+  return [...byDate.values()].slice(-3);
+}
+
 /** Only allowlisted market evidence is sent. No raw snapshot or provider credentials. */
 export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearchReport): SynthesisEvidence[] {
   const snapshot = object(input.snapshot);
@@ -95,16 +120,22 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
         interpretation: "Raw HYG/IEF is a price ratio, not an absolute stress threshold. Interpret its verified signal/ratioToMA50 and data quality." },
       gammaDiagnostics: { ...pick(snapshot.gamma, ["score", "effectiveGamma", "structuralGammaFloor"]), measurementStatus: "Producer model diagnostics; not independently verified dealer exposure" },
       rotation: pick(snapshot.rotation, ["score", "signal", "rsSmall", "rsEqual", "rsGrowth"]),
+      rotationComparison: {asOfDate: verifiedResearchMarketDate(snapshot,"NASDAQ")===verifiedResearchMarketDate(snapshot,"RUSSELL_2000")?verifiedResearchMarketDate(snapshot,"NASDAQ"):null, rsSmall:finite(object(snapshot.rotation).rsSmall)},
       instrumentStructure: {
-        NASDAQ: { source: "NASDAQ100_PRIMARY_CONSTITUENT_BREADTH", phase: typeof snapshot.phase === "string" ? snapshot.phase : object(snapshot.phase).phase,
+        NASDAQ: { source: "NASDAQ100_PRIMARY_CONSTITUENT_BREADTH", rotationConfirm:text(object(snapshot.rotationConfirm).state), phase: typeof snapshot.phase === "string" ? snapshot.phase : object(snapshot.phase).phase,
           breadth: object(object(snapshot.structure).breadth), participation: finite(object(snapshot.participation).score), quality: finite(object(snapshot.marketQuality).score),
-          referenceDate: text(object(snapshot.breadthDataQuality).referenceDate, 10) },
+          referenceDate: text(object(snapshot.breadthDataQuality).referenceDate, 10),
+          analysis: { observations:ownStructuralObservations(input,"NASDAQ"), historyQuality:pick(object(object(snapshot.historyMetrics).dataQuality).universeCompatibility,['mixedUniverseContext','compatibleDailyObservations','retainedContextObservations']), phaseConfidence: finite(object(snapshot.phase).confidence), phaseDataQuality: pick(object(snapshot.phase).dataQuality,['complete','classificationIsProvisional','derivedHistoryIncomplete','derivedHistoryCompatibleObservations','rawAdThresholdRecalibrated','rawAdComparability','rawAdCountDenominator','rawAdThresholdReachable']),
+            dynamics: { ...pick(snapshot.breadthVelocity,['velocity20','velocity50']), complete: object(object(snapshot.breadthVelocity).dataQuality).complete===true, timeBasis: object(object(snapshot.historyMetrics).dataQuality).timeBasis??'UNKNOWN' },
+            entry: { ...pick(snapshot.putTiming,['decision','entryWindow']), earlyCurrentTrigger: object(object(snapshot.putTiming).meta).earlyCurrentTrigger,
+              failedChecks: Array.isArray(object(object(snapshot.putTiming).meta).earlyCurrentBlockedReasons)?object(object(snapshot.putTiming).meta).earlyCurrentBlockedReasons.filter((v:unknown)=>typeof v==='string').slice(0,16):[] } } },
         RUSSELL_2000: (() => {
           const own = object(object(object(snapshot.russell).meta).independentContext);
           return { available: Object.keys(own).length > 0, source: text(own.source), phase: text(own.phase),
             referenceDate: text(own.referenceDate, 10), coverage: finite(own.coverage),
             breadth: Object.fromEntries(["b20", "b50", "b200"].map(key => [key, finite(object(object(own.breadth)[key]).value)])),
             participation: finite(own.participation), quality: finite(own.quality), rotationConfirm: text(own.rotationConfirm),
+            analysis: { observations:ownStructuralObservations(input,"RUSSELL_2000"), entry: { ...pick(snapshot.russell,['decision']), failedChecks: Array.isArray(object(snapshot.russell).blockReasons)?object(snapshot.russell).blockReasons.filter((v:unknown)=>typeof v==='string').slice(0,16):[] } },
             missingOwnStructureDoesNotUseNasdaqFallback: true };
         })(),
       },
@@ -201,8 +232,8 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     evidence.push({id:"CHART_"+market,kind:"CHART",market,available,entryDataReady:false,data:chart?{
       asOfDate:chart.asOfDate,basis:chart.basis,snapshotMarketDate:ownMarketDate(market),sameObservedDate:chart.asOfDate===ownMarketDate(market),
       timing:"COMPLETED_DAILY_CLOSE_CONTEXT_NOT_INTRADAY",momentum:{state:chart.momentum.state,fast:chart.momentum.fast,slow:chart.momentum.slow,intermediate:chart.momentum.intermediate,stateChangedIn5Sessions:chart.momentum.stateChangedIn5Sessions},
-      prior20:chart.prior20,prior63:chart.prior63,prior252:chart.prior252,lastClose:chart.lastClose,drawdownFrom252SessionHighClosePct:chart.drawdownFrom252SessionHighClosePct,
-      movingAverages:chart.movingAverages.map(m=>({period:m.period,closeAverage:m.closeAverage,distancePct:m.distancePct,slope5SessionsPct:m.slope5SessionsPct})),observations:chart.observations,formations:chart.formations?compactFormationContext(chart.formations):null,formationHistory:chart.formationHistory&&chart.formations?compactFormationHistory(chart.formationHistory,chart.formations):null,
+      prior20:chart.prior20,prior63:chart.prior63,prior252:chart.prior252,lastClose:chart.lastClose,return5SessionsPct:chart.return5SessionsPct,return20SessionsPct:chart.return20SessionsPct,drawdownFrom252SessionHighClosePct:chart.drawdownFrom252SessionHighClosePct,
+      priceTrajectory:chart.priceTrajectory,movingAverages:chart.movingAverages.map(m=>({period:m.period,closeAverage:m.closeAverage,distancePct:m.distancePct,slope5SessionsPct:m.slope5SessionsPct})),observations:chart.observations,formations:chart.formations?compactFormationContext(chart.formations):null,formationHistory:chart.formationHistory&&chart.formations?compactFormationHistory(chart.formationHistory,chart.formations):null,
       highCloseZone:chart.zones.high,lowCloseZone:chart.zones.low,
       limitations:"Close-based context only. Momentum state is NOT an app phase or confirmed turn. No independent confirmations from repeated price indicators. Supplied P&F targets are conditional price projections, not options asymmetry or calibrated probability."
     }:{missing:true}});

@@ -119,7 +119,7 @@ export function parseMarketEvaluations(raw:string):Record<'NASDAQ_CONTEXT'|'RUSS
   for(const row of body.matchAll(/^(APP|CHART|COT|HISTORY|NEWS):[ \t]*([^\n\r]*)/gm)){
    const key=row[1] as WeightBlock;if(seen.has(key)){result[name]![key]={reading:'UNKNOWN',reason:'Mehrfach widersprüchlich angegeben.'};continue;}seen.add(key);
    const m=/^(BULLISH|BEARISH|MIXED|UNKNOWN)(?:[ \t]*[|—–][ \t]*(.*))?[ \t]*$/.exec(row[2].trim());
-   result[name]![key]={reading:m?m[1] as MarketReading:'UNKNOWN',reason:m?.[2]?.trim().slice(0,350)??''};
+   result[name]![key]={reading:m?m[1] as MarketReading:'UNKNOWN',reason:m?.[2]?.trim().slice(0,350)??('Ungültiges Richtungsformat; Original: '+row[2].trim().slice(0,280))};
   }
  }
  return result;

@@ -40,6 +40,7 @@ import type {
 AIResearchHistoricalEvidence,
 } from "./aiResearchHistoricalEvidenceTypes";
 import { buildHistoricalMarketStudies } from "./aiResearchHistoricalMarketStudies";
+import { buildHistoricalTemporalValidation } from "./aiResearchHistoricalTemporalValidation";
 
 /* =====================================================
 AI RESEARCH - HISTORICAL EVIDENCE SERVICE
@@ -169,10 +170,13 @@ if (market.count === 0) return {
   ...unavailableEvidence("Historical market alignment returned no observations; inspect source coverage."), coverage, chartContext
 };
 const marketStudies = buildHistoricalMarketStudies(market.days);
+let temporalValidation: ReturnType<typeof buildHistoricalTemporalValidation>|undefined;
+try { temporalValidation=buildHistoricalTemporalValidation(market.days,completedDailyCutoff(new Date())); }
+catch { chartWarnings.push('Episode and chronological diagnostics unavailable; original historical studies retained.'); }
 const partial = (warning: string): AIResearchHistoricalEvidence => ({
   ...unavailableEvidence(warning), status: marketStudies.length ? "PARTIAL" : "NOT_AVAILABLE",
   asOfDate: market.lastDate, firstDate: market.firstDate, lastDate: market.lastDate,
-  marketStudies, coverage, chartContext, diagnostics:{...unavailableEvidence(warning).diagnostics,warnings:[warning,...chartWarnings]}
+  marketStudies, temporalValidation, coverage, chartContext, diagnostics:{...unavailableEvidence(warning).diagnostics,warnings:[warning,...chartWarnings]}
 });
 // A rates outage must not suppress independent index/rotation studies.
 if (ratesLoad.status === "rejected") return partial("Rates provider unavailable; independent market studies remain available.");
@@ -255,7 +259,7 @@ return partial(
 );
 }
 
-return {...evidence, chartContext, diagnostics:{...evidence.diagnostics,warnings:[...evidence.diagnostics.warnings,...chartWarnings]}};
+return {...evidence, chartContext, temporalValidation, diagnostics:{...evidence.diagnostics,warnings:[...evidence.diagnostics.warnings,...chartWarnings]}};
 } catch {
   return partial("Legacy Price/VIX or rates calculation failed; independent market studies remain available.");
 }

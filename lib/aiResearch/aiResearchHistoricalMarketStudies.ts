@@ -1,6 +1,7 @@
 import type { AIHistoricalMarketStudy, AIHistoricalStudyStatistics, AIHistoricalEvidenceHorizon } from "./aiResearchHistoricalEvidenceTypes";
 
-type Day = { date: string; nasdaq: number; russell: number; sp500: number; vix: number };
+export type HistoricalStudyDay = { date: string; nasdaq: number; russell: number; sp500: number; vix: number };
+type Day = HistoricalStudyDay;
 type Point = { index: number; date: string; value: number; rise: number; fall: number };
 const horizons: AIHistoricalEvidenceHorizon[] = [5, 20, 60];
 const mean = (values: number[]): number | null => values.length ? values.reduce((a,b) => a+b,0)/values.length : null;
@@ -48,21 +49,7 @@ export function buildHistoricalMarketStudies(input: Day[]): AIHistoricalMarketSt
   const vix=days.map(d=>d.vix), result:AIHistoricalMarketStudy[]=[];
   for (const market of ['NASDAQ','RUSSELL_2000'] as const) {
     const prices=days.map(d=>market==='NASDAQ'?d.nasdaq:d.russell);
-    const other=days.map(d=>market==='NASDAQ'?d.russell:d.nasdaq);
-    const families: Array<{family:AIHistoricalMarketStudy['family'];definition:string;states:Array<string|null>}> = [
-      {family:'OWN_TREND',definition:'Own index above/below its 50- and 200-observation simple moving averages.',states:prices.map((price,i)=>{
-        const ma50=average(prices,i,50),ma200=average(prices,i,200);
-        return ma50===null||ma200===null?null:`${price>=ma50?'ABOVE':'BELOW'}_MA50_${price>=ma200?'ABOVE':'BELOW'}_MA200`;
-      })},
-      {family:'ROTATION_20D',definition:'Own 20-observation return minus the other index return: positive LEADING, negative LAGGING, zero EQUAL. State is own-index relative.',states:prices.map((_,i)=>{
-        const own=change(prices,i,20),peer=change(other,i,20);
-        return own===null||peer===null?null:own>peer?'LEADING':own<peer?'LAGGING':'EQUAL';
-      })},
-      {family:'OWN_PRICE_VIX_5D',definition:'Signs of own-index and VIX returns over five aligned observations.',states:prices.map((_,i)=>{
-        const own=change(prices,i,5),vol=change(vix,i,5);
-        return own===null||vol===null?null:`PRICE_${own>0?'UP':own<0?'DOWN':'FLAT'}_VIX_${vol>0?'UP':vol<0?'DOWN':'FLAT'}`;
-      })}
-    ];
+    const families=historicalMarketStateSeries(days,market);
     const future = new Map<number,Point[]>();
     for (const horizon of horizons) {
       const points:Point[]=[];
@@ -77,7 +64,6 @@ export function buildHistoricalMarketStudies(input: Day[]): AIHistoricalMarketSt
       if(!current) continue;
       result.push({market,asOfDate:days.at(-1)!.date,currentMatch:true,family:family.family,state:current,definition:family.definition,
         statistics:horizons.map(h=>{
-          // Identical eligible dates for the unconditional reference; no warm-up mismatch.
           const eligible=future.get(h)!.filter(p=>family.states[p.index]!==null);
           return summarize(eligible.filter(p=>family.states[p.index]===current),eligible,h);
         }),
@@ -91,4 +77,23 @@ export function buildHistoricalMarketStudies(input: Day[]): AIHistoricalMarketSt
     }
   }
   return result;
+}
+
+/** Shared fixed definitions. Caller supplies sorted, valid observations. No future values read. */
+export function historicalMarketStateSeries(days:Day[],market:'NASDAQ'|'RUSSELL_2000'):Array<{family:AIHistoricalMarketStudy['family'];definition:string;states:Array<string|null>}>{
+    const prices=days.map(d=>market==='NASDAQ'?d.nasdaq:d.russell),other=days.map(d=>market==='NASDAQ'?d.russell:d.nasdaq),vix=days.map(d=>d.vix);
+    return [
+      {family:'OWN_TREND',definition:'Own index above/below its 50- and 200-observation simple moving averages.',states:prices.map((price,i)=>{
+        const ma50=average(prices,i,50),ma200=average(prices,i,200);
+        return ma50===null||ma200===null?null:`${price>=ma50?'ABOVE':'BELOW'}_MA50_${price>=ma200?'ABOVE':'BELOW'}_MA200`;
+      })},
+      {family:'ROTATION_20D',definition:'Own 20-observation return minus the other index return: positive LEADING, negative LAGGING, zero EQUAL. State is own-index relative.',states:prices.map((_,i)=>{
+        const own=change(prices,i,20),peer=change(other,i,20);
+        return own===null||peer===null?null:own>peer?'LEADING':own<peer?'LAGGING':'EQUAL';
+      })},
+      {family:'OWN_PRICE_VIX_5D',definition:'Signs of own-index and VIX returns over five aligned observations.',states:prices.map((_,i)=>{
+        const own=change(prices,i,5),vol=change(vix,i,5);
+        return own===null||vol===null?null:`PRICE_${own>0?'UP':own<0?'DOWN':'FLAT'}_VIX_${vol>0?'UP':vol<0?'DOWN':'FLAT'}`;
+      })}
+    ];
 }

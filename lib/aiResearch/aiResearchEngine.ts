@@ -3040,7 +3040,7 @@ confidence:
 0,
 
 summary:
-"No usable trusted research-history snapshots are available for persistence analysis.",
+"No usable retained research-history snapshots are available for persistence analysis.",
 
 evidence:
 [],
@@ -3127,7 +3127,7 @@ evidence.push(
 
 
 evidence.push(
-`Trusted research history currently spans ${history.uniqueTradingDays} observed market date(s).`
+`Retained research history currently spans ${history.uniqueTradingDays} observed market date(s).`
 );
 
 
@@ -3138,7 +3138,7 @@ history.masterScoreTrend !== null
 evidence.push(
 `Master Score changed ${history.masterScoreTrend >= 0 ? "+" : ""}${history.masterScoreTrend.toFixed(
 1
-)} points across the trusted research-history window.`
+)} points across the retained research-history window.`
 );
 
 }
@@ -3151,7 +3151,7 @@ data.daysInPhase > 0
 evidence.push(
 `Rotation-App engine history reports current phase age ${Math.round(
 data.daysInPhase
-)} day(s); this metric may include legacy observations outside the trusted AI Research window.`
+)} day(s); this metric may include legacy observations outside the retained AI Research window.`
 );
 
 }
@@ -3164,7 +3164,7 @@ data.distributionDays > 0
 evidence.push(
 `Rotation-App engine history reports ${Math.round(
 data.distributionDays
-)} distribution day(s); this metric may include legacy observations outside the trusted AI Research window.`
+)} distribution day(s); this metric may include legacy observations outside the retained AI Research window.`
 );
 
 }
@@ -3177,7 +3177,7 @@ data.fragilityHighDays > 0
 evidence.push(
 `Rotation-App engine history reports elevated fragility across ${Math.round(
 data.fragilityHighDays
-)} tracked day(s); this metric may include legacy observations outside the trusted AI Research window.`
+)} tracked day(s); this metric may include legacy observations outside the retained AI Research window.`
 );
 
 }
@@ -3353,10 +3353,10 @@ confidence
 
 summary:
 state === "SUPPORTS"
-? `Trusted research history supports the current structural thesis across ${history.uniqueTradingDays} observed market date(s).`
+? `Retained research history supports the current structural thesis across ${history.uniqueTradingDays} observed market date(s).`
 : state === "CONTRADICTS"
-? `Trusted research history contradicts the current structural thesis across ${history.uniqueTradingDays} observed market date(s).`
-: `Trusted research history does not yet strongly confirm the current structural thesis across ${history.uniqueTradingDays} observed market date(s).`,
+? `Retained research history contradicts the current structural thesis across ${history.uniqueTradingDays} observed market date(s).`
+: `Retained research history does not yet strongly confirm the current structural thesis across ${history.uniqueTradingDays} observed market date(s).`,
 
 evidence:
 uniqueStrings(

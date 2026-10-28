@@ -1,6 +1,7 @@
+import { advancedCandidates, PNF_ADVANCED_POLICY, type AdvancedFormation } from './aiResearchPnfAdvanced';
 export type FormationStatus='FORMING'|'CONFIRMED'|'INVALIDATED';
 export interface Formation {
- id:string;family:'DOUBLE_BOTTOM'|'DOUBLE_TOP'|'PNF_DOUBLE_TOP_BREAKOUT'|'PNF_DOUBLE_BOTTOM_BREAKDOWN'|'PNF_TRIPLE_TOP_BREAKOUT'|'PNF_TRIPLE_BOTTOM_BREAKDOWN';
+ id:string;family:'DOUBLE_BOTTOM'|'DOUBLE_TOP'|'PNF_DOUBLE_TOP_BREAKOUT'|'PNF_DOUBLE_BOTTOM_BREAKDOWN'|'PNF_TRIPLE_TOP_BREAKOUT'|'PNF_TRIPLE_BOTTOM_BREAKDOWN'|'PNF_BULL_TRAP'|'PNF_BEAR_TRAP'|'PNF_BULLISH_SIGNAL_REVERSED'|'PNF_BEARISH_SIGNAL_REVERSED'|'PNF_BULLISH_CATAPULT'|'PNF_BEARISH_CATAPULT';
  bias:'BULLISH'|'BEARISH';status:FormationStatus;discoveredAt:string;asOfDate:string;confirmedAt:string|null;invalidatedAt:string|null;
  confirmationLevel:number;invalidationLevel:number;
  meaning:string;confirmation:string;invalidation:string;
@@ -61,14 +62,15 @@ export function detectDoubleFormations(points:FormationPoint[]):Formation[]{
 interface Column {direction:'X'|'O';low:number;high:number;startedAt:string;updatedAt:string;fixedAt:string|null;}
 interface PnfEvent {signal:Formation;column:number;levels:{confirmation:number;invalidation:number};}
 /** Geometric percentage grid anchored at price 1; it never rescales old boxes. */
-export interface PnfObservation {index:number;date:string;forming:Formation|null;latest:Formation|null;fixed:Formation[];}
+export interface PnfObservation {index:number;date:string;forming:Formation|null;latest:Formation|null;fixed:Formation[];advanced:AdvancedFormation[];}
 export function buildPointFigure(points:FormationPoint[],boxPercent:number,onObservation?:(value:PnfObservation)=>void){
  if(![0.5,1].includes(boxPercent))throw Error('Unsupported P&F scale');
  if(points.some((p,i)=>!Number.isFinite(p.close)||p.close<=0||(i>0&&p.date<=points[i-1].date)))throw Error('P&F data must be positive, unique and chronological');
  const reversal=3,step=Math.log(1+boxPercent/100);
  const up=(price:number)=>Math.floor(Math.log(price)/step+1e-9),down=(price:number)=>Math.ceil(Math.log(price)/step-1e-9);
  const price=(box:number)=>Math.exp(box*step);
- const columns:Column[]=[],events:PnfEvent[]=[];
+ const columns:Column[]=[],events:PnfEvent[]=[],advancedEvents:AdvancedFormation[]=[];
+ const advancedSeen=new Set<string>();
  const seed=points.length?up(points[0].close):0;
  const add=(direction:'X'|'O',low:number,high:number,date:string)=>columns.push({direction,low,high,startedAt:date,updatedAt:date,fixedAt:null});
  const formingAt=(latestDate:string)=>{const ci=columns.length-1,last=columns[ci];
@@ -120,21 +122,59 @@ export function buildPointFigure(points:FormationPoint[],boxPercent:number,onObs
   events.push({column:ci,levels:{confirmation:confirm,invalidation:invalid},signal:{id:family+':'+boxPercent+':'+point.date,family,bias,status:'CONFIRMED',discoveredAt:point.date,confirmedAt:point.date,invalidatedAt:null,asOfDate:point.date,
    confirmationLevel:round(confirm),invalidationLevel:round(invalid),...rules(bias,confirm,invalid),target:null,predictiveEdgeValidated:false}});
  };
- for(let i=1;i<points.length;i++){advance(points[i]);if(onObservation)onObservation({index:i,date:points[i].date,forming:formingAt(points[i].date),latest:events.length?project(events[events.length-1],points[i].date,points[i].close):null,fixed:events.filter(e=>columns[e.column].fixedAt===points[i].date).map(e=>project(e,points[i].date,points[i].close))});}
+ for(let i=1;i<points.length;i++){
+  const point=points[i];advance(point);
+  for(const event of advancedEvents)if(event.status!=='INVALIDATED'&&(event.bias==='BULLISH'?down(point.close)<=event.recognition.invalidationRow:up(point.close)>=event.recognition.invalidationRow)){event.status='INVALIDATED';event.invalidatedAt=point.date;}
+  const emitted:AdvancedFormation[]=[];
+  for(const candidate of advancedCandidates(columns,boxPercent,point.date))if(!advancedSeen.has(candidate.id)){
+   advancedSeen.add(candidate.id);advancedEvents.push(candidate);emitted.push({...candidate});
+  }
+  if(onObservation)onObservation({index:i,date:point.date,forming:formingAt(point.date),latest:events.length?project(events[events.length-1],point.date,point.close):null,
+   fixed:events.filter(e=>columns[e.column].fixedAt===point.date).map(e=>project(e,point.date,point.close)),advanced:emitted});
+ }
 
  const latestDate=points[points.length-1]?.date??null,ci=columns.length-1,last=columns[ci];
  const forming=latestDate?formingAt(latestDate):null;
+ const close=points[points.length-1]?.close;
+ const threshold=(kind:string,row:number,direction:'UP'|'DOWN')=>({kind,row,price:price(row),direction,
+  distancePoints:typeof close==='number'?price(row)-close:null,distancePct:typeof close==='number'?pct(price(row),close):null,
+  conditionMetNow:typeof close==='number'&&(direction==='UP'?up(close)>=row:down(close)<=row)});
+ const lastX=columns.slice().reverse().find(c=>c.direction==='X');
+ const lastO=columns.slice().reverse().find(c=>c.direction==='O');
+ const currentHasEvent=events.some(e=>e.column===ci);
+ const priorX=last?.direction==='X'?(ci>=2?columns[ci-2]:undefined):lastX;
+ const priorO=last?.direction==='O'?(ci>=2?columns[ci-2]:undefined):lastO;
+ const nextThresholds=last?[
+  threshold('COLUMN_EXTENSION',last.direction==='X'?last.high+1:last.low-1,last.direction==='X'?'UP':'DOWN'),
+  threshold('COLUMN_REVERSAL',last.direction==='X'?last.high-reversal:last.low+reversal,last.direction==='X'?'DOWN':'UP'),
+  ...(priorX?[{...threshold('BASIC_BUY',(last.direction==='X'&&currentHasEvent?last.high:priorX.high)+1,'UP'),requiresNewColumn:last.direction==='X'&&currentHasEvent}]:[]),
+  ...(priorO?[{...threshold('BASIC_SELL',(last.direction==='O'&&currentHasEvent?last.low:priorO.low)-1,'DOWN'),requiresNewColumn:last.direction==='O'&&currentHasEvent}]:[]),
+ ]:[];
+ const basic=events[events.length-1];
+ const mechanics={version:'PNF_MECHANICS_V51',asOfDate:latestDate,referenceClose:close??null,source:'OBSERVED_DAILY_CLOSE',
+  grid:{anchor:1,ratio:1+boxPercent/100,logStep:step,rounding:'UP=floor(log/step+1e-9); DOWN=ceil(log/step-1e-9)',reversalBoxes:reversal},
+  currentRows:last?{low:last.low,high:last.high}:null,
+  currentColumnObservedIntervals:last?points.filter(p=>p.date>last.startedAt).length:null,
+  lastBasicSignal:basic?{bias:basic.signal.bias,triggeredAt:basic.signal.confirmedAt,patternStatus:basic.signal.status,
+   meaning:'Last basic buy/sell event persists until an opposite basic event; distinct from column direction and individual pattern invalidation.'}:null,
+  nextThresholds,
+  targetMethod:'Custom geometric price-height projection, own signal-column low + 3*height / high - 2*height; not the standard previous-column-anchor breakout objective.',
+  limitations:['Close-only, no intraday reversal order. Column reversal is not a basic buy/sell signal. Thresholds use integer rows, not rounded display prices.','Two scales share the same prices; agreement is not independent evidence. No ATR, horizontal count or 45-degree trendline computed.']};
  const signals=latestDate?events.slice(-8).map(event=>project(event,latestDate,points[points.length-1].close)):[];
  return {boxPercent,reversalBoxes:reversal,gridAnchor:1,method:'DAILY_CLOSE_GEOMETRIC_GRID',asOfDate:latestDate,currentColumn:last?.direction??null,currentColumnSince:last?.startedAt??null,columnCount:columns.length,
   columns:columns.slice(-20).map(c=>({direction:c.direction,low:round(price(c.low)),high:round(price(c.high)),boxes:c.high-c.low+1,startedAt:c.startedAt,updatedAt:c.updatedAt,fixedAt:c.fixedAt})),
-  signals,forming,
+  signals,forming,mechanics,
+  advanced:{version:PNF_ADVANCED_POLICY,asOfDate:latestDate,signals:advancedEvents.slice(-12).map(e=>({...e,asOfDate:latestDate!,
+   currentRelation:e.status==='INVALIDATED'?'INVALIDATED' as const:(e.bias==='BULLISH')===(last?.direction==='X')?'ALIGNED_WITH_CURRENT_COLUMN' as const:'COUNTER_TO_CURRENT_COLUMN' as const,
+   confirmationConditionMetNow:typeof close==='number'&&(e.bias==='BULLISH'?up(close)>=e.recognition.triggerRow:down(close)<=e.recognition.triggerRow)})),
+   limitations:['Strict close-grid subsets, not all discretionary variants.','No new projections or borrowed basic-family statistics. Related basic/advanced events and scales overlap.','A trap is a warning, can become a catapult, and need not reverse the last basic signal.','No confirmed future trend reversal or automatic execution.']},
   limitations:['Fixed percentage settings, not optimized for either index.','P&F Double Top Breakout is bullish and is NOT the classic bearish double top.','Vertical targets are rough price-height scenarios; preliminary targets change until column reversal fixes the count.','No horizontal count, 45-degree trendline, target-hit probability, time target or option return.','Fixed target means fixed column count, not assured realization or independent activation.'],
  };
 }
 
 export function buildFormationContext(points:FormationPoint[]){
  if(points.some((p,i)=>!Number.isFinite(p.close)||p.close<=0||(i>0&&p.date<=points[i-1].date)))throw Error('Formation data must be positive, unique and chronological');
- return {version:'CLOSE_FORMATIONS_V1_1',asOfDate:points[points.length-1]?.date??null,
+ return {version:'CLOSE_FORMATIONS_V2_ADVANCED',asOfDate:points[points.length-1]?.date??null,
   classic:detectDoubleFormations(points),pointFigure:[buildPointFigure(points,0.5),buildPointFigure(points,1)],
   interpretation:{FORMING:'Nach Regel erkennbare entstehende Struktur, Bestätigung fehlt; frühe Hypothese darf ausdrücklich bedingt diskutiert werden.',CONFIRMED:'Definierte Preisbedingung ausgelöst; kein bestätigter künftiger Kursverlauf und keine App-Freigabe.',INVALIDATED:'Definierte Ungültigkeitsbedingung ausgelöst; ursprüngliche Hypothese nicht als gültigen Einstieg verwenden.'},
   definitions:{classicPivotConfirmationSessions:3,classicPivotGapSessions:[8,60],classicPivotTolerancePct:1.5,classicNecklineDepthPct:3,classicPriorApproachSessions:10,classicPriorApproachPct:3,classicBreakoutBufferPct:0.5,classicInvalidationBufferPct:1},
@@ -147,7 +187,8 @@ export function buildFormationContext(points:FormationPoint[]){
 export function compactFormationContext(context:ReturnType<typeof buildFormationContext>){
  const pick=(f:Formation)=>({id:f.id,family:f.family,bias:f.bias,status:f.status,discoveredAt:f.discoveredAt,confirmedAt:f.confirmedAt,invalidatedAt:f.invalidatedAt,
   confirmationLevel:f.confirmationLevel,invalidationLevel:f.invalidationLevel,currentRelation:f.currentRelation,confirmationConditionMetNow:f.confirmationConditionMetNow,target:f.status==='INVALIDATED'?null:f.target});
- return {asOfDate:context.asOfDate,classic:context.classic.map(pick),pointFigure:context.pointFigure.map(p=>({boxPercent:p.boxPercent,reversalBoxes:p.reversalBoxes,currentColumn:p.currentColumn,currentColumnSince:p.currentColumnSince,
+ return {asOfDate:context.asOfDate,classic:context.classic.map(pick),pointFigure:context.pointFigure.map(p=>({boxPercent:p.boxPercent,reversalBoxes:p.reversalBoxes,currentColumn:p.currentColumn,currentColumnSince:p.currentColumnSince,mechanics:p.mechanics??null,
+  advanced:p.advanced?{version:p.advanced.version,asOfDate:p.advanced.asOfDate,latest:p.advanced.signals.length?{...pick(p.advanced.signals[p.advanced.signals.length-1]),recognition:p.advanced.signals[p.advanced.signals.length-1].recognition}:null}:null,
   latest:p.signals.length?pick(p.signals[p.signals.length-1]):null,forming:p.forming?pick(p.forming):null})),
   meaning:'FORMING = unconfirmed setup; CONFIRMED = historical trigger date, not necessarily current direction. Read currentColumn and currentRelation separately; a counter-column does not automatically invalidate the old pattern. INVALIDATED = hypothesis failed. P&F top breakout bullish, classic double top bearish. Targets are scenarios, not probabilities, times or warrant returns.'};
 }

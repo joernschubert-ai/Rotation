@@ -218,6 +218,7 @@ export interface AIResearchHistoricalEvidence {
 chartContext?: ResearchChartContext;
 /** Independent multi-market studies; original Nasdaq tables remain unchanged. */
 marketStudies?: AIHistoricalMarketStudy[];
+temporalValidation?: import('./aiResearchHistoricalTemporalValidation').HistoricalTemporalValidation;
 coverage?: {
   policy: string;
   requestedRange: string;

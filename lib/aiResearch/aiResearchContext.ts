@@ -5,7 +5,6 @@ import type {
 import type { AIResearchCOTData } from "./aiResearchCOTTypes";
 import type { AIResearchHistoricalEvidence } from "./aiResearchHistoricalEvidenceTypes";
 
-const TRUSTED_START = Date.parse("2026-09-16T00:00:00.000Z");
 const HISTORY_WINDOW = 30;
 const VERSION_KEYS = ["history", "master", "rotation", "liquidity", "rotationDecay", "participation", "marketQuality", "fragility"];
 
@@ -52,7 +51,7 @@ export function buildAIResearchContext(input: BuildAIResearchContextInput): AIRe
     .filter(item => item && typeof item === "object" && !Array.isArray(item))
     .filter(item => {
       const time = timestamp(item);
-      return Number.isFinite(time) && time >= TRUSTED_START && time <= asOf;
+      return Number.isFinite(time) && time <= asOf;
     });
   // Include the authoritative current frame even if it has not been stored yet.
   const frames = [...valid, snapshot].sort((a, b) => timestamp(a) - timestamp(b));
@@ -68,7 +67,7 @@ export function buildAIResearchContext(input: BuildAIResearchContextInput): AIRe
       comparable.unshift(archive[index]);
     }
   }
-  const history = comparable.slice(-HISTORY_WINDOW);
+  const history = archive.slice(-HISTORY_WINDOW);
   const context: AIResearchContext = {
     task: input.task,
     requestedAt: input.requestedAt ?? new Date().toISOString(),
@@ -80,13 +79,13 @@ export function buildAIResearchContext(input: BuildAIResearchContextInput): AIRe
     // are smuggled into comparable-history counts through this archive.
     priceHistory: archive.map(frame => ({ timestamp: frame.timestamp, indices: frame.indices })),
     historyQuality: {
-      policy: "UNIVERSE_AND_MODEL_CONTIGUOUS_DAILY_V1",
-      trustedStart: "2026-09-16", currentVersionKnown: currentSignature !== null,
-      retainedPriceDates: archive.length, comparableStructureDates: history.length,
+      policy: "LEGACY_RESEARCH_HISTORY_RESTORED_V55",
+      trustedStart: archive.length ? marketDate(timestamp(archive[0])) : marketDate(asOf), currentVersionKnown: currentSignature !== null,
+      retainedPriceDates: archive.length, comparableStructureDates: comparable.slice(-HISTORY_WINDOW).length,
       warnings: [
         "Persistence counts observed New York market dates, not a verified exchange-session calendar.",
-        "Older raw index references are retained separately; legacy structural scores are not reclassified as current-model history.",
-        ...(currentSignature === null ? ["Current universe/model identity is incomplete; structural history is unavailable."] : []),
+        "The last 30 retained daily snapshots, including legacy structural scores, are used as user-requested historical context. Universe/model changes can distort trends and persistence; this is not a homogeneous current-model sample.",
+        ...(currentSignature === null ? ["Current universe/model identity is incomplete; retained legacy history remains available as mixed-method context."] : []),
       ],
     },
     ...(input.positioning ? { positioning: input.positioning } : {}),

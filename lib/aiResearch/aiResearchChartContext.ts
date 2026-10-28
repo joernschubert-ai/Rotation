@@ -1,3 +1,4 @@
+import { priceTrajectory } from "./aiResearchPriceTrajectory";
 import { buildFormationHistory, type FormationHistory } from "./aiResearchFormationHistory";
 import { buildFormationContext } from "./aiResearchFormations";
 import { buildMomentumContext } from "./aiResearchMomentumContext";
@@ -49,7 +50,7 @@ export function buildOwnChartContext(symbol:string,raw:ChartPoint[],asOfDate:str
  try { formationHistory=buildFormationHistory(points); } catch { formationHistoryError="Historical formation study unavailable"; }
  return {
   symbol,asOfDate:points[n-1]?.date??null,requestedCutoff:asOfDate,status:n>=200?'AVAILABLE':n>=21?'PARTIAL':'INSUFFICIENT_DATA',observationCount:n,
-  basis:'DAILY_CLOSE_ONLY' as const,lastClose:last,momentum:buildMomentumContext(closes),formations:buildFormationContext(points),formationHistory,
+  basis:'DAILY_CLOSE_ONLY' as const,lastClose:last,priceTrajectory:priceTrajectory(points,asOfDate),momentum:buildMomentumContext(closes),formations:buildFormationContext(points),formationHistory,
   return5SessionsPct:rounded(n>5?pct(last!,closes[n-6]):null),return20SessionsPct:rounded(n>20?pct(last!,closes[n-21]):null),
   movingAverages:[ma(20),ma(50),ma(200)],prior20,prior63,prior252,
   drawdownFrom252SessionHighClosePct:rounded(last!==null&&max252!==null?pct(last,max252):null),

@@ -1,8 +1,12 @@
+import {readFrozenResearchReport,saveFrozenResearchReport,researchSnapshotHash} from './aiResearchFrozenReport';
 import { loadMarketHistory } from "@/lib/history/marketHistory";
 import { buildAIResearchContext } from "./aiResearchContext";
 import { runAIResearch } from "./aiResearchEngine";
 import { buildAIResearchDecisionSupport } from "./aiResearchDecisionSupport";
 import { synthesizeResearch } from "./aiResearchCloudflare";
+import { buildAppFacts } from "./aiResearchAppFacts";
+import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
+import { buildNarrativeFacts } from "./aiResearchNarrativeFacts";
 import { fetchExternalResearchSources } from "./aiResearchExternalSources";
 import { selectTopResearchSources } from "./aiResearchSourceRelevance";
 import { fetchCOTData } from "./aiResearchCOTProvider";
@@ -14,6 +18,8 @@ export interface RunAIResearchFromHistoryInput {
   task: AIResearchTask;
   question?: string;
   allowAIGeneration?: boolean;
+  /** Internal compatibility path: explicitly prepare a comparison input, never generate. */
+  prepareComparisonInput?: boolean;
 }
 
 function message(error: unknown): string {
@@ -34,6 +40,15 @@ export async function runAIResearchFromHistory(
   const warnings: string[] = [];
   try {
     const historyPromise = timed("historyMs", () => loadMarketHistory());
+    // GET must stop before optional providers: keep facts and headlines from the same saved result.
+    if(input.allowAIGeneration!==true&&input.prepareComparisonInput!==true){
+      const frames=await historyPromise;
+      const latest=(Array.isArray(frames)?frames:[]).filter(item=>item&&typeof item.timestamp==='string'&&Number.isFinite(Date.parse(item.timestamp))&&Date.parse(item.timestamp)<=Date.now()).sort((a,b)=>Date.parse(b.timestamp)-Date.parse(a.timestamp))[0];
+      if(!latest)return {status:'INSUFFICIENT_DATA',report:null,diagnostics:{historyCount:0,sourceCount:0,warnings:['Kein gültiger gespeicherter Snapshot verfügbar. Kein KI-Aufruf gestartet.']}};
+      const saved=await readFrozenResearchReport(latest.timestamp,input.task,input.question,researchSnapshotHash(latest));
+      if(saved)return saved;
+      return {status:'INSUFFICIENT_DATA',report:null,diagnostics:{snapshotTimestamp:latest.timestamp,historyCount:frames.length,sourceCount:0,warnings:['Noch kein eingefrorener Bericht für diesen Snapshot, diese Aufgabe und Frage gespeichert. Nachrichten wurden nicht neu abgerufen. Einmal bewusst Research aktualisieren, um einen zusammengehörigen Bericht zu erzeugen. Kein KI-Aufruf beim Lesen.']}};
+    }
     // Historical loading only needs the saved snapshot, not news or COT.
     // Start it as soon as history is ready instead of waiting for all providers.
     const historicalPromise = historyPromise.then(history => {
@@ -122,6 +137,14 @@ export async function runAIResearchFromHistory(
     if (result.status === "SUCCESS" && result.report) {
       result.report = { ...result.report, decisionSupport: buildAIResearchDecisionSupport(result.report, currentSnapshot) };
       try {
+        const factEvidence=buildSynthesisEvidence(researchInput,result.report);
+        const heatSource=(currentSnapshot as any).systemHeat??(currentSnapshot as any).heat;
+        const heat=heatSource&&typeof heatSource==='object'?Object.fromEntries(['score','state','signal','status','level'].filter(k=>typeof heatSource[k]==='number'||typeof heatSource[k]==='string').map(k=>[k,heatSource[k]])):null;
+        result.report.appFacts=buildAppFacts(buildNarrativeFacts(factEvidence),currentSnapshot.timestamp,{...factEvidence.find(e=>e.id==='APP')?.data,systemHeat:heat,
+          historyContext:{retainedSnapshotCount:history.length,comparability:'NOT_REASSESSED_HERE',meaning:'Gespeicherte App-Historie; Modell-/Universumswechsel können Vergleiche verzerren. Keine neue Validierung.'},
+          historicalTemporalValidation:result.report.historicalEvidence?.temporalValidation});
+      } catch { warnings.push("App-Fakten konnten nicht berechnet werden; keine KI-Ableitung als Ersatz ausgegeben."); }
+      try {
         timings.preparationMs = Date.now() - startedAt;
         result.report.aiSynthesis = await timed("synthesisMs", () => synthesizeResearch(researchInput, result.report!, input.allowAIGeneration === true, {
           requestStartedAt: startedAt, deadlineAt: startedAt + 55000, preparationMs: timings.preparationMs,
@@ -137,6 +160,10 @@ export async function runAIResearchFromHistory(
       warnings: [...new Set([...(result.diagnostics?.warnings ?? []), ...warnings])],
       timingsMs: { ...timings, totalMs: Date.now() - startedAt },
     };
+    if(input.allowAIGeneration===true&&result.status==='SUCCESS'&&result.report?.appFacts){
+      const saved=await saveFrozenResearchReport(currentSnapshot.timestamp,input.task,input.question,result,startedAt,researchSnapshotHash(currentSnapshot));
+      if(!saved)result.diagnostics.warnings=[...(result.diagnostics.warnings??[]),'Der neue Bericht konnte nicht als eingefrorener Lesestand gespeichert werden oder ein neuerer/vollständigerer Bericht blieb erhalten. Keine zusätzliche KI-Anfrage ausgelöst.'];
+    }
     return result;
   } catch (error) {
     return { status: "RESEARCH_ERROR", report: null,

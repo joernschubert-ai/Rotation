@@ -1,9 +1,11 @@
+import type { ScenarioReview } from "./aiResearchScenarioState";
+import type { COTExpertReport } from "./aiResearchCOTExpert";
 import type { COTDataQuality } from "./aiResearchCOTTypes";
 import type { InstrumentPriceReferences } from "./aiResearchPriceReferences";
 import type { WeightingContext, WeightedReview } from "./aiResearchWeighting";
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
 import type { ResearchTrigger } from "./aiResearchTriggers";
-export const SYNTHESIS_CONTRACT = "QWEN_SOURCE_STATE_REVIEW_V23";
+export const SYNTHESIS_CONTRACT = "GEMMA_SOURCE_REVIEW_V79";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -52,6 +54,13 @@ export interface ResearchSynthesisContent {
 }
 
 export interface ResearchSynthesis {
+  sourceReview?:import('./aiResearchSourceReview').SourceReview;
+  domainConcepts?:import("./aiResearchConcepts").ResearchConcepts;
+  narrative?:{format:'PLAIN_RESEARCH_V34';text:string;truncated:boolean;audit?:import('./aiResearchNarrativeAudit').NarrativeAudit};
+  cotAnalysis?:COTExpertReport;
+  modelRequestsUsed?:number;
+  indexScenarios?:Record<string,ScenarioReview>;
+  previousSuccessful?:{sourceReview?:ResearchSynthesis['sourceReview'];snapshotTimestamp:string;generatedAt?:string;model:string;content?:ResearchSynthesisContent;narrative?:ResearchSynthesis["narrative"]};
   status: "SUCCESS" | "UNAVAILABLE";
   weightingContexts?: WeightingContext[];
   priceReferences?: InstrumentPriceReferences[];

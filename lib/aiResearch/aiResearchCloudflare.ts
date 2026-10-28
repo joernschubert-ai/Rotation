@@ -1,3 +1,16 @@
+import {prepareSourceReview,evaluateSourceReview,recheckSourceReview} from './aiResearchSourceReview';
+import {SOURCE_REVIEW_PROMPT} from './aiResearchSourceReviewPrompt';
+import { RESEARCH_MODEL, RESEARCH_TRANSPORT_PROFILE, researchTransport } from './aiResearchModel';
+import { buildResearchConcepts, CONCEPT_VERSION, type ResearchConcepts } from "./aiResearchConcepts";
+import { freezeRequest, saveFrozenRequest } from "./aiResearchComparison";
+import { auditNarrative } from "./aiResearchNarrativeAudit";
+import { buildNarrativePayload } from "./aiResearchNarrativePayload";
+import { buildNarrativeFacts } from "./aiResearchNarrativeFacts";
+import { APP_FACTS_POLICY } from "./aiResearchAppFacts";
+import { NARRATIVE_PROMPT, narrativeFromProvider, hasNarrative } from './aiResearchNarrative';
+import { buildScenarioStates, type ScenarioReview } from "./aiResearchScenarioState";
+import type { COTExpertReport } from "./aiResearchCOTExpert";
+import { buildStructuredInput, STRUCTURED_PROMPT, structuredResponseFormat, structuredToNamedFields, attachStructuredReferences } from "./aiResearchStructured";
 import { buildInstrumentPriceReferences } from "./aiResearchPriceReferences";
 import { buildWeightingContexts, type WeightingContext } from "./aiResearchWeighting";
 import { reviewInstrumentFlows, contentForFlows, describeProviderResponse } from "./aiResearchLiveQwen";
@@ -14,13 +27,15 @@ import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
 export { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 export { validateSynthesis } from "./aiResearchLiveQwen";
 
-const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
+const MODEL = RESEARCH_MODEL;
+// Isolate the sampling comparison from prompts, schema, specialist and quota policy.
+export const SYNTHESIS_GENERATION_PROFILE = { id: "V79_3_GEMMA_SOURCE_REVIEW_07", temperature: 0.7, maxTokens: 2200 } as const;
 const PREFIX = "rotation:research:cf:v1";
 // Keep the quota namespace unchanged so the deployment cannot reset daily limits.
 const DAILY_LIMIT = 20;
 const text = (value: unknown, limit = 650): string => typeof value === "string" ? value.slice(0, limit) : "";
 
-export async function synthesizeResearch(input: AIResearchInput, report: AIResearchReport, allowGeneration = false,
+async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResearchReport, allowGeneration = false,
   execution: { requestStartedAt?: number; deadlineAt?: number; preparationMs?: number } = {}): Promise<ResearchSynthesis> {
   const synthesisStartedAt = Date.now();
   // Reserve five seconds for validation, storage and returning the response.
@@ -31,9 +46,15 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   let providerTimeoutMs = 0;
   const snapshotTimestamp = text(input.snapshot?.timestamp, 40);
   let weightingContexts:WeightingContext[]=[];
+  let cotAnalysis:COTExpertReport|undefined;
+  let domainConcepts:ResearchConcepts|undefined;
+  let modelRequestsUsed=0;
+  let indexScenarios:Record<string,ScenarioReview>|undefined;
   let priceReferences:ReturnType<typeof buildInstrumentPriceReferences>=[];
   const cotDataQuality=input.positioning?.dataQuality;
-  const unavailable = (message: string): ResearchSynthesis => ({ status: "UNAVAILABLE", model: MODEL, snapshotTimestamp, cached: false, message, weightingContexts, priceReferences, cotDataQuality });
+  const unavailable = (message: string): ResearchSynthesis => ({ status: "UNAVAILABLE", model: MODEL, snapshotTimestamp, cached: false, message, weightingContexts, priceReferences, cotDataQuality, cotAnalysis, domainConcepts, modelRequestsUsed, indexScenarios });
+  if(report.appFacts?.version!==APP_FACTS_POLICY)return unavailable("Verbindliche App-Fakten fehlen; keine neue KI-Anfrage ausgelöst.");
+  if(report.appFacts.snapshotTimestamp!==snapshotTimestamp)return unavailable('App-Fakten und Snapshot gehören nicht zum selben Stand. Keine neue KI-Anfrage ausgelöst.');
   priceReferences=buildInstrumentPriceReferences(buildSynthesisEvidence(input,report),snapshotTimestamp);
   const token = process.env.CLOUDFLARE_API_TOKEN;
   const account = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -44,7 +65,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   const briefs = buildInstrumentBriefs(evidence);
   weightingContexts=buildWeightingContexts(evidence,snapshotTimestamp);
 
-  const quality = { contractVersion: SYNTHESIS_CONTRACT, issues: [] as string[], instrumentBriefs: briefs, availableEvidenceIds: evidence.filter(item => item.available).map(item => item.id),
+  const quality = { normalizations:["GENERATION_PROFILE:"+SYNTHESIS_GENERATION_PROFILE.id,"TRANSPORT_PROFILE:"+RESEARCH_TRANSPORT_PROFILE], contractVersion: SYNTHESIS_CONTRACT, issues: [] as string[], instrumentBriefs: briefs, availableEvidenceIds: evidence.filter(item => item.available).map(item => item.id),
     missingOwnPriceMarkets: evidence.filter(item => item.kind === "PRICE" && item.entryDataReady !== true).map(item => item.market ?? item.id), semanticTruthVerified: false as const,
     inputSummary: {
       prices: evidence.filter(item => item.kind === "PRICE").map(item => ({ market: item.market ?? item.id, current: item.data.current as number | null, momentum5D: item.data.momentum5D as number | null,
@@ -52,9 +73,14 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       cotReportDates: [...new Set(evidence.filter(item => item.kind === "COT").flatMap(item => (item.data.summaries as Array<{ reportDate?: string }>).map(summary => summary.reportDate ?? "")).filter(Boolean))],
       historicalAsOf: report.historicalEvidence?.asOfDate ?? null, newsCount: evidence.filter(item => item.kind === "NEWS").length,
     } };
-  const payload = JSON.stringify({contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
-    question:text(input.context.question,500),...buildLiveInput(evidence)});
-  const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, weightingContexts, priceReferences, cotDataQuality, quality: {
+  const structuredInput=buildNarrativeFacts(evidence);
+  domainConcepts=buildResearchConcepts(structuredInput);
+  let sourceRequest:ReturnType<typeof prepareSourceReview>;
+  try{sourceRequest=prepareSourceReview(report.appFacts,input.context.task,text(input.context.question,500));}catch{return unavailable('Die App-Belege können nicht vollständig aufbereitet werden oder überschreiten die Eingabegrenze. Keine KI-Anfrage ausgelöst.');}
+  const identity = JSON.stringify({model:MODEL,transportProfile:RESEARCH_TRANSPORT_PROFILE,generationProfile:SYNTHESIS_GENERATION_PROFILE,prompt:SOURCE_REVIEW_PROMPT,domainVersion:CONCEPT_VERSION,contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
+    question:text(input.context.question,500),appFactsPolicy:APP_FACTS_POLICY,appFacts:report.appFacts??null,...structuredInput});
+  let payload=sourceRequest.payload;
+  const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, weightingContexts, priceReferences, cotDataQuality, cotAnalysis, domainConcepts, modelRequestsUsed, indexScenarios:indexScenarios??value.indexScenarios, quality: {
     ...(value.quality ?? quality), timing: {
       preparationMs: execution.preparationMs ?? null,
       synthesisMs: Date.now() - synthesisStartedAt,
@@ -66,7 +92,7 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
   if (payload.length > 26000) return unavailable("Die Belege überschreiten die festgelegte Eingabegrenze. Keine KI-Anfrage ausgelöst.");
   // Response diagnostics changed; do not reuse a rejection whose wording was discarded.
   // Daily quota, cooldown and lock namespaces deliberately remain unchanged.
-  const cacheKey = `${PREFIX}:cache:${SYNTHESIS_CONTRACT}:cot-horizons-v1:${createHash("sha256").update(payload).digest("hex")}`;
+  const cacheKey = `${PREFIX}:cache:${SYNTHESIS_CONTRACT}:cot-horizons-v1:${createHash("sha256").update(identity).digest("hex")}`;
   // Rejected text is diagnostic only. Keep it addressable even if news/context
   // change between the POST and a later GET for the identical snapshot/task/question.
   const diagnosticKey = `${PREFIX}:rejected:${SYNTHESIS_CONTRACT}:cot-horizons-v1:${createHash("sha256").update(JSON.stringify({
@@ -84,12 +110,14 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     catch { /* Optional diagnostic archive must not change validation or trigger retries. */ }
   };
   try {
+    // V49: COT semantics come from deterministic source facts, no specialist inference.
+    await saveFrozenRequest(redis,freezeRequest(snapshotTimestamp,SOURCE_REVIEW_PROMPT,sourceRequest.payload,SYNTHESIS_GENERATION_PROFILE.temperature,SYNTHESIS_GENERATION_PROFILE.maxTokens));
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
-    if (cached?.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
-      if (cached.status === "SUCCESS" && validateSynthesis(cached.content, evidence)) return { ...cached, cached: true, weightingContexts, priceReferences, cotDataQuality };
+    if (cached?.model === MODEL && cached.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
+      if (cached.sourceReview) {const sourceReview=recheckSourceReview(cached.sourceReview,report.appFacts);if(!sourceReview)return unavailable('Der gespeicherte Quellenbericht gehört zu einem anderen Faktenbestand. Keine Anfrage ausgelöst.');if(sourceReview.status==='VALID_SELECTION'||!allowGeneration)return {...cached,status:sourceReview.status==='VALID_SELECTION'?'SUCCESS':'UNAVAILABLE',sourceReview,message:sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; Originalantwort unverändert.':cached.message,narrative:undefined,content:undefined,cached:true,weightingContexts,priceReferences,cotDataQuality,cotAnalysis,domainConcepts,modelRequestsUsed};}
       if (!allowGeneration && cached.status === "UNAVAILABLE" && cached.quality.issues.length) {
         if (allowGeneration) await storeRejectedDiagnosis(cached);
-        return { ...cached, cached: true, weightingContexts, priceReferences, cotDataQuality };
+        return { ...cached, cached: true, weightingContexts, priceReferences, cotDataQuality, cotAnalysis, domainConcepts, modelRequestsUsed };
       }
     }
     if (!allowGeneration) {
@@ -97,7 +125,8 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       const rejected = await redis.get<ResearchSynthesis>(diagnosticKey);
       if (rejected?.status === "UNAVAILABLE" && rejected.snapshotTimestamp === snapshotTimestamp &&
         rejected.quality?.contractVersion === SYNTHESIS_CONTRACT && rejected.quality.issues?.length) {
-        return { ...rejected, cached: true, weightingContexts, priceReferences, cotDataQuality };
+        if(rejected.sourceReview){const sourceReview=recheckSourceReview(rejected.sourceReview,report.appFacts);if(!sourceReview)return unavailable('Die gespeicherte Diagnose gehört zu einem anderen Faktenbestand. Keine neue Anfrage ausgelöst.');return {...rejected,sourceReview,cached:true,weightingContexts,priceReferences,cotDataQuality,cotAnalysis,domainConcepts,modelRequestsUsed};}
+        return { ...rejected, cached: true, weightingContexts, priceReferences, cotDataQuality, cotAnalysis, domainConcepts, modelRequestsUsed };
       }
       return unavailable("Noch keine KI-Analyse für diesen Snapshot gespeichert. In der App Research aktualisieren.");
     }
@@ -106,11 +135,11 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     if (!locked) return unavailable("Eine KI-Analyse läuft bereits. Bitte kurz warten.");
     stage = "CACHE_RECHECK";
     const completed = await redis.get<ResearchSynthesis>(cacheKey);
-    if (completed?.snapshotTimestamp === snapshotTimestamp && completed.quality?.contractVersion === SYNTHESIS_CONTRACT) {
-      if (completed.status === "SUCCESS" && validateSynthesis(completed.content, evidence)) return { ...completed, cached: true, weightingContexts, priceReferences, cotDataQuality };
+    if (completed?.model === MODEL && completed.snapshotTimestamp === snapshotTimestamp && completed.quality?.contractVersion === SYNTHESIS_CONTRACT) {
+      if (completed.sourceReview) {const sourceReview=recheckSourceReview(completed.sourceReview,report.appFacts);if(!sourceReview)return unavailable('Der gespeicherte Quellenbericht gehört zu einem anderen Faktenbestand. Keine Anfrage ausgelöst.');if(sourceReview.status==='VALID_SELECTION'||!allowGeneration)return {...completed,status:sourceReview.status==='VALID_SELECTION'?'SUCCESS':'UNAVAILABLE',sourceReview,message:sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; Originalantwort unverändert.':completed.message,narrative:undefined,content:undefined,cached:true,weightingContexts,priceReferences,cotDataQuality,cotAnalysis,domainConcepts,modelRequestsUsed};}
       if (!allowGeneration && completed.status === "UNAVAILABLE" && completed.quality.issues.length) {
         await storeRejectedDiagnosis(completed);
-        return { ...completed, cached: true, weightingContexts, priceReferences, cotDataQuality };
+        return { ...completed, cached: true, weightingContexts, priceReferences, cotDataQuality, cotAnalysis, domainConcepts, modelRequestsUsed };
       }
     }
     // Reject an exhausted budget before quota admission, without consuming an attempt.
@@ -120,7 +149,10 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       await storeRejectedDiagnosis(failure);
       return failure;
     }
+    payload=sourceRequest.payload;
+    if(payload.length>26000)return withTiming(unavailable('Das vollständige Synthesepaket überschreitet die Eingabegrenze. Keine neue Modellanfrage gestartet.'));
     // Atomic daily admission AND cooldown. Attempts count, including provider failures.
+
     const dayKey = `${PREFIX}:day:${new Date().toISOString().slice(0, 10)}`;
     stage = "QUOTA_CHECK";
     const admitted = await redis.eval<[number], number>(
@@ -128,6 +160,8 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       [dayKey, `${PREFIX}:cooldown`], [DAILY_LIMIT]);
     if (admitted === -1) return unavailable("Aufrufpause aktiv. Eine neue KI-Analyse ist nach 90 Sekunden möglich.");
     if (admitted < 0) return unavailable("Das App-Tageslimit von 20 KI-Versuchen ist erreicht. Freigabe wieder ab 00:00 UTC.");
+    // The single admission covers the main synthesis. Domain interpretation needs no model call.
+    await saveFrozenRequest(redis,freezeRequest(snapshotTimestamp,SOURCE_REVIEW_PROMPT,payload,SYNTHESIS_GENERATION_PROFILE.temperature,SYNTHESIS_GENERATION_PROFILE.maxTokens));
     providerTimeoutMs = Math.min(45000, Math.max(0, Math.floor(deadlineAt - Date.now() - 5000)));
     if (providerTimeoutMs < 5000) {
       const failure = withTiming({ ...unavailable("Die Datenaufbereitung hat das verfügbare Zeitfenster verbraucht. Keine KI-Anfrage ausgelöst."),
@@ -136,14 +170,14 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
       return failure;
     }
     stage = "CLOUDFLARE_REQUEST";
-    providerRequestStarted = true;
+    providerRequestStarted = true;modelRequestsUsed++;
     providerStartedAt = Date.now();
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${MODEL}`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, cache: "no-store", signal: AbortSignal.timeout(providerTimeoutMs),
-      body: JSON.stringify({ max_tokens: 2200, temperature: 0.2, messages: [
-        { role: "system", content: RESEARCH_SYSTEM_PROMPT },
+      body: JSON.stringify(researchTransport({ max_tokens: SYNTHESIS_GENERATION_PROFILE.maxTokens, temperature: SYNTHESIS_GENERATION_PROFILE.temperature, messages: [
+        { role: "system", content: SOURCE_REVIEW_PROMPT },
         { role: "user", content: payload },
-      ] }),
+      ] })),
     });
     if (!response.ok) {
       let jsonModeFailure = false;
@@ -174,43 +208,18 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     providerFinishedAt = Date.now();
     if (body.success !== true) return unavailable("Cloudflare konnte keine vollständige KI-Antwort liefern.");
     const raw = body.result?.choices?.[0]?.message?.content ?? body.result?.response;
-    let content: unknown;
-    try { content = raw; } catch { content = null; }
-    const rawObject = content && typeof content === "object" && !Array.isArray(content) ? content as Record<string, unknown> : {};
-    const responseShape = { rootKeys: Object.keys(rawObject).slice(0,20).map(key => key.slice(0,80)),
-      flowsIsArray: Array.isArray(rawObject.flows), flowCount: Array.isArray(rawObject.flows) ? rawObject.flows.length : null };
-    const normalized = normalizeSynthesisEnvelope(content, evidence);
-    const derived = deriveSynthesisConclusion(normalized);
-    const answerQuality = { ...quality, providerText: text(raw,12000), responseShape, normalizations: [
-      ...((normalized as ResearchSynthesisContent|undefined)?.flows?.some(flow=>flow.weightedReview?.source==='SHARED_INDEX_CONTEXT')?["MODEL_MARKET_READING_TO_SERVER_INSTRUMENT_CONTRIBUTIONS"]:[]),
-      ...(normalized !== content ? ["NAMED_FIELDS_TO_UNCHANGED_FLOWS", "QUALITATIVE_CONDITIONS_FROM_INSTRUMENT_AND_ASSESSMENT_NOT_MODEL", "SOURCE_BINDINGS_FROM_OWN_EVIDENCE", "DATED_COT_FACTS_AND_MODEL_REVIEW", "OVERVIEW_FROM_REVIEWED_INSTRUMENTS", "DIRECTION_AND_CONTEXT_FROM_MEASURED_FACTS"] : []),
-      ...(derived.changed ? ["CONCLUSION_DERIVED_FROM_UNCHANGED_FLOWS"] : []) ] };
-    content = derived.value;
-    stage = "ANSWER_VALIDATION";
-    const reviewed=reviewInstrumentFlows(content,evidence,true);
     const providerDiagnostics=describeProviderResponse(body);
-    if(providerDiagnostics.finishReason==="length"){
-      const flows=(content as ResearchSynthesisContent|undefined)?.flows??[];
-      const lastInstrument=flows[flows.length-1]?.instrument;
-      for(const review of reviewed.reviews)if(review.instrument===lastInstrument){review.status="WITHHELD";review.issues.push("PROVIDER_OUTPUT_LIMIT_REACHED");}
-      reviewed.issues.push("PROVIDER_OUTPUT_LIMIT_REACHED");
-      const kept=reviewed.reviews.filter(r=>r.status==="CHECKED").map(r=>r.draft!);
-      reviewed.content=kept.length?contentForFlows(kept):undefined;
-    }
-    const accepted=reviewed.content;
-    const grounded=accepted?{...accepted,flows:accepted.flows.map(flow=>{
-      const brief=briefs.find(b=>b.instrument===flow.instrument)!;
-      return {...flow,grounding:{history:brief.histories.find(h=>h.id===flow.historyStudyId)??null,cot:brief.cot,price:brief.price}};
-    })}:undefined;
-    const withheld=reviewed.reviews.filter(r=>r.status!=="CHECKED").length;
-    const hasNotes=grounded?.flows.some(flow=>Boolean(flow.interpretationNotes?.length));
-    const result:ResearchSynthesis={status:grounded?"SUCCESS":"UNAVAILABLE",model:MODEL,generatedAt:new Date().toISOString(),snapshotTimestamp,cached:false,
-      message:grounded?(withheld?"Teilweise ausgewertet: Einzelne Instrumentaussagen sind zurückgehalten und gesondert gekennzeichnet. App-Freigaben bleiben unverändert.":hasNotes?"Auswertung verfügbar mit gekennzeichneten Vorbehalten. Textthese und tatsächlich beurteilte Gewichtungsbeiträge getrennt lesen.":"Keine bekannten Prüfprobleme gefunden. Dies beweist weder wirtschaftliche Richtigkeit noch einen Handelsvorteil."):
-      "Die KI hat geantwortet; ihre Instrumentaussagen sind zur Prüfung zurückgehalten. Originaltexte und Hinweise bleiben sichtbar. Keine KI-Einstiegsaussage übernommen.",
-      content:grounded,instrumentReviews:reviewed.reviews,quality:{...answerQuality,providerDiagnostics,issues:reviewed.issues}};
-    stage=grounded?"APPROVED_ANSWER_CACHE_WRITE":"REJECTED_ANSWER_CACHE_WRITE";
+    stage='ANSWER_VALIDATION';
+    const sourceReview=evaluateSourceReview(raw,providerDiagnostics.finishReason,report.appFacts);
+    const accepted=sourceReview.status==='VALID_SELECTION';
+    const result:ResearchSynthesis={status:accepted?'SUCCESS':'UNAVAILABLE',model:MODEL,generatedAt:new Date().toISOString(),snapshotTimestamp,cached:false,
+      message:accepted?'Quellenwahl geprüft. Sachliche Zustandsbeschreibung aus App-Daten; KI-Abwägung bleibt ungeprüft. Keine zusätzliche Einstiegsfreigabe.':sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; App-Fakten und unveränderte Originalantwort bleiben sichtbar. Keine automatische Wiederholung.':'Die Quellenantwort ist unvollständig oder ungültig. App-Fakten bleiben verfügbar; keine automatische Wiederholung.',
+      sourceReview,quality:{...quality,providerDiagnostics,providerText:typeof raw==='string'?raw:undefined,
+       issues:accepted?[]:[...sourceReview.validation.issues.map(i=>i.code),...(sourceReview.status==='OUTPUT_INCOMPLETE'?['PROVIDER_OUTPUT_LIMIT_REACHED']:[])],
+       normalizations:[...quality.normalizations,'APP_DERIVED_STATE_AND_SOURCE_FRAGMENTS','UNMODIFIED_HYPOTHESIS_UNVERIFIED']}};
+    stage=accepted?'APPROVED_ANSWER_CACHE_WRITE':'REJECTED_ANSWER_CACHE_WRITE';
     const diagnosed=withTiming(result);
-    if(!grounded)await storeRejectedDiagnosis(diagnosed);
+    if(!accepted)await storeRejectedDiagnosis(diagnosed);
     await redis.set(cacheKey,diagnosed,{ex:900});
     return diagnosed;
   } catch (error) {
@@ -218,6 +227,8 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     const name = error && typeof error === "object" && "name" in error ? String(error.name) : "";
     const timeout = name === "TimeoutError" || name === "AbortError";
     const messages: Record<string, string> = {
+      COT_AI_REQUEST: "Die getrennte COT-Fachanalyse konnte nicht vollständig geladen oder geprüft werden. Keine automatische Wiederholung und keine Gesamtsynthese gestartet.",
+      COT_AI_CACHE_WRITE: "COT-Fachanalyse lag vor, konnte aber nicht gespeichert werden. Keine Gesamtsynthese gestartet.",
       CACHE_READ: "Der Research-Zwischenspeicher konnte nicht gelesen werden. Keine neue KI-Anfrage ausgelöst.",
       DIAGNOSTIC_READ: "Die gespeicherte Ablehnungsdiagnose konnte nicht gelesen werden. Keine neue KI-Anfrage ausgelöst.",
       LOCK_ACQUIRE: "Der KI-Aufrufschutz konnte nicht aktiviert werden. Keine neue KI-Anfrage ausgelöst.",
@@ -242,3 +253,38 @@ export async function synthesizeResearch(input: AIResearchInput, report: AIResea
     if (locked) try { await redis.eval("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0", [lockKey], [lockToken]); } catch { /* Lock expires automatically. */ }
   }
 }
+
+/** Persist the last successful result separately; failures never overwrite it. */
+export async function synthesizeResearch(input:AIResearchInput,report:AIResearchReport,allowGeneration=false,
+ execution:{requestStartedAt?:number;deadlineAt?:number;preparationMs?:number}={}):Promise<ResearchSynthesis>{
+ const result=await synthesizeCurrentResearch(input,report,allowGeneration,execution);
+ const key=PREFIX+':last-success:v27:'+input.context.task;
+ async function bounded<T>(promise:Promise<T>):Promise<T>{
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  try{return await Promise.race([promise,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('Last report store timeout')),800);})]);}
+  finally{if(timer)clearTimeout(timer);}
+ };
+ try{
+  const redis=Redis.fromEnv();
+  if(result.status==='SUCCESS'&&!result.narrative?.truncated&&(result.sourceReview?.status==='VALID_SELECTION'||result.content||hasNarrative(result.narrative))){
+   const previousSuccessful={snapshotTimestamp:result.snapshotTimestamp,generatedAt:result.generatedAt,model:result.model,sourceReview:result.sourceReview,content:result.content,narrative:result.narrative};
+   await bounded(redis.eval<string[],number>(
+    "-- LAST_SUCCESS_V27\nlocal prev=redis.call('GET',KEYS[1]) if prev then local ok,v=pcall(cjson.decode,prev) if ok and type(v)=='table' and tonumber(v.snapshotTime or '0')>tonumber(ARGV[2]) then return 0 end end redis.call('SET',KEYS[1],ARGV[1],'EX',2592000) return 1",
+    [key],[JSON.stringify({...previousSuccessful,snapshotTime:Date.parse(result.snapshotTimestamp)}),String(Date.parse(result.snapshotTimestamp))]));
+  }else{
+   const previous=await bounded(redis.get<ResearchSynthesis['previousSuccessful']>(key));
+   if(previous&&typeof previous.snapshotTimestamp==='string'&&(previous.sourceReview?.status==='VALID_SELECTION'||(Array.isArray(previous.content?.flows)&&previous.content.flows.length)||hasNarrative(previous.narrative))&&Date.parse(previous.snapshotTimestamp)<=Date.now())result.previousSuccessful=previous;
+  }
+ }catch{/* Optional last-report preservation does not trigger model calls or suppress the current result. */}
+ return result;
+}
+
+
+
+
+
+
+
+
+
+

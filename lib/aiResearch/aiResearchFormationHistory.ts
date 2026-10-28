@@ -5,7 +5,7 @@ interface Outcome {event:Event;entryIndex:number;exitIndex:number;entryDate:stri
 const round=(x:number|null)=>x===null?null:Math.round(x*10000)/10000;
 const average=(a:number[])=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
 const quantile=(a:number[],q:number)=>{if(!a.length)return null;const sorted=a.slice().sort((x,y)=>x-y),p=(sorted.length-1)*q,i=Math.floor(p);return sorted[i]+(sorted[Math.ceil(p)]-sorted[i])*(p-i);};
-export const FORMATION_HISTORY_POLICY='CLOSE_EVENTS_NEXT_CLOSE_FROZEN_LEVELS_V1';
+export const FORMATION_HISTORY_POLICY='CLOSE_EVENTS_NEXT_CLOSE_FROZEN_LEVELS_V2_ADVANCED';
 
 /** Each event is captured when actually emitted by a chronological prefix. */
 export function collectFormationEvents(points:FormationPoint[],warmupSessions=252):Event[]{
@@ -21,6 +21,7 @@ export function collectFormationEvents(points:FormationPoint[],warmupSessions=25
  for(const scale of [0.5,1])buildPointFigure(points,scale,obs=>{
   record(obs.forming,'FORMING',scale,obs.index);
   if(obs.latest?.confirmedAt===obs.date)record(obs.latest,'CONFIRMED',scale,obs.index);
+  for(const event of obs.advanced??[])record(event,'CONFIRMED',scale,obs.index);
   for(const fixed of obs.fixed)record(fixed,'COUNT_FIXED',scale,obs.index);
  });
  for(let i=29;i<points.length;i++)for(const f of detectDoubleFormations(points.slice(0,i+1))){
@@ -109,14 +110,20 @@ export function buildFormationHistory(points:FormationPoint[],warmupSessions=252
 export function compactFormationHistory(history:FormationHistory,context:FormationContext){
  const wanted:{family:string;scale:number|null;stage:Stage}[]=[];
  for(const p of context.pointFigure)if(p.forming)wanted.push({family:p.forming.family,scale:p.boxPercent,stage:'FORMING'});
+ for(const p of context.pointFigure){const last=p.advanced?.signals[p.advanced.signals.length-1];if(last&&last.status!=='INVALIDATED'&&last.currentRelation==='ALIGNED_WITH_CURRENT_COLUMN'&&last.confirmationConditionMetNow===true)wanted.push({family:last.family,scale:p.boxPercent,stage:'CONFIRMED'});}
  for(const f of context.classic)if(f.status!=='INVALIDATED')wanted.push({family:f.family,scale:null,stage:f.status==='FORMING'?'FORMING':'CONFIRMED'});
- for(const p of context.pointFigure){const last=p.signals[p.signals.length-1];if(last&&last.status!=='INVALIDATED'&&last.currentRelation==='ALIGNED_WITH_CURRENT_COLUMN')wanted.push({family:last.family,scale:p.boxPercent,stage:'CONFIRMED'});}
+ for(const p of context.pointFigure){const last=p.signals[p.signals.length-1];if(last&&last.status!=='INVALIDATED'&&last.currentRelation==='ALIGNED_WITH_CURRENT_COLUMN'&&last.confirmationConditionMetNow===true)wanted.push({family:last.family,scale:p.boxPercent,stage:'CONFIRMED'});}
  const selected=wanted.slice(0,2).map(w=>{
   const study=history.studies.find(s=>s.family===w.family&&s.scale===w.scale&&s.stage===w.stage),stats=study?.horizons.find(h=>h.horizonSessions===20);
   return {family:w.family,scale:w.scale,stage:w.stage,horizonSessions:20,sampleSize:stats?.sampleSize??0,nonOverlappingCount:stats?.nonOverlappingCount??0,
+   bias:study?.bias??null,matched:!!study,rawIndexMeanPct:stats?.meanRawIndexReturnPct??null,
+   baselineRawIndexMeanPct:stats?.baselineDirectionalMeanPct==null?null:stats.baselineDirectionalMeanPct*(study?.bias==='BEARISH'?-1:1),
+   p10RawIndexPct:stats?.p10DirectionalReturnPct==null||stats?.p90DirectionalReturnPct==null?null:study?.bias==='BEARISH'?-stats.p90DirectionalReturnPct:stats.p10DirectionalReturnPct,
+   p90RawIndexPct:stats?.p10DirectionalReturnPct==null||stats?.p90DirectionalReturnPct==null?null:study?.bias==='BEARISH'?-stats.p10DirectionalReturnPct:stats.p90DirectionalReturnPct,
+   p10DirectionalPct:stats?.p10DirectionalReturnPct??null,p90DirectionalPct:stats?.p90DirectionalReturnPct??null,
    directionalMeanPct:stats?.meanDirectionalReturnPct??null,baselineDirectionalMeanPct:stats?.baselineDirectionalMeanPct??null,
    nonOverlappingMeanPct:stats?.nonOverlappingMeanDirectionalPct??null,quality:stats?.quality??'NO_COMPLETED_CASES'};
  });
- return {asOfDate:history.asOfDate,policy:history.policy,selected,omittedMatching:wanted.length-selected.length,
+ return {asOfDate:history.asOfDate,policy:history.policy,entryPolicy:history.entryPolicy,grossOnly:history.grossOnly,predictiveEdgeValidated:false,selected,omittedMatching:wanted.length-selected.length,
   meaning:'20-session gross signed INDEX returns after next-close entry; BULLISH positive sign, BEARISH reversed sign. Descriptive, overlapping, no validated alpha or option returns. Full 5/20/60 and segment statistics remain in report.'};
 }

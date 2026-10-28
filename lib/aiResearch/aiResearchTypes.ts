@@ -345,6 +345,7 @@ RESEARCH REPORT
 ===================================================== */
 
 export interface AIResearchReport {
+appFacts?: import("./aiResearchAppFacts").AppFacts;
 aiSynthesis?: import("./aiResearchSynthesisTypes").ResearchSynthesis;
 decisionSupport?: {
 action: string;
