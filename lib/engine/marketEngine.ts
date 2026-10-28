@@ -1,3 +1,4 @@
+import { legacyHistoryAdapter } from "./legacyHistoryAdapter";
 // /lib/engine/marketEngine.ts
 
 import { rotationEngine } from "./rotationEngine";
@@ -141,7 +142,8 @@ export function marketEngine(
   const historyContext = {
     universeVersion: data.breadthDataQuality?.universeVersion ?? null
   };
-  const historyMetrics = data.historyMetrics ?? historyEngine(data.history ?? [], historyContext);
+  const baseHistoryMetrics = data.historyMetrics ?? historyEngine(data.history ?? [], historyContext);
+  const historyMetrics = {...baseHistoryMetrics, dataQuality: {...baseHistoryMetrics.dataQuality, legacyStructuralInputPolicy: "CONNECTED_SNAPSHOT_FIELDS_V57"}};
 
   /* =====================================================
   HISTORY ACCESS
@@ -152,6 +154,8 @@ export function marketEngine(
     Array.isArray(historyMetrics?.history)
       ? historyMetrics.history
       : historyEngine(data.history ?? [], historyContext).history;
+
+  const structuralHistory = legacyHistoryAdapter(history);
 
   function getHistoryValue(
     offset: number,
@@ -348,6 +352,9 @@ export function marketEngine(
   ===================================================== */
 
   const liquidityPre = liquidityEngine({
+    marketDrivers,
+    driversCore,
+    history: structuralHistory,
     marketLiquidityScore: data.marketLiquidityScore,
     ...creditInput,
     gammaExposure: data.gammaExposure,
@@ -361,7 +368,7 @@ export function marketEngine(
   });
 
   const fragilityPre = fragilityEngine({
-    history,
+    history: structuralHistory,
     historyMetrics,
     crash: {
       probability: Number(
@@ -424,6 +431,9 @@ export function marketEngine(
   ===================================================== */
 
   const participation = participationEngine({
+    marketDrivers,
+    driversCore,
+    history: structuralHistory,
     historyMetrics,
     breadth20,
     breadth50,
@@ -442,6 +452,9 @@ export function marketEngine(
   // Final liquidity uses the available participation/rotation-base context.
   // Final rotation, decay and fragility must not feed back into this pass.
   const liquidity = liquidityEngine({
+    marketDrivers,
+    driversCore,
+    history: structuralHistory,
     historyMetrics,
     marketLiquidityScore: data.marketLiquidityScore,
     ...creditInput,
@@ -672,14 +685,12 @@ export function marketEngine(
     lows: finiteOr(structure?.highsLows?.lows, 0),
     distributionScore: finiteOr(structure?.distribution, 0),
     internalDivergence,
-    // Retain date slots; only expose compatible stored model measurements.
+    // Retain date slots and saved numeric participation, including user-authorized legacy context.
     history: history.map((snapshot: any) => ({
       timestamp: snapshot.timestamp,
       breadth50: finiteValue(snapshot.structure?.breadth?.b50) ?? undefined,
       breadth200: finiteValue(snapshot.structure?.breadth?.b200) ?? undefined,
-      participationScore: snapshot.calculationVersions?.participation === "STRONGEST_SHARED_LEADERSHIP_PENALTY" ||
-        snapshot.participation?.diagnostics?.aggregationPolicy === "STRONGEST_SHARED_LEADERSHIP_PENALTY"
-        ? finiteValue(snapshot.participation?.score) ?? undefined : undefined,
+      participationScore: finiteValue(snapshot.participation?.score) ?? undefined,
       marketLiquidityScore: finiteValue(snapshot.liquidity?.marketLiquidityScore) ??
         finiteValue(snapshot.liquidity?.metrics?.liquidity) ?? undefined,
       highLowDelta: finiteValue(snapshot.structure?.highsLows?.highs) !== null &&
@@ -1078,7 +1089,7 @@ export function marketEngine(
   ===================================================== */
 
   const fragility = fragilityEngine({
-    history,
+    history: structuralHistory,
     historyMetrics,
     crash,
     breadth50,
@@ -1152,7 +1163,7 @@ export function marketEngine(
       participation: independentRussell.participation.score, quality: independentRussell.marketQuality.score,
       rotationConfirm: independentRussell.rotationConfirm.state,
       historySnapshot: { timestamp: new Date().toISOString(), breadthDataQuality: { universeVersion: russellFrame.dataQuality.universeVersion },
-        calculationVersions: { participation: "STRONGEST_SHARED_LEADERSHIP_PENALTY", rotation: "STRUCTURAL_MODEL_2026_10_V3", liquidity: "STRUCTURAL_MODEL_2026_10_V3", fragility: "CORE_WITHOUT_DERIVED_QUALITY_OR_REPEATED_STRUCTURAL_OVERLAYS", rotationDecay: "STRUCTURAL_MODEL_2026_10_V3" },
+        calculationVersions: { participation: "LEGACY_STRUCTURAL_RULES_RESTORED_V56", rotation: "STRUCTURAL_MODEL_2026_10_V3", liquidity: "LEGACY_STRUCTURAL_RULES_RESTORED_V56", fragility: "LEGACY_STRUCTURAL_RULES_RESTORED_V56", rotationDecay: "STRUCTURAL_MODEL_2026_10_V3" },
         structure: { breadth: { b20: Math.round(russellFrame.b20 * 100), b50: Math.round(russellFrame.b50 * 100), b200: Math.round(russellFrame.b200 * 100) }, advanceDecline: russellFrame.advanceDecline, highsLows: { highs: russellFrame.newHighs, lows: russellFrame.newLows } },
         phase: { phase: independentRussell.phase }, participation: { score: independentRussell.participation.score },
         rotation: { score: independentRussell.rotation.score }, liquidity: { score: independentRussell.liquidity.score },

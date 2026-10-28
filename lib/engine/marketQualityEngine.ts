@@ -34,7 +34,6 @@ regimeSync?: any;
 export interface MarketQualityEngineOutput {
 
 score: number;
-diagnostics: Record<string, any>;
 
 marketIntegrity: number;
 
@@ -132,10 +131,9 @@ Math.min(max, value)
 }
 
 
-export function marketQualityEngine(
+function legacy_marketQualityEngine(
 input: MarketQualityEngineInput
 ): MarketQualityEngineOutput {
-input = input ?? {};
 
 
 /* =====================================================
@@ -146,8 +144,7 @@ const breadth50 =
 clamp(
 Number(
 input.breadth50 ??
-input.structure?.breadth?.b50?.value ??
-input.structure?.breadth?.b50 ??
+(input.structure?.breadth?.b50?.value ?? input.structure?.breadth?.b50) ??
 50
 )
 );
@@ -157,8 +154,7 @@ const breadth200 =
 clamp(
 Number(
 input.breadth200 ??
-input.structure?.breadth?.b200?.value ??
-input.structure?.breadth?.b200 ??
+(input.structure?.breadth?.b200?.value ?? input.structure?.breadth?.b200) ??
 50
 )
 );
@@ -503,10 +499,18 @@ Math.round(
 );
 
 
+if (weakParticipation) {
+
+participationIntegrity -= 10;
+
+}
 
 
+if (divergenceScore >= 70) {
 
+participationIntegrity -= 8;
 
+}
 
 
 participationIntegrity =
@@ -541,13 +545,25 @@ Math.round(
 );
 
 
+if (breadth50 < 45) {
+
+breadthIntegrity -= 10;
+
+}
 
 
+if (breadth200 < 40) {
+
+breadthIntegrity -= 10;
+
+}
 
 
+if (divergenceScore >= 75) {
 
+breadthIntegrity -= 8;
 
-
+}
 
 
 breadthIntegrity =
@@ -576,10 +592,18 @@ rotationDecayScore * 0.28
 );
 
 
+if (rotationScore < 40) {
+
+rotationIntegrity -= 8;
+
+}
 
 
+if (divergenceScore >= 70) {
 
+rotationIntegrity -= 6;
 
+}
 
 
 rotationIntegrity =
@@ -602,13 +626,28 @@ Math.round(
 );
 
 
+if (narrowLeadership) {
+
+leadershipIntegrity -= 15;
+
+}
 
 
+if (institutionalDistortion) {
+
+leadershipIntegrity -= 18;
+
+}
 
 
+if (
+narrowLeadership &&
+rsEqual < 0.97
+) {
 
+leadershipIntegrity -= 10;
 
-
+}
 
 
 leadershipIntegrity =
@@ -631,7 +670,52 @@ Math.round(
 );
 
 
-// Derived regime, fragility and passive character remain diagnostics.
+liquidityIntegrity +=
+Math.round(
+(regimeSyncScore - 50) * 0.15
+);
+
+
+liquidityIntegrity -=
+Math.round(
+Math.max(
+0,
+fragilityScore - 50
+) * 0.35
+);
+
+
+if (
+liquidityEngineCharacter === "ILLUSION"
+) {
+
+liquidityIntegrity -= 14;
+
+}
+
+else if (
+liquidityEngineCharacter === "FRAGILE"
+) {
+
+liquidityIntegrity -= 8;
+
+}
+
+else if (
+liquidityEngineCharacter === "NARROW"
+) {
+
+liquidityIntegrity -= 5;
+
+}
+
+
+if (passiveDependence >= 70) {
+
+liquidityIntegrity -= 8;
+
+}
+
 
 liquidityIntegrity =
 clamp(
@@ -655,12 +739,93 @@ rotationIntegrity * 0.18 +
 leadershipIntegrity * 0.15 +
 
 liquidityIntegrity * 0.10;
-const weightedIntegrity = marketIntegrity;
-const warningCandidates = { divergence: divergenceScore >= 80 ? -12 : divergenceScore >= 65 ? -8 : divergenceScore >= 50 ? -4 : 0, passiveDependence: passiveDependence >= 75 ? -10 : passiveDependence >= 65 ? -6 : 0, fragility: fragilityScore >= 80 ? -10 : 0, leadership: narrowLeadership && weakParticipation ? -8 : 0 };
 
 
 
-// Shared warnings are retained in diagnostics, not added again.
+/* =====================================================
+STRUCTURAL OVERLAYS
+===================================================== */
+
+/*
+* Divergence is a direct structural warning.
+*/
+
+if (divergenceScore >= 80) {
+
+marketIntegrity -= 12;
+
+}
+
+else if (divergenceScore >= 65) {
+
+marketIntegrity -= 8;
+
+}
+
+else if (divergenceScore >= 50) {
+
+marketIntegrity -= 4;
+
+}
+
+
+/*
+* Passive market structure.
+*/
+
+if (passiveDependence >= 75) {
+
+marketIntegrity -= 10;
+
+}
+
+else if (passiveDependence >= 65) {
+
+marketIntegrity -= 6;
+
+}
+
+
+/*
+* Strong synchronized expansion.
+*/
+
+if (
+strongParticipation &&
+leadershipBreadth >= 65 &&
+regimeSyncScore >= 60 &&
+divergenceScore < 35
+) {
+
+marketIntegrity += 5;
+
+}
+
+
+/*
+* Severe fragility.
+*/
+
+if (fragilityScore >= 80) {
+
+marketIntegrity -= 10;
+
+}
+
+
+/*
+* Internal leadership failure.
+*/
+
+if (
+narrowLeadership &&
+weakParticipation
+) {
+
+marketIntegrity -= 8;
+
+}
+
 
 marketIntegrity =
 clamp(
@@ -1053,7 +1218,6 @@ RETURN
 return {
 
 score,
-diagnostics: { aggregationPolicy: "WEIGHTED_INTEGRITY_WITHOUT_SHARED_WARNING_OVERLAYS", weightedIntegrity, warningCandidates, preliminaryFragilityUsedForScore: false, weightsCalibratedByThisAudit: false },
 
 marketIntegrity,
 
@@ -1124,4 +1288,27 @@ passiveDependence
 
 };
 
+}
+
+// Restore the saved structural rules; retain only explicit input-unit compatibility fixes.
+function readMeasured(value: any): number | null {
+  if (value && typeof value === "object") return readMeasured(value.value ?? value.score);
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  if (typeof value === "string" && !value.trim()) return null;
+  const n = Number(value); return Number.isFinite(n) ? n : null;
+}
+export function marketQualityEngine(input: MarketQualityEngineInput & {breadthUnit?: "PERCENT"|"FRACTION"; [key:string]: any}) {
+  const legacyInput: any = {...input};
+  for (const [field,key] of [["breadth20","b20"],["breadth50","b50"],["breadth200","b200"]]) {
+    const direct = readMeasured(input[field]);
+    const nested = readMeasured(input.structure?.breadth?.[key]);
+    const value = direct !== null ? (input.breadthUnit === "FRACTION" ? direct * 100 : direct) : nested;
+    if (value !== null) legacyInput[field] = Math.max(0, Math.min(100, value));
+  }
+  const result = legacy_marketQualityEngine(legacyInput);
+  return {...result, 
+    diagnostics: {aggregationPolicy: "LEGACY_STRUCTURAL_RULES_RESTORED_V56", source: "SAVED_LEGACY_marketQualityEngine",
+      termInputConvention: "VIX / VIX3M", internalLegacyTermConvention: "VIX3M / VIX",
+      weightsRecalibrated: false, }
+  };
 }

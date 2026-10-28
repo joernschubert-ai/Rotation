@@ -1,3 +1,4 @@
+import { TECHNICAL_RULES_VERSION } from '../engine/technicalRulesVersion';
 // /lib/history/snapshotEngine.ts
 
 export function createMarketSnapshot({
@@ -193,11 +194,12 @@ export function createMarketSnapshot({
     // Persist coverage and universe identity alongside the daily measurements.
     breadthDataQuality,
     calculationVersions: {
+      technicalRules: TECHNICAL_RULES_VERSION,
       history: "VERSIONED_HISTORY_V3",
       master: master.diagnostics?.calculationVersion ?? null,
       crash: crash.diagnostics?.inputPolicy ?? null,
       rotation: "STRUCTURAL_MODEL_2026_10_V3",
-      liquidity: "STRUCTURAL_MODEL_2026_10_V3",
+      liquidity: "LEGACY_STRUCTURAL_RULES_RESTORED_V56",
       rotationDecay: "STRUCTURAL_MODEL_2026_10_V3",
       participation: participation.diagnostics?.aggregationPolicy ?? null,
       marketQuality: marketQuality.diagnostics?.aggregationPolicy ?? null,

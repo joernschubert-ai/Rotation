@@ -76,7 +76,10 @@ export interface HistoryMetrics {
       structuralHistoryAvailable: boolean;
       has5StructuralWindow: boolean;
       has20StructuralWindow: boolean;
-      policy: "CONTIGUOUS_SAME_KNOWN_UNIVERSE";
+      policy: "LEGACY_HISTORY_RESTORED_V55";
+      retainedContextObservations: number;
+      mixedUniverseContext: boolean;
+      componentVersionMixAllowed: boolean;
       persistenceAvailability: { rotation: boolean; liquidity: boolean; fragility: boolean };
     };
     historicalComponents: Record<string, { measuredObservations: number; maturity: number }>;
@@ -155,9 +158,9 @@ const readers = {
 };
 
 function modelCompatible(snapshot: any, component: string, policy: string): boolean {
-  const version = snapshot?.calculationVersions?.[component] ??
-    snapshot?.[component]?.diagnostics?.aggregationPolicy;
-  return version === policy;
+  // User-authorized legacy context: retain stored measurements across model versions.
+  // Readers still require actual finite numeric values; missing data stays missing.
+  return snapshot != null && typeof snapshot === "object";
 }
 
 function positive(value: number | null): number | null {
@@ -238,13 +241,9 @@ export function historyEngine(
     : versionOf(priceDaily[0]);
   const universeVersion = typeof requestedVersion === "string" && requestedVersion.trim() !== ""
     ? requestedVersion : null;
-  const daily: any[] = [];
-  if (universeVersion !== null) {
-    for (const snapshot of priceDaily) {
-      if (versionOf(snapshot) !== universeVersion) break;
-      daily.push(snapshot);
-    }
-  }
+  // Restore the full daily archive as context, including the older breadth universe.
+  const daily: any[] = priceDaily;
+  const sameUniverseCount = universeVersion === null ? 0 : daily.filter(s => versionOf(s) === universeVersion).length;
   const recent = daily.slice(0, PERSISTENCE_OBSERVATIONS);
   const chronological = [...daily].reverse();
   const newest = daily[0];
@@ -394,7 +393,7 @@ export function historyEngine(
     liquidity: completePersistence(readers.liquidity),
     fragility: completePersistence(readers.fragility)
   };
-  // Structural extremes describe only the comparable universe period.
+  // Structural extremes describe retained legacy context, potentially mixed universes.
   const breadthValues = daily.map(readers.breadth50).filter((n): n is number => n !== null);
   const rotationValues = daily.map(readers.rotation).filter((n): n is number => n !== null);
 
@@ -439,13 +438,16 @@ export function historyEngine(
       })),
       universeCompatibility: {
         universeVersion,
-        compatibleDailyObservations: daily.length,
-        excludedDailyObservations: priceDaily.length - daily.length,
+        compatibleDailyObservations: sameUniverseCount,
+        excludedDailyObservations: 0,
         structuralHistoryAvailable: daily.length > 0,
         has5StructuralWindow: daily.length >= 6,
         has20StructuralWindow: daily.length >= 21,
         persistenceAvailability,
-        policy: "CONTIGUOUS_SAME_KNOWN_UNIVERSE"
+        policy: "LEGACY_HISTORY_RESTORED_V55",
+        retainedContextObservations: daily.length,
+        mixedUniverseContext: sameUniverseCount !== daily.length,
+        componentVersionMixAllowed: true
       },
       priceAvailability,
       rawSnapshots: raw.length, validSnapshots: valid.length,

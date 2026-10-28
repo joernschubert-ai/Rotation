@@ -7,6 +7,7 @@ INPUT
 ===================================================== */
 
 export interface BreadthThrustInput {
+breadthUnit?: 'PERCENT'|'FRACTION';
 breadth20?: number;
 breadth50?: number;
 breadth200?: number;
@@ -60,6 +61,9 @@ institutionalParticipation: number;
 summary: string;
 
 metrics: {
+ breadthInputUnit:'PERCENT'|'FRACTION';
+ breadthUnitDefaulted:boolean;
+ calculationPolicy:string;
 breadth20: number;
 breadth50: number;
 breadth200: number;
@@ -127,16 +131,14 @@ Math.min(max, value)
 */
 
 function normalizePercent(
-value: number
+value: number, unit: 'PERCENT'|'FRACTION'
 ): number {
 
 if (!Number.isFinite(value)) {
 return 50;
 }
 
-return value <= 1
-? value * 100
-: value;
+return unit === 'FRACTION' ? value * 100 : value;
 
 }
 
@@ -181,14 +183,16 @@ input: BreadthThrustInput
 INPUT
 =================================================== */
 
+// All current callers pass percentages; fractional callers must opt in explicitly.
+const breadthUnit = input.breadthUnit ?? 'PERCENT';
 const breadth20 =
 clamp(
 normalizePercent(
 Number(
 input.breadth20 ??
 input.structure?.breadth?.b20?.value ??
-50
-)
+(breadthUnit === 'FRACTION' ? 0.5 : 50)
+), breadthUnit
 )
 );
 
@@ -199,8 +203,8 @@ normalizePercent(
 Number(
 input.breadth50 ??
 input.structure?.breadth?.b50?.value ??
-50
-)
+(breadthUnit === 'FRACTION' ? 0.5 : 50)
+), breadthUnit
 )
 );
 
@@ -211,8 +215,8 @@ normalizePercent(
 Number(
 input.breadth200 ??
 input.structure?.breadth?.b200?.value ??
-50
-)
+(breadthUnit === 'FRACTION' ? 0.5 : 50)
+), breadthUnit
 )
 );
 
@@ -554,16 +558,11 @@ score += 4;
 
 }
 
-else if (ad < -8) {
-
-score -= 6;
-
-}
-
 else if (ad < -20) {
-
 score -= 10;
-
+}
+else if (ad < -8) {
+score -= 6;
 }
 
 
@@ -998,6 +997,9 @@ summary,
 
 
 metrics: {
+ breadthInputUnit:breadthUnit,
+ breadthUnitDefaulted:input.breadthUnit===undefined,
+ calculationPolicy:'BREADTH_UNITS_AD_BRANCH_V53',
 
 breadth20,
 

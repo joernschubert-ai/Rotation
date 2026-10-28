@@ -16,7 +16,7 @@ export function buildNasdaqStructureContext(data: any, shared: any): any | null 
   const participation = participationEngine({ historyMetrics: {}, breadthUnit: "PERCENT", breadth20, breadth50, breadth200,
     structure, highs: frame.newHighs, lows: frame.newLows, rsEqual: shared.rotation?.rsEqual, rsSmall: shared.rotation?.rsSmall,
     rotation: shared.rotation, concentrationScore: Number(data.concentrationScore ?? 50), rotationScore: shared.rotation?.score });
-  const breadthThrust = breadthThrustEngine({ breadth20, breadth50, breadth200, structure, advanceDecline: frame.advanceDecline,
+  const breadthThrust = breadthThrustEngine({ breadthUnit: "PERCENT", breadth20, breadth50, breadth200, structure, advanceDecline: frame.advanceDecline,
     rsEqual: shared.rotation?.rsEqual, rsSmall: shared.rotation?.rsSmall, rotationScore: shared.rotation?.score,
     participationScore: participation.score, concentrationScore: Number(data.concentrationScore ?? 50) });
   const marketQuality = marketQualityEngine({ ...shared, structure, participation, breadthThrust, breadth50, breadth200,

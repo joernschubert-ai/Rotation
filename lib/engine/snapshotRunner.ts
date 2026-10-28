@@ -125,7 +125,7 @@ THRUST
 ===================================================== */
 
 const breadthThrust =
-breadthThrustEngine({
+breadthThrustEngine({ breadthUnit: "PERCENT",
 structure,
 
 rsEqual:
