@@ -1,3 +1,5 @@
+import {maintainResearchMemory} from '@/lib/aiResearch/aiResearchMemoryService';
+export const maxDuration=60;
 import { NextResponse } from "next/server";
 import { GET as getMarketData } from "@/app/api/market/route";
 
@@ -19,6 +21,7 @@ function isAuthorized(request: Request): boolean {
 }
 
 export async function GET(request: Request) {
+  const requestStartedAt=Date.now();
   try {
     if (!isAuthorized(request)) {
       return NextResponse.json(
@@ -66,6 +69,9 @@ export async function GET(request: Request) {
     });
 
     await saveMarketSnapshot(snapshot);
+    // Auxiliary outcome collection is independent of the already committed market snapshot.
+    let researchMemory:unknown={ok:false,modelRequestsUsed:0,message:"Gedächtnisauswertung wegen Zeitbudget verschoben."};
+    if(Date.now()-requestStartedAt<42000)try{researchMemory=await maintainResearchMemory();}catch{researchMemory={ok:false,modelRequestsUsed:0,message:"Gedächtnisauswertung nicht verfügbar; Snapshot bleibt gespeichert."};}
 
     return NextResponse.json({
       ok: true,
@@ -75,6 +81,7 @@ export async function GET(request: Request) {
       masterSignal:
         snapshot.master?.signal ?? snapshot.master?.meta?.signal ?? null,
       historyLength: history.length + 1,
+      researchMemory,
     });
   } catch (error) {
     console.error("Cron Market Snapshot Error:", error);
