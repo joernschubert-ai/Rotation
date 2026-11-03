@@ -2,8 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { AIResearchStoredWeighing } from './AIResearchStoredWeighing';
 import { AIResearchSourceReview } from "./AIResearchSourceReview";
 import { AIResearchAppFacts } from "./AIResearchAppFacts";
+import { describeResearchPresentation } from '@/lib/aiResearch/aiResearchPresentationPolicy';
+import { AIResearchTemporalContext } from './AIResearchTemporalContext';
+import { prepareReportTemporalContext } from '@/lib/aiResearch/aiResearchReportTemporalContext';
+import { AIResearchDomainContext } from "./AIResearchDomainContext";
+import { prepareReportDomainContext } from "@/lib/aiResearch/aiResearchReportDomainContext";
 import type { AIResearchReport, AIResearchResult } from "@/lib/aiResearch/aiResearchTypes";
 import { SYNTHESIS_CONTRACT } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 import type { ResearchSynthesis } from "@/lib/aiResearch/aiResearchSynthesisTypes";
@@ -15,7 +21,10 @@ export function serializeDisplayedResearch(data: ResponseData, expectedSnapshotT
     expectedSnapshotTimestamp: expectedSnapshotTimestamp ?? null,
     displayedSnapshotTimestamp: data.report?.decisionSupport?.snapshotTimestamp ?? data.diagnostics?.snapshotTimestamp ?? null,
     entryStatementsSuspended: suspended,
-    source: "EXACT_DISPLAYED_RESPONSE" } }, null, 2);
+    source: "EXACT_DISPLAYED_RESPONSE",
+    presentation: describeResearchPresentation(data.report, expectedSnapshotTimestamp, suspended),
+    domainContext: prepareReportDomainContext(data.report, expectedSnapshotTimestamp, suspended),
+    temporalContext: prepareReportTemporalContext(data.report, expectedSnapshotTimestamp, suspended) } }, null, 2);
 }
 function date(value?: string | null): string {
   if (!value) return "unbekannt";
@@ -69,17 +78,19 @@ export function AIResearchOverview({ report, snapshotTimestamp, suspended = fals
   const synthesis = report.aiSynthesis;
   const age = snapshotTimestamp ? Date.now() - Date.parse(snapshotTimestamp) : NaN;
   const current = !suspended && Number.isFinite(age) && age >= 0 && age <= 86400000;
-  const content = current && synthesis && synthesis.snapshotTimestamp === snapshotTimestamp && synthesis.status === "SUCCESS" &&
+  const sourceReview=current&&synthesis&&synthesis.snapshotTimestamp===snapshotTimestamp&&synthesis.sourceReview?.snapshotTimestamp===snapshotTimestamp&&synthesis.quality?.contractVersion===SYNTHESIS_CONTRACT?synthesis.sourceReview:undefined;
+  const content = current && !sourceReview && synthesis && synthesis.snapshotTimestamp === snapshotTimestamp && synthesis.status === "SUCCESS" &&
     synthesis.quality?.contractVersion === SYNTHESIS_CONTRACT ? synthesis.content : undefined;
-  const narrative=current&&synthesis?.status==='SUCCESS'&&synthesis.snapshotTimestamp===snapshotTimestamp&&synthesis.quality?.contractVersion===SYNTHESIS_CONTRACT?synthesis.narrative:undefined;
-  const sourceReview=current&&synthesis&&synthesis.snapshotTimestamp===snapshotTimestamp&&synthesis.quality?.contractVersion===SYNTHESIS_CONTRACT?synthesis.sourceReview:undefined;
+  const narrative=current&&!sourceReview&&synthesis?.status==='SUCCESS'&&synthesis.snapshotTimestamp===snapshotTimestamp&&synthesis.quality?.contractVersion===SYNTHESIS_CONTRACT?synthesis.narrative:undefined;
+  const reportDomainContext = prepareReportDomainContext(report, snapshotTimestamp, suspended);
+  const reportTemporalContext = prepareReportTemporalContext(report, snapshotTimestamp, suspended);
   const names = { NASDAQ_PUT: "Nasdaq Put", NASDAQ_CALL: "Nasdaq Call", RUSSELL_CALL: "Russell Call" };
   const states = { WATCH: "Beobachten", PREPARE: "Vorbereiten", STARTER_CANDIDATE: "Früher Kandidat", CONFIRM: "Bestätigung prüfen", REDUCE: "Risiko prüfen" };
   const titles = { WATCH_ONLY: "Vorerst beobachten", PREPARATION: "Einstiege vorbereiten", CANDIDATES: "Frühe Chancen getrennt prüfen", RISK_REVIEW: "Risiken neu bewerten" };
   const reviews=current&&synthesis?.snapshotTimestamp===snapshotTimestamp&&synthesis?.quality?.contractVersion===SYNTHESIS_CONTRACT?synthesis?.instrumentReviews??[]:[];
   const partial=Boolean(content&&reviews.some(r=>r.status!=="CHECKED"));
   const hasCaveats=Boolean(content?.flows.some(flow=>flow.interpretationNotes?.length));
-  const overviewTitle = sourceReview ? "App-Befunde und getrennte KI-Abwägung" : narrative ? "App-Fakten und ungeprüfte KI-Interpretation" : !current ? "Aktuellen Marktstand abgleichen" : partial ? "KI-Auswertung teilweise zurückgehalten" : content ? titles[content.conclusion]+(hasCaveats?" · mit Vorbehalt":"") : reviews.length ? "KI-Antwort zur Prüfung zurückgehalten" : "KI-Einschätzung noch nicht verfügbar";
+  const overviewTitle = sourceReview ? "App-Fakten und geprüfte KI-Quellenwahl" : narrative ? "App-Fakten und ungeprüfte KI-Interpretation" : !current ? "Aktuellen Marktstand abgleichen" : partial ? "KI-Auswertung teilweise zurückgehalten" : content ? titles[content.conclusion]+(hasCaveats?" · mit Vorbehalt":"") : reviews.length ? "KI-Antwort zur Prüfung zurückgehalten" : "KI-Einschätzung noch nicht verfügbar";
   return <section aria-label="Research Überblick" className="overflow-hidden rounded-xl border border-slate-700 bg-gradient-to-br from-slate-900 via-[#101820] to-[#101114]">
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-700/60 p-4 sm:px-5">
       <div><div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Unabhängige KI · Überblick</div>
@@ -93,8 +104,11 @@ export function AIResearchOverview({ report, snapshotTimestamp, suspended = fals
     {current&&synthesis&&synthesis.snapshotTimestamp===snapshotTimestamp&&<ResearchFactOverview synthesis={synthesis} />}
     {current&&synthesis&&synthesis.snapshotTimestamp===snapshotTimestamp&&synthesis.domainConcepts&&<ResearchDomainConcepts concepts={synthesis.domainConcepts} />}
     {current&&synthesis?.domainConcepts?.interpretationFrame&&<ResearchInterpretationFrame frame={synthesis.domainConcepts.interpretationFrame} />}
+    <AIResearchTemporalContext context={reportTemporalContext} current={current&&reportTemporalContext.matchesDisplayedSnapshot} />
+    <AIResearchDomainContext context={reportDomainContext} current={current&&reportDomainContext.matchesDisplayedSnapshot} />
     {report.appFacts&&<AIResearchAppFacts facts={report.appFacts} />}
     {sourceReview&&<AIResearchSourceReview review={sourceReview} />}
+    {sourceReview&&(synthesis?.content||synthesis?.narrative)&&<Detail title="Zusätzliche frühere KI-Inhalte · ungeprüftes Original"><pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify({content:synthesis?.content,narrative:synthesis?.narrative},null,2)}</pre></Detail>}
     {narrative&&<ResearchNarrativeText narrative={narrative} />}
     <div className="grid grid-cols-1 gap-px bg-slate-700/40 sm:grid-cols-3">
       {(["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"] as const).map(instrument => {
@@ -301,6 +315,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     {report && <>
       <ResearchSequenceStatus synthesis={report.aiSynthesis} />
       <AIResearchOverview report={report} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+      <AIResearchStoredWeighing report={report} displayedSnapshotTimestamp={expectedSnapshotTimestamp ?? reportSnapshotTimestamp} suspended={suspended} />
       <ResearchWeightingPanel synthesis={report.aiSynthesis} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       <ResearchChartPanel context={report.historicalEvidence?.chartContext} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
