@@ -3,9 +3,10 @@ import { Redis } from '@upstash/redis';
 const PREFIX='rotation:research:cf:v1';
 const ROOT=PREFIX+':full-comparison:v1';
 export const COMPARISON_MODELS={qwen:'@cf/qwen/qwen3-30b-a3b-fp8',glm:'@cf/zai-org/glm-4.7-flash',nemotron:'@cf/nvidia/nemotron-3-120b-a12b',gemma:'@cf/google/gemma-4-26b-a4b-it'} as const;
-export type FrozenResearch={id:string;createdAt:string;snapshotTimestamp:string;body:{temperature:number;max_tokens:number;messages:Array<{role:'system'|'user';content:string}>};note:string};
-export function freezeRequest(snapshotTimestamp:string,system:string,user:string,temperature:number,maxTokens:number):FrozenResearch{
- const body={temperature,max_tokens:maxTokens,messages:[{role:'system' as const,content:system},{role:'user' as const,content:user}]};
+export type StructuredResponseFormat={type:'json_schema';json_schema:{name:string;strict:true;schema:Record<string,unknown>}};
+export type FrozenResearch={id:string;createdAt:string;snapshotTimestamp:string;body:{temperature:number;max_tokens:number;messages:Array<{role:'system'|'user';content:string}>;response_format?:StructuredResponseFormat};note:string};
+export function freezeRequest(snapshotTimestamp:string,system:string,user:string,temperature:number,maxTokens:number,responseFormat?:StructuredResponseFormat):FrozenResearch{
+ const body={temperature,max_tokens:maxTokens,messages:[{role:'system' as const,content:system},{role:'user' as const,content:user}],...(responseFormat?{response_format:responseFormat}:{})};
  return {id:createHash('sha256').update(JSON.stringify(body)).digest('hex'),createdAt:new Date().toISOString(),snapshotTimestamp,body,
   note:'Prepared full research request. Same messages and sampling budget for each selected model. Not a microcase and not proof this exact request was previously sent.'};
 }
@@ -23,6 +24,7 @@ export function comparisonBody(value:FrozenResearch){
  if(!b||!Number.isFinite(b.temperature)||b.temperature!==0.7||b.max_tokens!==2200||b.messages.length!==2||
  b.messages[0].role!=='system'||b.messages[1].role!=='user'||typeof b.messages[0].content!=='string'||typeof b.messages[1].content!=='string'||b.messages[1].content.length>26000)throw Error('Invalid frozen request');
  if(createHash('sha256').update(JSON.stringify(b)).digest('hex')!==value.id)throw Error('Invalid frozen hash');
+ if(b.response_format){const r=b.response_format;if(r.type!=='json_schema'||!['rotation_scenario_context_v1','rotation_index_scenarios_v2','rotation_context_sections_v3','rotation_bound_weighting_v1','rotation_bound_weighting_v2','rotation_bound_weighting_v3','rotation_bound_weighting_v4','rotation_bound_order_v1'].includes(r.json_schema?.name)||r.json_schema.strict!==true||!r.json_schema.schema||typeof r.json_schema.schema!=='object'||Array.isArray(r.json_schema.schema)||JSON.stringify(r).length>16000)throw Error('Invalid structured response format');}
  return b;
 }
 export function comparisonTransport(body:FrozenResearch['body'],variant:keyof typeof COMPARISON_MODELS){
@@ -39,6 +41,7 @@ export async function runFullComparison(id:string,variant:keyof typeof COMPARISO
  if(!model)return {ok:false,message:'Ungültiges Vergleichsmodell.',modelRequestsUsed:0};
  const value=await readFrozenRequest(id);if(!value)return {ok:false,message:'Eingabe fehlt oder ist abgelaufen. Vergleichsseite neu öffnen.',modelRequestsUsed:0};
  const body=comparisonBody(value);
+ if(body.response_format&&variant!=='gemma')return {ok:false,message:'Strukturierter Kandidat ist ausschließlich für Gemma vorgesehen.',modelRequestsUsed:0};
  const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
  if(!token||!account||!/^[a-f0-9]{32}$/i.test(account))return {ok:false,message:'Cloudflare-Konfiguration fehlt.',modelRequestsUsed:0};
  const redis=Redis.fromEnv(),lockKey=PREFIX+':lock',lockToken=randomBytes(16).toString('hex');
@@ -61,16 +64,22 @@ export async function runFullComparison(id:string,variant:keyof typeof COMPARISO
   if(!response.ok)return {ok:false,model,inputId:id,message:'Cloudflare HTTP '+response.status+'. Keine Wiederholung und kein Modellwechsel.',modelRequestsUsed:1};
   stage='RESPONSE_JSON';const data=await response.json(),result=data?.result,choice=result?.choices?.[0];
   const text=choice?.message?.content??result?.response,finish=choice?.finish_reason??result?.finish_reason??null;
-  const answer={ok:data?.success===true&&typeof text==='string'&&text.trim().length>0,cached:false,model,inputId:id,snapshotTimestamp:value.snapshotTimestamp,generatedAt:new Date().toISOString(),
-   modelRequestsUsed:1,answerText:typeof text==='string'?text:null,finishReason:finish,truncated:finish==='length',usage:result?.usage??null,
+  const structuredObject=!!body.response_format&&text!==null&&typeof text==='object'&&!Array.isArray(text);
+  const answerText=typeof text==='string'?text:structuredObject?JSON.stringify(text):null;
+  const answer={ok:data?.success===true&&typeof answerText==='string'&&answerText.trim().length>0,cached:false,model,inputId:id,snapshotTimestamp:value.snapshotTimestamp,generatedAt:new Date().toISOString(),
+   modelRequestsUsed:1,answerText,finishReason:finish,truncated:finish==='length',usage:result?.usage??null,
+   ...(body.response_format?{providerOutputForm:structuredObject?'STRUCTURED_OBJECT_SERIALIZED':'ORIGINAL_TEXT',providerOriginalOutput:text??null}:{}),
    timing:{elapsedMs:Date.now()-startedAt,headersAfterMs,timeoutMs:45000},
-   transportProfile:variant==='glm'?'GLM_DIRECT_V44':variant==='nemotron'?'NEMOTRON_DIRECT_V46':variant==='gemma'?'GEMMA_DIRECT_V47':'QWEN_ORIGINAL_V43',
-   comparison:'Identischer eingefrorener System-/Nutzertext, Temperatur 0,7 und 2200 Ausgabetokens. GLM, Nemotron und Gemma setzen zusätzlich den dokumentierten Parameter chat_template_kwargs.enable_thinking=false. Qwen unverändert; Nemotron und Gemma nutzen denselben dokumentierten Direktmodus. Vergleich beider konfigurierter Aufrufwege, keine isolierte Modellmessung bei identischem Denkmodus.',
+   transportProfile:body.response_format?(body.response_format.json_schema.name==='rotation_scenario_context_v1'?'GEMMA_SCENARIO_CONTEXT_V1':body.response_format.json_schema.name==='rotation_index_scenarios_v2'?'GEMMA_INDEX_SCENARIOS_V2':body.response_format.json_schema.name==='rotation_bound_order_v1'?'GEMMA_BOUND_ORDER_V1':body.response_format.json_schema.name==='rotation_bound_weighting_v4'?'GEMMA_BOUND_WEIGHTING_V4':body.response_format.json_schema.name==='rotation_bound_weighting_v3'?'GEMMA_BOUND_WEIGHTING_V3':body.response_format.json_schema.name==='rotation_bound_weighting_v2'?'GEMMA_BOUND_WEIGHTING_V2':body.response_format.json_schema.name==='rotation_bound_weighting_v1'?'GEMMA_BOUND_WEIGHTING_V1':'GEMMA_CONTEXT_SCHEMA_V3'):variant==='glm'?'GLM_DIRECT_V44':variant==='nemotron'?'NEMOTRON_DIRECT_V46':variant==='gemma'?'GEMMA_DIRECT_V47':'QWEN_ORIGINAL_V43',
+   comparison:body.response_format?'Getrennter Gemma-Kandidat mit JSON-Schema-Vorgabe, Temperatur 0,7 und 2200 Ausgabetokens; kein exakt gepaarter Vergleich mit V2. Schema-Vorgabe ersetzt keine lokale Quellen- und Inhaltsprüfung. Keine automatische Wiederholung ohne Schema.':'Identischer eingefrorener System-/Nutzertext, Temperatur 0,7 und 2200 Ausgabetokens. GLM, Nemotron und Gemma setzen zusätzlich den dokumentierten Parameter chat_template_kwargs.enable_thinking=false. Qwen unverändert; Nemotron und Gemma nutzen denselben dokumentierten Direktmodus. Vergleich beider konfigurierter Aufrufwege, keine isolierte Modellmessung bei identischem Denkmodus.',
    reviewRequired:'MA-Lage, COT-Netto/Änderung, historische Zahlen, Zeiträume, Instrumentrichtung und frühe Hypothesen manuell prüfen. Kein automatischer Wahrheitsscore.'};
   try{await redis.set(key,answer,{ex:86400});}catch{/* Return without replay. */}return answer;
- }catch(error){const failure={ok:false,model,inputId:id,...comparisonFailure(error,stage,Date.now()-startedAt),headersAfterMs,transportProfile:variant==='glm'?'GLM_DIRECT_V44':variant==='nemotron'?'NEMOTRON_DIRECT_V46':variant==='gemma'?'GEMMA_DIRECT_V47':'QWEN_ORIGINAL_V43',modelRequestsUsed:started?1:0};
+ }catch(error){const failure={ok:false,model,inputId:id,...comparisonFailure(error,stage,Date.now()-startedAt),headersAfterMs,transportProfile:body.response_format?(body.response_format.json_schema.name==='rotation_scenario_context_v1'?'GEMMA_SCENARIO_CONTEXT_V1':body.response_format.json_schema.name==='rotation_index_scenarios_v2'?'GEMMA_INDEX_SCENARIOS_V2':body.response_format.json_schema.name==='rotation_bound_order_v1'?'GEMMA_BOUND_ORDER_V1':body.response_format.json_schema.name==='rotation_bound_weighting_v4'?'GEMMA_BOUND_WEIGHTING_V4':body.response_format.json_schema.name==='rotation_bound_weighting_v3'?'GEMMA_BOUND_WEIGHTING_V3':body.response_format.json_schema.name==='rotation_bound_weighting_v2'?'GEMMA_BOUND_WEIGHTING_V2':body.response_format.json_schema.name==='rotation_bound_weighting_v1'?'GEMMA_BOUND_WEIGHTING_V1':'GEMMA_CONTEXT_SCHEMA_V3'):variant==='glm'?'GLM_DIRECT_V44':variant==='nemotron'?'NEMOTRON_DIRECT_V46':variant==='gemma'?'GEMMA_DIRECT_V47':'QWEN_ORIGINAL_V43',modelRequestsUsed:started?1:0};
   if(started)try{await redis.set(key,failure,{ex:900});}catch{/* Do not retry failed inference. */}return failure;}
  finally{if(locked)try{await redis.eval("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) else return 0 end",[lockKey],[lockToken]);}catch{/* Lock expires. */}}
 }
+
+
+
 
 

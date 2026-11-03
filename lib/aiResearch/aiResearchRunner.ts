@@ -1,9 +1,13 @@
+import {archiveResearchMemory} from './aiResearchMemoryService';
+import {digest} from './aiResearchMemoryProtocol';
+import {SOURCE_REVIEW_PROMPT} from './aiResearchSourceReviewPrompt';
+import {RESEARCH_TRANSPORT_PROFILE} from './aiResearchModel';
 import {readFrozenResearchReport,saveFrozenResearchReport,researchSnapshotHash} from './aiResearchFrozenReport';
 import { loadMarketHistory } from "@/lib/history/marketHistory";
 import { buildAIResearchContext } from "./aiResearchContext";
 import { runAIResearch } from "./aiResearchEngine";
 import { buildAIResearchDecisionSupport } from "./aiResearchDecisionSupport";
-import { synthesizeResearch } from "./aiResearchCloudflare";
+import { synthesizeResearch, SYNTHESIS_GENERATION_PROFILE } from "./aiResearchCloudflare";
 import { buildAppFacts } from "./aiResearchAppFacts";
 import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 import { buildNarrativeFacts } from "./aiResearchNarrativeFacts";
@@ -163,6 +167,8 @@ export async function runAIResearchFromHistory(
     if(input.allowAIGeneration===true&&result.status==='SUCCESS'&&result.report?.appFacts){
       const saved=await saveFrozenResearchReport(currentSnapshot.timestamp,input.task,input.question,result,startedAt,researchSnapshotHash(currentSnapshot));
       if(!saved)result.diagnostics.warnings=[...(result.diagnostics.warnings??[]),'Der neue Bericht konnte nicht als eingefrorener Lesestand gespeichert werden oder ein neuerer/vollständigerer Bericht blieb erhalten. Keine zusätzliche KI-Anfrage ausgelöst.'];
+      try{const memory=await archiveResearchMemory(result,input.task,{origin:'NORMAL_RESEARCH_PIPELINE',question:typeof input.question==='string'?input.question.slice(0,500):'',snapshotHash:researchSnapshotHash(currentSnapshot),generationProfile:result.report.aiSynthesis?.cached===false?SYNTHESIS_GENERATION_PROFILE:null,systemPromptHash:result.report.aiSynthesis?.cached===false?digest(SOURCE_REVIEW_PROMPT):null,transportProfile:result.report.aiSynthesis?.cached===false?RESEARCH_TRANSPORT_PROFILE:null,providerRequestId:null});
+      if(!memory.ok)result.diagnostics.warnings=[...(result.diagnostics.warnings??[]),'Gedächtnisablage nicht bestätigt; keine zusätzliche KI-Anfrage ausgelöst.'];}catch{result.diagnostics.warnings=[...(result.diagnostics.warnings??[]),'Gedächtnisablage nicht bestätigt; Bericht bleibt unverändert verfügbar.'];}
     }
     return result;
   } catch (error) {
