@@ -16,11 +16,11 @@ export async function readNormalReportWeighing(expected?:ReportWeighingExpected)
  try{identity=makeMemoryRecord(result,'DAILY_MARKET_REVIEW',new Date().toISOString()).meta;}catch{return finish('REPORT_FRAME_INVALID','Berichtsrahmen konnte nicht exakt an das Researchgedächtnis gebunden werden.',{factsHash});}
  if(!identity.eligibleForForecast)return finish('REPORT_NOT_ELIGIBLE','Dieser Quellenbericht besitzt keinen geeigneten gespeicherten Szenariobezug.',{factsHash,sourceRecordId:identity.id});
  const reference={factsHash,sourceIdentityHash,sourceRecordId:identity.id};
- let candidates:Array<{id:string;sourceRecordId:string}> = [],scanned=0,scanComplete=false;
+ let candidates:Array<{id:string;sourceRecordId:string;issuedAt?:string|null}> = [],scanned=0,scanComplete=false;
  if(expected?.baseEpisodeId){if(!/^[a-f0-9]{64}$/.test(expected.baseEpisodeId))return finish('INVALID_BASE_ID','Ungültiger Szenariobezug.',reference);candidates=[{id:expected.baseEpisodeId,sourceRecordId:identity.id}];}
  else{
   for(let offset=0;offset<100;offset+=20){const page=await listScenarioEpisodes(offset);scanned+=page.length;
-   for(const raw of page){const m=object(raw);if(m.sourceRecordId===identity.id&&m.sourceSnapshot===stamp&&m.status==='UNVERIFIED_SCENARIOS_RECORDED'&&typeof m.id==='string'&&/^[a-f0-9]{64}$/.test(m.id)&&!candidates.some(c=>c.id===m.id))candidates.push({id:m.id,sourceRecordId:m.sourceRecordId});}
+   for(const raw of page){const m=object(raw);if(m.sourceRecordId===identity.id&&m.sourceSnapshot===stamp&&m.status==='UNVERIFIED_SCENARIOS_RECORDED'&&typeof m.id==='string'&&/^[a-f0-9]{64}$/.test(m.id)&&!candidates.some(c=>c.id===m.id))candidates.push({id:m.id,sourceRecordId:m.sourceRecordId,issuedAt:typeof m.issuedAt==='string'&&Number.isFinite(Date.parse(m.issuedAt))?m.issuedAt:null});}
    if(page.length<20){scanComplete=true;break;}
   }
   if(!scanComplete)return finish('SEARCH_LIMIT_REACHED','Die begrenzte Archivrecherche ist nicht vollständig. Keine automatische Auswahl eines möglicherweise anderen Szenarios.',{...reference,scanned,candidates});
