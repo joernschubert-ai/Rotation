@@ -3,6 +3,8 @@ import {useEffect,useRef,useState} from 'react';
 import {reportSourceIdentityFields} from '@/lib/aiResearch/aiResearchReportIdentity';
 import type {AIResearchReport} from '@/lib/aiResearch/aiResearchTypes';
 
+function candidateTime(value:unknown){if(typeof value!=='string'||!Number.isFinite(Date.parse(value)))return 'Ausgabezeit nicht im Archivverzeichnis verfügbar';return 'Ausgabezeit: '+new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Berlin'}).format(new Date(value))+' (Europe/Berlin, Archivangabe)';}
+
 /** Explicit read only. No mount fetch, no report mutation, no model-generating route. */
 export function AIResearchStoredWeighing({report,displayedSnapshotTimestamp,suspended=false}:{report:AIResearchReport;displayedSnapshotTimestamp?:string;suspended?:boolean}){
  const facts=report.appFacts,stamp=facts?.snapshotTimestamp;
@@ -25,7 +27,8 @@ export function AIResearchStoredWeighing({report,displayedSnapshotTimestamp,susp
    if(id!==seq.current||frameRef.current!==key||request.signal.aborted)return;
    const response=await fetch('/api/ai-research/report-weighing',{method:'POST',cache:'no-store',credentials:'same-origin',signal:request.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'read',snapshotTimestamp:stamp,factsHash,reportGeneratedAt:report.generatedAt,sourceIdentityHash,...(baseEpisodeId?{baseEpisodeId}:{})})});
    const data=await response.json();if(id!==seq.current||frameRef.current!==key||request.signal.aborted)return;
-   if(data.status==='AVAILABLE'&&(data.reportSnapshotTimestamp!==stamp||data.factsHash!==factsHash||data.reportGeneratedAt!==report.generatedAt||data.sourceIdentityHash!==sourceIdentityHash))throw Error('Antwort gehört nicht zum angezeigten Quellenbericht.');
+   if(['AVAILABLE','MULTIPLE_MATCHING_SCENARIOS','SEARCH_LIMIT_REACHED'].includes(data.status)&&(data.reportSnapshotTimestamp!==stamp||data.factsHash!==factsHash||data.reportGeneratedAt!==report.generatedAt||data.sourceIdentityHash!==sourceIdentityHash))throw Error('Antwort gehört nicht zum angezeigten Quellenbericht.');
+   if(baseEpisodeId&&data.status==='AVAILABLE'&&data.baseEpisodeId!==baseEpisodeId)throw Error('Antwort gehört nicht zum ausdrücklich gewählten Szenario.');
    setStored({key,payload:data});
   }catch(error){if(id===seq.current&&!request.signal.aborted){setStored(null);setMessage(error instanceof Error?error.message:'Gespeicherte Ergänzung nicht lesbar.');}}
   finally{if(id===seq.current){pending.current=false;setBusy(false);}}
@@ -38,8 +41,9 @@ export function AIResearchStoredWeighing({report,displayedSnapshotTimestamp,susp
   {payload&&<>
    <p role="status" className="mt-3">{payload.message}</p>
    <p className="mt-1 text-slate-500">{payload.status} · neue KI-Aufrufe: {payload.modelRequestsUsed??0}</p>
-   {payload.status==='MULTIPLE_MATCHING_SCENARIOS'&&Array.isArray(payload.candidates)&&payload.candidates.map((c:Record<string,string>)=><button key={c.id} type="button" disabled={busy} onClick={()=>void read(c.id)} className="mt-2 block break-all rounded border border-slate-700 p-2">Gespeicherten Szenariobezug {c.id} gezielt lesen · ohne KI</button>)}
+   {payload.status==='MULTIPLE_MATCHING_SCENARIOS'&&Array.isArray(payload.candidates)&&payload.candidates.filter((c:Record<string,unknown>)=>typeof c.id==='string'&&/^[a-f0-9]{64}$/.test(c.id)).map((c:Record<string,any>)=><button key={c.id} type="button" disabled={busy} onClick={()=>void read(c.id)} className="mt-2 block break-all rounded border border-slate-700 p-2"><span className="block text-left font-semibold">{candidateTime(c.issuedAt)}</span><span className="mt-1 block text-left">Szenario {c.id}</span><span className="mt-1 block text-left">Diesen Szenariobezug gezielt lesen · ohne KI</span></button>)}
    {payload.status==='AVAILABLE'&&<>
+    {typeof payload.baseEpisodeId==='string'&&/^[a-f0-9]{64}$/.test(payload.baseEpisodeId)&&<a href={'/api/ai-research/scenario-overview?baseEpisodeId='+encodeURIComponent(payload.baseEpisodeId)} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block rounded border border-slate-500 px-3 py-2 text-slate-100 underline">Lesbare Gesamtansicht dieses Szenarios öffnen · ohne KI</a>}
     <p className="mt-2 text-slate-400">Archivierter Quellenstand {payload.reportSnapshotTimestamp}; Modellausgabe {payload.modelGeneratedAt}. Quellenprüfung bestanden, Gewichtungsqualität ungeprüft.</p>
     {Array.isArray(payload.markets)&&payload.markets.map((row:Record<string,any>)=><article key={row.market} className="mt-3 rounded border border-slate-700 p-3">
      <h4 className="font-semibold">{row.market} · gespeicherte Basis {row.baseDirection}</h4>
