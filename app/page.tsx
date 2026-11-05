@@ -93,7 +93,9 @@ export default function Home() {
       });
 
       if (!marketRes.ok) {
-        throw new Error(`MARKET REQUEST FAILED: ${marketRes.status}`);
+        const failure = await marketRes.json().catch(() => null);
+        const reason = typeof failure?.error === "string" ? failure.error.slice(0, 200) : "Keine Fehlerbeschreibung vom Datenabruf";
+        throw new Error(`Marktdaten HTTP ${marketRes.status}: ${reason}`);
       }
 
       const marketJson = await marketRes.json();
@@ -208,7 +210,8 @@ export default function Home() {
     } catch (error) {
       console.error("LOAD ERROR", error);
       setLoadError(
-        "Market refresh failed. Any displayed values remain from the previous successful load."
+        "Markt-Aktualisierung fehlgeschlagen. Angezeigte Werte bleiben vom letzten erfolgreichen Abruf. " +
+        (error instanceof Error ? error.message.slice(0, 300) : "Keine weitere Fehlerbeschreibung verfügbar.")
       );
     } finally {
       loadingRef.current = false;
