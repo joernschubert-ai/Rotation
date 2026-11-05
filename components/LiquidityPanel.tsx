@@ -1,6 +1,7 @@
 // /components/panels/LiquidityPanel.tsx
 
 "use client";
+import {TemporalQualityNote} from "./TemporalQualityNote";
 
 /* ============================================================
 LIQUIDITY PANEL
@@ -914,6 +915,8 @@ borderColor:
 headline.color,
 }}
 >
+<TemporalQualityNote quality={data?.liquidity?.periodDiagnostics} />
+
 
 {/* ======================================================
 HEADER

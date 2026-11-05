@@ -1,6 +1,7 @@
 // /components/panels/FragilityPanel.tsx
 
 "use client";
+import {TemporalQualityNote} from "./TemporalQualityNote";
 
 
 interface Props {
@@ -434,6 +435,8 @@ ${borderColor}
 ${bgGlow}
 `}
 >
+<TemporalQualityNote quality={data?.fragility?.periodDiagnostics} />
+
 
 
 {/* =================================================

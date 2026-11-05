@@ -203,6 +203,7 @@ ${getChangeColor(change)}
 >
 {formatChange(change)}
 </div>
+{item?.changePeriod&&<div className="mt-1 text-[10px] font-normal text-zinc-500">{item.changePeriod==='OBSERVED_5_MINUTE_INTERVAL'?'Letztes 5-Minuten-Intervall':'Vergleichsperiode unklar'}{item.quoteTimestamp?' · '+new Date(item.quoteTimestamp).toLocaleTimeString('de-DE',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit'}):''}<br/>Tagesänderung: {formatChange(item.dailyChangePct)}{item.dailyChangePct==null?' · Schluss-/Settlementbezug fehlt':''}</div>}
 
 </div>
 
