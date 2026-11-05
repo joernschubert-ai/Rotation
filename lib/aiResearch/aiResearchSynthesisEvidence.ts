@@ -116,7 +116,7 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
         vixTermRatio: finite(object(snapshot.indices).vixTermRatio), termDefinition: "VIX / VIX3M; below one is contango",
         volOfVolRatio: finite(object(snapshot.indices).volOfVolRatio) },
       credit: { ...pick(snapshot.credit, ["rawRatio", "ma50", "ratioToMA50", "distancePct", "signal"]),
-        ...pick(object(snapshot.credit).dataQuality, ["available", "ratioDefinition", "normalizedDefinition", "dateAlignmentVerified"]),
+        ...pick(object(snapshot.credit).dataQuality, ["available", "ratioDefinition", "normalizedDefinition", "dateAlignmentVerified", "asOfDate", "fallbackUsed", "latestBarFinality"]),
         interpretation: "Raw HYG/IEF is a price ratio, not an absolute stress threshold. Interpret its verified signal/ratioToMA50 and data quality." },
       gammaDiagnostics: { ...pick(snapshot.gamma, ["score", "effectiveGamma", "structuralGammaFloor"]), measurementStatus: "Producer model diagnostics; not independently verified dealer exposure" },
       rotation: pick(snapshot.rotation, ["score", "signal", "rsSmall", "rsEqual", "rsGrowth"]),

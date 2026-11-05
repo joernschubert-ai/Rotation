@@ -5939,12 +5939,12 @@ data.crashProbability >= 50
 risks.push({
 
 risk:
-"Elevated crash probability",
+"Elevated uncalibrated crash model indicator",
 
 explanation:
-`Crash Engine probability is ${Math.round(
+`Uncalibrated Crash Engine model indicator is ${Math.round(
 data.crashProbability
-)}%.`,
+)}/100; not a calibrated event probability.`,
 
 evidenceType:
 "SNAPSHOT",
@@ -6343,9 +6343,9 @@ history.available
 
 `Detected divergences: ${divergences.length}.`,
 
-`Crash Engine probability: ${Math.round(
+`Uncalibrated Crash Engine model indicator: ${Math.round(
 data.crashProbability
-)}%.`,
+)}/100; not a calibrated event probability.`,
 
 `COT positioning: ${
 cot.available
