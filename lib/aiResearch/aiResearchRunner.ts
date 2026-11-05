@@ -145,7 +145,18 @@ export async function runAIResearchFromHistory(
         const heatSource=(currentSnapshot as any).systemHeat??(currentSnapshot as any).heat;
         const heat=heatSource&&typeof heatSource==='object'?Object.fromEntries(['score','state','signal','status','level'].filter(k=>typeof heatSource[k]==='number'||typeof heatSource[k]==='string').map(k=>[k,heatSource[k]])):null;
         result.report.appFacts=buildAppFacts(buildNarrativeFacts(factEvidence),currentSnapshot.timestamp,{...factEvidence.find(e=>e.id==='APP')?.data,systemHeat:heat,
-          historyContext:{retainedSnapshotCount:history.length,comparability:'NOT_REASSESSED_HERE',meaning:'Gespeicherte App-Historie; Modell-/Universumswechsel können Vergleiche verzerren. Keine neue Validierung.'},
+          putTiming:{...((factEvidence.find(e=>e.id==='APP')?.data.putTiming as Record<string,unknown>)??{}),meta:{
+            earlyStructuralTrigger:(currentSnapshot as any).putTiming?.meta?.earlyStructuralTrigger??null,
+            earlyCurrentTrigger:(currentSnapshot as any).putTiming?.meta?.earlyCurrentTrigger??null,
+            persistentDistribution:(currentSnapshot as any).putTiming?.meta?.persistentDistribution??null}},
+          historyContext:{retainedSnapshotCount:history.length,comparability:'NOT_REASSESSED_HERE',
+            persistentDistribution:(currentSnapshot as any).historyMetrics?.persistentDistribution??null,
+            prolongedBearRegime:(currentSnapshot as any).historyMetrics?.prolongedBearRegime??null,
+            distributionObservations:(currentSnapshot as any).historyMetrics?.distributionDays??null,
+            phaseObservations:(currentSnapshot as any).historyMetrics?.daysInPhase??null,
+            legacyTimeBasis:'LATEST_PER_NEW_YORK_CAPTURE_DATE_NOT_VERIFIED_TRADING_SESSIONS',
+            datedComparisons:(currentSnapshot as any).breadthVelocity?.periodDiagnostics??null,
+            meaning:'Vollständige gespeicherte App-Historie bleibt Kontext. Historische Tageszähler zählen Beobachtungstage, nicht nachgewiesene Börsensitzungen. Nur periodDiagnostics kennzeichnet den neuen datierten Vergleich. Modell-/Universumswechsel können alte Vergleiche verzerren; keine neue Kalibrierung.'},
           historicalTemporalValidation:result.report.historicalEvidence?.temporalValidation});
       } catch { warnings.push("App-Fakten konnten nicht berechnet werden; keine KI-Ableitung als Ersatz ausgegeben."); }
       try {

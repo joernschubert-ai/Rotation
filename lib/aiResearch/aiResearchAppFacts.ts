@@ -1,3 +1,4 @@
+import {newsRelevance} from './aiResearchNewsRelevance';
 import { buildResearchConcepts } from './aiResearchConcepts';
 import { cotGroupCard } from './aiResearchCOTSemantics';
 import { buildNewsCards } from './aiResearchNewsCards';
@@ -89,7 +90,7 @@ export function buildAppFacts(input:unknown,snapshotTimestamp:string,appContext:
     } catch { add('NEWS-EVENT-MISSING','Nachrichten-Ereignisstruktur','SHARED',snapshotTimestamp,'MISSING','Neue Ereignisdiagnostik nicht verfügbar; bisherige Nachrichtenkarten bleiben erhalten.'); }
     add('NEWS-COVERAGE','Nachrichtenabdeckung','SHARED',snapshotTimestamp,'CALCULATED',`${news.length} gelieferte Meldungen, ${result.cards.length} Quellgruppen, ${result.duplicateSourceCount} eindeutige Kopien gebündelt, ${result.excluded.length} ausgeschlossen. Keine vollständige Ereignisdeduplizierung oder vollständiger Nachrichtenstrom.`,{excluded:result.excluded,duplicateSourceCount:result.duplicateSourceCount,independentEventCount:null});
     if(!result.cards.length)add('NEWS-MISSING','Nachrichten','SHARED',snapshotTimestamp,'MISSING','Keine zulässigen Nachrichten im gelieferten Bestand.',{excluded:result.excluded});
-    for(const n of result.cards)add(n.id,'Nachrichten','SHARED',n.publishedAt,'SUPPLIED',`${n.title}. ${n.summary??'Nur Überschrift; kein Volltext.'} Veröffentlichung ${n.publishedAt}; Ereigniszeit, Neuigkeitswert, Überraschung und Marktreaktion nicht festgestellt.`,{url:n.url,publisher:n.publisher,contentLevel:n.contentLevel,sourceIds:n.sourceIds,topicHints:n.topicHints,marketHints:n.marketHints,direction:'NOT_DETERMINED'});
+    for(const n of result.cards)add(n.id,'Nachrichten','SHARED',n.publishedAt,'SUPPLIED',`${n.title}. ${n.summary??'Nur Überschrift; kein Volltext.'} Veröffentlichung ${n.publishedAt}; Ereigniszeit, Neuigkeitswert, Überraschung und Marktreaktion nicht festgestellt.`,{url:n.url,publisher:n.publisher,contentLevel:n.contentLevel,sourceIds:n.sourceIds,topicHints:n.topicHints,marketHints:n.marketHints,relevance:newsRelevance(n.title,n.summary??''),direction:'NOT_DETERMINED'});
   }catch{add('NEWS-INVALID','Nachrichten','SHARED',null,'MISSING','Nachrichten-Zeitbezug ungültig; keine Richtungsableitung.');}
   facts.push(...buildInstrumentBindings(facts,snapshotTimestamp).map(instrumentBindingFact));
   for(const f of facts){const binding=periodBinding(f);if(binding)f.values={...f.values,periodBinding:binding};}
@@ -110,7 +111,7 @@ export function appFactsForModel(facts:AppFacts):string{
     const newsSuffix=` Veröffentlichung ${f.asOf}; Ereigniszeit, Neuigkeitswert, Überraschung und Marktreaktion nicht festgestellt.`;
     let newsText=f.text.endsWith(newsSuffix)?f.text.slice(0,-newsSuffix.length):f.text;
     if(v.contentLevel==='HEADLINE'&&newsText.endsWith(' Nur Überschrift; kein Volltext.'))newsText=newsText.slice(0,-' Nur Überschrift; kein Volltext.'.length);
-    const news=f.domain==='Nachrichten'?{publisher:v.publisher,contentLevel:v.contentLevel,text:newsText}:null;
+    const news=f.domain==='Nachrichten'?{publisher:v.publisher,contentLevel:v.contentLevel,...(v.relevance?{relevance:[obj(v.relevance).tier,false]}:{}),marketHints:v.marketHints??[],text:newsText}:null;
     const history=f.domain==='Historische Vergleiche'?{family:v.family,state:v.state,currentMatch:v.currentMatch,followingIntervals:20,statistics:v.statistics,validation:v.validation}:null;
     const text=f.status==='MISSING'?'Datenlücke: '+f.text:diagnosticModelValue(f)??cot??quote??magnitude??shared??news??history??(f.domain==='Preisbedingungen'?{price:v.price,direction:v.direction,state:v.state,put:obj(v.effects).put,call:obj(v.effects).call}:f.text);
     return `[${f.id}] ${JSON.stringify(text)}`;

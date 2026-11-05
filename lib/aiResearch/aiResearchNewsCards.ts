@@ -1,3 +1,4 @@
+import {newsRelevance} from './aiResearchNewsRelevance';
 /** Additive offline-first news context. No I/O, scores, trading gates or model calls. */
 export const NEWS_CARDS_POLICY = 'NEWS_CARDS_V1' as const;
 export interface NewsCardInput {
@@ -49,7 +50,7 @@ function hints(text: string) {
     ['GEOPOLITICS', /\bwar\b|\bsanctions?\b|\btariffs?\b|krieg|sanktion|zölle/iu]
   ];
   for (const [topic,re] of rules) if (re.test(text)) topicHints.push(topic);
-  if (topicHints.some(t => t !== 'EARNINGS')) marketHints.push('SHARED_MACRO');
+  if (topicHints.some(t => t !== 'EARNINGS') && newsRelevance(text).tier==='US_MACRO') marketHints.push('SHARED_MACRO');
   return { marketHints, topicHints };
 }
 export function buildNewsCards(sources: readonly NewsCardInput[], asOf: string): NewsCardsResult {

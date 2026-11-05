@@ -10,7 +10,7 @@ export interface MeaningIssue {instrument:string;code:string;quote:string;explan
 /** Narrow diagnostics. No repair, no proof of truth when nothing is detected. */
 export function auditSelectionMeaning(raw:unknown,facts:AppFact[]){
  const findings:MeaningIssue[]=[];
- let root:any;try{root=typeof raw==='string'?JSON.parse(raw):null;}catch{return {version:'SELECTION_MEANING_V7',findings,scope:'Keine prüfbare JSON-Antwort.',semanticTruthVerified:false};}
+ let root:any;try{root=typeof raw==='string'?JSON.parse(raw):null;}catch{return {version:'SELECTION_MEANING_V8',findings,scope:'Keine prüfbare JSON-Antwort.',semanticTruthVerified:false};}
  for(const row of Array.isArray(root?.instruments)?root.instruments:[]){
   if(!['NASDAQ_PUT','NASDAQ_CALL','RUSSELL_CALL'].includes(row?.instrument)||typeof row.hypothesis!=='string')continue;
   const market=row.instrument==='RUSSELL_CALL'?'RUSSELL_2000':'NASDAQ';
@@ -19,6 +19,12 @@ export function auditSelectionMeaning(raw:unknown,facts:AppFact[]){
   const add=(code:string,quote:string,explanation:string)=>findings.push({instrument:row.instrument,code,quote,explanation});
   for(const group of [{name:'LEVERAGED_MONEY',pattern:/Leveraged[ -]?Money/i},{name:'ASSET_MANAGER',pattern:/Asset[ -]?Manager/i}]){const source=own.find(f=>f.domain==='COT'&&f.values.group===group.name);if(source&&group.pattern.test(row.hypothesis)&&!selected.includes(source.id))add('COT_GROUP_WITHOUT_SELECTED_SOURCE',row.hypothesis,'Die genannte COT-Gruppe stammt aus '+source.id+', ist aber nicht als eigener Beleg mit Teilbefunden gebunden. Das belegt keine falsche Nettozahl, sondern eine fehlende Quellenbindung.');}
   for(const sentence of row.hypothesis.split(/(?<=[.!?])\s+|\n/)){
+   // Inspect the local support proposition: an unrelated later "nicht" must not hide it.
+   const support=/(?:Unterstützung|Widerstand)\s+(?:durch|an|bei)\s+(?:(?:der|die|den|dem)\s+)?MA\s*(?:20|50|200)|MA\s*(?:20|50|200)\s+(?:bietet|bildet|ist)\s+(?:(?:eine?|die|der|tragfähige[rn]?)\s+)*(?:Unterstützung|Widerstand)/i.exec(sentence);
+   if(support){const before=sentence.slice(Math.max(0,support.index-65),support.index),after=sentence.slice(support.index+support[0].length,support.index+support[0].length+45);
+    if(!/\b(?:wenn|falls|würde|könnte|kein\w*|nicht|mögliche\w*)\b/i.test(before)&&!/\b(?:nicht|unbewiesen|unbelegt)\b/i.test(after)&&own.some(f=>/-MA(?:20|50|200)$/.test(f.id)&&selected.includes(f.id)))
+     add('MA_RELATION_IS_NOT_SUPPORT',sentence,'Geliefert ist nur die Kursrelation zur MA; eine tragfähige Unterstützung oder ein Widerstand ist damit nicht nachgewiesen.');
+   }
    // Hypothetical, negated and quoted propositions are deliberately left to manual review.
    if(/\b(?:wenn|falls|würde|könnte|sollte|nicht|kein\w*)\b|[„“«»"]/.test(sentence))continue;
    const inverse=/\b(MA\s*\d+(?:(?:\s*\/\s*|\s*(?:und|sowie|,)\s*)(?:MA\s*)?\d+)*)\s+(?:liegen|liegt|stehen|steht)\s+(über|unter)\s+(?:dem\s+)?(?:aktuellen\s+)?(?:Kurs|Kursniveau|Niveau)/i.exec(sentence);
@@ -40,5 +46,5 @@ export function auditSelectionMeaning(raw:unknown,facts:AppFact[]){
     add('REFERENCE_NOT_MANDATORY',sentence,'Eine allgemeine MA-Referenz kann eine These stärken; ihre Notwendigkeit für eine frühe Gegenidee ist nicht belegt.');
   }
  }
- return {version:'SELECTION_MEANING_V7',findings,status:findings.length?'REVIEW_REQUIRED':'NO_COVERED_ISSUES_FOUND',scope:'Ausgewählte ausdrückliche MA-Relationen, MA-Steigung, Phasen-/Volatilitätsableitung und Pflichtreferenzen. Keine vollständige Sprach- oder COT-Prüfung; kein Befund bestätigt keine Richtigkeit.',semanticTruthVerified:false};
+ return {version:'SELECTION_MEANING_V8',findings,status:findings.length?'REVIEW_REQUIRED':'NO_COVERED_ISSUES_FOUND',scope:'Ausgewählte ausdrückliche MA-Relationen, MA-Steigung/Unterstützung, Phasen-/Volatilitätsableitung und Pflichtreferenzen. Keine vollständige Sprach- oder COT-Prüfung; kein Befund bestätigt keine Richtigkeit.',semanticTruthVerified:false};
 }
