@@ -1,3 +1,4 @@
+import {structuralPeriodQuality} from './datedStructuralHistory';
 // /lib/engine/crashEngine.ts
 
 import { getCreditContext } from "./creditContext";
@@ -192,15 +193,13 @@ data.historyMetrics?.phasePersistence ?? 0
 const history =
 data.history ?? []
 
-const h5 =
-history.length >= 5
+const h5 = data.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? data.sessionHistory.rows?.[5] ?? null : (history.length >= 5
 ? history[history.length - 5]
-: null
+: null)
 
-const h10 =
-history.length >= 10
+const h10 = data.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? data.sessionHistory.rows?.[10] ?? null : (history.length >= 10
 ? history[history.length - 10]
-: null
+: null)
 
 const participationTrend =
 participationScore -
@@ -992,6 +991,7 @@ return {
 
 score: finalScore,
 diagnostics: {
+  periodComparisons:structuralPeriodQuality(data.sessionHistory,'CRASH'),
   inputPolicy: "CRASH_CANONICAL_PERCENT_CURRENT_INTERNALS_V1",
   inputs: { breadth50, breadth200, participationScore, rotationScore, ad, highs, lows, distributionScore, vix, vixTerm, marketLiquidityScore, divergenceSeverity: measuredDivergence },
   termRatioDefinition: "VIX / VIX3M",

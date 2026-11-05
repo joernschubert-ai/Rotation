@@ -1,3 +1,4 @@
+import { datedStructuralHistory } from "./datedStructuralHistory";
 import { sessionComparisons } from "./sessionComparisons";
 import { legacyHistoryAdapter } from "./legacyHistoryAdapter";
 // /lib/engine/marketEngine.ts
@@ -157,6 +158,7 @@ export function marketEngine(
       : historyEngine(data.history ?? [], historyContext).history;
 
   const structuralHistory = legacyHistoryAdapter(history);
+  const sessionHistory = isHistoricalScenario ? undefined : datedStructuralHistory(data, history);
 
   function getHistoryValue(
     offset: number,
@@ -364,6 +366,7 @@ export function marketEngine(
     marketDrivers,
     driversCore,
     history: structuralHistory,
+    sessionHistory,
     marketLiquidityScore: data.marketLiquidityScore,
     ...creditInput,
     gammaExposure: data.gammaExposure,
@@ -378,6 +381,7 @@ export function marketEngine(
 
   const fragilityPre = fragilityEngine({
     history: structuralHistory,
+    sessionHistory,
     historyMetrics,
     crash: {
       probability: Number(
@@ -443,6 +447,7 @@ export function marketEngine(
     marketDrivers,
     driversCore,
     history: structuralHistory,
+    sessionHistory,
     historyMetrics,
     breadth20,
     breadth50,
@@ -464,6 +469,7 @@ export function marketEngine(
     marketDrivers,
     driversCore,
     history: structuralHistory,
+    sessionHistory,
     historyMetrics,
     marketLiquidityScore: data.marketLiquidityScore,
     ...creditInput,
@@ -686,6 +692,7 @@ export function marketEngine(
     ...data,
     // Canonical structure uses percent. Raw backend breadth remains fractional.
     structure,
+    sessionHistory,
     breadth20, breadth50, breadth200,
     participation,
     participationScore: participation.score,
@@ -1101,6 +1108,7 @@ export function marketEngine(
 
   const fragility = fragilityEngine({
     history: structuralHistory,
+    sessionHistory,
     historyMetrics,
     crash,
     breadth50,

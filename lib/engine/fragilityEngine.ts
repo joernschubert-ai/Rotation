@@ -1,3 +1,4 @@
+import {structuralPeriodQuality} from './datedStructuralHistory';
 // /lib/engine/fragilityEngine.ts
 
 import { getMarketStructureFlags } from "./marketStructureFlags";
@@ -10,6 +11,7 @@ TYPES
 export interface FragilityEngineInput {
 
 history?: any[];
+sessionHistory?: any;
 
 historyMetrics?: any;
 
@@ -497,16 +499,14 @@ const historyMetrics =
 input.historyMetrics ?? {};
 
 
-const h10 =
-history.length >= 10
+const h10 = input.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? input.sessionHistory.rows?.[10] ?? null : (history.length >= 10
 ? history[history.length - 10]
-: null;
+: null);
 
 
-const h20 =
-history.length >= 20
+const h20 = input.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? input.sessionHistory.rows?.[20] ?? null : (history.length >= 20
 ? history[history.length - 20]
-: null;
+: null);
 
 
 /*
@@ -2329,7 +2329,9 @@ export function fragilityEngine(input: FragilityEngineInput & {breadthUnit?: "PE
   const term = readMeasured(input.vixTermRatio);
   legacyInput.vixTermRatio = term !== null && term > 0 ? 1 / term : 1;
   const result = legacy_fragilityEngine(legacyInput);
-  return {...result, metrics: {...result.metrics, vixTerm: readMeasured(input.vixTermRatio) ?? 1},
+  const periodQuality=structuralPeriodQuality(input.sessionHistory,'FRAGILITY');
+  return {...result, periodDiagnostics:periodQuality, temporalValues:{participationTrend:periodQuality.missing.some(k=>["10:participationScore"].includes(k))?null:result.metrics.participationTrend,breadthTrend:periodQuality.missing.some(k=>["10:breadth50"].includes(k))?null:result.metrics.breadthTrend,liquidityTrend:periodQuality.missing.some(k=>["10:liquidityScore"].includes(k))?null:result.metrics.liquidityTrend,marketQualityTrend:periodQuality.missing.some(k=>["10:marketQualityScore"].includes(k))?null:result.metrics.marketQualityTrend},
+    dataQuality:{...((result as any).dataQuality??{}),temporalComparisonsComplete:periodQuality.complete,scoreIsPartial:!periodQuality.complete}, metrics: {...result.metrics, vixTerm: readMeasured(input.vixTermRatio) ?? 1},
     diagnostics: {aggregationPolicy: "LEGACY_STRUCTURAL_RULES_RESTORED_V56", source: "SAVED_LEGACY_fragilityEngine",
       termInputConvention: "VIX / VIX3M", internalLegacyTermConvention: "VIX3M / VIX",
       weightsRecalibrated: false, }

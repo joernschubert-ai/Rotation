@@ -1,3 +1,4 @@
+import {structuralPeriodQuality} from './datedStructuralHistory';
 import { getCreditContext } from "./creditContext";
 // /lib/engine/liquidityEngine.ts
 
@@ -43,6 +44,7 @@ INPUT
 export interface LiquidityEngineInput {
 
 history?: any[];
+sessionHistory?: any;
 historyMetrics?: any;
 
 marketDrivers?: any;
@@ -508,26 +510,23 @@ historyMetrics?.institutionalPressure,
 HISTORY SNAPSHOTS
 ========================================================== */
 
-const h5 =
-history.length >= 5
+const h5 = input.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? input.sessionHistory.rows?.[5] ?? null : (history.length >= 5
 ? history[
 history.length - 5
 ]
-: null;
+: null);
 
-const h10 =
-history.length >= 10
+const h10 = input.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? input.sessionHistory.rows?.[10] ?? null : (history.length >= 10
 ? history[
 history.length - 10
 ]
-: null;
+: null);
 
-const h20 =
-history.length >= 20
+const h20 = input.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? input.sessionHistory.rows?.[20] ?? null : (history.length >= 20
 ? history[
 history.length - 20
 ]
-: null;
+: null);
 
 /* ==========================================================
 LIQUIDITY TRENDS
@@ -1772,7 +1771,9 @@ export function liquidityEngine(input: LiquidityEngineInput & {breadthUnit?: "PE
   const creditContext = getCreditContext(input);
   legacyInput.creditRatio = creditContext.available ? creditContext.ratioToMA50 : 1;
   const result = legacy_liquidityEngine(legacyInput);
-  return {...result, creditRatio: readMeasured(input.creditRatio) ?? 1,
+  const periodQuality=structuralPeriodQuality(input.sessionHistory,'LIQUIDITY');
+  return {...result, periodDiagnostics:periodQuality, temporalValues:{liquidityTrend:periodQuality.missing.some(k=>["10:marketLiquidityScore"].includes(k))?null:result.metrics.liquidityTrend,liquidityAcceleration:periodQuality.missing.some(k=>["10:marketLiquidityScore", "20:marketLiquidityScore"].includes(k))?null:result.metrics.liquidityAcceleration,gammaTrend:periodQuality.missing.some(k=>["10:gammaExposure"].includes(k))?null:result.metrics.gammaTrend,breadthTrend:periodQuality.missing.some(k=>["10:breadth50"].includes(k))?null:result.metrics.breadthTrend},
+    dataQuality:{...((result as any).dataQuality??{}),temporalComparisonsComplete:periodQuality.complete,scoreIsPartial:!periodQuality.complete}, creditRatio: readMeasured(input.creditRatio) ?? 1,
     vixTermRatio: readMeasured(input.vixTermRatio) ?? 1,
     metrics: {...result.metrics, credit: readMeasured(input.creditRatio) ?? 1, vixTerm: readMeasured(input.vixTermRatio) ?? 1},
     diagnostics: {aggregationPolicy: "LEGACY_STRUCTURAL_RULES_RESTORED_V56", source: "SAVED_LEGACY_liquidityEngine",

@@ -11,22 +11,27 @@ export function sessionComparisons(data:any,history:any[],now=Date.now()){
  const currentStructureDate=day(data.breadthDataQuality?.referenceDate);
  const version=data.breadthDataQuality?.universeVersion;
  const diagnostics:any[]=[];
+ const row=(offset:number)=>{
+  const target=valid&&sessions.length>offset?sessions[sessions.length-1-offset].date:null;
+  if(!target||currentStructureDate!==anchor||typeof version!=='string'||!version)return null;
+  const candidates=(Array.isArray(history)?history:[]).filter(s=>s?.breadthDataQuality?.referenceDate===target&&s?.breadthDataQuality?.universeVersion===version&&typeof s.timestamp==='string'&&/(Z|[+-]\d{2}:\d{2})$/.test(s.timestamp)&&Number.isFinite(Date.parse(s.timestamp))&&Date.parse(s.timestamp)<=now).sort((a,b)=>Date.parse(b.timestamp)-Date.parse(a.timestamp));
+  const latest=candidates[0];
+  if(!latest)return null;
+  const tied=candidates.filter(s=>s.timestamp===latest.timestamp);
+  return {latest,tied,target};
+ };
  const snapshot=(offset:number,paths:string[])=>{
   const target=valid&&sessions.length>offset?sessions[sessions.length-1-offset].date:null;
   const reason=!target?'NO_DATED_SESSION_WINDOW':currentStructureDate!==anchor?'CURRENT_STRUCTURE_DATE_MISMATCH':typeof version!=='string'||!version?'CURRENT_UNIVERSE_MISSING':null;
   if(reason){diagnostics.push({offset,target,available:false,reason});return undefined;}
-  const candidates=(Array.isArray(history)?history:[]).filter(s=>s?.breadthDataQuality?.referenceDate===target&&s?.breadthDataQuality?.universeVersion===version&&typeof s.timestamp==='string'&&/(Z|[+-]\d{2}:\d{2})$/.test(s.timestamp)&&Number.isFinite(Date.parse(s.timestamp))&&Date.parse(s.timestamp)<=now).sort((a,b)=>Date.parse(b.timestamp)-Date.parse(a.timestamp));
-  const latest=candidates[0];
-  // Ambiguous equal capture times do not silently select one conflicting row.
-  const tied=latest?candidates.filter(s=>s.timestamp===latest.timestamp):[];
-  const values=tied.map(s=>read(s,paths)),n=latest?read(latest,paths):null;
-  const available=n!==null&&values.every(x=>x===n);
-  diagnostics.push({offset,target,available,capturedAt:latest?.timestamp??null,reason:available?null:latest?'VALUE_MISSING_OR_CONFLICT':'NO_MATCHING_DATED_STRUCTURE'});
+  const match=row(offset),n=match?read(match.latest,paths):null;
+  const available=n!==null&&!!match&&match.tied.every(s=>read(s,paths)===n);
+  diagnostics.push({offset,target,available,capturedAt:match?.latest.timestamp??null,reason:available?null:match?'VALUE_MISSING_OR_CONFLICT':'NO_MATCHING_DATED_STRUCTURE'});
   return available?n!:undefined;
  };
  const spxCurrent=valid?number(sessions[sessions.length-1].close):null;
  const window=valid&&sessions.length>5?sessions.slice(-6):[];
  const priceReady=window.length===6&&window.every((r:any)=>{const n=number(r.close);return n!==null&&n>0;})&&spxCurrent!==null&&spxCurrent===price?.current&&price?.dataQuality?.stale!==true;
- return {snapshot,spxCurrent:priceReady?spxCurrent!:undefined,spx5dAgo:priceReady?number(window[0].close)!:undefined,
+ return {snapshot,row,targetDate:(offset:number)=>valid&&sessions.length>offset?sessions[sessions.length-1-offset].date:null,anchorDate:anchor,structureDate:currentStructureDate,spxCurrent:priceReady?spxCurrent!:undefined,spx5dAgo:priceReady?number(window[0].close)!:undefined,
   diagnostics:{policy:'DATED_OBSERVED_SESSION_COMPARISONS_V1',anchorDate:anchor,structureDate:currentStructureDate,price5dAvailable:priceReady,priceFromDate:priceReady?window[0].date:null,structureComparisons:diagnostics,calendarVerified:false,legacyArchivePreserved:true}};
 }

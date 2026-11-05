@@ -1,3 +1,4 @@
+import {structuralPeriodQuality} from './datedStructuralHistory';
 // /lib/engine/participationEngine.ts
 
 import {
@@ -12,6 +13,7 @@ INPUT
 export interface ParticipationEngineInput {
 
 history?: any[];
+sessionHistory?: any;
 historyMetrics?: any;
 
 marketDrivers?: any;
@@ -285,22 +287,19 @@ const history =
 input.history ?? [];
 
 
-const h5 =
-history.length >= 5
+const h5 = input.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? input.sessionHistory.rows?.[5] ?? null : (history.length >= 5
 ? history[history.length - 5]
-: null;
+: null);
 
 
-const h10 =
-history.length >= 10
+const h10 = input.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? input.sessionHistory.rows?.[10] ?? null : (history.length >= 10
 ? history[history.length - 10]
-: null;
+: null);
 
 
-const h20 =
-history.length >= 20
+const h20 = input.sessionHistory?.policy === 'DATED_STRUCTURAL_HISTORY_V2' ? input.sessionHistory.rows?.[20] ?? null : (history.length >= 20
 ? history[history.length - 20]
-: null;
+: null);
 
 
 const historyMetrics =
@@ -1482,7 +1481,9 @@ export function participationEngine(input: ParticipationEngineInput & {breadthUn
     if (value !== null) legacyInput[field] = Math.max(0, Math.min(100, value));
   }
   const result = legacy_participationEngine(legacyInput);
-  return {...result, 
+  const periodQuality=structuralPeriodQuality(input.sessionHistory,'PARTICIPATION');
+  return {...result, periodDiagnostics:periodQuality, temporalValues:{breadth50Slope:periodQuality.missing.includes('5:breadth50')?null:result.breadth50Slope,breadth50Trend:periodQuality.missing.some(k=>['5:breadth50','10:breadth50'].includes(k))?null:result.breadth50Trend,breadth200Trend:periodQuality.missing.some(k=>['10:breadth200','20:breadth200'].includes(k))?null:result.breadth200Trend,participationSlope:periodQuality.missing.includes('20:participationScore')?null:result.participationSlope},
+    dataQuality:{...((result as any).dataQuality??{}),temporalComparisonsComplete:periodQuality.complete,scoreIsPartial:!periodQuality.complete}, 
     diagnostics: {aggregationPolicy: "LEGACY_STRUCTURAL_RULES_RESTORED_V56", source: "SAVED_LEGACY_participationEngine",
       termInputConvention: "VIX / VIX3M", internalLegacyTermConvention: "VIX3M / VIX",
       weightsRecalibrated: false, }

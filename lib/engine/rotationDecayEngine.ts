@@ -80,6 +80,7 @@ relativeBreadthWeakness?: number;
 }
 
 export interface RotationDecayOutput {
+periodDiagnostics?:{policy:string;tradingSessionComparisonsVerified:boolean;meaning:string};
 creditContext: ReturnType<typeof getCreditContext>;
 score: number;
 
@@ -1612,6 +1613,7 @@ summary +=
 */
 
 return {
+periodDiagnostics:{policy:'LEGACY_PERSISTENCE_CONTEXT_RETAINED',tradingSessionComparisonsVerified:false,meaning:'Historical persistence/trends are retained observation context, not newly dated 5/10/20-session measurements.'},
 
 score,
 
