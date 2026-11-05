@@ -37,6 +37,12 @@ export function prepareObservedIndexSeries(result: any, symbol: string, now = Da
     lastValidClose: validIndex >= 0 ? closes[validIndex] : null,
     lastValidBarTimestamp: Number.isFinite(validTime) ? new Date(validTime).toISOString() : null,
     lastValidIsCurrentEndpoint: validIndex === last && endpointAvailable,
+    // Observed provider sessions, not snapshot capture days. Null closes preserve supplied gaps.
+    observedSessions: times.length === closes.length ? times.slice(-61).map((t: unknown, i: number) => ({
+      date: typeof t === "number" && Number.isFinite(t) ? marketDate(t * 1000) : null,
+      close: positive(closes[Math.max(0, closes.length - 61) + i]) ? closes[Math.max(0, closes.length - 61) + i] : null
+    })) : [],
+    sessionCalendarBasis: "OBSERVED_PROVIDER_DAILY_BARS_NOT_OFFICIAL_EXCHANGE_CALENDAR",
     missingBars: closes.filter(value => !Number.isFinite(value)).length, gapsPreserved: true,
   } };
 }
