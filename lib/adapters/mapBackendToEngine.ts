@@ -36,6 +36,9 @@ export function mapBackendToEngine(data: any) {
     return {
       value: positiveNumber(source.current),
       change: finiteNumber(source.change),
+      ...(symbol.endsWith('=F')?{changePeriod:source.changePeriod??'UNKNOWN',change5m:finiteNumber(source.change5m),quoteTimestamp:source.quoteTimestamp??null,
+        previousObservationTimestamp:source.previousObservationTimestamp??null,dailyChangePct:finiteNumber(source.dailyChangePct),dailyReference:source.dailyReference??null,
+        dailyReferenceReason:source.dailyReferenceReason??'NOT_SUPPLIED',dataQuality:source.dataQuality??{available:false}}:{}),
     };
   }
 
