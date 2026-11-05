@@ -1,4 +1,6 @@
 "use client";
+import { AIResearchQuickPanel } from './AIResearchQuickPanel';
+import { researchQuickView } from '@/lib/aiResearch/aiResearchQuickView';
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -22,7 +24,8 @@ export function serializeDisplayedResearch(data: ResponseData, expectedSnapshotT
     displayedSnapshotTimestamp: data.report?.decisionSupport?.snapshotTimestamp ?? data.diagnostics?.snapshotTimestamp ?? null,
     entryStatementsSuspended: suspended,
     source: "EXACT_DISPLAYED_RESPONSE",
-    presentation: describeResearchPresentation(data.report, expectedSnapshotTimestamp, suspended),
+    presentation: { ...describeResearchPresentation(data.report, expectedSnapshotTimestamp, suspended), compactOverview: true, modelStanceInitiallyCollapsed: false },
+    quickOverview: data.report ? researchQuickView(data.report, expectedSnapshotTimestamp ?? data.report.decisionSupport?.snapshotTimestamp, suspended) : null,
     domainContext: prepareReportDomainContext(data.report, expectedSnapshotTimestamp, suspended),
     temporalContext: prepareReportTemporalContext(data.report, expectedSnapshotTimestamp, suspended) } }, null, 2);
 }
@@ -72,7 +75,10 @@ export function appPermissionSummary(support: AIResearchReport["decisionSupport"
 }
 
 /** Compact overview; app permissions and independent research remain distinct. */
-export function AIResearchOverview({ report, snapshotTimestamp, suspended = false }: {
+export function AIResearchOverview(props: {report: AIResearchReport; snapshotTimestamp?: string; suspended?: boolean}) {
+ return <div className="space-y-3"><AIResearchQuickPanel {...props} permissionSummary={appPermissionSummary(props.report.decisionSupport)} /><Detail title="Vollständige Fachansicht · App-Fakten, Quellenwahl und Originale"><AIResearchDetailedOverview {...props} /></Detail></div>;
+}
+function AIResearchDetailedOverview({ report, snapshotTimestamp, suspended = false }: {
   report: AIResearchReport; snapshotTimestamp?: string; suspended?: boolean;
 }) {
   const synthesis = report.aiSynthesis;
@@ -313,12 +319,14 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     {snapshotMismatch && <p role="status" className="border border-amber-900 p-3 text-xs text-amber-200">Research und Dashboard verwenden unterschiedliche Snapshots. Die Einstiegsaussage ist ausgesetzt. Bitte den Marktstand erneut aktualisieren.</p>}
     {!report && marketReady && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
     {report && <>
-      <ResearchSequenceStatus synthesis={report.aiSynthesis} />
+      <Detail title="Auftragsstatus und Herkunft"><ResearchSequenceStatus synthesis={report.aiSynthesis} /></Detail>
       <AIResearchOverview report={report} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
-      <AIResearchStoredWeighing report={report} displayedSnapshotTimestamp={expectedSnapshotTimestamp ?? reportSnapshotTimestamp} suspended={suspended} />
+      <Detail title="Gespeicherte Szenarien und Kontextabwägung · ohne neue KI"><AIResearchStoredWeighing report={report} displayedSnapshotTimestamp={expectedSnapshotTimestamp ?? reportSnapshotTimestamp} suspended={suspended} /></Detail>
+      <Detail title="Weitere Modell-, Chart- und Syntheseansichten">
       <ResearchWeightingPanel synthesis={report.aiSynthesis} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       <ResearchChartPanel context={report.historicalEvidence?.chartContext} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+      </Detail>
       <Detail title="App · Freigaben, Modellanteile und Einstiegsbedingungen">
         <AIResearchDecisionSummary report={report} snapshotTimestamp={data?.diagnostics?.snapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
       </Detail>
