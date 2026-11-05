@@ -1,3 +1,4 @@
+import { sessionComparisons } from "./sessionComparisons";
 import { legacyHistoryAdapter } from "./legacyHistoryAdapter";
 // /lib/engine/marketEngine.ts
 
@@ -194,7 +195,7 @@ export function marketEngine(
     return fallback;
   }
 
-  function getHistorySeriesValue(
+  function getLegacyHistorySeriesValue(
     seriesNames: string[],
     offset: number,
     paths: string[],
@@ -215,6 +216,11 @@ export function marketEngine(
     }
 
     return getHistoryValue(offset, paths, fallback);
+  }
+
+  const datedComparisons = sessionComparisons(data, history);
+  function getHistorySeriesValue(names:string[],offset:number,paths:string[],fallback:number|undefined){
+    return isHistoricalScenario ? getLegacyHistorySeriesValue(names,offset,paths,fallback) : datedComparisons.snapshot(offset,paths);
   }
 
   /* =====================================================
@@ -294,14 +300,14 @@ export function marketEngine(
     undefined
   );
 
-  const spxCurrent =
+  const legacySpxCurrent =
     finiteValue(data.indices?.spx) ??
     finiteValue(data.indices?.sp500) ??
     finiteValue(data.indices?.SPX) ??
     finiteValue(data.marketData?.["^GSPC"]) ??
     0;
 
-  const spx5dAgo = getHistorySeriesValue(
+  const legacySpx5dAgo = getLegacyHistorySeriesValue(
     ["spxHistory", "SPXHistory"],
     5,
     [
@@ -314,6 +320,9 @@ export function marketEngine(
     ],
     undefined
   );
+
+  const spxCurrent = isHistoricalScenario ? legacySpxCurrent : datedComparisons.spxCurrent;
+  const spx5dAgo = isHistoricalScenario ? legacySpx5dAgo : datedComparisons.spx5dAgo;
 
   /* =====================================================
   PRICE MOMENTUM / LEGACY DIVERGENCE
@@ -513,7 +522,7 @@ export function marketEngine(
   BREADTH VELOCITY
   ===================================================== */
 
-  const breadthVelocity = breadthVelocityEngine({
+  const breadthVelocityRaw = breadthVelocityEngine({
     structure,
     breadth20: finiteValue(structure?.breadth?.b20) ?? undefined,
     breadth20_5dAgo,
@@ -529,6 +538,8 @@ export function marketEngine(
     spx: spxCurrent,
     spx5dAgo
   });
+  const breadthVelocity = {...breadthVelocityRaw, periodDiagnostics: isHistoricalScenario
+    ? {policy:'SYNTHETIC_REPLAY_POSITIONAL_NOT_VERIFIED'} : datedComparisons.diagnostics};
 
   /* =====================================================
   INTERNAL DIVERGENCE
