@@ -972,9 +972,9 @@ marginTop: "14px"
 >
 
 <MetricCard
-label="CRASH PROBABILITY"
+label="MODELL-RISIKOWERT (UNKALIBRIERT)"
 value={probability}
-suffix="%"
+suffix="/100"
 color={
 sensitiveCrashColor(
 probability
@@ -1610,7 +1610,7 @@ SCORE {score}
 </span>
 
 <span>
-PROB {probability}%
+MODELL {probability}/100 · keine Wahrscheinlichkeit
 </span>
 
 <span

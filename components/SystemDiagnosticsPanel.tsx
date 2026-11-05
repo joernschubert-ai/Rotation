@@ -407,7 +407,7 @@ Score: {crash.score ?? 0}
 </div>
 
 <div style={valueStyle("#ff7875")}>
-Probability: {crash.probability ?? 0}%
+Modell-Risikowert: {crash.probability ?? 0}/100 (unkalibriert)
 </div>
 
 </div>
