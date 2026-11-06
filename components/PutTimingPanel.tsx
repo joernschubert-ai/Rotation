@@ -414,8 +414,10 @@ execution === "FULL SIZE"
 : "#999"
 }}
 >
-{execution}
+{execution === "FULL SIZE" ? "STARKES EINSTIEGSSIGNAL" : execution}
 </div>
+<div style={{color:"#888",fontSize:"10px",marginTop:"4px"}}>Signalstufe, keine Positionsgröße. Maßgeblich ist der risikobereinigte Modellanteil im Positionspanel. </div>
+<details style={{fontSize:"10px",color:"#777"}}><summary>Originale Signalstufe</summary>{execution}</details>
 
 </div>
 

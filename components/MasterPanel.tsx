@@ -417,9 +417,9 @@ const action =
     .toUpperCase();
 
 const producedExecution = decision?.execution;
-if (typeof producedExecution === "string") return producedExecution.replaceAll("_", " ");
+if (typeof producedExecution === "string") return producedExecution === "FULL SIZE" ? "STARKES EINSTIEGSSIGNAL · GRÖSSE SEPARAT" : producedExecution.replaceAll("_", " ");
 if (producedExecution && typeof producedExecution.mode === "string") {
-  return producedExecution.mode.replaceAll("_", " ");
+  return producedExecution.mode === "FULL SIZE" ? "STARKES EINSTIEGSSIGNAL · GRÖSSE SEPARAT" : producedExecution.mode.replaceAll("_", " ");
 }
 
 if (

@@ -342,7 +342,7 @@ function FlowDiagnostics({ flow }: { flow: any }) {
     <>
       <MetricGrid minWidth={95}>
         <Metric label="BEFORE PORTFOLIO CAP" value={flow?.prePortfolioSize} suffix="%" />
-        <Metric label="FINAL ALLOCATION" value={flow?.finalSize ?? flow?.size} suffix="%" />
+        <Metric label="FINALER MODELLANTEIL" value={flow?.finalSize ?? flow?.size} suffix="%" />
         <Metric label="SIZING FACTOR" formatted={factor(flow?.riskMultiplier)} />
       </MetricGrid>
 
@@ -403,10 +403,11 @@ function FlowCard({ title, flow }: { title: string; flow: any }) {
         </span>
       </div>
 
-      <div style={{ fontSize: "10px", color: "#666" }}>FINAL ALLOCATION</div>
+      <div style={{ fontSize: "10px", color: "#666" }}>FINALER MODELLANTEIL</div>
       <div style={{ fontSize: "28px", fontWeight: "bold", color: "#ddd" }}>
         {display(finalSize, 0, "%")}
       </div>
+      <div style={{fontSize:"10px",color:"#999",marginTop:"4px"}}>Nach Risikoabschlägen und Begrenzungen. Modellwert, keine individuell berechnete Depotquote. Signalstufe und Modellgröße sind getrennte Angaben.</div>
 
       <div
         style={{
@@ -631,7 +632,7 @@ export default function PositionSizingPanel({
           <div style={{ borderTop: "1px solid #222", paddingTop: "10px", marginTop: "12px" }}>
             <MetricGrid minWidth={110}>
               <Metric label="PRIMARY INSTRUMENT" formatted={instrumentLabel(primary.instrument)} />
-              <Metric label="PRIMARY ALLOCATION" value={primary.size} suffix="%" />
+              <Metric label="PRIMÄRER MODELLANTEIL" value={primary.size} suffix="%" />
               <Metric label="PRIMARY STRENGTH" value={primary.strength} suffix="/100" />
               <Metric
                 label={`SETUP SUPPORT · ${instrumentLabel(primary.instrument)}`}
@@ -693,7 +694,7 @@ export default function PositionSizingPanel({
         <Metric label="BEFORE PORTFOLIO CAP" value={portfolio.rawSize} suffix="%" />
         <Metric label="PORTFOLIO CAP" value={portfolio.cap} suffix="%" />
         <Metric label="PORTFOLIO SCALE" formatted={factor(portfolio.scale)} />
-        <Metric label="FINAL ALLOCATION" value={portfolio.totalSize} suffix="%" />
+        <Metric label="FINALER MODELLANTEIL" value={portfolio.totalSize} suffix="%" />
       </MetricGrid>
 
       <SectionTitle>SIZING ENVIRONMENT</SectionTitle>
