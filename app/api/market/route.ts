@@ -2828,7 +2828,7 @@ const data = await res.json();
 
 if (!data?.chart?.result) return [];
 
-const observation=prepareFuturesObservation(data.chart.result[0],symbol);
+const observation=prepareFuturesObservation(data.chart.result[0],symbol,Date.now(),indexObservationQuality.get(spClosesFull)?.latestEndpointAvailable===true?String(indexObservationQuality.get(spClosesFull)?.currentObservationTimestamp??" ").slice(0,10):null);
 futuresObservations.set(observation.engineCloses,observation);
 return observation.engineCloses;
 
