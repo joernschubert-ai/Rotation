@@ -1,3 +1,4 @@
+import {equivalentMemoryCloses} from './aiResearchMemoryCloseComparison';
 import {createHash} from 'node:crypto';
 import {gzipSync,gunzipSync} from 'node:zlib';
 import {prepareReportDomainContext} from './aiResearchReportDomainContext';
@@ -45,7 +46,7 @@ export function evaluateMemoryForecast(plan:MemoryForecast,bars:MemoryBar[],eval
  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(issued));const part=(k:string)=>parts.find(p=>p.type===k)!.value;const issuedDay=`${part('year')}-${part('month')}-${part('day')}`;
  const grouped=new Map<string,MemoryBar[]>();
  for(const b of bars){if(b.market!==plan.market||!validDay(b.date)||!finite(b.close)||b.close<=0||!Number.isFinite(Date.parse(b.observedAt))||Date.parse(b.observedAt)>at||Date.parse(b.observedAt)<Date.parse(b.date+'T00:00:00Z'))continue;const available=Date.parse(b.date+'T00:00:00Z')+86400000;if(b.date<=issuedDay||available>at)continue;grouped.set(b.date,[...(grouped.get(b.date)??[]),b]);}
- const rows=[...grouped.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([day,values])=>({...values[0],date:day,conflict:values.some(v=>v.conflict)||new Set(values.map(v=>v.close)).size>1}));
+ const rows=[...grouped.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([day,values])=>({...values[0],date:day,conflict:values.some(v=>v.conflict)||!equivalentMemoryCloses(Math.min(...values.map(v=>v.close)),Math.max(...values.map(v=>v.close)))}));
  const anchor=rows[0]??null;
  return {version:EVALUATION_POLICY,forecastId:plan.id,evaluatedAt,attribution:plan.attribution,anchor:anchor?{date:anchor.date,close:anchor.close,observedAt:anchor.observedAt}:null,
   outcomes:plan.horizons.map(horizon=>{

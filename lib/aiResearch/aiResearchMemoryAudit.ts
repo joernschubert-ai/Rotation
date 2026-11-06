@@ -1,3 +1,4 @@
+import {memoryConflictEvidence,MEMORY_CLOSE_COMPARISON_POLICY,MEMORY_CLOSE_ABSOLUTE_TOLERANCE} from './aiResearchMemoryCloseComparison';
 import {readCronAudit} from './aiResearchCronAudit';
 import {readMemoryMaintenanceAudit} from './aiResearchMemoryMaintenanceLog';
 import {Redis} from '@upstash/redis';
@@ -15,9 +16,9 @@ async function ledger(market:'NASDAQ'|'RUSSELL_2000',at:string){
  if(dates.some(d=>!validDay(d)))return {market,status:'INVALID_INDEX_DATES',newestObservedCloseDate:null,recent:[],issue:'Ungültiges Datumsformat im Kursindex. Keine Reparatur ausgelöst.'};
  if(!dates.length)return {market,status:'EMPTY',newestObservedCloseDate:null,recent:[],issue:'Kein Kurs im Prüfgedächtnis gespeichert; keine Aussage über den separaten Marktverlauf.'};
  const keys=dates.map(d=>MEMORY_PREFIX+':bar:'+market+':'+d);
- const [bars,flags]=await Promise.all([memoryBounded(redis.mget<unknown[]>(...keys)),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':conflict')))]);
- const recent=dates.map((date,i)=>{const b=object(bars[i]);const valid=b.market===market&&b.date===date&&finite(b.close)&&b.close>0&&typeof b.observedAt==='string'&&Number.isFinite(Date.parse(b.observedAt))&&Date.parse(b.observedAt)>=Date.parse(date+'T00:00:00Z')&&Date.parse(b.observedAt)<=Date.parse(at);return {date,close:finite(b.close)?b.close:null,firstObservedAt:b.observedAt??null,source:b.source??null,conflict:!!flags[i]||b.conflict===true,status:valid?'OBSERVED':'MISSING_OR_INVALID_ROW'};});
- return {market,status:recent.some(r=>r.status!=='OBSERVED'||r.conflict)?'REVIEW_REQUIRED':'OBSERVATIONS_PRESENT',newestObservedCloseDate:recent.find(r=>r.status==='OBSERVED')?.date??null,recent,issue:null};
+ const [bars,flags,comparisons]=await Promise.all([memoryBounded(redis.mget<unknown[]>(...keys)),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':conflict'))),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':comparison:latest')))]);
+ const recent=dates.map((date,i)=>{const b=object(bars[i]);const valid=b.market===market&&b.date===date&&finite(b.close)&&b.close>0&&typeof b.observedAt==='string'&&Number.isFinite(Date.parse(b.observedAt))&&Date.parse(b.observedAt)>=Date.parse(date+'T00:00:00Z')&&Date.parse(b.observedAt)<=Date.parse(at);return {date,close:finite(b.close)?b.close:null,firstObservedAt:b.observedAt??null,source:b.source??null,conflict:!!flags[i]||b.conflict===true,conflictEvidence:memoryConflictEvidence(flags[i]),latestComparison:comparisons[i]??null,status:valid?'OBSERVED':'MISSING_OR_INVALID_ROW'};});
+ return {market,comparisonPolicy:MEMORY_CLOSE_COMPARISON_POLICY,absoluteTolerance:MEMORY_CLOSE_ABSOLUTE_TOLERANCE,legacyConflictsAutoCleared:false,status:recent.some(r=>r.status!=='OBSERVED'||r.conflict)?'REVIEW_REQUIRED':'OBSERVATIONS_PRESENT',newestObservedCloseDate:recent.find(r=>r.status==='OBSERVED')?.date??null,recent,issue:null};
 }
 export async function inspectMemoryAudit(recordOffset=0,forecastOffset=0){
  if(![recordOffset,forecastOffset].every(n=>Number.isInteger(n)&&n>=0&&n<=100000))throw Error('MEMORY_AUDIT_PAGE');
