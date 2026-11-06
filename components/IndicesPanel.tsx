@@ -203,7 +203,7 @@ ${getChangeColor(change)}
 >
 {formatChange(change)}
 </div>
-{item?.changePeriod&&<div className="mt-1 text-[10px] font-normal text-zinc-500">{item.changePeriod==='OBSERVED_5_MINUTE_INTERVAL'?'Letztes 5-Minuten-Intervall':'Vergleichsperiode unklar'}{item.quoteTimestamp?' · '+new Date(item.quoteTimestamp).toLocaleTimeString('de-DE',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit'}):''}<br/>Tagesänderung: {formatChange(item.dailyChangePct)}{item.dailyChangePct==null?' · Schluss-/Settlementbezug fehlt':''}</div>}
+{item?.changePeriod&&<div className="mt-1 text-[10px] font-normal text-zinc-500">{item.changePeriod==='OBSERVED_5_MINUTE_INTERVAL'?'Letztes 5-Minuten-Intervall':'Vergleichsperiode unklar'}{item.quoteTimestamp?' · '+new Date(item.quoteTimestamp).toLocaleTimeString('de-DE',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit'}):''}{item?.dataQuality?.terminalQuoteSeparated&&<><br/>Preis und Änderung: letztes reguläres 5-Minuten-Raster.<br/>Zusatzkurs: {formatValue(item.dataQuality.terminalQuote?.value)}{item.dataQuality.terminalQuote?.timestamp?' · '+new Date(item.dataQuality.terminalQuote.timestamp).toLocaleTimeString('de-DE',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit',second:'2-digit'}):''} · separat, keine 5-Minuten-Rendite</>}<br/>Tagesänderung: {formatChange(item.dailyChangePct)}{item.dailyChangePct==null?' · Schluss-/Settlementbezug fehlt':''}</div>}
 
 </div>
 
