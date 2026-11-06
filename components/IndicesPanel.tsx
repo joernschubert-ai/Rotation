@@ -1,399 +1,44 @@
-// /components/panels/IndicesPanel.tsx
-
 "use client";
 
-
-/* =====================================================
-PROPS
-===================================================== */
-
-interface Props {
-indices?: any;
-futures?: any;
-}
-
-
-/* =====================================================
-COMPONENT
-===================================================== */
-
-export default function IndicesPanel({
-indices,
-futures,
-}: Props) {
-
-const safeIndices =
-indices ?? {};
-
-const safeFutures =
-futures ?? {};
-
-
-/* =====================================================
-HELPERS
-===================================================== */
-
-function isValidNumber(
-value: unknown
-): value is number {
-
-return (
-typeof value === "number" &&
-Number.isFinite(value)
-);
-
-}
-
-
-function getChangeColor(
-change: unknown
-): string {
-
-if (!isValidNumber(change)) {
-return "text-zinc-500";
-}
-
-
-if (change > 0.5) {
-return "text-green-400";
-}
-
-
-if (change > 0) {
-return "text-green-300";
-}
-
-
-if (change === 0) {
-return "text-zinc-500";
-}
-
-
-if (change > -0.5) {
-return "text-yellow-400";
-}
-
-
-return "text-red-400";
-
-}
-
-
-function formatValue(
-value: unknown
-): string {
-
-if (!isValidNumber(value)) {
-return "—";
-}
-
-
-return Math.round(
-value
-).toLocaleString(
-"en-US"
-);
-
-}
-
-
-function formatChange(
-change: unknown
-): string {
-
-if (!isValidNumber(change)) {
-return "N/A";
-}
-
-
-return `${
-change > 0
-? "+"
-: ""
-}${change.toFixed(2)}%`;
-
-}
-
-
-/* =====================================================
-MARKET ROW
-===================================================== */
-
-function MarketRow({
-label,
-item,
-}: {
-label: string;
-item: any;
-}) {
-
-const value =
-item?.value;
-
-const change =
-item?.change;
-
-
-return (
-
-<div
-className="
-flex
-items-center
-justify-between
-gap-4
-border-b
-border-zinc-800/70
-py-3
-last:border-b-0
-"
->
-
-{/* =============================================
-LABEL
-============================================== */}
-
-<span
-className="
-min-w-0
-text-sm
-text-zinc-400
-"
->
-{label}
-</span>
-
-
-{/* =============================================
-VALUE
-============================================== */}
-
-<div
-className="
-shrink-0
-text-right
-"
->
-
-<div
-className="
-text-base
-font-semibold
-tabular-nums
-text-zinc-100
-sm:text-lg
-"
->
-{formatValue(value)}
-</div>
-
-
-{/* ===========================================
-CHANGE
-=========================================== */}
-
-<div
-className={`
-mt-0.5
-text-sm
-font-semibold
-tabular-nums
-${getChangeColor(change)}
-`}
->
-{formatChange(change)}
-</div>
-{item?.changePeriod&&<div className="mt-1 text-[10px] font-normal text-zinc-500">{item.changePeriod==='OBSERVED_5_MINUTE_INTERVAL'?'Letztes 5-Minuten-Intervall':'Vergleichsperiode unklar'}{item.quoteTimestamp?' · '+new Date(item.quoteTimestamp).toLocaleTimeString('de-DE',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit'}):''}{item?.dataQuality?.terminalQuoteSeparated&&<><br/>Preis und Änderung: letztes reguläres 5-Minuten-Raster.<br/>Zusatzkurs: {formatValue(item.dataQuality.terminalQuote?.value)}{item.dataQuality.terminalQuote?.timestamp?' · '+new Date(item.dataQuality.terminalQuote.timestamp).toLocaleTimeString('de-DE',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit',second:'2-digit'}):''} · separat, keine 5-Minuten-Rendite</>}<br/>Tagesänderung: {formatChange(item.dailyChangePct)}{item.dailyChangePct==null?' · Schluss-/Settlementbezug fehlt':''}</div>}
-
-</div>
-
-</div>
-
-);
-
-}
-
-
-/* =====================================================
-RENDER
-===================================================== */
-
-return (
-
-<div
-className="
-rounded-2xl
-border
-border-zinc-800
-bg-zinc-900
-p-4
-sm:p-5
-"
->
-
-
-{/* =================================================
-HEADER
-================================================= */}
-
-<div
-className="
-mb-5
-flex
-items-start
-justify-between
-gap-4
-"
->
-
-<div
-className="
-min-w-0
-"
->
-
-<h2
-className="
-text-lg
-font-semibold
-text-zinc-100
-"
->
-Index Markets
-</h2>
-
-
-<p
-className="
-mt-1
-text-xs
-leading-relaxed
-text-zinc-500
-"
->
-Cash indices and futures market overview
-</p>
-
-</div>
-
-</div>
-
-
-{/* =================================================
-GRID
-================================================= */}
-
-<div
-className="
-grid
-grid-cols-1
-gap-6
-lg:grid-cols-2
-"
->
-
-
-{/* =============================================
-CASH INDICES
-============================================== */}
-
-<section
-className="
-min-w-0
-"
->
-
-<div
-className="
-mb-2
-text-xs
-font-semibold
-tracking-wider
-text-zinc-500
-"
->
-CASH INDICES
-</div>
-
-
-<MarketRow
-label="Dow Jones"
-item={safeIndices.dow}
-/>
-
-
-<MarketRow
-label="NASDAQ"
-item={safeIndices.ndx}
-/>
-
-
-<MarketRow
-label="S&P 500"
-item={safeIndices.spx}
-/>
-
-
-<MarketRow
-label="Russell 2000"
-item={safeIndices.rut}
-/>
-
-</section>
-
-
-{/* =============================================
-FUTURES
-============================================== */}
-
-<section
-className="
-min-w-0
-"
->
-
-<div
-className="
-mb-2
-text-xs
-font-semibold
-tracking-wider
-text-zinc-500
-"
->
-FUTURES
-</div>
-
-
-<MarketRow
-label="Dow Futures"
-item={safeFutures.ym}
-/>
-
-
-<MarketRow
-label="NASDAQ Futures"
-item={safeFutures.nq}
-/>
-
-
-<MarketRow
-label="S&P Futures"
-item={safeFutures.es}
-/>
-
-
-<MarketRow
-label="Russell Futures"
-item={safeFutures.rty}
-/>
-
-</section>
-
-</div>
-
-</div>
-
-);
-
+type Props={indices?:any;futures?:any};
+const valid=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
+const number=(v:unknown)=>valid(v)?Math.round(v).toLocaleString('en-US'):'—';
+const percent=(v:unknown)=>valid(v)?`${v>0?'+':''}${v.toFixed(2)}%`:'—';
+const color=(v:unknown)=>!valid(v)?'text-zinc-500':v>0?'text-green-400':v<0?'text-red-400':'text-zinc-400';
+const time=(v:unknown)=>typeof v==='string'&&Number.isFinite(Date.parse(v))?new Date(v).toLocaleString('de-DE',{timeZone:'Europe/Berlin',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'unbekannt';
+export default function IndicesPanel({indices={},futures={}}:Props){
+ const cash=indices??{},future=futures??{};
+ const rows=[
+  {name:'Dow Jones',label:'Dow Futures',cash:cash.dow,future:future.ym??future.dow},
+  {name:'NASDAQ',label:'NASDAQ Futures',cash:cash.ndx??cash.nasdaq,future:future.nq??future.nasdaq},
+  {name:'S&P 500',label:'S&P Futures',cash:cash.spx??cash.sp500,future:future.es??future.sp500},
+  {name:'Russell 2000',label:'Russell Futures',cash:cash.rut??cash.russell,future:future.rty??future.russell}
+ ];
+ function cell(label:string,item:any,isFuture:boolean){
+  const period=isFuture?(item?.changePeriod==='OBSERVED_5_MINUTE_INTERVAL'?'5 Min.':'Zeitraum unklar'):'Tag';
+  return <div className="flex min-h-[76px] min-w-0 items-center justify-between gap-3 py-3">
+   <span className="min-w-0 text-sm text-zinc-400">{label}</span>
+   <div className="shrink-0 text-right"><div className="text-base font-semibold tabular-nums text-zinc-100 sm:text-lg">{number(item?.value)}</div>
+    <div className={`mt-0.5 text-sm font-semibold tabular-nums ${color(item?.change)}`}>{percent(item?.change)} <span className="text-[10px] font-normal text-zinc-500">{period}</span></div>
+   </div>
+  </div>;
+ }
+ return <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 sm:p-5">
+  <h2 className="text-lg font-semibold text-zinc-100">Index Markets</h2>
+  <p className="mb-4 mt-1 text-xs leading-relaxed text-zinc-500">Cash: Tagesänderung · Futures: letztes beobachtetes 5-Minuten-Intervall, zeitverzögerte Daten.</p>
+  <div className="hidden grid-cols-2 gap-x-6 text-xs font-semibold tracking-wider text-zinc-500 lg:grid"><div>CASH INDICES</div><div>FUTURES</div></div>
+  {rows.map(row=><div key={row.name} className="grid grid-cols-1 gap-x-6 border-b border-zinc-800/70 lg:grid-cols-2">
+   {cell(row.name,row.cash,false)}{cell(row.label,row.future,true)}
+  </div>)}
+  <details className="mt-3 text-xs text-zinc-400">
+   <summary className="cursor-pointer text-zinc-500">Datenstand und Futures-Details</summary>
+   <p className="mb-2 mt-3 leading-relaxed">Die Futures-Prozentwerte sind keine Tagesrenditen. Preis und Veränderung verwenden dieselben regulären Beobachtungen. Zusatzkurse werden getrennt ausgewiesen; endgültige Balkenschlüsse sind nicht bestätigt.</p>
+   {rows.map(row=><div key={row.name} className="border-t border-zinc-800 py-2 leading-relaxed">
+    <strong>{row.label}</strong> · Kursstand: {time(row.future?.quoteTimestamp)}<br/>
+    Vergleich: {time(row.future?.previousObservationTimestamp)} → {time(row.future?.quoteTimestamp)}<br/>
+    Tagesänderung: {percent(row.future?.dailyChangePct)}{row.future?.dailyChangePct==null?' · Schluss-/Settlementbezug fehlt':''}
+    {row.future?.dataQuality?.terminalQuoteSeparated&&<><br/>Zusatzkurs: {number(row.future.dataQuality.terminalQuote?.value)} · {time(row.future.dataQuality.terminalQuote?.timestamp)} · nicht für die 5-Minuten-Rendite verwendet</>}
+   </div>)}
+  </details>
+ </div>;
 }
