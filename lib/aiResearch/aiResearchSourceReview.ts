@@ -22,7 +22,7 @@ export function buildAppStateCards(facts:AppFacts):AppStateCard[]{
  const stamp=Date.parse(facts.snapshotTimestamp);
  return facts.facts.filter(f=>{
   if(f.asOf!==null&&(!Number.isFinite(Date.parse(f.asOf))||Date.parse(f.asOf)>stamp))return false;
-  return /^[NR]-F-(?:CLOSE|MA20|MA50|MA200|WINDOW-(?:5|20|30|60)|PHASE|BREADTH|COT\d+|H\d+|PF\d+-(?:LAST|FORM|ADV)|PRICE-MISSING|COT-MISSING|PNF-MISSING)$/.test(f.id)||['G-MASTER','G-CREDIT','G-VOLATILITY','G-VOLATILITY_QUALITY','G-ROTATION','NEWS-EVENT-OVERVIEW','NEWS-COVERAGE'].includes(f.id);
+  return /^[NR]-F-(?:CLOSE|ENTRY-TIMING|MA20|MA50|MA200|WINDOW-(?:5|20|30|60)|PHASE|BREADTH|COT\d+|H\d+|PF\d+-(?:LAST|FORM|ADV)|PRICE-MISSING|COT-MISSING|PNF-MISSING)$/.test(f.id)||['G-MASTER','G-CREDIT','G-VOLATILITY','G-VOLATILITY_QUALITY','G-ROTATION','NEWS-EVENT-OVERVIEW','NEWS-COVERAGE'].includes(f.id);
  }).map(({market,asOf,id,domain,status,text})=>({market,asOf,id,domain,status,text}));
 }
 export function prepareSourceReview(facts:AppFacts,task:string,question:string){
