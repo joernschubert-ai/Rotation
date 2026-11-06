@@ -44,11 +44,9 @@ async function loadBreadthUniverse(): Promise<string[]> { return loadNasdaqMembe
 const EARLY_ETF_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","RSP","MTUM","QUAL","SMH","XBI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","SPHB","SPLV","IWO","IWN","USMV","XRT","SOXX","XLRE"];
 const SUPPLEMENTAL_ETF_UNIVERSE: string[] = ["SPY","QQQ","IWM","DIA","MDY","VTI","XLK","XLF","XLE","XLV","XLI","XLY","XLP","XLU","XLB","XLRE","SMH","XBI","ARKK","MTUM","QUAL","IYR"];
 type BreadthBars = { closes: number[]; latest: number; source: string; sessionDate: string; timestamps?: number[] };
-const breadthBarCache = new Map<string, { time: number; bars: BreadthBars }>();
+// Daily bars use one request-scoped cache key; no second in-process stale layer.
 
-async function fetchBreadthBarsUncached(symbol: string): Promise<BreadthBars> {
-  const cached = breadthBarCache.get(symbol);
-  if (cached && Date.now() - cached.time < 15 * 60 * 1000) return cached.bars;
+async function fetchBreadthBarsUncached(symbol: string, _scope: string): Promise<BreadthBars> {
   try {
     const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y`, { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store", signal: AbortSignal.timeout(4000) });
     if (!response.ok) throw new Error("Breadth prices unavailable");
@@ -60,13 +58,12 @@ async function fetchBreadthBarsUncached(symbol: string): Promise<BreadthBars> {
     const latest = Number(timestamps[timestamps.length - 1]) * 1000;
     if (!Number.isFinite(latest)) throw new Error("Invalid breadth timestamp");
     const bars = { closes, latest, timestamps: timestamps as number[], source: "YAHOO_DAILY_BARS", sessionDate: new Date(latest).toISOString().slice(0, 10) };
-    breadthBarCache.set(symbol, { time: Date.now(), bars });
     return bars;
   } catch { throw new Error("Breadth price fetch failed"); }
 }
-const fetchBreadthBarsCached = unstable_cache(fetchBreadthBarsUncached, ["sp500-breadth-daily-bars-v3-dated"], { revalidate: 900 });
-async function fetchBreadthBars(symbol: string): Promise<BreadthBars | null> {
-  try { return await fetchBreadthBarsCached(symbol); } catch { return null; }
+const fetchBreadthBarsCached = unstable_cache(fetchBreadthBarsUncached, ["constituent-breadth-daily-bars-v4-price-date-window"], { revalidate: 900 });
+async function fetchBreadthBars(symbol: string, scope: string): Promise<BreadthBars | null> {
+  try { return await fetchBreadthBarsCached(symbol, scope); } catch { return null; }
 }
 
 function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now = Date.now()) {
@@ -97,7 +94,9 @@ function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now
   };
 }
 
-async function loadBroadBreadth(symbols: string[]) {
+async function loadBroadBreadth(symbols: string[], priceObservationDate: string | null) {
+  const cacheWindow = Math.floor(Date.now() / 900000);
+  const cacheScope = `${priceObservationDate ?? "UNKNOWN"}:${cacheWindow}`;
   const nasdaqSymbols = symbols;
   const sp500Symbols = await loadSP500Constituents().catch(() => [] as string[]);
   const russellHoldings = await loadRussellHoldings().catch(() => null);
@@ -108,7 +107,7 @@ async function loadBroadBreadth(symbols: string[]) {
   await Promise.all(Array.from({ length: 24 }, async () => {
     while (next < fetchSymbols.length && Date.now() - started < 20000) {
       const symbol = fetchSymbols[next++];
-      const data = await fetchBreadthBars(symbol);
+      const data = await fetchBreadthBars(symbol, cacheScope);
       if (data) bars.set(symbol, data);
     }
   }));
@@ -134,6 +133,7 @@ async function loadBroadBreadth(symbols: string[]) {
   } : { definition: "SP500_REFERENCE_ONLY", affectsEngineScores: false, status: "UNAVAILABLE" };
   const russell2000 = summarizeRussellBreadth(russellHoldings, aligned, referenceDate);
   return { ...main, nasdaq100, russell2000, bars: aligned, dataQuality: { ...main.dataQuality,
+    cachePolicy: "OBSERVED_PRICE_DATE_AND_15_MINUTE_WINDOW_V1", cachePriceObservationDate: priceObservationDate, cacheWindowStartedAt: new Date(cacheWindow * 900000).toISOString(), providerPublicationMayLag: true,
     nasdaq100: nasdaq100,
     russell2000,
     primaryEngineUniverse: "NASDAQ100",
@@ -2898,7 +2898,9 @@ const spAbove50 = spMA50 ? spCurrent > spMA50 : false;
 
 const spLowerHigh = detectLowerHigh(spClosesFull);
 
-const broadBreadth = await loadBroadBreadth(breadthUniverse);
+const spObservation = indexObservationQuality.get(spClosesFull);
+const spObservedDay = spObservation?.latestEndpointAvailable === true && typeof spObservation.currentObservationTimestamp === "string" ? spObservation.currentObservationTimestamp.slice(0,10) : null;
+const broadBreadth = await loadBroadBreadth(breadthUniverse, spObservedDay);
 // Refuse fabricated zero breadth when the data sample is mostly unavailable.
 if (broadBreadth.dataQuality.coverage < 0.98 || broadBreadth.b20 === null || broadBreadth.b50 === null || broadBreadth.b200 === null) {
   return NextResponse.json({ error: "Insufficient fresh breadth coverage", breadthDataQuality: broadBreadth.dataQuality }, { status: 503 });
