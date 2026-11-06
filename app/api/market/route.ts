@@ -1,3 +1,5 @@
+import {calculateDatedCredit, type CreditBar} from '@/lib/market/datedCredit';
+import {prepareFuturesObservation} from '@/lib/market/futuresObservation';
 import { selectVolatilityContext } from "@/lib/market/volatilityContext";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +13,10 @@ import type { Redis as RedisType } from "@upstash/redis";
 // Must exist before GET performs its first index fetch.
 const volatilityDailyObservations = new WeakMap<number[], {symbol:string;timestamps:number[];closes:number[]}>();
 const indexObservationQuality = new WeakMap<number[], Record<string, any>>();
+const etfDatedObservations = new WeakMap<number[], CreditBar[]>();
+const futuresObservations = new WeakMap<number[], ReturnType<typeof prepareFuturesObservation>>();
+const nySessionFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+const nyDate=(seconds:number)=>nySessionFormatter.format(new Date(seconds*1000));
 
 import {
 loadMarketHistory
@@ -374,78 +380,9 @@ return aReturn - bReturn;
 
 /* ================= CREDIT SPREAD ================= */
 
-async function calculateCreditSpread(fetchETF: any) {
-  function positivePrice(value: unknown): number | null {
-    if (typeof value !== "number" && typeof value !== "string") return null;
-    if (typeof value === "string" && value.trim() === "") return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-  }
-
-  function unavailable(reason: string) {
-    return {
-      creditSignal: "neutral",
-      creditRatio: null,
-      creditRatioMA50: null,
-      creditRatioToMA50: null,
-      creditDistancePct: null,
-      creditDataQuality: {
-        available: false,
-        reason,
-        ratioDefinition: "HYG / IEF",
-        normalizedDefinition: "(HYG / IEF) / MA50(HYG / IEF)",
-        timeOrder: "OLDEST_FIRST_REQUIRED",
-        alignmentBasis: "POSITIONAL_EQUAL_LENGTH",
-        dateAlignmentVerified: false
-      }
-    };
-  }
-
-  const [hyg, ief] = await Promise.all([fetchETF("HYG"), fetchETF("IEF")]);
-  if (!Array.isArray(hyg) || !Array.isArray(ief)) return unavailable("ETF_HISTORY_NOT_ARRAY");
-  if (hyg.length < 60 || ief.length < 60) return unavailable("INSUFFICIENT_HISTORY");
-  if (hyg.length !== ief.length) return unavailable("HISTORY_LENGTH_MISMATCH");
-
-  // Preserve the current positional contract. Date pairing requires dated bars.
-  // Missing observations must not shorten or shift this 50-observation window.
-  const last50: number[] = [];
-  for (let i = hyg.length - 50; i < hyg.length; i++) {
-    const hygPrice = positivePrice(hyg[i]);
-    const iefPrice = positivePrice(ief[i]);
-    if (hygPrice === null || iefPrice === null) return unavailable("INVALID_PRICE_IN_MA50_WINDOW");
-    const ratio = hygPrice / iefPrice;
-    if (!Number.isFinite(ratio) || ratio <= 0) return unavailable("INVALID_RATIO_IN_MA50_WINDOW");
-    last50.push(ratio);
-  }
-
-  const ma50 = last50.reduce((sum, ratio) => sum + ratio / 50, 0);
-  const lastRatio = last50[last50.length - 1];
-  const tolerance = Number.EPSILON * 64 * Math.max(Math.abs(lastRatio), Math.abs(ma50));
-  const ratioToMA50 = Math.abs(lastRatio - ma50) <= tolerance ? 1 : lastRatio / ma50;
-  const distancePct = (ratioToMA50 - 1) * 100;
-  if (!Number.isFinite(ma50) || ma50 <= 0 || !Number.isFinite(ratioToMA50) || !Number.isFinite(distancePct)) {
-    return unavailable("INVALID_NORMALIZED_RATIO");
-  }
-  let creditSignal = "neutral";
-  if (ratioToMA50 > 1) creditSignal = "risk_on";
-  if (ratioToMA50 < 1) creditSignal = "risk_off";
-  return {
-    creditSignal,
-    // Preserve the raw ratio; do not silently replace its semantics.
-    creditRatio: lastRatio,
-    creditRatioMA50: ma50,
-    creditRatioToMA50: ratioToMA50,
-    creditDistancePct: distancePct,
-    creditDataQuality: {
-      available: true,
-      reason: null,
-      ratioDefinition: "HYG / IEF",
-      normalizedDefinition: "(HYG / IEF) / MA50(HYG / IEF)",
-      timeOrder: "OLDEST_FIRST_REQUIRED",
-      alignmentBasis: "POSITIONAL_EQUAL_LENGTH",
-      dateAlignmentVerified: false
-    }
-  };
+async function calculateCreditSpread(fetchETF: any,referenceDate?:string) {
+  const [hyg,ief]=await Promise.all([fetchETF('HYG'),fetchETF('IEF')]);
+  return calculateDatedCredit(etfDatedObservations.get(hyg),etfDatedObservations.get(ief),Date.now(),referenceDate);
 }
 
 /* ================= GEOPOLITICAL / SYSTEMIC SHOCK ENGINE ================= */
@@ -2512,6 +2449,8 @@ const cleaned =
 closes.filter((v:number)=>v !== null)
 
 if(cleaned.length > 50){
+const times=data.chart.result[0].timestamp??[];
+if(['HYG','IEF'].includes(symbol)&&times.length===closes.length)etfDatedObservations.set(cleaned,times.map((t:number,i:number)=>({date:Number.isFinite(t)?nyDate(t):'',close:typeof closes[i]==='number'&&Number.isFinite(closes[i])&&closes[i]>0?closes[i]:null})));
 
 etfCache[symbol] = {
 data: cleaned,
@@ -2538,6 +2477,7 @@ const rows = text.trim().split("\n")
 
 const closes =
 rows.slice(1).map(r=>parseFloat(r.split(",")[4]))
+if(['HYG','IEF'].includes(symbol))etfDatedObservations.set(closes,rows.slice(1).map(r=>{const cells=r.trim().split(',');const value=Number(cells[4]);return {date:cells[0],close:Number.isFinite(value)&&value>0?value:null};}));
 
 etfCache[symbol] = {
 data: closes,
@@ -2888,19 +2828,9 @@ const data = await res.json();
 
 if (!data?.chart?.result) return [];
 
-const closes =
-data.chart.result[0].indicators.quote[0].close ?? [];
-
-const cleaned = closes.filter((v: number) => v !== null);
-
-return cleaned;
-
-if (cleaned.length < 10) {
-console.log("FUTURES WARNING: insufficient data", symbol);
-return [];
-}
-
-return cleaned;
+const observation=prepareFuturesObservation(data.chart.result[0],symbol);
+futuresObservations.set(observation.engineCloses,observation);
+return observation.engineCloses;
 
 } catch (e) {
 console.log("Futures fetch error:", symbol);
@@ -2939,41 +2869,13 @@ nq_last: nq[nq.length - 1],
 rty_last: rty[rty.length - 1]
 });
 
-marketData["ES=F"] = {
-current: es[es.length - 1],
-previous: es[es.length - 2] ?? es[es.length - 1],
-change: percentChange(
-es[es.length - 1],
-es[es.length - 2] ?? es[es.length - 1]
-)
-};
-
-marketData["NQ=F"] = {
-current: nq[nq.length - 1],
-previous: nq[nq.length - 2] ?? nq[nq.length - 1],
-change: percentChange(
-nq[nq.length - 1],
-nq[nq.length - 2] ?? nq[nq.length - 1]
-)
-};
-
-marketData["RTY=F"] = {
-current: rty[rty.length - 1],
-previous: rty[rty.length - 2] ?? rty[rty.length - 1],
-change: percentChange(
-rty[rty.length - 1],
-rty[rty.length - 2] ?? rty[rty.length - 1]
-)
-};
-
-marketData["YM=F"] = {
-current: ym.length ? ym[ym.length - 1] : null,
-previous: ym.length > 1 ? ym[ym.length - 2] : null,
-change: ym.length > 1
-? percentChange(ym[ym.length - 1], ym[ym.length - 2])
-: 0
-};
-
+for(const [symbol,closes]of [['ES=F',es],['NQ=F',nq],['RTY=F',rty],['YM=F',ym]] as const){
+ const observation=futuresObservations.get(closes);
+ marketData[symbol]={current:observation?.current??null,previous:observation?.previous??null,
+  change:observation?.change??null,change5m:observation?.change5m??null,changePeriod:observation?.changePeriod??'UNKNOWN',quoteTimestamp:observation?.quoteTimestamp??null,
+  previousObservationTimestamp:observation?.previousObservationTimestamp??null,dailyChangePct:observation?.dailyChangePct??null,dailyReference:observation?.dailyReference??null,
+  dailyReferenceReason:observation?.dailyReferenceReason??'FUTURES_DATA_UNAVAILABLE',dataQuality:observation?.dataQuality??{available:false}};
+}
 
 /* ================= SPX MOMENTUM ================= */
 
@@ -3030,7 +2932,7 @@ breadth200
 
 /* CREDIT SPREAD */
 
-const creditData = await calculateCreditSpread(fetchETF);
+const creditData = await calculateCreditSpread(fetchETF,broadBreadth.dataQuality.referenceDate);
 
 const rawVixCloses = await fetchIndex("^VIX","1mo");
 const rawVix3mCloses = await fetchIndex("^VIX3M","1mo");
@@ -4020,26 +3922,7 @@ nq: futuresSignal.nqMove,
 rty: futuresSignal.rtyMove
 },
 
-futures: {
-"ES=F": {
-price: es.length ? es[es.length - 1] : null,
-change: es.length > 1
-? ((es[es.length - 1] - es[es.length - 2]) / es[es.length - 2]) * 100
-: null
-},
-"NQ=F": {
-price: nq.length ? nq[nq.length - 1] : null,
-change: nq.length > 1
-? ((nq[nq.length - 1] - nq[nq.length - 2]) / nq[nq.length - 2]) * 100
-: null
-},
-"RTY=F": {
-price: rty.length ? rty[rty.length - 1] : null,
-change: rty.length > 1
-? ((rty[rty.length - 1] - rty[rty.length - 2]) / rty[rty.length - 2]) * 100
-: null
-}
-},
+futures: Object.fromEntries(['ES=F','NQ=F','RTY=F','YM=F'].map(symbol=>[symbol,{...marketData[symbol],price:marketData[symbol]?.current??null}])),
 
 dataQuality: {
 indexObservationPolicy: "GAPS_WITH_SAME_DATE_QUOTES_V2",
@@ -4051,6 +3934,9 @@ auxiliaryIndices: {
 },
 futuresAvailable:
 es.length > 0 && nq.length > 0 && rty.length > 0,
+futuresPricesAvailable:[es,nq,rty].every(closes=>futuresObservations.get(closes)?.current!=null),
+futuresFiveMinuteChangesAvailable:[es,nq,rty].every(closes=>futuresObservations.get(closes)?.change5m!=null),
+futuresMinimumHistoryAvailable:[es,nq,rty].every(closes=>futuresObservations.get(closes)?.dataQuality.historySufficient===true),
 timestamp: Date.now()
 },
 
