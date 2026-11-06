@@ -36,6 +36,7 @@ export default function IndicesPanel({indices={},futures={}}:Props){
    {rows.map(row=><div key={row.name} className="border-t border-zinc-800 py-2 leading-relaxed">
     <strong>{row.label}</strong> · Kursstand: {time(row.future?.quoteTimestamp)}<br/>
     Vergleich: {time(row.future?.previousObservationTimestamp)} → {time(row.future?.quoteTimestamp)}<br/>
+    Bewegung seit Referenz 16:00 NY: {percent(row.future?.dataQuality?.sessionReference?.returnPct)} · kein offizielles Settlement<br/>
     Tagesänderung: {percent(row.future?.dailyChangePct)}{row.future?.dailyChangePct==null?' · Schluss-/Settlementbezug fehlt':''}
     {row.future?.dataQuality?.terminalQuoteSeparated&&<><br/>Zusatzkurs: {number(row.future.dataQuality.terminalQuote?.value)} · {time(row.future.dataQuality.terminalQuote?.timestamp)} · nicht für die 5-Minuten-Rendite verwendet</>}
    </div>)}
