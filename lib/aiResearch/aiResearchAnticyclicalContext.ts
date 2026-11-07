@@ -1,3 +1,4 @@
+import {assessAsymmetricRecovery} from './aiResearchAsymmetricEvidence';
 import {recoveryBreadthRows,breadthRecoverySignals} from './aiResearchEarlyRecoverySignals';
 import type {AppFacts,AppFact} from './aiResearchAppFacts';
 import {completedDailyCutoff} from './aiResearchChartContext';
@@ -33,6 +34,7 @@ function bindMarket(facts:AppFacts,study:unknown,market:string,entry:AppFact,his
  for(const r of selected)if(r.current.latestSignalDate!==null&&r.current.latestSignalDate>entry.asOf)throw Error('ANTI_FUTURE_SIGNAL');
  return {version:ANTI_CONTEXT_VERSION,status:'AVAILABLE',market,asOf:entry.asOf,source:'ANTICYCLICAL_CLOSE_STUDY_V1',
   earlyRecovery:m.earlyRecovery?.version==='EARLY_RECOVERY_SIGNALS_V1'&&m.earlyRecovery.asOf===entry.asOf?{...m.earlyRecovery,signals:[...m.earlyRecovery.signals,...breadthRecoverySignals(recoveryBreadthRows(history,market,Array.isArray(m.recoverySessions)?m.recoverySessions:[],facts.snapshotTimestamp),entry.asOf)]}:null,
+  asymmetricEvidence:m.asymmetricEvidence?.version==='ASYMMETRIC_INDEX_EVIDENCE_V1'&&m.asymmetricEvidence.asOf===entry.asOf?m.asymmetricEvidence:null,
   sourceCoverage:m.coverage,rsi14:f.rsi14,drawdown252Pct:f.drawdown252,rules:selected,ruleSelection:'FIXED_DRAWDOWN_252_AND_RSI_RECLAIM_NOT_BEST_RETURN',
   historicalReturnsAreOptionsReturns:false,calibratedProbability:false,positionSizingChanged:false,
   meaning:'60/80 beobachtete Folgeintervalle ab naechstem Schluss nach historischem Signal; alle Marktphasen. Kein heutiger Renditeimpuls oder garantierter Boden.'};
@@ -42,6 +44,7 @@ export function attachAnticyclicalContext(facts:AppFacts,study:unknown,history:a
   if(!['N-F-ENTRY-TIMING','R-F-ENTRY-TIMING'].includes(f.id)||f.status!=='CALCULATED')return f;
   let anti:Record<string,any>;
   try{anti=bindMarket(facts,study,f.market,f,history);}catch(error){anti={version:ANTI_CONTEXT_VERSION,status:'UNAVAILABLE',reason:error instanceof Error?error.message:'ANTI_UNAVAILABLE'};}
+  if(anti.status==='AVAILABLE')anti.asymmetricDecision=assessAsymmetricRecovery(anti);
   const rule=anti.status==='AVAILABLE'?anti.rules.find((r:any)=>r.id==='RSI_RECLAIM'):null;
   const sentence=anti.status==='AVAILABLE'?` Antizyklischer Kontext ${anti.asOf}: RSI14 ${anti.rsi14.toFixed(2)}, Rueckkehr ueber30 ${rule.current.active?'heute erkannt':'heute nicht erkannt'}, Abstand252Hoch ${anti.drawdown252Pct.toFixed(2)}%. Eigene historische60/80-Intervall-Folgen mit Basis und weiteren Rueckgaengen separat in values.anticyclical; keine Optionsrendite/automatische Freigabe.`:'';
   const baseText=typeof f.values.anticyclicalBaseText==='string'?f.values.anticyclicalBaseText:f.text;
@@ -59,5 +62,6 @@ export function compactAnticyclicalContext(value:unknown){
   (result.rules as unknown[]).push({id,currentSatisfied:r.current.active,ageIntervals:r.current.intervalsSinceSignal,follow60:stats[0],follow80:stats[1]});
  }
  if(a.earlyRecovery?.version==='EARLY_RECOVERY_SIGNALS_V1')result.early={rsiChange:round(a.earlyRecovery.rsiChange),events:a.earlyRecovery.signals.filter((s:any)=>s.status==='TODAY'||s.status==='RECENT').map((s:any)=>[s.id,s.ageIntervals])};
+ if(a.asymmetricDecision?.version==='ASYMMETRIC_DECISION_V1'){const d=a.asymmetricDecision;result.asym=[({POSSIBLE_RECOVERY:'P',UNFAVORABLE_HISTORY:'U',NO_RECENT_SETUP:'N',NO_PRICE_SETUP:'N',OPEN:'O',UNKNOWN:'?'} as Record<string,string>)[d.status]??'?',d.weight,d.confluence.areas,({RSI_RECLAIM:'R',RSI_FAILURE_SWING:'F',RSI_DIVERGENCE:'D',MA20_RECLAIM_STRESS:'M'} as Record<string,string>)[d.basisId??'']??null];}
  return result;
 }

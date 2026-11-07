@@ -1,3 +1,4 @@
+import {buildAsymmetricIndexEvidence} from './aiResearchAsymmetricEvidence';
 import {priceRecoverySignals} from './aiResearchEarlyRecoverySignals';
 export type RecoveryPoint={date:string;close:number};
 export const RECOVERY_POLICY={version:'ANTICYCLICAL_CLOSE_STUDY_V1',startDate:'2012-01-01',warmupStart:'2011-01-01',horizons:[5,20,60,80] as const,
@@ -102,7 +103,7 @@ export function buildOwnRecoveryStudy(market:'NASDAQ'|'RUSSELL_2000',symbol:stri
  });
  return {market,symbol,status:points.length>=252?'AVAILABLE':points.length?'PARTIAL':'UNAVAILABLE',firstSuppliedDate:points[0]?.date??null,lastSuppliedDate:points.at(-1)?.date??null,
   coverage:{requestedStudyStart:RECOVERY_POLICY.startDate,firstStudyObservation:eligibleIndex<0?null:points[eligibleIndex].date,historyIncludes2012:has2012,observations:points.length,studyObservations:points.filter(p=>p.date>=RECOVERY_POLICY.startDate).length,duplicateRows:cleaned.duplicateCount,excludedAfterCutoff:cleaned.excludedAfterCutoff,exchangeCalendarCompletenessVerified:false},
-  currentFeatures:features.at(-1)??null,earlyRecovery:priceRecoverySignals(features),recoverySessions:features.slice(-100).map(f=>({date:f.date,close:f.close})),studies};
+  currentFeatures:features.at(-1)??null,earlyRecovery:priceRecoverySignals(features),asymmetricEvidence:buildAsymmetricIndexEvidence(features),recoverySessions:features.slice(-100).map(f=>({date:f.date,close:f.close})),studies};
 }
 export function buildRecoveryStudy(data:{nasdaq:RecoveryPoint[];russell:RecoveryPoint[];vix:RecoveryPoint[]},cutoff:string){
  const markets=[buildOwnRecoveryStudy('NASDAQ','^NDX',data.nasdaq,data.vix,cutoff),buildOwnRecoveryStudy('RUSSELL_2000','^RUT',data.russell,data.vix,cutoff)];
