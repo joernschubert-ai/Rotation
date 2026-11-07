@@ -1,16 +1,25 @@
+export function AIResearchAnticyclicalSummary({fact}:{fact:any}){
+ const anti=fact?.values?.anticyclical;
+ if(anti?.version!=='ANTICYCLICAL_ENTRY_CONTEXT_V1'||anti.status!=='AVAILABLE'||anti.asOf!==fact?.asOf||!Number.isFinite(anti.rsi14))return null;
+ const active=anti.rules?.find((r:any)=>r.id==='RSI_RECLAIM')?.current?.active===true;
+ return <div className="mt-3 rounded-lg border border-sky-800 bg-sky-950/40 px-3 py-2 text-xs text-sky-100">
+  <p className="font-semibold">Antizyklisch: RSI14 {anti.rsi14.toLocaleString('de-DE',{maximumFractionDigits:2})}</p>
+  <p className="mt-1">{active?'Rückkehr über 30 erkannt · frühes Erholungszeichen':'Keine neue Rückkehr über 30 erkannt'}</p>
+  <p className="mt-1 text-[10px] text-slate-400">Indexschluss {anti.asOf} · keine Bodenbestätigung</p>
+ </div>;
+}
 const pct=(v:any)=>typeof v==='number'&&Number.isFinite(v)?`${v>0?'+':''}${v.toLocaleString('de-DE',{maximumFractionDigits:2})} %`:'unbekannt';
 export function AIResearchEntryContext({fact,instrument}:{fact:any;instrument:string}){
  const c=fact?.values?.context;if(!c)return null;
  const put=instrument==='NASDAQ_PUT';
  const anti=fact?.values?.anticyclical,available=anti?.version==='ANTICYCLICAL_ENTRY_CONTEXT_V1'&&anti.status==='AVAILABLE'&&anti.asOf===fact.asOf;
- const turn=available?anti.rules.find((r:any)=>r.id==='RSI_RECLAIM'):null;
  return <section className="mt-3 rounded border border-sky-900 bg-sky-950/20 p-3 text-[11px]">
   <h5 className="font-semibold text-sky-200">Aktuelle Bewegung und neuer Einstieg · App-Fakten</h5>
   <p className="mt-1">Index {fact.asOf??'unbekannt'}: {pct(c.return1D)} · Futures seit 16-Uhr-NY-Referenz: <strong>{pct(c.futuresReferenceMovePct)}</strong></p>
   {c.recentDecline&&<p className="mt-1 text-slate-300">Größter Rückgang der letzten 10 Intervalle: {c.recentDecline.date} · {pct(c.recentDecline.returnPct)}. Seither {pct(c.recentDecline.recoverySinceDeclineClosePct)} relativ zu dessen Schluss; {c.recentDecline.observedIntervalsSince} beobachtete Intervalle.</p>}
   {c.futuresAvailabilityReason==='SCHEDULED_PAUSE'&&<p className="mt-1 text-slate-400">Futures-Handelspause: keine laufende Gegenbewegung bewertet.</p>}
   <p className="mt-1 text-amber-200">{put?((c.exceptionalDecline||c.recentExceptionalDecline)?'Nach außergewöhnlichem Abverkauf: neuen Puts nicht allein wegen roter Struktur nachlaufen. Einstieg separat prüfen.':'Bearische Struktur und Attraktivität neuer Puts getrennt prüfen.'):(c.futuresContext==='COUNTERMOVE_UP'?'Gegenbewegung nach oben: frühe antizyklische Call-Idee prüfen. Boden unbestätigt.':'Frühe Call-Idee separat bewerten; keine Erholung aus dem Abverkauf allein ableiten.')}</p>
-  {available&&<div className="mt-2 border-t border-sky-900 pt-2 text-slate-300"><p>Antizyklisch: RSI14 {anti.rsi14.toLocaleString('de-DE',{maximumFractionDigits:2})} · {turn?.current.active?'Rückkehr über30 erkannt':'heute keine neue RSI30-Rückkehr'}.</p>
+  {available&&<div className="mt-2 border-t border-sky-900 pt-2 text-slate-300">
    <details className="mt-2"><summary className="cursor-pointer text-sky-200">Längerer Horizont · historische60/80-Intervalle</summary>
     {anti.rules.map((r:any)=><div key={r.id} className="mt-2"><strong>{r.title}</strong>{r.horizons.map((h:any)=><p key={h.horizonIntervals}>{h.horizonIntervals} Intervalle · n={h.statistics.matureCases} · Median {pct(h.statistics.medianReturnPct)} · p10/p90 {pct(h.statistics.p10ReturnPct)} / {pct(h.statistics.p90ReturnPct)} · weiterer Rückgang im Median {pct(h.statistics.medianWorstFurtherCloseChangePct)} · Basismittel {pct(h.baseline.meanReturnPct)}.</p>)}</div>)}
     <a className="mt-2 block text-sky-200 underline" href="/api/ai-research/anticyclical" target="_blank" rel="noopener noreferrer">Vollständige historische Auswertung</a>
