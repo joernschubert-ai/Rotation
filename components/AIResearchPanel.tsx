@@ -17,11 +17,12 @@ import type { AIResearchReport, AIResearchResult } from "@/lib/aiResearch/aiRese
 import { SYNTHESIS_CONTRACT } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 import type { ResearchSynthesis } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 
+type AttemptDiagnostic={status:string;startedAt?:string;snapshotTimestamp?:string|null;aiStatus?:string|null;message?:string|null;modelRequestsUsed?:number|null;profile?:string[];issues?:string[]};
 type ResponseData = AIResearchResult & { ok?: boolean; error?: string; storedDisplay?: {archived:boolean;recordId:string} };
 /** Export the exact response in component state; never fetch or regenerate. */
-export function serializeDisplayedResearch(data: ResponseData, expectedSnapshotTimestamp?: string, suspended = false): string {
+export function serializeDisplayedResearch(data: ResponseData, expectedSnapshotTimestamp?: string, suspended = false, latestAttempt:AttemptDiagnostic|null=null): string {
   return JSON.stringify({ ...data, display: { copiedAt: new Date().toISOString(),
-    expectedSnapshotTimestamp: expectedSnapshotTimestamp ?? null,
+    expectedSnapshotTimestamp: expectedSnapshotTimestamp ?? null, latestAttempt,
     displayedSnapshotTimestamp: data.report?.decisionSupport?.snapshotTimestamp ?? data.diagnostics?.snapshotTimestamp ?? null,
     entryStatementsSuspended: suspended,
     source: "EXACT_DISPLAYED_RESPONSE",
@@ -255,37 +256,46 @@ export function AIResearchSynthesisSummary({ synthesis, snapshotTimestamp, suspe
   </section>;
 }
 
-export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady = true }: {
+export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady = true, marketPending = false }: {
   expectedSnapshotTimestamp?: string;
   marketReady?: boolean;
+  marketPending?: boolean;
 } = {}) {
   const [data, setData] = useState<ResponseData | null>(null);
   const [loading, setLoading] = useState(false);
   const [archiveLoading,setArchiveLoading]=useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [latestAttempt,setLatestAttempt]=useState<AttemptDiagnostic|null>(null);
   const controller = useRef<AbortController | null>(null);
   const requestId = useRef(0);
-  const load = useCallback(async () => {
-    if (!marketReady) return;
+  const load = useCallback(async (allowStored=false) => {
+    if (marketPending || (!marketReady&&!allowStored)) return;
     const id = ++requestId.current;
     controller.current?.abort();
     const request = new AbortController(); controller.current = request;
     setLoading(true); setError(null); setCopyStatus(null);
+    setLatestAttempt({status:"RUNNING",startedAt:new Date().toISOString(),modelRequestsUsed:null});
     try {
       const response = await fetch("/api/ai-research/dashboard?task=DAILY_MARKET_REVIEW", { method: "POST", cache: "no-store", credentials: "same-origin", signal: request.signal });
       const result: ResponseData = await response.json();
+      if(id===requestId.current&&!request.signal.aborted)setLatestAttempt({status:result.status??'HTTP_ERROR',snapshotTimestamp:result.report?.appFacts?.snapshotTimestamp??result.diagnostics?.snapshotTimestamp??null,
+        aiStatus:result.report?.aiSynthesis?.status??null,message:result.report?.aiSynthesis?.message??result.error??result.diagnostics?.warnings?.join(' · ')??null,
+        modelRequestsUsed:result.report?.aiSynthesis?.modelRequestsUsed??null,profile:result.report?.aiSynthesis?.quality?.normalizations,issues:result.report?.aiSynthesis?.quality?.issues});
       if (!response.ok || result.status !== "SUCCESS" || !result.report) throw new Error(result.error ?? "Kein vollständiger Research-Bericht verfügbar.");
       if (id === requestId.current && !request.signal.aborted) {
         setData(previous=>result.report?.aiSynthesis?.status!=='SUCCESS'&&previous?.report?.aiSynthesis?.status==='SUCCESS'?previous:result);
         if(result.report.aiSynthesis?.status!=='SUCCESS')setError(result.report.aiSynthesis?.message??'Aktuelle KI-Auswertung nicht verfügbar; der bisherige Bericht bleibt erhalten.');
       }
     } catch (failure) {
-      if (id === requestId.current && !request.signal.aborted) setError(failure instanceof Error ? failure.message : "Research konnte nicht geladen werden.");
+      if (id === requestId.current && !request.signal.aborted) {
+        setError(failure instanceof Error ? failure.message : "Research konnte nicht geladen werden.");
+        setLatestAttempt(previous=>previous?.status==='RUNNING'?{status:'REQUEST_OUTCOME_UNKNOWN',message:failure instanceof Error?failure.message:'Abruf unterbrochen',modelRequestsUsed:null}:previous);
+      }
     } finally {
       if (id === requestId.current && !request.signal.aborted) setLoading(false);
     }
-  }, [marketReady, expectedSnapshotTimestamp]);
+  }, [marketReady, marketPending, expectedSnapshotTimestamp]);
   // Independent archive read: never waits for the current market save and never generates.
   useEffect(()=>{
     const request=new AbortController();
@@ -308,13 +318,13 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
   const archivedDisplay=suspended||!reportSnapshotTimestamp||Date.now()-Date.parse(reportSnapshotTimestamp)>86400000;
   async function copyDisplayedReport() {
     if (!data?.report) return;
-    const serialized = serializeDisplayedResearch(data, expectedSnapshotTimestamp, suspended);
+    const serialized = serializeDisplayedResearch(data, expectedSnapshotTimestamp, suspended, latestAttempt);
     try { await navigator.clipboard.writeText(serialized); setCopyStatus("Angezeigter Bericht kopiert."); }
     catch { setCopyStatus("Kopieren nicht möglich. Bitte JSON herunterladen verwenden."); }
   }
   function downloadDisplayedReport() {
     if (!data?.report) return;
-    const blob = new Blob([serializeDisplayedResearch(data, expectedSnapshotTimestamp, suspended)], { type: "application/json" });
+    const blob = new Blob([serializeDisplayedResearch(data, expectedSnapshotTimestamp, suspended, latestAttempt)], { type: "application/json" });
     const url = URL.createObjectURL(blob), anchor = document.createElement("a");
     anchor.href = url; anchor.download = `research-${data.report.generatedAt.replace(/[^0-9TZ-]/g, "-")}.json`;
     document.body.appendChild(anchor); anchor.click(); anchor.remove();
@@ -326,8 +336,8 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       <div className="flex flex-wrap gap-2">
       <button type="button" disabled={!report} onClick={() => void copyDisplayedReport()} className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">Angezeigten Bericht kopieren</button>
       <button type="button" disabled={!report} onClick={downloadDisplayedReport} className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">JSON herunterladen</button>
-      <button type="button" disabled={loading || !marketReady} onClick={() => void load()} className="border border-[#444] bg-[#181818] px-3 py-2 text-xs text-[#bbb] hover:bg-[#252525] disabled:opacity-50">
-        {loading ? "Wird aktualisiert …" : "Research aktualisieren"}
+      <button type="button" disabled={loading || marketPending} onClick={() => void load(true)} className="border border-[#444] bg-[#181818] px-3 py-2 text-xs text-[#bbb] hover:bg-[#252525] disabled:opacity-50">
+        {loading ? "Wird aktualisiert …" : marketReady ? "Research aktualisieren" : "Gespeicherten Stand auswerten"}
       </button>
       </div>
     </div>
