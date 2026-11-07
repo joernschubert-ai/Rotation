@@ -332,9 +332,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       </div>
     </div>
     {copyStatus && <p role="status" className="text-xs text-slate-400">{copyStatus}</p>}
-    {error && <p role="alert" className="border border-red-900 p-3 text-xs text-red-300">{error}{report ? " Angezeigt wird der vorherige Bericht; seine Einstiegsaussage ist ausgesetzt." : ""}</p>}
-    {!marketReady && <p className="border border-[#292929] p-3 text-xs text-[#999]">Aktueller Research wartet auf den gespeicherten Marktstand. Ein vorhandener früherer Bericht bleibt darunter lesbar.</p>}
-    {snapshotMismatch && <p role="status" className="border border-amber-900 p-3 text-xs text-amber-200">Research und Dashboard verwenden unterschiedliche Snapshots. Die Einstiegsaussage ist ausgesetzt. Bitte den Marktstand erneut aktualisieren.</p>}
+    {error && !report && <p role="alert" className="border border-red-900 p-3 text-xs text-red-300">{error}{report ? " Angezeigt wird der vorherige Bericht; seine Einstiegsaussage ist ausgesetzt." : ""}</p>}
     {!report && !marketReady && <p className="text-xs text-slate-400">{archiveLoading?"Letzter gespeicherter Bericht wird gelesen …":"Kein lesbarer früherer Bericht gefunden. Beim Lesen wurde keine KI gestartet."}</p>}
     {!report && marketReady && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
     {report && <>
