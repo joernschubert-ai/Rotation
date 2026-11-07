@@ -1,3 +1,4 @@
+import {reviewEntryWeighing} from './aiResearchEntryWeighingReview';
 import {createHash} from 'node:crypto';
 import type {AppFacts,AppFact} from './aiResearchAppFacts';
 import {selectionContext,selectionCatalog,validateSelection,renderSelection,INSTRUMENTS,SELECTION_CONTRACT} from './aiResearchSelectionContract';
@@ -12,6 +13,7 @@ export interface SourceReview {
  originalText:string;finishReason:string|null;
  validation:ReturnType<typeof validateSelection>;
  interpretationAudit:ReturnType<typeof auditSelectionMeaning>;
+ entryTimingReview?:ReturnType<typeof reviewEntryWeighing>;
  states:AppStateCard[];
  view:ReturnType<typeof renderSelection>;
  semanticTruthVerified:false;
@@ -55,7 +57,7 @@ export function evaluateSourceReview(raw:unknown,finishReason:unknown,facts:AppF
  }
  const partial=!incomplete&&!validation.ok&&!!view?.length;
  return {version:SOURCE_REVIEW_VERSION,snapshotTimestamp:facts.snapshotTimestamp,factsHash:sourceFactsHash(facts),status:incomplete?'OUTPUT_INCOMPLETE':validation.ok?'VALID_SELECTION':partial?'PARTIAL_SELECTION':'INVALID_SELECTION',originalText,finishReason:finish,
-  validation,instrumentReviews,interpretationAudit:auditSelectionMeaning(originalText,facts.facts),states:buildAppStateCards(facts),view,semanticTruthVerified:false};
+  validation,instrumentReviews,interpretationAudit:auditSelectionMeaning(originalText,facts.facts),entryTimingReview:reviewEntryWeighing(originalText,facts),states:buildAppStateCards(facts),view,semanticTruthVerified:false};
 }
 /** Saved numeric cards are never trusted as a replacement for current matching app facts. */
 export function recheckSourceReview(saved:SourceReview,facts:AppFacts):SourceReview|null{
