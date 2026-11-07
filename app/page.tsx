@@ -348,6 +348,7 @@ export default function Home() {
         />
         <AIResearchPanel
           expectedSnapshotTimestamp={loadedMarket.snapshot.timestamp}
+          marketPending={isReloading}
           marketReady={!isReloading && !loadError && researchSnapshotTimestamp === loadedMarket.snapshot.timestamp}
         />
       </section>
