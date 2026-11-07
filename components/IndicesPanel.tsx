@@ -15,7 +15,7 @@ export default function IndicesPanel({indices={},futures={}}:Props){
   {name:'Russell 2000',label:'Russell Futures',cash:cash.rut??cash.russell,future:future.rty??future.russell}
  ];
  function cell(label:string,item:any,isFuture:boolean){
-  const period=isFuture?(item?.changePeriod==='OBSERVED_5_MINUTE_INTERVAL'?'5 Min.':'Zeitraum unklar'):'Tag';
+  const period=isFuture?(item?.changePeriod==='OBSERVED_5_MINUTE_INTERVAL'?(item?.dataQuality?.observationMode==='DATED_SCHEDULED_PAUSE'?'5 Min. historisch':'5 Min.'):'Zeitraum unklar'):'Tag';
   return <div className="flex min-h-[76px] min-w-0 items-center justify-between gap-3 py-3">
    <span className="min-w-0 text-sm text-zinc-400">{label}</span>
    <div className="shrink-0 text-right"><div className="text-base font-semibold tabular-nums text-zinc-100 sm:text-lg">{number(item?.value)}</div>
@@ -26,6 +26,7 @@ export default function IndicesPanel({indices={},futures={}}:Props){
  return <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 sm:p-5">
   <h2 className="text-lg font-semibold text-zinc-100">Index Markets</h2>
   <p className="mb-4 mt-1 text-xs leading-relaxed text-zinc-500">Cash: Tagesänderung · Futures: letztes beobachtetes 5-Minuten-Intervall, zeitverzögerte Daten.</p>
+  {rows.some(r=>r.future?.dataQuality?.observationMode==='DATED_SCHEDULED_PAUSE')&&<p role="status" className="mb-3 text-xs text-amber-200">Planmäßige Futures-Handelspause: letzter datierter Stand, keine laufende Gegenbewegung. Kurszeiten stehen in den Details.</p>}
   <div className="hidden grid-cols-2 gap-x-6 text-xs font-semibold tracking-wider text-zinc-500 lg:grid"><div>CASH INDICES</div><div>FUTURES</div></div>
   {rows.map(row=><div key={row.name} className="grid grid-cols-1 gap-x-6 border-b border-zinc-800/70 lg:grid-cols-2">
    {cell(row.name,row.cash,false)}{cell(row.label,row.future,true)}
