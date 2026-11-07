@@ -1,3 +1,4 @@
+import {readLastDisplayedResearch} from '@/lib/aiResearch/aiResearchLastReport';
 import { NextResponse } from "next/server";
 import { runAIResearchFromHistory } from "@/lib/aiResearch/aiResearchRunner";
 import { researchAuthorized } from "@/lib/aiResearch/aiResearchSession";
@@ -17,6 +18,10 @@ async function handle(request: Request, generate: boolean) {
     const parameter = url.searchParams.get("task") as AIResearchTask;
     const task = tasks.includes(parameter) ? parameter : "DAILY_MARKET_REVIEW";
     const question = url.searchParams.get("question")?.slice(0, 500);
+    if(!generate&&url.searchParams.get('stored')==='latest'){
+      if(question)return NextResponse.json({ok:false,modelRequestsUsed:0,error:'Die Archivansicht gilt nur dem Standardbericht ohne Zusatzfrage.'},{status:400,headers});
+      return NextResponse.json(await readLastDisplayedResearch(task),{headers});
+    }
     const result = await runAIResearchFromHistory({ task, question, allowAIGeneration: generate });
     return NextResponse.json({ ok: result.status === "SUCCESS", ...result }, { headers });
   } catch { return NextResponse.json({ ok: false, error: "Research derzeit nicht verfügbar" }, { status: 500, headers }); }
