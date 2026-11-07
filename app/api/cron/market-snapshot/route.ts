@@ -26,6 +26,26 @@ export async function GET(request: Request) {
   let cronAudit:Awaited<ReturnType<typeof beginCronAudit>>|null=null;
   let stage='AUTHORIZATION';
   let snapshotSaved=false;
+  let authorized=false;
+  let maintenanceAttempted=false;
+  let maintenanceStatus='NOT_REACHED';
+  let researchMemory:unknown=null;
+  const attemptMemoryMaintenance=async()=>{
+    if(!authorized||maintenanceAttempted)return;
+    maintenanceAttempted=true;
+    if(Date.now()-requestStartedAt>=42000){
+      maintenanceStatus='SKIPPED_TIME_BUDGET';
+      researchMemory={ok:false,modelRequestsUsed:0,message:"Gedaechtniswartung wegen Zeitbudget verschoben."};
+      return;
+    }
+    try{
+      researchMemory=await maintainResearchMemory();
+      maintenanceStatus=(researchMemory as {ok?:boolean})?.ok===true?'RETURNED_OK':'RETURNED_NOT_OK';
+    }catch{
+      maintenanceStatus='THREW';
+      researchMemory={ok:false,modelRequestsUsed:0,message:"Gedaechtniswartung fehlgeschlagen; Marktstatus bleibt separat ausgewiesen."};
+    }
+  };
   try {
     if (!isAuthorized(request)) {
       return NextResponse.json(
@@ -34,6 +54,7 @@ export async function GET(request: Request) {
       );
     }
 
+    authorized=true;
     cronAudit=await beginCronAudit(requestStartedAt);
     stage='MARKET_REQUEST';
     // Reuse the server-side handler without an HTTP round trip through
@@ -80,10 +101,7 @@ export async function GET(request: Request) {
     await saveMarketSnapshot(snapshot);
     snapshotSaved=true;
     stage='MEMORY_MAINTENANCE';
-    // Auxiliary outcome collection is independent of the already committed market snapshot.
-    let researchMemory:unknown={ok:false,modelRequestsUsed:0,message:"Gedächtnisauswertung wegen Zeitbudget verschoben."};
-    let maintenanceStatus='SKIPPED_TIME_BUDGET';
-    if(Date.now()-requestStartedAt<42000)try{researchMemory=await maintainResearchMemory();maintenanceStatus=(researchMemory as {ok?:boolean})?.ok===true?'RETURNED_OK':'RETURNED_NOT_OK';}catch{maintenanceStatus='THREW';researchMemory={ok:false,modelRequestsUsed:0,message:"Gedächtnisauswertung nicht verfügbar; Snapshot bleibt gespeichert."};}
+    await attemptMemoryMaintenance();
     const cronDiagnostic=await finishCronAudit(cronAudit,{status:'COMPLETED',stage:'FINISHED',snapshotSaved,snapshotTimestamp:snapshot.timestamp,maintenanceStatus,researchMemory});
 
     return NextResponse.json({
@@ -98,12 +116,15 @@ export async function GET(request: Request) {
       cronDiagnostic,
     });
   } catch (error) {
-    const cronDiagnostic=await finishCronAudit(cronAudit,{status:'FAILED',stage,snapshotSaved,maintenanceStatus:'NOT_REACHED',errorCode:'CRON_STEP_FAILED'});
+    // Keep the original failure stage even if independent collection succeeds.
+    await attemptMemoryMaintenance();
+    const cronDiagnostic=await finishCronAudit(cronAudit,{status:'FAILED',stage,snapshotSaved,maintenanceStatus,researchMemory,errorCode:'CRON_STEP_FAILED'});
     console.error("Cron Market Snapshot Error:", error);
     return NextResponse.json(
       {
         ok: false,
         error: error instanceof Error ? error.message : "Unknown error",
+        researchMemory,
         cronDiagnostic,
       },
       { status: 500 }
