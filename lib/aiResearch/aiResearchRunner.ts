@@ -1,3 +1,5 @@
+import {loadRecoveryStudy} from './aiResearchAnticyclicalService';
+import {attachAnticyclicalContext} from './aiResearchAnticyclicalContext';
 import {buildEntryContext} from '../market/entryContext';
 import {archiveResearchMemory} from './aiResearchMemoryService';
 import {digest} from './aiResearchMemoryProtocol';
@@ -66,11 +68,12 @@ export async function runAIResearchFromHistory(
     });
     // Optional providers fail independently. History remains the required basis.
     // Promise.resolve also captures a provider that throws synchronously.
-    const [historyLoad, newsLoad, cotLoad, historicalLoad] = await Promise.allSettled([
+    const [historyLoad, newsLoad, cotLoad, historicalLoad, recoveryLoad] = await Promise.allSettled([
       historyPromise,
       timed("newsMs", () => fetchExternalResearchSources({ task: input.task })),
       timed("cotMs", () => fetchCOTData()),
       historicalPromise,
+      timed("anticyclicalMs",()=>loadRecoveryStudy()),
     ]);
     if (historyLoad.status === "rejected") {
       throw new Error(`Required market history unavailable: ${message(historyLoad.reason)}`);
@@ -159,6 +162,7 @@ export async function runAIResearchFromHistory(
             datedComparisons:(currentSnapshot as any).breadthVelocity?.periodDiagnostics??null,
             meaning:'Vollständige gespeicherte App-Historie bleibt Kontext. Historische Tageszähler zählen Beobachtungstage, nicht nachgewiesene Börsensitzungen. Nur periodDiagnostics kennzeichnet den neuen datierten Vergleich. Modell-/Universumswechsel können alte Vergleiche verzerren; keine neue Kalibrierung.'},
           historicalTemporalValidation:result.report.historicalEvidence?.temporalValidation});
+        result.report.appFacts=attachAnticyclicalContext(result.report.appFacts,recoveryLoad.status==='fulfilled'?recoveryLoad.value:null);
       } catch { warnings.push("App-Fakten konnten nicht berechnet werden; keine KI-Ableitung als Ersatz ausgegeben."); }
       try {
         timings.preparationMs = Date.now() - startedAt;
