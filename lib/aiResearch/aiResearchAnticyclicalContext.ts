@@ -1,3 +1,4 @@
+import {recoveryBreadthRows,breadthRecoverySignals} from './aiResearchEarlyRecoverySignals';
 import type {AppFacts,AppFact} from './aiResearchAppFacts';
 import {completedDailyCutoff} from './aiResearchChartContext';
 const validDay=(v:unknown):v is string=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T00:00:00Z'))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;
@@ -22,7 +23,7 @@ function summarizeRule(rule:Record<string,any>){
  });
  return {id:rule.id,title:rule.title,stage:rule.stage,definition:rule.definition,current,horizons};
 }
-function bindMarket(facts:AppFacts,study:unknown,market:string,entry:AppFact){
+function bindMarket(facts:AppFacts,study:unknown,market:string,entry:AppFact,history:any[]){
  const root=obj(study),rows=Array.isArray(root.markets)?root.markets.filter((m:any)=>m.market===market):[],m=obj(rows[0]),f=obj(m.currentFeatures),prefix=market==='NASDAQ'?'N-F':'R-F';
  const closes=facts.facts.filter(f=>f.id===prefix+'-CLOSE'&&f.market===market&&f.status!=='MISSING'),close=closes[0];
  if(root.version!=='ANTICYCLICAL_CLOSE_STUDY_V1'||root.ok!==true||rows.length!==1||m.symbol!==(market==='NASDAQ'?'^NDX':'^RUT')||m.status!=='AVAILABLE'||obj(m.coverage).historyIncludes2012!==true)throw Error('ANTI_HISTORY_UNAVAILABLE');
@@ -31,15 +32,16 @@ function bindMarket(facts:AppFacts,study:unknown,market:string,entry:AppFact){
  const selected=rules.map(id=>{const found=Array.isArray(m.studies)?m.studies.filter((r:any)=>r.id===id):[];if(found.length!==1)throw Error('ANTI_RULE_MISSING');return summarizeRule(found[0]);});
  for(const r of selected)if(r.current.latestSignalDate!==null&&r.current.latestSignalDate>entry.asOf)throw Error('ANTI_FUTURE_SIGNAL');
  return {version:ANTI_CONTEXT_VERSION,status:'AVAILABLE',market,asOf:entry.asOf,source:'ANTICYCLICAL_CLOSE_STUDY_V1',
+  earlyRecovery:m.earlyRecovery?.version==='EARLY_RECOVERY_SIGNALS_V1'&&m.earlyRecovery.asOf===entry.asOf?{...m.earlyRecovery,signals:[...m.earlyRecovery.signals,...breadthRecoverySignals(recoveryBreadthRows(history,market,Array.isArray(m.recoverySessions)?m.recoverySessions:[],facts.snapshotTimestamp),entry.asOf)]}:null,
   sourceCoverage:m.coverage,rsi14:f.rsi14,drawdown252Pct:f.drawdown252,rules:selected,ruleSelection:'FIXED_DRAWDOWN_252_AND_RSI_RECLAIM_NOT_BEST_RETURN',
   historicalReturnsAreOptionsReturns:false,calibratedProbability:false,positionSizingChanged:false,
   meaning:'60/80 beobachtete Folgeintervalle ab naechstem Schluss nach historischem Signal; alle Marktphasen. Kein heutiger Renditeimpuls oder garantierter Boden.'};
 }
-export function attachAnticyclicalContext(facts:AppFacts,study:unknown):AppFacts{
+export function attachAnticyclicalContext(facts:AppFacts,study:unknown,history:any[]=[]):AppFacts{
  const changed=facts.facts.map(f=>{
   if(!['N-F-ENTRY-TIMING','R-F-ENTRY-TIMING'].includes(f.id)||f.status!=='CALCULATED')return f;
   let anti:Record<string,any>;
-  try{anti=bindMarket(facts,study,f.market,f);}catch(error){anti={version:ANTI_CONTEXT_VERSION,status:'UNAVAILABLE',reason:error instanceof Error?error.message:'ANTI_UNAVAILABLE'};}
+  try{anti=bindMarket(facts,study,f.market,f,history);}catch(error){anti={version:ANTI_CONTEXT_VERSION,status:'UNAVAILABLE',reason:error instanceof Error?error.message:'ANTI_UNAVAILABLE'};}
   const rule=anti.status==='AVAILABLE'?anti.rules.find((r:any)=>r.id==='RSI_RECLAIM'):null;
   const sentence=anti.status==='AVAILABLE'?` Antizyklischer Kontext ${anti.asOf}: RSI14 ${anti.rsi14.toFixed(2)}, Rueckkehr ueber30 ${rule.current.active?'heute erkannt':'heute nicht erkannt'}, Abstand252Hoch ${anti.drawdown252Pct.toFixed(2)}%. Eigene historische60/80-Intervall-Folgen mit Basis und weiteren Rueckgaengen separat in values.anticyclical; keine Optionsrendite/automatische Freigabe.`:'';
   const baseText=typeof f.values.anticyclicalBaseText==='string'?f.values.anticyclicalBaseText:f.text;
@@ -56,5 +58,6 @@ export function compactAnticyclicalContext(value:unknown){
   const stats=[60,80].map(horizon=>{const h=r.horizons.find((x:any)=>x.horizonIntervals===horizon),s=h.statistics;return [s.matureCases,round(s.meanReturnPct),round(s.medianReturnPct),round(s.p10ReturnPct),round(s.p90ReturnPct),round(s.medianWorstFurtherCloseChangePct),round(h.baseline.meanReturnPct)];});
   (result.rules as unknown[]).push({id,currentSatisfied:r.current.active,ageIntervals:r.current.intervalsSinceSignal,follow60:stats[0],follow80:stats[1]});
  }
+ if(a.earlyRecovery?.version==='EARLY_RECOVERY_SIGNALS_V1')result.early={rsiChange:round(a.earlyRecovery.rsiChange),events:a.earlyRecovery.signals.filter((s:any)=>s.status==='TODAY'||s.status==='RECENT').map((s:any)=>[s.id,s.ageIntervals])};
  return result;
 }
