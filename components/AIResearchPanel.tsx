@@ -1,4 +1,5 @@
 "use client";
+import {AIResearchArchivedReport} from './AIResearchArchivedReport';
 import { AIResearchQuickPanel } from './AIResearchQuickPanel';
 import { researchQuickView } from '@/lib/aiResearch/aiResearchQuickView';
 
@@ -16,7 +17,7 @@ import type { AIResearchReport, AIResearchResult } from "@/lib/aiResearch/aiRese
 import { SYNTHESIS_CONTRACT } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 import type { ResearchSynthesis } from "@/lib/aiResearch/aiResearchSynthesisTypes";
 
-type ResponseData = AIResearchResult & { ok?: boolean; error?: string };
+type ResponseData = AIResearchResult & { ok?: boolean; error?: string; storedDisplay?: {archived:boolean;recordId:string} };
 /** Export the exact response in component state; never fetch or regenerate. */
 export function serializeDisplayedResearch(data: ResponseData, expectedSnapshotTimestamp?: string, suspended = false): string {
   return JSON.stringify({ ...data, display: { copiedAt: new Date().toISOString(),
@@ -259,7 +260,8 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
   marketReady?: boolean;
 } = {}) {
   const [data, setData] = useState<ResponseData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [archiveLoading,setArchiveLoading]=useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -274,28 +276,44 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       const response = await fetch("/api/ai-research/dashboard?task=DAILY_MARKET_REVIEW", { method: "POST", cache: "no-store", credentials: "same-origin", signal: request.signal });
       const result: ResponseData = await response.json();
       if (!response.ok || result.status !== "SUCCESS" || !result.report) throw new Error(result.error ?? "Kein vollständiger Research-Bericht verfügbar.");
-      if (id === requestId.current && !request.signal.aborted) setData(result);
+      if (id === requestId.current && !request.signal.aborted) {
+        setData(previous=>result.report?.aiSynthesis?.status!=='SUCCESS'&&previous?.report?.aiSynthesis?.status==='SUCCESS'?previous:result);
+        if(result.report.aiSynthesis?.status!=='SUCCESS')setError(result.report.aiSynthesis?.message??'Aktuelle KI-Auswertung nicht verfügbar; der bisherige Bericht bleibt erhalten.');
+      }
     } catch (failure) {
       if (id === requestId.current && !request.signal.aborted) setError(failure instanceof Error ? failure.message : "Research konnte nicht geladen werden.");
     } finally {
       if (id === requestId.current && !request.signal.aborted) setLoading(false);
     }
   }, [marketReady, expectedSnapshotTimestamp]);
-  useEffect(() => { if (marketReady) void load(); return () => { controller.current?.abort(); }; }, [load, marketReady]);
+  // Independent archive read: never waits for the current market save and never generates.
+  useEffect(()=>{
+    const request=new AbortController();
+    void (async()=>{try{
+      const response=await fetch('/api/ai-research/dashboard?task=DAILY_MARKET_REVIEW&stored=latest',{method:'GET',cache:'no-store',credentials:'same-origin',signal:request.signal});
+      const saved:ResponseData=await response.json();
+      if(!request.signal.aborted&&response.ok&&saved.status==='SUCCESS'&&saved.report&&saved.storedDisplay?.archived)
+        setData(previous=>previous?.report?.aiSynthesis?.status==='SUCCESS'?previous:saved);
+    }catch{/* Keep any displayed report. No model retry or replacement generation. */}
+    finally{if(!request.signal.aborted)setArchiveLoading(false);}})();
+    return ()=>request.abort();
+  },[]);
+  useEffect(() => { if (marketReady) void load(); else setLoading(false); return () => { controller.current?.abort(); }; }, [load, marketReady]);
   const report = data?.report;
   const reportSnapshotTimestamp = report?.decisionSupport?.snapshotTimestamp ?? data?.diagnostics?.snapshotTimestamp;
   const snapshotMismatch = Boolean(report && expectedSnapshotTimestamp && reportSnapshotTimestamp !== expectedSnapshotTimestamp);
   const evidence = report?.evidenceAssessment?.evidence ?? [];
   const historical = report?.historicalEvidence;
-  const suspended = loading || Boolean(error) || !marketReady || snapshotMismatch;
+  const suspended = loading || Boolean(error) || !marketReady || snapshotMismatch || Boolean(data?.storedDisplay?.archived);
+  const archivedDisplay=suspended||!reportSnapshotTimestamp||Date.now()-Date.parse(reportSnapshotTimestamp)>86400000;
   async function copyDisplayedReport() {
-    if (!data?.report || loading) return;
+    if (!data?.report) return;
     const serialized = serializeDisplayedResearch(data, expectedSnapshotTimestamp, suspended);
     try { await navigator.clipboard.writeText(serialized); setCopyStatus("Angezeigter Bericht kopiert."); }
     catch { setCopyStatus("Kopieren nicht möglich. Bitte JSON herunterladen verwenden."); }
   }
   function downloadDisplayedReport() {
-    if (!data?.report || loading) return;
+    if (!data?.report) return;
     const blob = new Blob([serializeDisplayedResearch(data, expectedSnapshotTimestamp, suspended)], { type: "application/json" });
     const url = URL.createObjectURL(blob), anchor = document.createElement("a");
     anchor.href = url; anchor.download = `research-${data.report.generatedAt.replace(/[^0-9TZ-]/g, "-")}.json`;
@@ -306,8 +324,8 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="text-xs font-semibold text-[#999]">AI RESEARCH</div>
       <div className="flex flex-wrap gap-2">
-      <button type="button" disabled={!report || loading} onClick={() => void copyDisplayedReport()} className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">Angezeigten Bericht kopieren</button>
-      <button type="button" disabled={!report || loading} onClick={downloadDisplayedReport} className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">JSON herunterladen</button>
+      <button type="button" disabled={!report} onClick={() => void copyDisplayedReport()} className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">Angezeigten Bericht kopieren</button>
+      <button type="button" disabled={!report} onClick={downloadDisplayedReport} className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">JSON herunterladen</button>
       <button type="button" disabled={loading || !marketReady} onClick={() => void load()} className="border border-[#444] bg-[#181818] px-3 py-2 text-xs text-[#bbb] hover:bg-[#252525] disabled:opacity-50">
         {loading ? "Wird aktualisiert …" : "Research aktualisieren"}
       </button>
@@ -315,20 +333,21 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     </div>
     {copyStatus && <p role="status" className="text-xs text-slate-400">{copyStatus}</p>}
     {error && <p role="alert" className="border border-red-900 p-3 text-xs text-red-300">{error}{report ? " Angezeigt wird der vorherige Bericht; seine Einstiegsaussage ist ausgesetzt." : ""}</p>}
-    {!marketReady && <p className="border border-[#292929] p-3 text-xs text-[#999]">Research wartet auf den erfolgreich gespeicherten aktuellen Marktstand.</p>}
+    {!marketReady && <p className="border border-[#292929] p-3 text-xs text-[#999]">Aktueller Research wartet auf den gespeicherten Marktstand. Ein vorhandener früherer Bericht bleibt darunter lesbar.</p>}
     {snapshotMismatch && <p role="status" className="border border-amber-900 p-3 text-xs text-amber-200">Research und Dashboard verwenden unterschiedliche Snapshots. Die Einstiegsaussage ist ausgesetzt. Bitte den Marktstand erneut aktualisieren.</p>}
+    {!report && !marketReady && <p className="text-xs text-slate-400">{archiveLoading?"Letzter gespeicherter Bericht wird gelesen …":"Kein lesbarer früherer Bericht gefunden. Beim Lesen wurde keine KI gestartet."}</p>}
     {!report && marketReady && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
     {report && <>
       <Detail title="Auftragsstatus und Herkunft"><ResearchSequenceStatus synthesis={report.aiSynthesis} /></Detail>
-      <AIResearchOverview report={report} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+      {archivedDisplay?<AIResearchArchivedReport report={report} />:<AIResearchOverview report={report} snapshotTimestamp={reportSnapshotTimestamp} suspended={suspended} />}
       <Detail title="Gespeicherte Szenarien und Kontextabwägung · ohne neue KI"><AIResearchStoredWeighing report={report} displayedSnapshotTimestamp={expectedSnapshotTimestamp ?? reportSnapshotTimestamp} suspended={suspended} /></Detail>
       <Detail title="Weitere Modell-, Chart- und Syntheseansichten">
-      <ResearchWeightingPanel synthesis={report.aiSynthesis} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
-      <ResearchChartPanel context={report.historicalEvidence?.chartContext} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
-      <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+      <ResearchWeightingPanel synthesis={report.aiSynthesis} suspended={suspended} />
+      <ResearchChartPanel context={report.historicalEvidence?.chartContext} suspended={suspended} />
+      <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={suspended} />
       </Detail>
       <Detail title="App · Freigaben, Modellanteile und Einstiegsbedingungen">
-        <AIResearchDecisionSummary report={report} snapshotTimestamp={data?.diagnostics?.snapshotTimestamp} suspended={loading || Boolean(error) || !marketReady || snapshotMismatch} />
+        <AIResearchDecisionSummary report={report} snapshotTimestamp={data?.diagnostics?.snapshotTimestamp} suspended={suspended} />
       </Detail>
       <Detail title="Begründung: App, Kurse, COT und Nachrichten">
         <p className="text-xs leading-relaxed text-[#bbb]">{report.thesis.statement}</p>
