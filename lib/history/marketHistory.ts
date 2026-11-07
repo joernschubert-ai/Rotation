@@ -4,7 +4,7 @@ import type { Redis as RedisType } from "@upstash/redis";
 let redis: RedisType | undefined;
 
 try {
-  redis = Redis.fromEnv();
+  redis = Redis.fromEnv({ automaticDeserialization: false });
 } catch {
   console.warn("Redis not available");
 }
@@ -141,43 +141,18 @@ ATOMIC SAVE
 Compare the current data with the previously read data.
 A concurrent modification causes a retry.
 
-Decode legacy JSON strings before comparison.
+Compare exact stored bytes, without decoding the archive inside Redis.
+Legacy JSON decoding and daily normalization remain in the application.
 No write occurs when the comparison fails.
 ===================================================== */
 
 const SAVE_SCRIPT = `
-local function decode(value)
-  for i = 1, 2 do
-    if type(value) ~= 'string' then break end
-    value = cjson.decode(value)
-  end
-  return value
-end
-
-local function equal(a, b)
-  if type(a) ~= type(b) then return false end
-  if type(a) ~= 'table' then return a == b end
-
-  for k, v in pairs(a) do
-    if not equal(v, b[k]) then return false end
-  end
-
-  for k, _ in pairs(b) do
-    if a[k] == nil then return false end
-  end
-
-  return true
-end
-
 local raw = redis.call('GET', KEYS[1])
-local expected = cjson.decode(ARGV[1])
-
-if not raw then
-  if expected ~= cjson.null then return 0 end
-elseif not equal(decode(raw), decode(expected)) then
+if ARGV[3] == 'missing' then
+  if raw then return 0 end
+elseif not raw or raw ~= ARGV[1] then
   return 0
 end
-
 redis.call('SET', KEYS[1], ARGV[2])
 return 1
 `;
@@ -258,7 +233,10 @@ export async function saveMarketSnapshot(
       attempt < MAX_RETRIES;
       attempt++
     ) {
-      const current = await redis.get(KEY);
+      const current = await redis.get<string>(KEY);
+      if (current !== null && typeof current !== "string") {
+        throw new Error("History raw read did not return stored text");
+      }
 
       const history = normalizeHistory([
         serializableSnapshot,
@@ -269,8 +247,9 @@ export async function saveMarketSnapshot(
         SAVE_SCRIPT,
         [KEY],
         [
-          JSON.stringify(current ?? null),
-          JSON.stringify(history)
+          current ?? "",
+          JSON.stringify(history),
+          current === null ? "missing" : "present"
         ]
       );
 
