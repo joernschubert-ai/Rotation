@@ -29,7 +29,7 @@ export { validateSynthesis } from "./aiResearchLiveQwen";
 
 const MODEL = RESEARCH_MODEL;
 // Isolate the sampling comparison from prompts, schema, specialist and quota policy.
-export const SYNTHESIS_GENERATION_PROFILE = { id: "V79_9_GEMMA_ENTRY_PAIR_WEIGHING_07", temperature: 0.7, maxTokens: 2200 } as const;
+export const SYNTHESIS_GENERATION_PROFILE = { id: "V79_10_GEMMA_LOSSLESS_CATALOG_07", temperature: 0.7, maxTokens: 2200 } as const;
 const PREFIX = "rotation:research:cf:v1";
 // Keep the quota namespace unchanged so the deployment cannot reset daily limits.
 const DAILY_LIMIT = 20;
@@ -77,7 +77,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
   domainConcepts=buildResearchConcepts(structuredInput);
   let sourceRequest:ReturnType<typeof prepareSourceReview>;
   try{sourceRequest=prepareSourceReview(report.appFacts,input.context.task,text(input.context.question,500));}catch{return unavailable('Die App-Belege können nicht vollständig aufbereitet werden oder überschreiten die Eingabegrenze. Keine KI-Anfrage ausgelöst.');}
-  const identity = JSON.stringify({model:MODEL,transportProfile:RESEARCH_TRANSPORT_PROFILE,generationProfile:SYNTHESIS_GENERATION_PROFILE,prompt:SOURCE_REVIEW_PROMPT,domainVersion:CONCEPT_VERSION,contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
+  const identity = JSON.stringify({sourcePayloadHash:createHash("sha256").update(sourceRequest.payload).digest("hex"),model:MODEL,transportProfile:RESEARCH_TRANSPORT_PROFILE,generationProfile:SYNTHESIS_GENERATION_PROFILE,prompt:SOURCE_REVIEW_PROMPT,domainVersion:CONCEPT_VERSION,contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
     question:text(input.context.question,500),appFactsPolicy:APP_FACTS_POLICY,appFacts:report.appFacts??null,...structuredInput});
   let payload=sourceRequest.payload;
   const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, weightingContexts, priceReferences, cotDataQuality, cotAnalysis, domainConcepts, modelRequestsUsed, indexScenarios:indexScenarios??value.indexScenarios, quality: {

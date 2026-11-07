@@ -51,8 +51,17 @@ export function selectionCatalog(context:base.SelectionContext){
  const expanded=old.eligible.map(r=>({instrument:r.instrument,supports:r.supports,opposes:r.opposes}));
  const compact=old.eligible.map(r=>({instrument:r.instrument,either:r.supports.filter(id=>r.opposes.includes(id)),supports:r.supports.filter(id=>!r.opposes.includes(id)),opposes:r.opposes.filter(id=>!r.supports.includes(id))}));
  const facetRule='APP-ZUORDNUNG: arguments enthält nur side und sourceId. Die App liefert sämtliche Teilbefunde aus der Quelle, bei COT Nettozustand und alle vorhandenen Horizonte samt Konflikten. Keine facets/readings/Teilbefundcodes ausgeben. Mehrere MA-/P&F-Befunde sind abhängiger Preiskontext, keine unabhängigen Stimmen. Historische Vergleichswerte sind kein aktueller Impuls.';
- const text=old.text.replace(JSON.stringify(expanded),JSON.stringify(compact))+'\n'+facetRule;
- return {...old,version:'APP_DERIVED_CATALOG_V7',text,appDerivedCatalog:old.observationIds.map(id=>({sourceId:id,facets:sourceFacets(context,id),derivedBy:'APP_SOURCE_DATA'}))};
+ // Encode repeated admissibility lists once. Every source and side remains unchanged.
+ const allEither=compact[0].either.filter(id=>compact.every(r=>r.either.includes(id)));
+ const nasdaqRows=compact.filter(r=>r.instrument.startsWith('NASDAQ_'));
+ const nasdaqEither=nasdaqRows[0].either.filter(id=>!allEither.includes(id)&&nasdaqRows.every(r=>r.either.includes(id)));
+ const roles={allEither,nasdaqEither,rows:compact.map(r=>({...r,either:r.either.filter(id=>!allEither.includes(id)&&!(r.instrument.startsWith('NASDAQ_')&&nasdaqEither.includes(id)))}))};
+ const conditions=old.eligible.map(r=>({instrument:r.instrument,conditions:r.conditions.map(c=>({id:c.id,sourceFindingId:c.sourceFindingId,price:c.price,direction:c.direction,state:c.state,role:c.role,effect:c.effect}))}));
+ const tuples=old.eligible.map(r=>({instrument:r.instrument,open:r.conditions.map(c=>[c.id,c.sourceFindingId,c.price,c.direction,c.role,c.effect])}));
+ if(old.eligible.some(r=>r.conditions.some(c=>c.state!=='OPEN')))throw Error('CATALOG_CONDITION_NOT_OPEN');
+ const text=old.text.replace(JSON.stringify(expanded),'allEither gilt allen drei Instrumenten, nasdaqEither nur Nasdaq Put/Call; beide bedeuten either. rows ergaenzt eigene either/supports/opposes. '+JSON.stringify(roles))
+  .replace(JSON.stringify(conditions),'Alle Bedingungen OPEN. Tupel=[id,sourceFindingId,price,direction,role,effect]. '+JSON.stringify(tuples))+'\n'+facetRule;
+ return {...old,version:'APP_DERIVED_CATALOG_V8',text,appDerivedCatalog:old.observationIds.map(id=>({sourceId:id,facets:sourceFacets(context,id),derivedBy:'APP_SOURCE_DATA'}))};
 }
 
 /** Descriptive families only: no score, ranking, vote count or independence claim. */
