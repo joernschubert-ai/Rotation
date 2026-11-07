@@ -1,3 +1,10 @@
+/** Same instrument-specific colour projection for compact overview and full card. */
+export function anticyclicalInstrumentReading(fact:any,instrument?:string){
+ const a=fact?.values?.anticyclical;
+ if(a?.version!=='ANTICYCLICAL_ENTRY_CONTEXT_V1'||a.status!=='AVAILABLE'||a.asOf!==fact?.asOf||!Number.isFinite(a.rsi14))return null;
+ const d=a.asymmetricDecision?.version==='ASYMMETRIC_DECISION_V1'?a.asymmetricDecision:null,put=instrument==='NASDAQ_PUT';
+ return {tone:put?(d?.tone==='good'?'bad':'neutral'):(d?.tone??'neutral'),label:put?(d?.tone==='good'?'Erholung · Gegenwind für neue Puts':'Put-Einstieg separat prüfen'):(d?.label??'Antizyklische Einordnung offen'),areas:d?.confluence?.areas??null,rsi:a.rsi14,asOf:a.asOf};
+}
 const pp=(v:any)=>typeof v==='number'&&Number.isFinite(v)?`${v>0?'+':''}${v.toLocaleString('de-DE',{maximumFractionDigits:2})} Prozentpunkte`:'unbekannt';
 export function AIResearchAnticyclicalSummary({fact,instrument}:{fact:any;instrument?:string}){
  const anti=fact?.values?.anticyclical;
@@ -7,7 +14,8 @@ export function AIResearchAnticyclicalSummary({fact,instrument}:{fact:any;instru
  const detected=rows.filter((s:any)=>s.status==='TODAY'||s.status==='RECENT');
  const decision=anti.asymmetricDecision?.version==='ASYMMETRIC_DECISION_V1'?anti.asymmetricDecision:null;
  const put=instrument==='NASDAQ_PUT';
- const tone=put?(decision?.tone==='good'?'bad':'neutral'):(decision?.tone??'neutral');
+ const reading=anticyclicalInstrumentReading(fact,instrument);
+ const tone=reading?.tone??'neutral';
  const colors=tone==='good'?'border-emerald-600 bg-emerald-950/40 text-emerald-100':tone==='bad'?'border-rose-700 bg-rose-950/30 text-rose-100':tone==='watch'?'border-amber-700 bg-amber-950/30 text-amber-100':'border-slate-600 bg-slate-900/40 text-slate-200';
  const active=anti.rules?.find((r:any)=>r.id==='RSI_RECLAIM')?.current?.active===true;
  return <div className={'mt-3 rounded-lg border px-3 py-2 text-xs '+colors}>
