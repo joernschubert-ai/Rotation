@@ -182,6 +182,7 @@ style={{
 background: "#0e1722",
 border: "1px solid #475569",
 padding: "12px",
+borderRadius: "12px",
 }}
 >
 <div
@@ -227,6 +228,26 @@ color: "#94a3b8",
 </div>
 ))}
 </div>
+
+<details className="mt-3 border-t border-slate-700 pt-2 text-xs text-slate-400">
+<summary className="cursor-pointer text-slate-300">Info · Abkürzungen und Farben</summary>
+<dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
+{[
+["LIQ", "Liquidität: verfügbarer Liquiditätsindikator der App."],
+["CRD", "Credit: Kreditmarktindikator der App; Kontext für Risikobereitschaft."],
+["TERM", "VIX-Terminstruktur: Verhältnis der kurzen zur längeren Volatilität."],
+["GAM", "Gamma: Gamma-Indikator der App; Kontext zur möglichen Verstärkung oder Dämpfung von Bewegungen."],
+["CORR", "Korrelation: Gleichlauf-Indikator der App; höherer Gleichlauf kann die Diversifikation schwächen."],
+["MOVE", "Erwartete Schwankungen am US-Anleihemarkt."],
+["SYNC", "Regime-Synchronität: stimmen die zugrunde liegenden Regimebefunde überein?"],
+["DANGER", "Gefahrenzone: zusammengefasster Risikobefund der App."],
+["VIX", "Erwartete S&P-500-Schwankung; kein Richtungssignal."],
+["BRD", "Breadth: Anteil der Aktien über ihrem MA50."],
+["MOM", "Breitenmomentum: hier aus den Anteilen über MA20 und MA50 abgeleitet, keine Kursrendite."],
+].map(([label,meaning])=><div key={label}><dt className="font-semibold text-slate-200">{label}</dt><dd className="mt-0.5 leading-relaxed">{meaning}</dd></div>)}
+</dl>
+<p className="mt-3 leading-relaxed">Grün = positiv, Gelb = neutral, Rot = negativ nach den bestehenden Panelregeln. Größere Punkte kennzeichnen eine höhere Darstellungsgewichtung; sie sind keine Erfolgswahrscheinlichkeit. Die Übersicht ist keine eigenständige Einstiegsfreigabe.</p>
+</details>
 
 {!!dangerZone && (
 <div
