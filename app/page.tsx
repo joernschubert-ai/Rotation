@@ -41,7 +41,6 @@ import SqueezeRiskPanel from "@/components/SqueezeRiskPanel";
 import GammaPanel from "@/components/GammaPanel";
 import RotationCompositePanel from "@/components/RotationCompositePanel";
 import RotationInternalsPanel from "@/components/RotationInternalsPanel";
-import HistoricalReplayPanel from "@/components/HistoricalReplayPanel";
 
 type LoadedMarket = {
   engine: any;
@@ -530,13 +529,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mb-8">
-        <SectionHeader
-          title="MARKET HISTORY & REPLAY"
-          subtitle="Historical structural development and regime validation"
-        />
-        <HistoricalReplayPanel replay={engine.replay} />
-      </section>
 
     </main>
   );
