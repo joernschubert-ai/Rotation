@@ -17,9 +17,14 @@ export function reviewEntryWeighing(raw:string,facts:AppFacts){
   const anticyclicalContext=anti?.version==='ANTICYCLICAL_ENTRY_CONTEXT_V1'&&anti.status==='AVAILABLE'?{available:true,asOf:anti.asOf,mentionsContext:/RSI|antizykl|60|80|langfrist|Monat/i.test(text),mentionsLongerHorizon:/60|80|langfrist|Monat/i.test(text),semanticTruthVerified:false}:undefined;
   const decision=anti?.asymmetricDecision as Record<string,any>|undefined;
   const concreteApplicable=anticyclicalContext?.available===true&&anti?.asOf===entry?.asOf&&decision?.version==='ASYMMETRIC_DECISION_V1';
-  const concreteRSI=/RSI(?:14)?[^\d]{0,12}(\d{1,3}(?:[.,]\d+)?)/i.exec(text),expected=typeof anti?.rsi14==='number'?Math.round(anti.rsi14*100)/100:null;
+  // Keep decimal separators inside the clause; do not borrow a value from another sentence or topic.
+  const rsiWindow=/\bRSI(?:\s*14)?\b([^;!?\n]{0,80})/i.exec(text)?.[1]?.split(/\.(?!\d)|(?<!\d)\./)[0]?.split(/\b(?:Futures|COT|Index|MA\s*(?:20|50|200))\b/i)[0]??'';
+  const direct=/^\s*(?:=|:)?\s*(\d{1,3}(?:[.,]\d+)?)(?!\d)/.exec(rsiWindow);
+  const named=/\b(?:bei|Wert(?:\s+von)?|beträgt|betraegt|auf|von)\s*(\d{1,3}(?:[.,]\d+)?)(?!\d)/i.exec(rsiWindow);
+  const fallback=/^[^\d]{0,60}(\d{1,3}(?:[.,]\d+)?)(?!\d)/.exec(rsiWindow);
+  const concreteRSI=direct??named??fallback,expected=typeof anti?.rsi14==='number'?Math.round(anti.rsi14*100)/100:null;
   const rsiMatched=!!concreteRSI&&expected!==null&&Math.abs(Number(concreteRSI[1].replace(',','.'))-expected)<=.011;
-  const noFresh=/kein(?:e|en|em)?[^.;]{0,45}(?:frisch|neu)[^.;]{0,35}(?:Preis|RSI|Signal|Erholungszeichen)|(?:Preis|RSI)[^.;]{0,35}(?:Signal|zeichen)[^.;]{0,25}(?:fehlt|offen)/i.test(text);
+  const noFresh=/(?:kein(?:e|en|em|es)?|ohne)[^.;]{0,45}(?:frisch|neu)[^.;]{0,35}(?:Preis|RSI|Signal|Erholungszeichen)|(?:Preis|RSI)[^.;]{0,35}(?:Signal|zeichen)[^.;]{0,25}(?:fehlt|offen)/i.test(text.replace(/\bnicht\s+(?:ohne|kein(?:e|en|em|es)?)\b/gi,''));
   const hasFreshMeaning=/R[üu]ckkehr|zur[üu]ck[^.;]{0,25}30|Divergenz|Erholungsmuster|Failure.?Swing|MA20[^.;]{0,30}(?:erobert|eroberung)/i.test(text);
   const longer=/60\s*(?:\/|und|oder|bis|–|-)\s*80|(?:60|80)[^.;]{0,15}(?:Intervall|Sitzung)/i.test(text);
   const concreteChecks={ownRSIValue:rsiMatched,signalOrAbsence:decision?.basisId?hasFreshMeaning:noFresh,longerHorizon:longer};

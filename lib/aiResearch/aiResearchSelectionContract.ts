@@ -50,7 +50,7 @@ export function selectionCatalog(context:base.SelectionContext){
  const old=base.selectionCatalog(context);
  const expanded=old.eligible.map(r=>({instrument:r.instrument,supports:r.supports,opposes:r.opposes}));
  const compact=old.eligible.map(r=>({instrument:r.instrument,either:r.supports.filter(id=>r.opposes.includes(id)),supports:r.supports.filter(id=>!r.opposes.includes(id)),opposes:r.opposes.filter(id=>!r.supports.includes(id))}));
- const facetRule='APP-ZUORDNUNG: arguments enthält nur side und sourceId. Die App liefert sämtliche Teilbefunde aus der Quelle, bei COT Nettozustand und alle vorhandenen Horizonte samt Konflikten. Keine facets/readings/Teilbefundcodes ausgeben. Mehrere MA-/P&F-Befunde sind abhängiger Preiskontext, keine unabhängigen Stimmen. Historische Vergleichswerte sind kein aktueller Impuls.';
+ const facetRule='AUSGABE: arguments nur side+sourceId; keine facets/readings. App liefert COT-Teilbefunde. MA/P&F abhaengig, Historie kein Impuls. JE HYPOTHESIS: eigener RSI-Befund; Neueinstieg mit Paar-ID, Kurzfristig UND 60/80 Intervalle abwaegen. Erholung: Call-Kontext/Put-Gegenwind, keine Freigabe. Gegenidee/offen erlaubt.';
  // Encode repeated admissibility lists once. Every source and side remains unchanged.
  const allEither=compact[0].either.filter(id=>compact.every(r=>r.either.includes(id)));
  const nasdaqRows=compact.filter(r=>r.instrument.startsWith('NASDAQ_'));
