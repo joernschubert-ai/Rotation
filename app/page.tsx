@@ -1,5 +1,7 @@
 "use client";
 
+import MarketOverviewRibbon from "@/components/MarketOverviewRibbon";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -55,12 +57,12 @@ function SectionHeader({
   subtitle?: string;
 }) {
   return (
-    <div className="mb-3 border-b border-[#222] pb-2">
-      <h2 className="text-sm font-bold tracking-[0.12em] text-[#888] md:text-base">
+    <div className="mb-3 border-b border-slate-700/70 pb-2">
+      <h2 className="text-sm font-semibold tracking-wide text-slate-300 md:text-base">
         {title}
       </h2>
       {subtitle && (
-        <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#555]">
+        <div className="mt-1 text-[10px] tracking-wide text-slate-500">
           {subtitle}
         </div>
       )}
@@ -270,20 +272,21 @@ export default function Home() {
   const engine = loadedMarket.engine;
 
   const panel = {
-    background: "#111",
-    border: "1px solid #222",
+    background: "#0e1722",
+    border: "1px solid #334155",
+    borderRadius: "12px",
     padding: "16px",
   };
 
   return (
-    <main className="min-h-screen bg-black p-3 font-mono text-white sm:p-4 md:p-6 lg:p-8">
-      <header className="mb-6 flex flex-col gap-4 border-b border-[#222] pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <main className="rotation-dashboard min-h-screen bg-[#0b1120] p-3 font-sans text-slate-200 sm:p-4 md:p-6 lg:p-8">
+      <header className="mb-5 flex flex-col gap-3 border-b border-slate-700/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-wide md:text-2xl">
-            MARKET DASHBOARD
+            ROTATION · MARKET DASHBOARD
           </h1>
-          <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#555]">
-            Institutional Market Structure Engine
+          <div className="mt-1 text-[10px] tracking-wide text-slate-500">
+            Marktüberblick · Rotation · Research
           </div>
         </div>
 
@@ -293,7 +296,7 @@ export default function Home() {
             onClick={() => void load()}
             disabled={isReloading}
             title={isReloading ? "Market data is refreshing" : "Refresh market data"}
-            className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isReloading ? "↻ ..." : "↻"}
           </button>
@@ -302,7 +305,7 @@ export default function Home() {
             type="button"
             onClick={copySnapshot}
             title="Copy the snapshot of the displayed market result"
-            className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333]"
+            className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm transition hover:bg-slate-700"
           >
             📸
           </button>
@@ -314,13 +317,14 @@ export default function Home() {
               localStorage.removeItem("auth");
               router.push("/login");
             }}
-            className="border border-[#444] bg-[#8b0000] px-3 py-2 text-sm transition hover:bg-[#a00000]"
+            className="rounded-lg border border-rose-900 bg-rose-950/50 px-3 py-2 text-sm transition hover:bg-rose-900"
           >
             🔒
           </button>
         </div>
       </header>
 
+      <MarketOverviewRibbon engine={engine} map={loadedMarket.map} snapshotTimestamp={loadedMarket.snapshot.timestamp} />
       <MarketDataStatus map={loadedMarket.map} />
 
       {loadedMarket.map.volatilityDataQuality?.fallbackUsed === true && (
@@ -453,11 +457,13 @@ export default function Home() {
         </div>
 
         <div style={panel}>
-          <h3 className="mb-4 text-sm text-[#888]">INDEX MARKETS</h3>
-          <IndicesPanel
-            indices={engine.indices}
-            futures={engine.futures}
-          />
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-slate-300">Indizes und Futures · ausführliche Ansicht</summary>
+            <div className="mt-3"><IndicesPanel
+              indices={engine.indices}
+              futures={engine.futures}
+            /></div>
+          </details>
         </div>
       </section>
 

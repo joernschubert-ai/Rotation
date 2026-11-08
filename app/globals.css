@@ -24,3 +24,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+
+/* Dashboard visual system. No engine or signal semantics changed. */
+.rotation-dashboard { color-scheme: dark; font-variant-numeric: tabular-nums; }
+.rotation-dashboard button, .rotation-dashboard input, .rotation-dashboard select { font: inherit; }
+.rotation-dashboard summary { list-style-position: inside; }
+.rotation-dashboard summary::marker { color: #7dd3fc; }
+.rotation-dashboard :is(button, a, summary):focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+.rotation-dashboard ::selection { background: #0c4a6e; color: #f0f9ff; }
