@@ -33,6 +33,7 @@ export function AIResearchAnticyclicalSummary({fact,instrument}:{fact:any;instru
     <a className="mt-2 block text-sky-200 underline" href="/api/ai-research/reversal-lab" target="_blank" rel="noopener noreferrer">Historische Preisreaktionen und Fortbestand</a>
    </details>
   </div>}
+  {fact.values.entryWeighing?.version==='APP_ENTRY_WEIGHING_V1'&&fact.values.entryWeighing.asOf===fact.asOf&&fact.values.entryWeighing.market===fact.market&&<details className="mt-2 text-[11px]"><summary className="cursor-pointer text-slate-300">Konkrete Gegenüberstellung · App-Fakten</summary><p className="mt-2">{fact.values.entryWeighing.nowText}</p><p className="mt-2">{fact.values.entryWeighing.historyText}</p><p className="mt-2">{fact.values.entryWeighing.pnfText}</p><p className="mt-2 text-slate-400">{fact.values.entryWeighing.interpretation}</p></details>}
   {decision&&<details className="mt-3 text-[11px]"><summary className="cursor-pointer font-medium">Gewichtung, Kombinationen und historische Balance</summary>
    <p className="mt-2">{decision.reason}</p><p className="mt-2 text-slate-300">0 = historisch ungünstig · 1 = Frühhinweis / uneinheitlich · 2 = konsistenter im Rückblick. Keine Prozentgewichte; pro Bereich höchstens die höchste Stufe, keine Addition.</p>
    {decision.families?.map((f:any)=><p key={f.name} className="mt-1">{f.name}: {f.signals.length?`${f.signals.length} Hinweis(e)`: 'kein frischer Hinweis'} · {f.weight===null?'historische Gewichtung offen':`Evidenzstufe ${f.weight}`}</p>)}
