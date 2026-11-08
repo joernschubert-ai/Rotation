@@ -324,6 +324,14 @@ export default function Home() {
         </div>
       </header>
 
+      <div className="mb-4">
+        <SystemDotsPanel
+          drivers={engine.marketDrivers}
+          structure={engine.structure}
+          crash={engine.crash}
+        />
+      </div>
+
       <MarketOverviewRibbon engine={engine} map={loadedMarket.map} snapshotTimestamp={loadedMarket.snapshot.timestamp} />
       <MarketDataStatus map={loadedMarket.map} />
 
@@ -446,13 +454,7 @@ export default function Home() {
           <div style={panel}>
             <h3 className="mb-4 text-sm text-[#888]">SYSTEM HEAT</h3>
             <SystemHeatPanel heat={engine.systemHeat} />
-            <div className="mt-4">
-              <SystemDotsPanel
-                drivers={engine.marketDrivers}
-                structure={engine.structure}
-                crash={engine.crash}
-              />
-            </div>
+
           </div>
         </div>
 
