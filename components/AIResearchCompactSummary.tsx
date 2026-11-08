@@ -23,7 +23,7 @@ export function AIResearchCompactSummary({report,view}:{report:AIResearchReport;
     {snippet&&<p className={'mt-1 line-clamp-2 text-[11px] leading-relaxed '+(card.factContradictions.length||card.statisticsWarnings.length?'text-amber-200':'text-slate-300')} title={raw}>{snippet}</p>}
     {!!card.factContradictions.length&&<details className="mt-2 text-[10px] text-amber-200"><summary className="cursor-pointer">Faktenwiderspruch · Begründung</summary>{card.factContradictions.map((f,i)=><div key={i} className="mt-2"><p>{f.explanation}</p><p className="mt-1 text-slate-400">Original: „{f.quote}“</p></div>)}</details>}
     {!!card.statisticsWarnings.length&&<details className="mt-2 text-[10px] text-amber-200"><summary className="cursor-pointer">Statistikdeutung · Prüfhinweis</summary>{card.statisticsWarnings.map((f,i)=><div key={i} className="mt-2"><p>{f.explanation}</p><p className="mt-1 text-slate-400">Original: „{f.quote}“</p></div>)}</details>}
-    {concrete?.status==='CONTEXT_NOT_EXPLICIT'&&<p className="mt-1 text-[10px] text-amber-200">Antizyklische Abwägung noch nicht ausdrücklich ausgewiesen.</p>}
+    {concrete?.status==='CONTEXT_NOT_EXPLICIT'&&(!concrete.checks.signalOrAbsence||!concrete.checks.longerHorizon)&&<p className="mt-1 text-[10px] text-amber-200">Antizyklische Abwägung noch nicht ausdrücklich ausgewiesen.</p>}
    </article>;
   })}</div>
  </section>;
