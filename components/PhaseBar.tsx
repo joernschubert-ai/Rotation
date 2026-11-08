@@ -13,7 +13,7 @@ const phases = [
     description: "Broad Participation",
     context: "LONG REGIME",
     interpretation: "Broad participation supports a constructive phase",
-    color: "#52c41a",
+    color: "#6ee7b7",
   },
   {
     key: "PHASE_2_WARNING",
@@ -21,7 +21,7 @@ const phases = [
     description: "Early Internal Deterioration",
     context: "LONG / SELECTIVE",
     interpretation: "Monitor emerging internal deterioration",
-    color: "#faad14",
+    color: "#fcd34d",
   },
   {
     key: "PHASE_3_DISTRIBUTION",
@@ -29,7 +29,7 @@ const phases = [
     description: "Institutional Distribution",
     context: "TRANSITION",
     interpretation: "Distribution phase with incomplete regime transition",
-    color: "#fa8c16",
+    color: "#fdba74",
   },
   {
     key: "PHASE_4_RISK",
@@ -45,7 +45,7 @@ const phases = [
     description: "Structural Breakdown",
     context: "RISK OFF",
     interpretation: "Structural breakdown phase",
-    color: "#ff4d4f",
+    color: "#fda4af",
   },
   {
     key: "PHASE_6_ACCELERATION",
@@ -100,7 +100,7 @@ function getRegimeColor(state: string): string {
     value.includes("RISK_OFF") ||
     value.includes("BREAKDOWN")
   ) {
-    return "#ff4d4f";
+    return "#fda4af";
   }
 
   if (value.includes("FRAGILE")) return "#fa541c";
@@ -109,28 +109,28 @@ function getRegimeColor(state: string): string {
     value.includes("TRANSITION") ||
     value.includes("DISTRIBUTION")
   ) {
-    return "#fa8c16";
+    return "#fdba74";
   }
 
   // Check this before the broader EXPANSION match.
-  if (value.includes("LATE_EXPANSION")) return "#faad14";
+  if (value.includes("LATE_EXPANSION")) return "#fcd34d";
 
   if (
     value.includes("RISK_ON") ||
     value.includes("EXPANSION")
   ) {
-    return "#52c41a";
+    return "#6ee7b7";
   }
 
-  return "#999";
+  return "#94a3b8";
 }
 
 function confidenceColor(value: number | null): string {
-  if (value === null) return "#777";
-  if (value >= 85) return "#52c41a";
+  if (value === null) return "#94a3b8";
+  if (value >= 85) return "#6ee7b7";
   if (value >= 70) return "#13c2c2";
-  if (value >= 55) return "#faad14";
-  return "#777";
+  if (value >= 55) return "#fcd34d";
+  return "#94a3b8";
 }
 
 function confidenceLabel(value: number | null): string {
@@ -184,7 +184,7 @@ export default function PhaseBar({
   const currentPhase =
     activeIndex >= 0 ? phases[activeIndex] : null;
 
-  const phaseColor = currentPhase?.color ?? "#777";
+  const phaseColor = currentPhase?.color ?? "#94a3b8";
   const regimeColor = getRegimeColor(regimeState);
   const confColor = confidenceColor(confidence);
 
@@ -195,8 +195,8 @@ export default function PhaseBar({
       })}%`;
 
   const box = {
-    background: "#101010",
-    border: "1px solid #222",
+    background: "#121d2a",
+    border: "1px solid #334155",
     padding: "10px",
     minWidth: 0,
   };
@@ -204,8 +204,8 @@ export default function PhaseBar({
   return (
     <div
       style={{
-        background: "#0d0d0d",
-        border: "1px solid #222",
+        background: "#0e1722",
+        border: "1px solid #334155",
         padding: "16px",
         width: "100%",
         boxSizing: "border-box",
@@ -222,10 +222,10 @@ export default function PhaseBar({
         }}
       >
         <div>
-          <h3 style={{ margin: 0, color: "#bbb", fontSize: "15px" }}>
+          <h3 style={{ margin: 0, color: "#cbd5e1", fontSize: "15px" }}>
             MARKET REGIME
           </h3>
-          <div style={{ fontSize: "11px", color: "#666", marginTop: "3px" }}>
+          <div style={{ fontSize: "11px", color: "#64748b", marginTop: "3px" }}>
             Institutional 7-Phase Market Model
           </div>
         </div>
@@ -246,14 +246,14 @@ export default function PhaseBar({
 
       <div
         style={{
-          background: "#101010",
+          background: "#121d2a",
           border: `1px solid ${phaseColor}`,
           borderLeft: `4px solid ${phaseColor}`,
           padding: "12px",
           marginBottom: "14px",
         }}
       >
-        <div style={{ fontSize: "10px", color: "#666", marginBottom: "4px" }}>
+        <div style={{ fontSize: "10px", color: "#64748b", marginBottom: "4px" }}>
           CURRENT MARKET PHASE
         </div>
 
@@ -261,14 +261,14 @@ export default function PhaseBar({
           ● {currentPhase?.label ?? "Unknown Market Phase"}
         </div>
 
-        <div style={{ fontSize: "11px", color: "#777", marginTop: "4px" }}>
+        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>
           {currentPhase?.description ?? "No recognized phase supplied"}
         </div>
 
         <div
           style={{
             fontSize: "11px",
-            color: "#888",
+            color: "#94a3b8",
             marginTop: "8px",
             lineHeight: "1.4",
           }}
@@ -293,7 +293,7 @@ export default function PhaseBar({
                     marginTop: active ? "0" : "2px",
                     background: active
                       ? item.color
-                      : lower ? "#333" : "#1c1c1c",
+                      : lower ? "#475569" : "#162232",
                     borderRadius: "4px",
                     transition: "all 0.3s ease",
                     boxShadow: active
@@ -305,14 +305,14 @@ export default function PhaseBar({
             })}
           </div>
 
-          <div style={{ display: "flex", fontSize: "10px", color: "#666" }}>
+          <div style={{ display: "flex", fontSize: "10px", color: "#64748b" }}>
             {phases.map((item, index) => (
               <span
                 key={item.key}
                 style={{
                   flex: 1,
                   textAlign: "center",
-                  color: index === activeIndex ? phaseColor : "#666",
+                  color: index === activeIndex ? phaseColor : "#64748b",
                   fontWeight: index === activeIndex ? "bold" : "normal",
                 }}
               >
@@ -326,7 +326,7 @@ export default function PhaseBar({
               display: "flex",
               marginTop: "5px",
               fontSize: "9px",
-              color: "#555",
+              color: "#64748b",
             }}
           >
             {phases.map((item, index) => (
@@ -335,7 +335,7 @@ export default function PhaseBar({
                 style={{
                   flex: 1,
                   textAlign: "center",
-                  color: index === activeIndex ? phaseColor : "#555",
+                  color: index === activeIndex ? phaseColor : "#64748b",
                   whiteSpace: "nowrap",
                 }}
               >
@@ -361,7 +361,7 @@ export default function PhaseBar({
         }}
       >
         <div style={box}>
-          <div style={{ fontSize: "10px", color: "#666" }}>
+          <div style={{ fontSize: "10px", color: "#64748b" }}>
             REGIME STATE
           </div>
           <div
@@ -378,13 +378,13 @@ export default function PhaseBar({
         </div>
 
         <div style={box}>
-          <div style={{ fontSize: "10px", color: "#666" }}>
+          <div style={{ fontSize: "10px", color: "#64748b" }}>
             SUB PHASE
           </div>
           <div
             style={{
               marginTop: "5px",
-              color: "#ccc",
+              color: "#e2e8f0",
               fontWeight: "bold",
               fontSize: "13px",
               lineHeight: "1.35",
@@ -396,7 +396,7 @@ export default function PhaseBar({
         </div>
 
         <div style={box}>
-          <div style={{ fontSize: "10px", color: "#666" }}>
+          <div style={{ fontSize: "10px", color: "#64748b" }}>
             PHASE CONFIDENCE
           </div>
           <div
@@ -418,16 +418,16 @@ export default function PhaseBar({
       <div
         style={{
           padding: "11px",
-          border: "1px solid #222",
+          border: "1px solid #334155",
           borderLeft: `3px solid ${phaseColor}`,
           fontSize: "11px",
           lineHeight: "1.55",
-          color: "#999",
-          background: "#101010",
+          color: "#94a3b8",
+          background: "#121d2a",
           overflowWrap: "anywhere",
         }}
       >
-        <span style={{ color: "#666" }}>MARKET CLASSIFICATION</span>
+        <span style={{ color: "#64748b" }}>MARKET CLASSIFICATION</span>
         <br />
         <span style={{ color: phaseColor, fontWeight: "bold" }}>
           {currentPhase?.label ?? currentPhaseKey}
@@ -437,7 +437,7 @@ export default function PhaseBar({
           {regimeState}
         </span>
         {" · "}
-        <span style={{ color: "#ccc", fontWeight: "bold" }}>
+        <span style={{ color: "#e2e8f0", fontWeight: "bold" }}>
           {subPhase}
         </span>
       </div>

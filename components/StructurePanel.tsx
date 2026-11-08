@@ -189,22 +189,22 @@ const safeValue =
   clamp(value);
 
 if (safeValue >= 75) {
-  return "#52c41a";
+  return "#6ee7b7";
 }
 
 if (safeValue >= 60) {
-  return "#95de64";
+  return "#a7f3d0";
 }
 
 if (safeValue >= 45) {
-  return "#faad14";
+  return "#fcd34d";
 }
 
 if (safeValue >= 30) {
-  return "#ff7875";
+  return "#fda4af";
 }
 
-return "#ff4d4f";
+return "#fda4af";
 
 }
 
@@ -223,22 +223,22 @@ const safeValue =
   clamp(value);
 
 if (safeValue >= 75) {
-  return "#ff4d4f";
+  return "#fda4af";
 }
 
 if (safeValue >= 55) {
-  return "#ff7875";
+  return "#fda4af";
 }
 
 if (safeValue >= 35) {
-  return "#faad14";
+  return "#fcd34d";
 }
 
 if (safeValue >= 20) {
-  return "#95de64";
+  return "#a7f3d0";
 }
 
-return "#52c41a";
+return "#6ee7b7";
 
 }
 
@@ -258,22 +258,22 @@ if (
   value === null ||
   value === undefined
 ) {
-  return "#666";
+  return "#64748b";
 }
 
 if (
   value > threshold
 ) {
-  return "#52c41a";
+  return "#6ee7b7";
 }
 
 if (
   value < -threshold
 ) {
-  return "#ff4d4f";
+  return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 
 }
 
@@ -507,16 +507,16 @@ function syncColor() {
 if (
   syncState === "ALIGNED"
 ) {
-  return "#52c41a";
+  return "#6ee7b7";
 }
 
 if (
   syncState === "DIVERGING"
 ) {
-  return "#ff4d4f";
+  return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 
 }
 
@@ -539,16 +539,16 @@ function marketModeColor() {
 if (
   marketMode === "RISK_ON"
 ) {
-  return "#52c41a";
+  return "#6ee7b7";
 }
 
 if (
   marketMode === "RISK_OFF"
 ) {
-  return "#ff4d4f";
+  return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 
 }
 
@@ -580,7 +580,7 @@ if (
       "Internal market participation is structurally deteriorating",
 
     color:
-      "#ff4d4f",
+      "#fda4af",
   };
 
 }
@@ -598,7 +598,7 @@ if (
       "Market participation is weakening and requires defensive monitoring",
 
     color:
-      "#ff7875",
+      "#fda4af",
   };
 
 }
@@ -616,7 +616,7 @@ if (
       "Market internals are mixed and structural confirmation is incomplete",
 
     color:
-      "#faad14",
+      "#fcd34d",
   };
 
 }
@@ -629,7 +629,7 @@ return {
     "Broad market participation supports the current market structure",
 
   color:
-    "#52c41a",
+    "#6ee7b7",
 };
 
 }
@@ -657,7 +657,7 @@ const safeValue =
 const valueColor =
   value !== null
     ? positiveColor(safeValue)
-    : "#666";
+    : "#64748b";
 
 return (
 
@@ -684,7 +684,7 @@ return (
 
       <span
         style={{
-          color: "#888",
+          color: "#94a3b8",
 
           fontSize: "12px",
         }}
@@ -708,7 +708,7 @@ return (
             color:
               change !== null
                 ? directionColor(change)
-                : "#666",
+                : "#64748b",
 
             fontSize:
               "10px",
@@ -740,7 +740,7 @@ return (
         height: "6px",
 
         background:
-          "#222",
+          "#334155",
 
         borderRadius:
           "4px",
@@ -797,10 +797,10 @@ return (
   <div
     style={{
       background:
-        "#111",
+        "#121d2a",
 
       border:
-        "1px solid #222",
+        "1px solid #334155",
 
       padding:
         "12px",
@@ -810,7 +810,7 @@ return (
     <div
       style={{
         color:
-          "#666",
+          "#64748b",
 
         fontSize:
           "10px",
@@ -847,7 +847,7 @@ return (
             "5px",
 
           color:
-            "#555",
+            "#64748b",
 
           fontSize:
             "10px",
@@ -873,7 +873,7 @@ return (
 <div
   style={{
     background:
-      "#0d0d0d",
+      "#0e1722",
 
     border:
       `2px solid ${currentStructure.color}`,
@@ -907,7 +907,7 @@ return (
       <h3
         style={{
           color:
-            "#ddd",
+            "#e2e8f0",
 
           margin:
             "0 0 5px 0",
@@ -928,7 +928,7 @@ return (
       <div
         style={{
           color:
-            "#666",
+            "#64748b",
 
           fontSize:
             "10px",
@@ -977,7 +977,7 @@ return (
       <div
         style={{
           color:
-            "#777",
+            "#94a3b8",
 
           fontSize:
             "10px",
@@ -1016,7 +1016,7 @@ return (
     <div
       style={{
         color:
-          "#777",
+          "#94a3b8",
 
         fontSize:
           "10px",
@@ -1052,7 +1052,7 @@ return (
     <div
       style={{
         color:
-          "#aaa",
+          "#cbd5e1",
 
         fontSize:
           "12px",
@@ -1073,7 +1073,7 @@ return (
   <div
     style={{
       borderTop:
-        "1px solid #222",
+        "1px solid #334155",
 
       paddingTop:
         "16px",
@@ -1086,7 +1086,7 @@ return (
     <div
       style={{
         color:
-          "#666",
+          "#64748b",
 
         fontSize:
           "10px",
@@ -1131,7 +1131,7 @@ return (
   <div
     style={{
       borderTop:
-        "1px solid #222",
+        "1px solid #334155",
 
       paddingTop:
         "16px",
@@ -1144,7 +1144,7 @@ return (
     <div
       style={{
         color:
-          "#666",
+          "#64748b",
 
         fontSize:
           "10px",
@@ -1254,7 +1254,7 @@ return (
                 hlStrength,
                 0.05
               )
-            : "#666"
+            : "#64748b"
         }
 
         subLabel="Net new high / low balance"
@@ -1271,7 +1271,7 @@ return (
   <div
     style={{
       borderTop:
-        "1px solid #222",
+        "1px solid #334155",
 
       paddingTop:
         "16px",
@@ -1302,7 +1302,7 @@ return (
         <div
           style={{
             color:
-              "#666",
+              "#64748b",
 
             fontSize:
               "10px",
@@ -1323,7 +1323,7 @@ return (
         <div
           style={{
             color:
-              "#888",
+              "#94a3b8",
 
             fontSize:
               "11px",
@@ -1366,7 +1366,7 @@ return (
           "7px",
 
         background:
-          "#222",
+          "#334155",
 
         borderRadius:
           "5px",
@@ -1409,7 +1409,7 @@ return (
   <div
     style={{
       borderTop:
-        "1px solid #222",
+        "1px solid #334155",
 
       paddingTop:
         "16px",
@@ -1419,7 +1419,7 @@ return (
     <div
       style={{
         color:
-          "#666",
+          "#64748b",
 
         fontSize:
           "10px",
@@ -1478,7 +1478,7 @@ return (
 
         value={executionMode}
 
-        color="#aaa"
+        color="#cbd5e1"
 
         subLabel="Current execution posture"
       />
@@ -1497,7 +1497,7 @@ return (
         "18px",
 
       color:
-        "#555",
+        "#64748b",
 
       fontSize:
         "10px",

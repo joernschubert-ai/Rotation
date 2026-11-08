@@ -35,55 +35,55 @@ function safeBoolean(value: unknown): boolean | null {
 
 function getPhaseColor(phaseValue: string): string {
   const value = safeText(phaseValue, "").toUpperCase();
-  if (value === "PHASE_1" || value.includes("PHASE_1_EXPANSION")) return "#52c41a";
-  if (value === "PHASE_2" || value.includes("PHASE_2_WARNING")) return "#95de64";
-  if (value === "PHASE_3" || value.includes("PHASE_3_DISTRIBUTION")) return "#fadb14";
-  if (value === "PHASE_4" || value.includes("PHASE_4_RISK")) return "#fa8c16";
-  if (value === "PHASE_5" || value.includes("PHASE_5_BREAKDOWN")) return "#ff4d4f";
+  if (value === "PHASE_1" || value.includes("PHASE_1_EXPANSION")) return "#6ee7b7";
+  if (value === "PHASE_2" || value.includes("PHASE_2_WARNING")) return "#a7f3d0";
+  if (value === "PHASE_3" || value.includes("PHASE_3_DISTRIBUTION")) return "#fcd34d";
+  if (value === "PHASE_4" || value.includes("PHASE_4_RISK")) return "#fdba74";
+  if (value === "PHASE_5" || value.includes("PHASE_5_BREAKDOWN")) return "#fda4af";
   if (value === "PHASE_6" || value.includes("PHASE_6_ACCELERATION")) return "#a8071a";
   if (value === "PHASE_7" || value.includes("PHASE_7_CAPITULATION")) return "#7f1d1d";
-  return "#666";
+  return "#64748b";
 }
 
 function getModeColor(mode: string): string {
   switch (mode.toUpperCase()) {
-    case "RISK_ON": return "#52c41a";
+    case "RISK_ON": return "#6ee7b7";
     case "RISK_OFF":
-    case "RISK": return "#ff4d4f";
-    case "TRANSITION": return "#faad14";
-    default: return "#888";
+    case "RISK": return "#fda4af";
+    case "TRANSITION": return "#fcd34d";
+    default: return "#94a3b8";
   }
 }
 
 function getRiskColor(risk: string): string {
   switch (risk.toUpperCase()) {
-    case "STABLE": return "#52c41a";
-    case "FRAGILE": return "#fa8c16";
-    case "BREAKDOWN": return "#ff7875";
-    case "CRISIS": return "#ff4d4f";
-    default: return "#666";
+    case "STABLE": return "#6ee7b7";
+    case "FRAGILE": return "#fdba74";
+    case "BREAKDOWN": return "#fda4af";
+    case "CRISIS": return "#fda4af";
+    default: return "#64748b";
   }
 }
 
 function getDangerColor(level: string): string {
   switch (level.toUpperCase()) {
-    case "LOW": return "#52c41a";
-    case "ELEVATED": return "#faad14";
-    case "HIGH": return "#ff7875";
-    case "EXTREME": return "#ff4d4f";
-    default: return "#666";
+    case "LOW": return "#6ee7b7";
+    case "ELEVATED": return "#fcd34d";
+    case "HIGH": return "#fda4af";
+    case "EXTREME": return "#fda4af";
+    default: return "#64748b";
   }
 }
 
 function getSyncColor(state: string): string {
   switch (state.toUpperCase()) {
-    case "ALIGNED": return "#52c41a";
-    case "TRANSITION": return "#faad14";
-    case "FRAGILE": return "#fa8c16";
-    case "DIVERGING": return "#ff7875";
-    case "BREAKDOWN": return "#ff4d4f";
+    case "ALIGNED": return "#6ee7b7";
+    case "TRANSITION": return "#fcd34d";
+    case "FRAGILE": return "#fdba74";
+    case "DIVERGING": return "#fda4af";
+    case "BREAKDOWN": return "#fda4af";
     case "CRISIS": return "#a8071a";
-    default: return "#666";
+    default: return "#64748b";
   }
 }
 
@@ -91,21 +91,21 @@ function getBiasColor(bias: string): string {
   switch (bias.toUpperCase()) {
     case "BULLISH":
     case "LONG":
-    case "LONG_INDEX": return "#52c41a";
+    case "LONG_INDEX": return "#6ee7b7";
     case "BEARISH":
     case "SHORT":
-    case "SHORT_INDEX": return "#ff4d4f";
-    default: return "#aaa";
+    case "SHORT_INDEX": return "#fda4af";
+    default: return "#cbd5e1";
   }
 }
 
 function getUrgencyColor(urgency: string): string {
   switch (urgency.toUpperCase()) {
-    case "EXTREME": return "#ff4d4f";
-    case "HIGH": return "#ff7875";
-    case "MEDIUM": return "#faad14";
-    case "LOW": return "#52c41a";
-    default: return "#aaa";
+    case "EXTREME": return "#fda4af";
+    case "HIGH": return "#fda4af";
+    case "MEDIUM": return "#fcd34d";
+    case "LOW": return "#6ee7b7";
+    default: return "#cbd5e1";
   }
 }
 
@@ -115,8 +115,8 @@ function RibbonBlock({label, value, color}: {
   color: string;
 }) {
   return (
-    <div style={{padding: "10px", border: `1px solid ${color}`, background: "#111", textAlign: "center", minHeight: "72px", borderRadius: "6px", minWidth: 0}}>
-      <div style={{fontSize: "10px", color: "#666", marginBottom: "6px", letterSpacing: "0.5px", whiteSpace: "nowrap"}}>{label}</div>
+    <div style={{padding: "10px", border: `1px solid ${color}`, background: "#121d2a", textAlign: "center", minHeight: "72px", borderRadius: "6px", minWidth: 0}}>
+      <div style={{fontSize: "10px", color: "#64748b", marginBottom: "6px", letterSpacing: "0.5px", whiteSpace: "nowrap"}}>{label}</div>
       <div style={{color, fontWeight: "bold", fontSize: "14px", lineHeight: 1.2, overflowWrap: "anywhere"}}>{value}</div>
     </div>
   );
@@ -139,16 +139,16 @@ export default function RegimeRibbonPanel({executionState, regimeSync, dangerZon
   const syncAlignment = safeBoolean(regimeSync?.aligned);
   const regimeAlignment = executionAlignment ?? syncAlignment;
   const alignmentText = regimeAlignment === true ? "CONFIRMED" : regimeAlignment === false ? "UNSTABLE" : "UNKNOWN";
-  const alignmentColor = regimeAlignment === true ? "#52c41a" : regimeAlignment === false ? "#ff4d4f" : "#888";
+  const alignmentColor = regimeAlignment === true ? "#6ee7b7" : regimeAlignment === false ? "#fda4af" : "#94a3b8";
   const phaseColor = getPhaseColor(phaseValue);
   const summary = `${marketMode} | ${tacticalBias} | ${executionMode}`;
 
   return (
-    <div style={{background: "#0d0d0d", border: `1px solid ${phaseColor}`, padding: "16px", marginBottom: "16px", borderRadius: "8px", width: "100%", boxSizing: "border-box"}}>
+    <div style={{background: "#0e1722", border: `1px solid ${phaseColor}`, padding: "16px", marginBottom: "16px", borderRadius: "8px", width: "100%", boxSizing: "border-box"}}>
       {/* HEADER */}
       <div style={{marginBottom: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap"}}>
-        <div style={{color: "#999", fontSize: "13px", fontWeight: "bold", letterSpacing: "0.5px"}}>REGIME COMMAND CENTER</div>
-        <div style={{color: "#40a9ff", fontSize: "12px", fontWeight: "bold"}}>Regime-Ausführung: {executionMode}</div>
+        <div style={{color: "#94a3b8", fontSize: "13px", fontWeight: "bold", letterSpacing: "0.5px"}}>REGIME COMMAND CENTER</div>
+        <div style={{color: "#7dd3fc", fontSize: "12px", fontWeight: "bold"}}>Regime-Ausführung: {executionMode}</div>
       </div>
 
       {/* SUMMARY */}
@@ -161,13 +161,13 @@ export default function RegimeRibbonPanel({executionState, regimeSync, dangerZon
         <RibbonBlock label="RISK" value={riskState} color={getRiskColor(riskState)} />
         <RibbonBlock label="REGIME SYNC" value={syncState} color={getSyncColor(syncState)} />
         <RibbonBlock label="DANGER" value={dangerLevel} color={getDangerColor(dangerLevel)} />
-        <RibbonBlock label="REGIME-AUSFÜHRUNG" value={executionMode} color="#40a9ff" />
+        <RibbonBlock label="REGIME-AUSFÜHRUNG" value={executionMode} color="#7dd3fc" />
       </div>
 
-      <p style={{fontSize: "11px", color: "#999", lineHeight: 1.5}}>Allgemeiner Regime-Status. Einzelne Instrumente können trotz WAIT einen begrenzten Starter freigeben; maßgeblich sind Trade Stack und Positionsgröße.</p>
+      <p style={{fontSize: "11px", color: "#94a3b8", lineHeight: 1.5}}>Allgemeiner Regime-Status. Einzelne Instrumente können trotz WAIT einen begrenzten Starter freigeben; maßgeblich sind Trade Stack und Positionsgröße.</p>
 
       {/* FOOTER */}
-      <div style={{marginTop: "14px", paddingTop: "14px", borderTop: "1px solid #2a2a2a", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", fontSize: "11px", color: "#666"}}>
+      <div style={{marginTop: "14px", paddingTop: "14px", borderTop: "1px solid #334155", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", fontSize: "11px", color: "#64748b"}}>
         <div>Bias: <span style={{color: getBiasColor(tacticalBias), fontWeight: "bold"}}>{tacticalBias}</span></div>
         <div>Urgency: <span style={{color: getUrgencyColor(urgency), fontWeight: "bold"}}>{urgency}</span></div>
         <div>Alignment: <span style={{color: alignmentColor, fontWeight: "bold"}}>{alignmentText}</span></div>

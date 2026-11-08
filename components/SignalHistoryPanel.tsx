@@ -351,7 +351,7 @@ if (
   value.includes("SHORT")
 ) {
 
-  return "#ff4d4f";
+  return "#fda4af";
 
 }
 
@@ -361,7 +361,7 @@ if (
   value.includes("CALL")
 ) {
 
-  return "#52c41a";
+  return "#6ee7b7";
 
 }
 
@@ -371,7 +371,7 @@ if (
   value.includes("TRIM")
 ) {
 
-  return "#faad14";
+  return "#fcd34d";
 
 }
 
@@ -380,7 +380,7 @@ if (
   value.includes("EXIT")
 ) {
 
-  return "#ff7875";
+  return "#fda4af";
 
 }
 
@@ -395,7 +395,7 @@ if (
 }
 
 
-return "#888";
+return "#94a3b8";
 
 }
 
@@ -404,15 +404,15 @@ value: number
 ) {
 
 if (value >= 80)
-  return "#52c41a";
+  return "#6ee7b7";
 
 if (value >= 60)
-  return "#faad14";
+  return "#fcd34d";
 
 if (value >= 40)
   return "#d4b106";
 
-return "#666";
+return "#64748b";
 
 }
 
@@ -423,19 +423,19 @@ phase?: string
 switch (phase) {
 
   case "PHASE_1_EXPANSION":
-    return "#52c41a";
+    return "#6ee7b7";
 
   case "PHASE_2_WARNING":
-    return "#95de64";
+    return "#a7f3d0";
 
   case "PHASE_3_DISTRIBUTION":
-    return "#faad14";
+    return "#fcd34d";
 
   case "PHASE_4_RISK":
-    return "#fa8c16";
+    return "#fdba74";
 
   case "PHASE_5_BREAKDOWN":
-    return "#ff4d4f";
+    return "#fda4af";
 
   case "PHASE_6_ACCELERATION":
     return "#cf1322";
@@ -444,7 +444,7 @@ switch (phase) {
     return "#820014";
 
   default:
-    return "#666";
+    return "#64748b";
 
 }
 
@@ -491,8 +491,8 @@ return (
 
 <div
   style={{
-    background: "#0d0d0d",
-    border: "1px solid #222",
+    background: "#0e1722",
+    border: "1px solid #334155",
     padding: "16px"
   }}
 >
@@ -519,7 +519,7 @@ return (
       <h3
         style={{
           margin: 0,
-          color: "#ddd",
+          color: "#e2e8f0",
           fontSize: "15px",
           letterSpacing: "0.5px"
         }}
@@ -533,7 +533,7 @@ return (
       <div
         style={{
           fontSize: "11px",
-          color: "#666",
+          color: "#64748b",
           marginTop: "4px"
         }}
       >
@@ -549,7 +549,7 @@ return (
           style={{
             marginTop: "8px",
             fontSize: "10px",
-            color: "#555"
+            color: "#64748b"
           }}
         >
 
@@ -602,31 +602,31 @@ return (
       <StatItem
         label="Total"
         value={totalSignals}
-        color="#ddd"
+        color="#e2e8f0"
       />
 
       <StatItem
         label="Today"
         value={todaySignals}
-        color="#bbb"
+        color="#cbd5e1"
       />
 
       <StatItem
         label="Strong"
         value={strongSignals}
-        color="#52c41a"
+        color="#6ee7b7"
       />
 
       <StatItem
         label="Weak"
         value={weakSignals}
-        color="#faad14"
+        color="#fcd34d"
       />
 
       <StatItem
         label="Avg"
         value={averageStrength}
-        color="#ddd"
+        color="#e2e8f0"
       />
 
     </div>
@@ -672,18 +672,18 @@ return (
 
             background:
               filter === currentFilter
-                ? "#2a2a2a"
-                : "#151515",
+                ? "#334155"
+                : "#121d2a",
 
             border:
               filter === currentFilter
-                ? "1px solid #555"
+                ? "1px solid #64748b"
                 : "1px solid #292929",
 
             color:
               filter === currentFilter
-                ? "#fff"
-                : "#777",
+                ? "#f8fafc"
+                : "#94a3b8",
 
             cursor: "pointer",
 
@@ -716,7 +716,7 @@ return (
       style={{
         padding: "35px",
         textAlign: "center",
-        color: "#555",
+        color: "#64748b",
         fontSize: "12px",
         border: "1px dashed #292929"
       }}
@@ -740,7 +740,7 @@ return (
         style={{
           padding: "30px",
           textAlign: "center",
-          color: "#ff7875",
+          color: "#fda4af",
           fontSize: "12px",
           border:
             "1px solid #3a1f1f"
@@ -766,9 +766,9 @@ return (
         style={{
           padding: "35px",
           textAlign: "center",
-          color: "#555",
+          color: "#64748b",
           border:
-            "1px dashed #333",
+            "1px dashed #475569",
           fontSize: "12px"
         }}
       >
@@ -826,10 +826,10 @@ return (
                 }
 
                 style={{
-                  background: "#101010",
+                  background: "#121d2a",
 
                   border:
-                    "1px solid #222",
+                    "1px solid #334155",
 
                   borderLeft:
                     `4px solid ${color}`,
@@ -914,7 +914,7 @@ return (
                         "10px",
 
                       color:
-                        "#666",
+                        "#64748b",
 
                       lineHeight:
                         "1.5"
@@ -994,7 +994,7 @@ return (
                         "10px",
 
                       color:
-                        "#666",
+                        "#64748b",
 
                       marginBottom:
                         "5px"
@@ -1033,7 +1033,7 @@ return (
                         "5px",
 
                       background:
-                        "#222",
+                        "#334155",
 
                       overflow:
                         "hidden"
@@ -1076,7 +1076,7 @@ return (
                       "12px",
 
                     borderTop:
-                      "1px solid #1d1d1d"
+                      "1px solid #162232"
                   }}
                 >
 
@@ -1086,7 +1086,7 @@ return (
                         "9px",
 
                       color:
-                        "#555",
+                        "#64748b",
 
                       letterSpacing:
                         "0.7px",
@@ -1165,7 +1165,7 @@ return (
                         "#0c0c0c",
 
                       borderLeft:
-                        "2px solid #333"
+                        "2px solid #475569"
                     }}
                   >
 
@@ -1175,7 +1175,7 @@ return (
                           "9px",
 
                         color:
-                          "#555",
+                          "#64748b",
 
                         marginBottom:
                           "4px",
@@ -1196,7 +1196,7 @@ return (
                           "11px",
 
                         color:
-                          "#aaa",
+                          "#cbd5e1",
 
                         lineHeight:
                           "1.45"
@@ -1227,7 +1227,7 @@ return (
                         "11px",
 
                       color:
-                        "#777",
+                        "#94a3b8",
 
                       lineHeight:
                         "1.5"
@@ -1237,7 +1237,7 @@ return (
                     <span
                       style={{
                         color:
-                          "#555",
+                          "#64748b",
 
                         marginRight:
                           "6px",
@@ -1302,7 +1302,7 @@ return (
   <div
     style={{
       fontSize: "9px",
-      color: "#666",
+      color: "#64748b",
       marginBottom: "3px"
     }}
   >
@@ -1348,7 +1348,7 @@ typeof value === "number"
 : null;
 
 let color =
-"#aaa";
+"#cbd5e1";
 
 if (
 numericValue !== null
@@ -1360,26 +1360,26 @@ if (
 ) {
 
   if (numericValue >= 75)
-    color = "#ff4d4f";
+    color = "#fda4af";
 
   else if (numericValue >= 50)
-    color = "#faad14";
+    color = "#fcd34d";
 
   else
-    color = "#52c41a";
+    color = "#6ee7b7";
 
 }
 
 else {
 
   if (numericValue >= 70)
-    color = "#52c41a";
+    color = "#6ee7b7";
 
   else if (numericValue >= 40)
-    color = "#faad14";
+    color = "#fcd34d";
 
   else
-    color = "#ff7875";
+    color = "#fda4af";
 
 }
 
@@ -1406,7 +1406,7 @@ return (
         "8px",
 
       color:
-        "#555",
+        "#64748b",
 
       marginBottom:
         "5px",

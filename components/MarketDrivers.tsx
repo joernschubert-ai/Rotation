@@ -129,22 +129,22 @@ const safeValue =
 clamp(value);
 
 if (safeValue >= 75) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (safeValue >= 60) {
-return "#95de64";
+return "#a7f3d0";
 }
 
 if (safeValue >= 45) {
-return "#faad14";
+return "#fcd34d";
 }
 
 if (safeValue >= 30) {
-return "#ff7875";
+return "#fda4af";
 }
 
-return "#ff4d4f";
+return "#fda4af";
 
 }
 
@@ -157,22 +157,22 @@ const safeValue =
 clamp(value);
 
 if (safeValue >= 75) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 if (safeValue >= 55) {
-return "#ff7875";
+return "#fda4af";
 }
 
 if (safeValue >= 35) {
-return "#faad14";
+return "#fcd34d";
 }
 
 if (safeValue >= 20) {
-return "#95de64";
+return "#a7f3d0";
 }
 
-return "#52c41a";
+return "#6ee7b7";
 
 }
 
@@ -187,98 +187,98 @@ switch (type) {
 case "vix":
 
 return value < 18
-? "#52c41a"
+? "#6ee7b7"
 : value < 25
-? "#faad14"
-: "#ff4d4f";
+? "#fcd34d"
+: "#fda4af";
 
 
 case "term":
 
 return value > 1.05
-? "#52c41a"
+? "#6ee7b7"
 : value >= 0.95
-? "#faad14"
-: "#ff4d4f";
+? "#fcd34d"
+: "#fda4af";
 
 
 case "volOfVol":
 
 return value < 1.10
-? "#52c41a"
+? "#6ee7b7"
 : value < 1.30
-? "#faad14"
-: "#ff4d4f";
+? "#fcd34d"
+: "#fda4af";
 
 
 case "liquidity":
 
 return value > 70
-? "#52c41a"
+? "#6ee7b7"
 : value > 40
-? "#faad14"
-: "#ff4d4f";
+? "#fcd34d"
+: "#fda4af";
 
 
 case "gamma":
 
 return value > 0
-? "#52c41a"
+? "#6ee7b7"
 : value < 0
-? "#ff4d4f"
-: "#faad14";
+? "#fda4af"
+: "#fcd34d";
 
 
 case "skew":
 
 return value < 105
-? "#52c41a"
+? "#6ee7b7"
 : value < 120
-? "#faad14"
-: "#ff4d4f";
+? "#fcd34d"
+: "#fda4af";
 
 
 case "credit":
 
 return value > 0.90
-? "#52c41a"
+? "#6ee7b7"
 : value > 0.80
-? "#faad14"
-: "#ff4d4f";
+? "#fcd34d"
+: "#fda4af";
 
 
 case "correlation":
 
 return value < 1
-? "#52c41a"
+? "#6ee7b7"
 : value < 2
-? "#faad14"
-: "#ff4d4f";
+? "#fcd34d"
+: "#fda4af";
 
 
 case "breadth":
 
 return value > 70
-? "#52c41a"
+? "#6ee7b7"
 : value > 50
-? "#95de64"
+? "#a7f3d0"
 : value > 40
-? "#faad14"
-: "#ff4d4f";
+? "#fcd34d"
+: "#fda4af";
 
 
 case "move":
 
 return value < 75
-? "#52c41a"
+? "#6ee7b7"
 : value < 90
-? "#faad14"
-: "#ff4d4f";
+? "#fcd34d"
+: "#fda4af";
 
 
 default:
 
-return "#999";
+return "#94a3b8";
 
 }
 
@@ -296,16 +296,16 @@ value: string
 if (
 value === "RISK_ON"
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (
 value === "RISK_OFF"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 
 }
 
@@ -318,17 +318,17 @@ if (
 value.includes("LONG") ||
 value === "BULLISH"
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (
 value.includes("SHORT") ||
 value === "BEARISH"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 
 }
 
@@ -340,22 +340,22 @@ value: string
 if (
 value === "STABLE"
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (
 value === "NORMAL"
 ) {
-return "#95de64";
+return "#a7f3d0";
 }
 
 if (
 value === "FRAGILE"
 ) {
-return "#faad14";
+return "#fcd34d";
 }
 
-return "#ff4d4f";
+return "#fda4af";
 
 }
 
@@ -367,16 +367,16 @@ state: string
 if (
 state === "ALIGNED"
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (
 state === "DIVERGING"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 
 }
 
@@ -536,34 +536,34 @@ function globalStateColor() {
 if (
 globalState === "RISK_ON"
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (
 globalState === "FRAGILE_RISK_ON"
 ) {
-return "#faad14";
+return "#fcd34d";
 }
 
 if (
 globalState === "COMPRESSED_MELTUP"
 ) {
-return "#ff7875";
+return "#fda4af";
 }
 
 if (
 globalState === "INTERNAL_DISTRIBUTION"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 if (
 globalState === "RISK_OFF"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 
 }
 
@@ -584,7 +584,7 @@ text:
 "Critical market instability detected",
 
 color:
-"#ff4d4f",
+"#fda4af",
 };
 
 }
@@ -600,7 +600,7 @@ text:
 "Internal distribution despite index-level stability",
 
 color:
-"#ff4d4f",
+"#fda4af",
 };
 
 }
@@ -616,7 +616,7 @@ text:
 "Compressed market: low volatility with elevated structural risk",
 
 color:
-"#ff7875",
+"#fda4af",
 };
 
 }
@@ -632,7 +632,7 @@ text:
 "Risk-on price environment with weakening internal participation",
 
 color:
-"#faad14",
+"#fcd34d",
 };
 
 }
@@ -648,7 +648,7 @@ text:
 "Defensive market driver environment",
 
 color:
-"#ff4d4f",
+"#fda4af",
 };
 
 }
@@ -664,7 +664,7 @@ text:
 "Broad institutional regime alignment",
 
 color:
-"#52c41a",
+"#6ee7b7",
 };
 
 }
@@ -679,7 +679,7 @@ text:
 "Early structural warning signals detected",
 
 color:
-"#faad14",
+"#fcd34d",
 };
 
 }
@@ -690,7 +690,7 @@ text:
 "Mixed market driver environment",
 
 color:
-"#999",
+"#94a3b8",
 };
 
 }
@@ -716,13 +716,13 @@ return (
 <div
 style={{
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding:
 "12px",
 
 background:
-"#111",
+"#121d2a",
 
 minWidth:
 0,
@@ -735,7 +735,7 @@ fontSize:
 "10px",
 
 color:
-"#666",
+"#64748b",
 
 marginBottom:
 "6px",
@@ -781,7 +781,7 @@ marginTop:
 "5px",
 
 color:
-"#555",
+"#64748b",
 
 fontSize:
 "10px",
@@ -811,7 +811,7 @@ return (
 <div
 style={{
 background:
-"#0d0d0d",
+"#0e1722",
 
 border:
 `1px solid ${summary.color}`,
@@ -845,7 +845,7 @@ margin:
 "0 0 5px 0",
 
 color:
-"#ddd",
+"#e2e8f0",
 
 fontSize:
 "16px",
@@ -860,7 +860,7 @@ MARKET DRIVERS
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -910,7 +910,7 @@ driverScore
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -979,7 +979,7 @@ marginBottom:
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -1053,7 +1053,7 @@ PRIMARY DRIVERS
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 
 paddingTop:
 "16px",
@@ -1066,7 +1066,7 @@ marginBottom:
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -1222,7 +1222,7 @@ STRUCTURAL RISK DIAGNOSTICS
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 
 paddingTop:
 "16px",
@@ -1232,7 +1232,7 @@ paddingTop:
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -1307,7 +1307,7 @@ marginTop:
 "16px",
 
 color:
-"#555",
+"#64748b",
 
 fontSize:
 "10px",

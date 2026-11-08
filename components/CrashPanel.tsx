@@ -76,36 +76,36 @@ CRASH SCALE
 */
 
 if (value >= 65) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 if (value >= 36) {
-return "#fa8c16";
+return "#fdba74";
 }
 
 if (value >= 21) {
-return "#faad14";
+return "#fcd34d";
 }
 
-return "#52c41a";
+return "#6ee7b7";
 }
 
 function structuralColor(
 value: number
 ) {
 if (value >= 75) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 if (value >= 45) {
-return "#fa8c16";
+return "#fdba74";
 }
 
 if (value >= 25) {
-return "#faad14";
+return "#fcd34d";
 }
 
-return "#52c41a";
+return "#6ee7b7";
 }
 
 function stateColor(
@@ -115,7 +115,7 @@ if (
 state === "HIGH" ||
 state === "PANIC"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 if (
@@ -123,10 +123,10 @@ state === "ELEVATED" ||
 state === "MEDIUM" ||
 state === "STRESSED"
 ) {
-return "#fa8c16";
+return "#fdba74";
 }
 
-return "#52c41a";
+return "#6ee7b7";
 }
 
 function eventColor(
@@ -134,10 +134,10 @@ eventType: string
 ) {
 switch (eventType) {
 case "PANIC_CAPITULATION":
-return "#ff4d4f";
+return "#fda4af";
 
 case "LIQUIDATION_EVENT":
-return "#ff7875";
+return "#fda4af";
 
 case "VOL_CRASH":
 return "#fa541c";
@@ -146,10 +146,10 @@ case "CREDIT_EVENT":
 return "#722ed1";
 
 case "ORDERLY_RESET":
-return "#faad14";
+return "#fcd34d";
 
 default:
-return "#777";
+return "#94a3b8";
 }
 }
 
@@ -246,7 +246,7 @@ transform:
 borderRadius: "50%",
 
 background:
-"conic-gradient(from 270deg, #52c41a 0deg, #faad14 60deg, #fa8c16 120deg, #ff4d4f 180deg, transparent 180deg)"
+"conic-gradient(from 270deg, #6ee7b7 0deg, #fcd34d 60deg, #fdba74 120deg, #fda4af 180deg, transparent 180deg)"
 }}
 />
 
@@ -267,7 +267,7 @@ transform:
 
 borderRadius: "50%",
 
-background: "#0d0d0d"
+background: "#0e1722"
 }}
 />
 
@@ -313,7 +313,7 @@ height: "10px",
 
 borderRadius: "50%",
 
-background: "#fff"
+background: "#f8fafc"
 }}
 />
 </div>
@@ -357,7 +357,7 @@ minWidth: 0
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "8px",
 marginBottom: "6px"
 }}
@@ -417,7 +417,7 @@ color={resolvedColor}
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 
 fontSize: "8px",
 
@@ -460,15 +460,15 @@ num(value);
 return (
 <div
 style={{
-border: "1px solid #222",
-background: "#101010",
+border: "1px solid #334155",
+background: "#121d2a",
 padding: "9px",
 minWidth: 0
 }}
 >
 <div
 style={{
-color: "#555",
+color: "#64748b",
 fontSize: "7px",
 
 whiteSpace: "nowrap",
@@ -485,7 +485,7 @@ textOverflow: "ellipsis"
 style={{
 color:
 missing
-? "#555"
+? "#64748b"
 : color ??
 sensitiveCrashColor(
 numeric
@@ -517,7 +517,7 @@ children: React.ReactNode;
 return (
 <div
 style={{
-color: "#888",
+color: "#94a3b8",
 
 fontSize: "9px",
 
@@ -550,7 +550,7 @@ return (
 <details
 style={{
 borderTop:
-"1px solid #1c1c1c",
+"1px solid #162232",
 
 paddingTop: "10px",
 
@@ -578,7 +578,7 @@ gap: "10px"
 <div>
 <div
 style={{
-color: "#888",
+color: "#94a3b8",
 
 fontSize: "9px",
 
@@ -591,7 +591,7 @@ fontWeight: "bold"
 {subtitle && (
 <div
 style={{
-color: "#555",
+color: "#64748b",
 
 fontSize: "7px",
 
@@ -605,7 +605,7 @@ marginTop: "2px"
 
 <div
 style={{
-color: "#555",
+color: "#64748b",
 fontSize: "8px"
 }}
 >
@@ -727,7 +727,7 @@ let marketState =
 "STABLE";
 
 let marketStateColor =
-"#52c41a";
+"#6ee7b7";
 
 let marketStateText =
 "No significant structural or acute crash stress.";
@@ -751,7 +751,7 @@ marketState =
 "STRUCTURAL DANGER";
 
 marketStateColor =
-"#fa8c16";
+"#fdba74";
 
 marketStateText =
 "Market structure is severely damaged, but an acute crash trigger is not yet confirmed.";
@@ -765,7 +765,7 @@ marketState =
 "FRAGILE MARKET";
 
 marketStateColor =
-"#faad14";
+"#fcd34d";
 
 marketStateText =
 "Structural weakness is elevated. Monitor liquidity and trigger acceleration.";
@@ -779,7 +779,7 @@ marketState =
 "CRASH RISK BUILDING";
 
 marketStateColor =
-"#fa8c16";
+"#fdba74";
 
 marketStateText =
 "Acute trigger conditions are developing. Downside acceleration risk is increasing.";
@@ -792,7 +792,7 @@ marketState =
 "ACTIVE STRESS";
 
 marketStateColor =
-"#ff4d4f";
+"#fda4af";
 
 marketStateText =
 "Market stress is active. Volatility and panic conditions require defensive risk management.";
@@ -805,7 +805,7 @@ marketState =
 "EARLY WARNING";
 
 marketStateColor =
-"#faad14";
+"#fcd34d";
 
 marketStateText =
 "Early risk conditions are present, but no confirmed crash regime.";
@@ -819,14 +819,14 @@ RENDER
 return (
 <div
 style={{
-background: "#0d0d0d",
+background: "#0e1722",
 
-border: "1px solid #222",
+border: "1px solid #334155",
 
 padding:
 "clamp(10px, 2vw, 16px)",
 
-color: "#ddd",
+color: "#e2e8f0",
 
 width: "100%",
 
@@ -857,7 +857,7 @@ marginBottom: "14px"
 <div>
 <div
 style={{
-color: "#aaa",
+color: "#cbd5e1",
 
 fontSize: "14px",
 
@@ -869,7 +869,7 @@ CRASH ENGINE
 
 <div
 style={{
-color: "#555",
+color: "#64748b",
 
 fontSize: "8px",
 
@@ -908,7 +908,7 @@ HERO
 style={{
 border: "1px solid #252525",
 
-background: "#111",
+background: "#121d2a",
 
 padding:
 "clamp(12px, 2vw, 16px)",
@@ -944,7 +944,7 @@ fontWeight: "bold"
 
 <div
 style={{
-color: "#555",
+color: "#64748b",
 
 fontSize: "8px",
 
@@ -987,8 +987,8 @@ label="MOMENTUM"
 value={momentum}
 color={
 momentum >= 15
-? "#fa8c16"
-: "#777"
+? "#fdba74"
+: "#94a3b8"
 }
 />
 
@@ -1020,7 +1020,7 @@ style={{
 border:
 `1px solid ${marketStateColor}33`,
 
-background: "#111",
+background: "#121d2a",
 
 padding: "11px",
 
@@ -1029,7 +1029,7 @@ marginBottom: "14px"
 >
 <div
 style={{
-color: "#555",
+color: "#64748b",
 fontSize: "7px"
 }}
 >
@@ -1053,7 +1053,7 @@ marginTop: "5px"
 
 <div
 style={{
-color: "#888",
+color: "#94a3b8",
 
 fontSize: "9px",
 
@@ -1161,9 +1161,9 @@ marginBottom: "14px"
 
 <div
 style={{
-border: "1px solid #222",
+border: "1px solid #334155",
 
-background: "#101010",
+background: "#121d2a",
 
 padding: "10px",
 
@@ -1172,7 +1172,7 @@ minWidth: 0
 >
 <div
 style={{
-color: "#555",
+color: "#64748b",
 fontSize: "7px"
 }}
 >
@@ -1203,16 +1203,16 @@ overflowWrap:
 
 <div
 style={{
-border: "1px solid #222",
+border: "1px solid #334155",
 
-background: "#101010",
+background: "#121d2a",
 
 padding: "10px"
 }}
 >
 <div
 style={{
-color: "#555",
+color: "#64748b",
 fontSize: "7px"
 }}
 >
@@ -1256,9 +1256,9 @@ HIGH / LOW STRUCTURE
 
 <div
 style={{
-border: "1px solid #222",
+border: "1px solid #334155",
 
-background: "#101010",
+background: "#121d2a",
 
 padding: "11px",
 
@@ -1285,7 +1285,7 @@ flexWrap: "wrap"
 
 <div
 style={{
-color: "#555",
+color: "#64748b",
 fontSize: "8px"
 }}
 >
@@ -1339,7 +1339,7 @@ textAlign: "right"
 
 <div
 style={{
-color: "#555",
+color: "#64748b",
 fontSize: "7px"
 }}
 >
@@ -1352,8 +1352,8 @@ color:
 num(
 highLow?.strength
 ) < 0
-? "#fa8c16"
-: "#52c41a",
+? "#fdba74"
+: "#6ee7b7",
 
 fontSize: "16px",
 
@@ -1460,7 +1460,7 @@ subtitle="How the crash engine should be interpreted"
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 
 fontSize: "9px",
 
@@ -1471,7 +1471,7 @@ lineHeight: 1.6
 <div>
 <strong
 style={{
-color: "#aaa"
+color: "#cbd5e1"
 }}
 >
 STRUCTURAL FRAGILITY:
@@ -1487,7 +1487,7 @@ marginTop: "6px"
 >
 <strong
 style={{
-color: "#aaa"
+color: "#cbd5e1"
 }}
 >
 CRASH TRIGGER:
@@ -1503,7 +1503,7 @@ marginTop: "6px"
 >
 <strong
 style={{
-color: "#aaa"
+color: "#cbd5e1"
 }}
 >
 PANIC:
@@ -1516,7 +1516,7 @@ Measures whether the event is already active and volatility-driven liquidation i
 style={{
 marginTop: "8px",
 
-color: "#faad14"
+color: "#fcd34d"
 }}
 >
 High structural fragility alone does not automatically mean an imminent crash.
@@ -1537,15 +1537,15 @@ marginTop: "12px",
 
 padding: "11px",
 
-background: "#111",
+background: "#121d2a",
 
-border: "1px solid #222"
+border: "1px solid #334155"
 }}
 >
 
 <div
 style={{
-color: "#555",
+color: "#64748b",
 
 fontSize: "7px",
 
@@ -1557,7 +1557,7 @@ ENGINE SUMMARY
 
 <div
 style={{
-color: "#999",
+color: "#94a3b8",
 
 fontSize: "9px",
 
@@ -1584,7 +1584,7 @@ marginTop: "12px",
 paddingTop: "9px",
 
 borderTop:
-"1px solid #1c1c1c",
+"1px solid #162232",
 
 display: "flex",
 
@@ -1595,7 +1595,7 @@ gap: "8px",
 
 flexWrap: "wrap",
 
-color: "#555",
+color: "#64748b",
 
 fontSize: "7px"
 }}

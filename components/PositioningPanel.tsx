@@ -21,13 +21,13 @@ bias?: string
 switch (bias) {
 
 case "BULLISH":
-return "#52c41a";
+return "#6ee7b7";
 
 case "BEARISH":
-return "#ff4d4f";
+return "#fda4af";
 
 default:
-return "#888";
+return "#94a3b8";
 
 }
 
@@ -41,16 +41,16 @@ state?: string
 switch (state) {
 
 case "RISK_ON":
-return "#52c41a";
+return "#6ee7b7";
 
 case "RISK_OFF":
-return "#ff4d4f";
+return "#fda4af";
 
 case "UNSTABLE":
-return "#fa8c16";
+return "#fdba74";
 
 default:
-return "#888";
+return "#94a3b8";
 
 }
 
@@ -64,16 +64,16 @@ crowding?: string
 switch (crowding) {
 
 case "CROWDED LONG":
-return "#ff4d4f";
+return "#fda4af";
 
 case "CROWDED SHORT":
-return "#52c41a";
+return "#6ee7b7";
 
 case "SQUEEZE ZONE":
-return "#fa8c16";
+return "#fdba74";
 
 default:
-return "#888";
+return "#94a3b8";
 
 }
 
@@ -116,7 +116,7 @@ text:
 "Crowd positioning remains bullish while the system turns defensive",
 
 color:
-"#ff4d4f"
+"#fda4af"
 
 };
 
@@ -176,7 +176,7 @@ text:
 "Positioning is bullish but structural confirmation is missing",
 
 color:
-"#fa8c16"
+"#fdba74"
 
 };
 
@@ -205,7 +205,7 @@ text:
 "Structural edge and market positioning are aligned",
 
 color:
-"#52c41a"
+"#6ee7b7"
 
 };
 
@@ -230,7 +230,7 @@ text:
 "System and positioning both support a defensive market stance",
 
 color:
-"#ff4d4f"
+"#fda4af"
 
 };
 
@@ -246,7 +246,7 @@ text:
 "No meaningful positioning divergence detected",
 
 color:
-"#888"
+"#94a3b8"
 
 };
 
@@ -312,10 +312,10 @@ return (
 style={{
 
 background:
-"#0d0d0d",
+"#0e1722",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding:
 "16px",
@@ -370,7 +370,7 @@ margin:
 0,
 
 color:
-"#bbb",
+"#cbd5e1",
 
 fontSize:
 "14px",
@@ -396,7 +396,7 @@ fontSize:
 "10px",
 
 color:
-"#666"
+"#64748b"
 
 }}
 >
@@ -450,7 +450,7 @@ border:
 `1px solid ${divergence.color}`,
 
 background:
-"#101010"
+"#121d2a"
 
 }}
 >
@@ -488,7 +488,7 @@ fontSize:
 "11px",
 
 color:
-"#888",
+"#94a3b8",
 
 lineHeight:
 "1.4"
@@ -532,10 +532,10 @@ marginBottom:
 style={{
 
 background:
-"#101010",
+"#121d2a",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding:
 "9px",
@@ -553,7 +553,7 @@ fontSize:
 "9px",
 
 color:
-"#666"
+"#64748b"
 
 }}
 >
@@ -599,10 +599,10 @@ wordBreak:
 style={{
 
 background:
-"#101010",
+"#121d2a",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding:
 "9px",
@@ -620,7 +620,7 @@ fontSize:
 "9px",
 
 color:
-"#666"
+"#64748b"
 
 }}
 >
@@ -666,10 +666,10 @@ wordBreak:
 style={{
 
 background:
-"#101010",
+"#121d2a",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding:
 "9px",
@@ -687,7 +687,7 @@ fontSize:
 "9px",
 
 color:
-"#666"
+"#64748b"
 
 }}
 >
@@ -755,7 +755,7 @@ fontSize:
 "10px",
 
 color:
-"#666",
+"#64748b",
 
 marginBottom:
 "5px"
@@ -781,7 +781,7 @@ height:
 "6px",
 
 background:
-"#222",
+"#334155",
 
 overflow:
 "hidden"
@@ -826,7 +826,7 @@ COMPONENTS
 style={{
 
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 
 paddingTop:
 "14px"
@@ -841,7 +841,7 @@ fontSize:
 "10px",
 
 color:
-"#666",
+"#64748b",
 
 marginBottom:
 "10px",
@@ -884,10 +884,10 @@ putCall > 0
 }
 color={
 putCall > 1.3
-? "#52c41a"
+? "#6ee7b7"
 : putCall < 0.7
-? "#ff4d4f"
-: "#bbb"
+? "#fda4af"
+: "#cbd5e1"
 }
 />
 
@@ -901,10 +901,10 @@ gamma.toFixed(2)
 }
 color={
 gamma > 0
-? "#52c41a"
+? "#6ee7b7"
 : gamma < 0
-? "#ff4d4f"
-: "#888"
+? "#fda4af"
+: "#94a3b8"
 }
 />
 
@@ -920,10 +920,10 @@ skew > 0
 }
 color={
 skew > 1.1
-? "#52c41a"
+? "#6ee7b7"
 : skew < 0.9
-? "#ff4d4f"
-: "#bbb"
+? "#fda4af"
+: "#cbd5e1"
 }
 />
 
@@ -939,10 +939,10 @@ vix > 0
 }
 color={
 vix > 25
-? "#ff4d4f"
+? "#fda4af"
 : vix < 20
-? "#52c41a"
-: "#faad14"
+? "#6ee7b7"
+: "#fcd34d"
 }
 />
 
@@ -977,10 +977,10 @@ return (
 style={{
 
 background:
-"#101010",
+"#121d2a",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding:
 "10px",
@@ -998,7 +998,7 @@ fontSize:
 "9px",
 
 color:
-"#666"
+"#64748b"
 
 }}
 >

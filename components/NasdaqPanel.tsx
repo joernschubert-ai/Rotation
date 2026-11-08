@@ -79,8 +79,8 @@ switch (decision) {
 case "AGGRESSIVE":
 return {
 text: "STRONG NASDAQ LONG",
-color: "#52c41a",
-border: "#52c41a",
+color: "#6ee7b7",
+border: "#6ee7b7",
 note: "High conviction Nasdaq momentum environment"
 };
 
@@ -88,7 +88,7 @@ note: "High conviction Nasdaq momentum environment"
 case "ADD":
 return {
 text: "ADD NASDAQ LONG",
-color: "#95de64",
+color: "#a7f3d0",
 border: "#389e0d",
 note: "Constructive Nasdaq environment – scale in"
 };
@@ -97,7 +97,7 @@ note: "Constructive Nasdaq environment – scale in"
 case "BUILD":
 return {
 text: "BUILD NASDAQ LONG",
-color: "#faad14",
+color: "#fcd34d",
 border: "#d48806",
 note: "Long setup developing – partial position only"
 };
@@ -106,7 +106,7 @@ note: "Long setup developing – partial position only"
 case "EARLY":
 return {
 text: "EARLY NASDAQ SETUP",
-color: "#fa8c16",
+color: "#fdba74",
 border: "#d46b08",
 note: "Early recovery environment – confirmation required"
 };
@@ -116,8 +116,8 @@ case "NONE":
 default:
 return {
 text: "NO NASDAQ LONG EDGE",
-color: "#999",
-border: "#333",
+color: "#94a3b8",
+border: "#475569",
 note: "Nasdaq CALL conditions are currently not executable"
 };
 }
@@ -196,7 +196,7 @@ if (!longExit) {
 if (!active) {
 return {
 label: "NO NEW ENTRY",
-color: "#999",
+color: "#94a3b8",
 note: "Nasdaq long engine is currently inactive",
 sizeReduction: 0
 };
@@ -204,7 +204,7 @@ sizeReduction: 0
 
 return {
 label: "LONG STRUCTURE ACTIVE",
-color: "#52c41a",
+color: "#6ee7b7",
 note: "No explicit exit signal available",
 sizeReduction: 0
 };
@@ -223,7 +223,7 @@ if (sizeReduction >= 80) {
 
 return {
 label: "EXIT LONG",
-color: "#ff4d4f",
+color: "#fda4af",
 note: "Strong structural deterioration",
 sizeReduction
 };
@@ -234,7 +234,7 @@ if (sizeReduction >= 50) {
 
 return {
 label: "REDUCE LONG",
-color: "#fa8c16",
+color: "#fdba74",
 note: "Long environment weakening",
 sizeReduction
 };
@@ -245,7 +245,7 @@ if (sizeReduction >= 30) {
 
 return {
 label: "TRIM POSITION",
-color: "#fadb14",
+color: "#fcd34d",
 note: "Momentum deteriorating",
 sizeReduction
 };
@@ -256,7 +256,7 @@ if (!active) {
 
 return {
 label: "NO NEW ENTRY",
-color: "#999",
+color: "#94a3b8",
 note: "Existing position management only",
 sizeReduction
 };
@@ -265,7 +265,7 @@ sizeReduction
 
 return {
 label: "HOLD LONG",
-color: "#52c41a",
+color: "#6ee7b7",
 note: "Nasdaq long structure remains valid",
 sizeReduction
 };
@@ -359,8 +359,8 @@ return (
 
 <div
 style={{
-background: "#0d0d0d",
-border: "1px solid #222",
+background: "#0e1722",
+border: "1px solid #334155",
 padding: "16px",
 width: "100%",
 boxSizing: "border-box",
@@ -376,7 +376,7 @@ HEADER
 
 <h3
 style={{
-color: "#888",
+color: "#94a3b8",
 marginBottom: "12px",
 marginTop: 0,
 fontSize: "16px"
@@ -396,7 +396,7 @@ marginBottom: "14px",
 padding: "10px",
 border:
 `1px solid ${superSignal.border}`,
-background: "#111",
+background: "#121d2a",
 textAlign: "center",
 wordBreak: "break-word"
 }}
@@ -456,8 +456,8 @@ active
 }
 color={
 active
-? "#52c41a"
-: "#999"
+? "#6ee7b7"
+: "#94a3b8"
 }
 />
 
@@ -485,13 +485,13 @@ POSITION STATE
 style={{
 marginBottom: "14px",
 paddingTop: "10px",
-borderTop: "1px solid #222"
+borderTop: "1px solid #334155"
 }}
 >
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "11px",
 marginBottom: "5px"
 }}
@@ -523,7 +523,7 @@ marginTop: "3px"
 <div
 style={{
 fontSize: "11px",
-color: "#777",
+color: "#94a3b8",
 marginTop: "4px"
 }}
 >
@@ -547,7 +547,7 @@ marginBottom: "14px"
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "12px"
 }}
 >
@@ -572,7 +572,7 @@ marginTop: "3px"
 <div
 style={{
 height: "6px",
-background: "#222",
+background: "#334155",
 marginTop: "5px",
 width: "100%"
 }}
@@ -599,10 +599,10 @@ label="Suggested Size"
 value={`${Math.round(sizeMultiplier * 100)}%`}
 color={
 sizeMultiplier >= 0.5
-? "#52c41a"
+? "#6ee7b7"
 : sizeMultiplier > 0
-? "#faad14"
-: "#999"
+? "#fcd34d"
+: "#94a3b8"
 }
 bold
 />
@@ -617,12 +617,12 @@ label="Primary Driver"
 value={driver}
 color={
 driver === "NASDAQ_MOMENTUM"
-? "#52c41a"
+? "#6ee7b7"
 : driver === "NASDAQ_RELATIVE_STRENGTH"
-? "#95de64"
+? "#a7f3d0"
 : driver === "BALANCED_ROTATION"
-? "#faad14"
-: "#999"
+? "#fcd34d"
+: "#94a3b8"
 }
 />
 
@@ -635,7 +635,7 @@ DETAILS TOGGLE
 style={{
 marginTop: "14px",
 paddingTop: "12px",
-borderTop: "1px solid #222"
+borderTop: "1px solid #334155"
 }}
 >
 
@@ -647,9 +647,9 @@ setShowDetails(
 }
 style={{
 width: "100%",
-background: "#111",
-border: "1px solid #333",
-color: "#aaa",
+background: "#121d2a",
+border: "1px solid #475569",
+color: "#cbd5e1",
 padding: "9px",
 cursor: "pointer",
 fontSize: "12px",
@@ -687,8 +687,8 @@ meta.phase ??
 }
 color={
 riskRegime
-? "#ff4d4f"
-: "#52c41a"
+? "#fda4af"
+: "#6ee7b7"
 }
 />
 
@@ -702,10 +702,10 @@ label="Crash Probability"
 value={`${formatNumber(meta.crashProbability)}%`}
 color={
 meta.crashProbability >= 55
-? "#ff4d4f"
+? "#fda4af"
 : meta.crashProbability >= 35
-? "#faad14"
-: "#52c41a"
+? "#fcd34d"
+: "#6ee7b7"
 }
 />
 
@@ -714,10 +714,10 @@ label="Crash Score"
 value={formatNumber(meta.crashScore)}
 color={
 meta.crashScore >= 60
-? "#ff4d4f"
+? "#fda4af"
 : meta.crashScore >= 40
-? "#faad14"
-: "#52c41a"
+? "#fcd34d"
+: "#6ee7b7"
 }
 />
 
@@ -735,12 +735,12 @@ label="Rotation Score"
 value={formatNumber(meta.rotationScore)}
 color={
 meta.rotationScore >= 70
-? "#52c41a"
+? "#6ee7b7"
 : meta.rotationScore >= 55
-? "#95de64"
+? "#a7f3d0"
 : meta.rotationScore >= 40
-? "#faad14"
-: "#ff4d4f"
+? "#fcd34d"
+: "#fda4af"
 }
 />
 
@@ -749,8 +749,8 @@ label="Early Warning Score"
 value={formatNumber(meta.earlyScore)}
 color={
 meta.earlyScore >= 10
-? "#ff4d4f"
-: "#52c41a"
+? "#fda4af"
+: "#6ee7b7"
 }
 />
 
@@ -759,10 +759,10 @@ label="Put Pressure"
 value={formatNumber(meta.putScore)}
 color={
 meta.putScore >= 8
-? "#ff4d4f"
+? "#fda4af"
 : meta.putScore >= 5
-? "#faad14"
-: "#52c41a"
+? "#fcd34d"
+: "#6ee7b7"
 }
 />
 
@@ -780,10 +780,10 @@ label="Market Quality"
 value={formatNumber(meta.qualityScore)}
 color={
 meta.qualityScore >= 60
-? "#52c41a"
+? "#6ee7b7"
 : meta.qualityScore >= 40
-? "#faad14"
-: "#ff4d4f"
+? "#fcd34d"
+: "#fda4af"
 }
 />
 
@@ -792,10 +792,10 @@ label="Participation"
 value={formatNumber(meta.participationScore)}
 color={
 meta.participationScore >= 70
-? "#52c41a"
+? "#6ee7b7"
 : meta.participationScore >= 50
-? "#faad14"
-: "#ff4d4f"
+? "#fcd34d"
+: "#fda4af"
 }
 />
 
@@ -804,10 +804,10 @@ label="Breadth Thrust"
 value={formatNumber(meta.breadthThrustScore)}
 color={
 meta.breadthThrustScore >= 70
-? "#52c41a"
+? "#6ee7b7"
 : meta.breadthThrustScore >= 50
-? "#faad14"
-: "#ff4d4f"
+? "#fcd34d"
+: "#fda4af"
 }
 />
 
@@ -816,10 +816,10 @@ label="Liquidity"
 value={formatNumber(meta.liquidityScore)}
 color={
 meta.liquidityScore >= 70
-? "#52c41a"
+? "#6ee7b7"
 : meta.liquidityScore >= 40
-? "#faad14"
-: "#ff4d4f"
+? "#fcd34d"
+: "#fda4af"
 }
 />
 
@@ -828,10 +828,10 @@ label="Regime Sync"
 value={formatNumber(meta.regimeSyncScore)}
 color={
 meta.regimeSyncScore >= 70
-? "#52c41a"
+? "#6ee7b7"
 : meta.regimeSyncScore >= 40
-? "#faad14"
-: "#ff4d4f"
+? "#fcd34d"
+: "#fda4af"
 }
 />
 
@@ -840,10 +840,10 @@ label="Execution Quality"
 value={formatNumber(meta.executionScore)}
 color={
 meta.executionScore >= 70
-? "#52c41a"
+? "#6ee7b7"
 : meta.executionScore >= 40
-? "#faad14"
-: "#ff4d4f"
+? "#fcd34d"
+: "#fda4af"
 }
 />
 
@@ -899,9 +899,9 @@ setShowHistory(
 }
 style={{
 width: "100%",
-background: "#111",
-border: "1px solid #333",
-color: "#aaa",
+background: "#121d2a",
+border: "1px solid #475569",
+color: "#cbd5e1",
 padding: "9px",
 cursor: "pointer",
 fontSize: "12px",
@@ -1066,7 +1066,7 @@ INFO ROW
 function InfoRow({
 label,
 value,
-color = "#ddd",
+color = "#e2e8f0",
 bold = false
 }: any) {
 
@@ -1085,7 +1085,7 @@ fontSize: "12px"
 
 <span
 style={{
-color: "#777",
+color: "#94a3b8",
 minWidth: 0
 }}
 >
@@ -1127,11 +1127,11 @@ negative = false
 const color =
 negative
 ? active
-? "#ff4d4f"
-: "#52c41a"
+? "#fda4af"
+: "#6ee7b7"
 : active
-? "#52c41a"
-: "#999";
+? "#6ee7b7"
+: "#94a3b8";
 
 const value =
 negative
@@ -1157,7 +1157,7 @@ fontSize: "12px"
 
 <span
 style={{
-color: "#ccc",
+color: "#e2e8f0",
 minWidth: 0,
 wordBreak: "break-word"
 }}
@@ -1194,12 +1194,12 @@ return (
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginTop: "12px",
 marginBottom: "8px",
 paddingTop: "8px",
-borderTop: "1px solid #222"
+borderTop: "1px solid #334155"
 }}
 >
 {title}

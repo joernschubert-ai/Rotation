@@ -37,7 +37,7 @@ earlyWarning?.active
 
 const color =
 earlyWarning?.color ??
-"#666";
+"#64748b";
 
 const components =
 earlyWarning?.components ?? {};
@@ -91,15 +91,15 @@ const ratio =
 percentage(value, max);
 
 if (ratio >= 75)
-return "#ff4d4f";
+return "#fda4af";
 
 if (ratio >= 50)
-return "#fa8c16";
+return "#fdba74";
 
 if (ratio >= 25)
-return "#fadb14";
+return "#fcd34d";
 
-return "#666";
+return "#64748b";
 
 }
 
@@ -267,8 +267,8 @@ return (
 
 <div
 style={{
-background: "#0d0d0d",
-border: "1px solid #222",
+background: "#0e1722",
+border: "1px solid #334155",
 padding: "16px",
 width: "100%",
 boxSizing: "border-box"
@@ -297,7 +297,7 @@ marginBottom: "16px"
 <h3
 style={{
 margin: 0,
-color: "#bbb",
+color: "#cbd5e1",
 fontSize: "14px",
 letterSpacing: "0.5px"
 }}
@@ -308,7 +308,7 @@ EARLY WARNING
 <div
 style={{
 fontSize: "10px",
-color: "#666",
+color: "#64748b",
 marginTop: "3px"
 }}
 >
@@ -324,13 +324,13 @@ fontSize: "10px",
 color:
 active
 ? color
-: "#666",
+: "#64748b",
 
 border:
 `1px solid ${
 active
 ? color
-: "#333"
+: "#475569"
 }`,
 
 padding: "4px 7px",
@@ -354,7 +354,7 @@ STATE
 
 <div
 style={{
-background: "#101010",
+background: "#121d2a",
 
 border:
 `1px solid ${color}`,
@@ -413,7 +413,7 @@ marginBottom: "6px"
 <div
 style={{
 fontSize: "10px",
-color: "#666"
+color: "#64748b"
 }}
 >
 EARLY WARNING SCORE
@@ -435,7 +435,7 @@ fontWeight: "bold"
 <span
 style={{
 fontSize: "12px",
-color: "#666",
+color: "#64748b",
 marginLeft: "3px"
 }}
 >
@@ -452,7 +452,7 @@ marginLeft: "3px"
 style={{
 height: "7px",
 
-background: "#222",
+background: "#334155",
 
 overflow: "hidden"
 }}
@@ -486,7 +486,7 @@ COMPONENT BREAKDOWN
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 
 paddingTop: "12px"
 }}
@@ -496,7 +496,7 @@ paddingTop: "12px"
 style={{
 fontSize: "10px",
 
-color: "#666",
+color: "#64748b",
 
 marginBottom: "12px",
 
@@ -558,7 +558,7 @@ marginBottom: "4px"
 <div
 style={{
 fontSize: "10px",
-color: "#888"
+color: "#94a3b8"
 }}
 >
 {component.label}
@@ -588,7 +588,7 @@ whiteSpace:
 style={{
 height: "5px",
 
-background: "#222",
+background: "#334155",
 
 overflow: "hidden"
 }}
@@ -654,21 +654,21 @@ padding:
 border:
 `1px solid ${
 flag.active
-? "#ff4d4f"
+? "#fda4af"
 : "#292929"
 }`,
 
 color:
 flag.active
-? "#ff4d4f"
-: "#555",
+? "#fda4af"
+: "#64748b",
 
 fontSize: "9px",
 
 background:
 flag.active
 ? "#1a1010"
-: "#101010"
+: "#121d2a"
 }}
 >
 
@@ -698,13 +698,13 @@ width: "100%",
 
 marginTop: "16px",
 
-background: "#151515",
+background: "#121d2a",
 
-border: "1px solid #222",
+border: "1px solid #334155",
 
 padding: "8px",
 
-color: "#777",
+color: "#94a3b8",
 
 fontSize: "10px",
 
@@ -730,7 +730,7 @@ style={{
 marginTop: "16px",
 
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 
 paddingTop: "12px"
 }}
@@ -741,7 +741,7 @@ paddingTop: "12px"
 style={{
 fontSize: "10px",
 
-color: "#666",
+color: "#64748b",
 
 marginBottom: "10px",
 
@@ -867,9 +867,9 @@ return (
 
 <div
 style={{
-background: "#101010",
+background: "#121d2a",
 
-border: "1px solid #1d1d1d",
+border: "1px solid #162232",
 
 padding: "8px"
 }}
@@ -879,7 +879,7 @@ padding: "8px"
 style={{
 fontSize: "9px",
 
-color: "#666"
+color: "#64748b"
 }}
 >
 {label}
@@ -892,7 +892,7 @@ marginTop: "4px",
 
 fontSize: "11px",
 
-color: "#ccc",
+color: "#e2e8f0",
 
 wordBreak:
 "break-word"

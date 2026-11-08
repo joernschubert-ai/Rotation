@@ -4,11 +4,11 @@ export default function DotStrip({ heat }: any) {
 if (!heat?.components) return null;
 
 function getColor(v: number) {
-if (v >= 1) return "#52c41a";
+if (v >= 1) return "#6ee7b7";
 if (v >= 0.2) return "#a0d911";
-if (v > -0.2) return "#999";
-if (v > -1) return "#faad14";
-return "#ff4d4f";
+if (v > -0.2) return "#94a3b8";
+if (v > -1) return "#fcd34d";
+return "#fda4af";
 }
 
 function render(label: string, value: number) {
@@ -27,7 +27,7 @@ marginBottom: "6px"
 }} />
 <div style={{
 fontSize: "11px",
-color: "#888"
+color: "#94a3b8"
 }}>
 {label}
 </div>
@@ -39,8 +39,8 @@ const c = heat.components;
 
 return (
 <div style={{
-background: "#0d0d0d",
-border: "1px solid #333",
+background: "#0e1722",
+border: "1px solid #475569",
 padding: "12px"
 }}>
 <div style={{

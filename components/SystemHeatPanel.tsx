@@ -52,18 +52,18 @@ value: number
 ) {
 
 if (value >= 1.20)
-return "#52c41a";
+return "#6ee7b7";
 
 if (value >= 0.40)
 return "#a0d911";
 
 if (value > -0.40)
-return "#888";
+return "#94a3b8";
 
 if (value > -1.20)
-return "#faad14";
+return "#fcd34d";
 
-return "#ff4d4f";
+return "#fda4af";
 
 }
 
@@ -81,7 +81,7 @@ state ?? ""
 if (
 s.includes("STRONG_BULLISH")
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 
@@ -95,18 +95,18 @@ return "#a0d911";
 if (
 s.includes("DEFENSIVE")
 ) {
-return "#faad14";
+return "#fcd34d";
 }
 
 
 if (
 s.includes("BEARISH")
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 
-return "#888";
+return "#94a3b8";
 
 }
 
@@ -146,18 +146,18 @@ value: number
 ) {
 
 if (value >= 0.8)
-return "#52c41a";
+return "#6ee7b7";
 
 if (value >= 0.2)
 return "#a0d911";
 
 if (value <= -0.8)
-return "#ff4d4f";
+return "#fda4af";
 
 if (value <= -0.2)
-return "#faad14";
+return "#fcd34d";
 
-return "#777";
+return "#94a3b8";
 
 }
 
@@ -314,9 +314,9 @@ return (
 <div
 style={{
 
-background:"#101010",
+background:"#121d2a",
 
-border:"1px solid #222",
+border:"1px solid #334155",
 
 padding:"8px",
 
@@ -330,7 +330,7 @@ style={{
 
 fontSize:"10px",
 
-color:"#666",
+color:"#64748b",
 
 whiteSpace:"nowrap",
 
@@ -382,9 +382,9 @@ return (
 <div
 style={{
 
-background:"#0d0d0d",
+background:"#0e1722",
 
-border:"1px solid #222",
+border:"1px solid #334155",
 
 padding:"16px",
 
@@ -425,7 +425,7 @@ style={{
 
 margin:0,
 
-color:"#bbb",
+color:"#cbd5e1",
 
 fontSize:"15px"
 
@@ -442,7 +442,7 @@ style={{
 
 fontSize:"11px",
 
-color:"#666",
+color:"#64748b",
 
 marginTop:"3px"
 
@@ -487,7 +487,7 @@ MAIN VALUE
 <div
 style={{
 
-background:"#101010",
+background:"#121d2a",
 
 border:
 `1px solid ${heatColor}`,
@@ -525,7 +525,7 @@ style={{
 
 fontSize:"10px",
 
-color:"#666"
+color:"#64748b"
 
 }}
 >
@@ -584,7 +584,7 @@ position:"relative",
 
 height:"8px",
 
-background:"#222",
+background:"#334155",
 
 marginTop:"14px",
 
@@ -608,7 +608,7 @@ height:"14px",
 
 width:"1px",
 
-background:"#666"
+background:"#64748b"
 
 }}
 />
@@ -653,7 +653,7 @@ justifyContent:"space-between",
 
 fontSize:"9px",
 
-color:"#666",
+color:"#64748b",
 
 marginTop:"6px"
 
@@ -686,7 +686,7 @@ style={{
 
 fontSize:"10px",
 
-color:"#666",
+color:"#64748b",
 
 marginBottom:"7px"
 
@@ -751,9 +751,9 @@ marginBottom:"14px"
 <div
 style={{
 
-border:"1px solid #ff4d4f",
+border:"1px solid #fda4af",
 
-color:"#ff4d4f",
+color:"#fda4af",
 
 padding:"3px 6px",
 
@@ -774,9 +774,9 @@ CRASH OVERRIDE
 <div
 style={{
 
-border:"1px solid #faad14",
+border:"1px solid #fcd34d",
 
-color:"#faad14",
+color:"#fcd34d",
 
 padding:"3px 6px",
 
@@ -797,9 +797,9 @@ TERM STRESS
 <div
 style={{
 
-border:"1px solid #fa8c16",
+border:"1px solid #fdba74",
 
-color:"#fa8c16",
+color:"#fdba74",
 
 padding:"3px 6px",
 
@@ -820,9 +820,9 @@ NEGATIVE GAMMA
 <div
 style={{
 
-border:"1px solid #ff4d4f",
+border:"1px solid #fda4af",
 
-color:"#ff4d4f",
+color:"#fda4af",
 
 padding:"3px 6px",
 
@@ -843,9 +843,9 @@ DOUBLE STRESS
 <div
 style={{
 
-border:"1px solid #faad14",
+border:"1px solid #fcd34d",
 
-color:"#faad14",
+color:"#fcd34d",
 
 padding:"3px 6px",
 
@@ -872,13 +872,13 @@ style={{
 
 padding:"10px",
 
-border:"1px solid #222",
+border:"1px solid #334155",
 
 fontSize:"11px",
 
 lineHeight:"1.5",
 
-color:"#999"
+color:"#94a3b8"
 
 }}
 >

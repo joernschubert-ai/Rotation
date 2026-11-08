@@ -16,7 +16,7 @@ COLORS
 function getActionColor(action?: string) {
 
 if (!action)
-return "#777";
+return "#94a3b8";
 
 const a =
 action.toUpperCase();
@@ -27,46 +27,46 @@ a.includes("SYSTEM EXIT") ||
 a.includes("EXIT LONG") ||
 a.includes("EXIT MAJORITY")
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 
 if (
 a.includes("REDUCE HARD")
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 
 if (
 a.includes("REDUCE")
 ) {
-return "#fa8c16";
+return "#fdba74";
 }
 
 
 if (
 a.includes("TRIM")
 ) {
-return "#faad14";
+return "#fcd34d";
 }
 
 
 if (
 a.includes("HOLD")
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 
 if (
 a.includes("MANAGE")
 ) {
-return "#40a9ff";
+return "#7dd3fc";
 }
 
 
-return "#999";
+return "#94a3b8";
 
 }
 
@@ -80,14 +80,14 @@ String(bias ?? "").toUpperCase();
 if (
 b.includes("SYSTEM")
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 
 if (
 b.includes("LONG_EXIT")
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 
@@ -101,18 +101,18 @@ return "#13c2c2";
 if (
 b.includes("MULTI")
 ) {
-return "#fa8c16";
+return "#fdba74";
 }
 
 
 if (
 b.includes("CAUTION")
 ) {
-return "#faad14";
+return "#fcd34d";
 }
 
 
-return "#999";
+return "#94a3b8";
 
 }
 
@@ -126,19 +126,19 @@ function getPriorityColor(priority?: string) {
 switch(priority) {
 
 case "CRITICAL":
-return "#ff4d4f";
+return "#fda4af";
 
 case "HIGH":
-return "#fa8c16";
+return "#fdba74";
 
 case "MEDIUM":
-return "#faad14";
+return "#fcd34d";
 
 case "NORMAL":
-return "#52c41a";
+return "#6ee7b7";
 
 default:
-return "#777";
+return "#94a3b8";
 
 }
 
@@ -177,9 +177,9 @@ return (
 <div
 style={{
 
-background:"#101010",
+background:"#121d2a",
 
-border:"1px solid #222",
+border:"1px solid #334155",
 
 borderLeft:
 `4px solid ${actionColor}`,
@@ -214,7 +214,7 @@ style={{
 
 fontSize:"11px",
 
-color:"#777",
+color:"#94a3b8",
 
 letterSpacing:"0.5px"
 
@@ -280,7 +280,7 @@ justifyContent:"space-between",
 
 fontSize:"11px",
 
-color:"#777"
+color:"#94a3b8"
 
 }}
 >
@@ -294,12 +294,12 @@ style={{
 
 color:
 reduction >= 70
-? "#ff4d4f"
+? "#fda4af"
 : reduction >= 30
-? "#faad14"
+? "#fcd34d"
 : reduction > 0
-? "#fa8c16"
-: "#52c41a",
+? "#fdba74"
+: "#6ee7b7",
 
 fontWeight:"bold"
 
@@ -320,7 +320,7 @@ style={{
 
 height:"5px",
 
-background:"#222",
+background:"#334155",
 
 marginTop:"5px",
 
@@ -366,7 +366,7 @@ fontSize:"11px",
 
 lineHeight:"1.45",
 
-color:"#888"
+color:"#94a3b8"
 
 }}
 >
@@ -399,7 +399,7 @@ label:
 "SYSTEMIC EXIT",
 
 color:
-"#ff4d4f",
+"#fda4af",
 
 text:
 "Extreme systemic market conditions"
@@ -419,7 +419,7 @@ label:
 "CRASH ENVIRONMENT",
 
 color:
-"#ff4d4f",
+"#fda4af",
 
 text:
 "Crash probability elevated"
@@ -461,7 +461,7 @@ label:
 "BREAKDOWN",
 
 color:
-"#ff4d4f",
+"#fda4af",
 
 text:
 "Structural market breakdown"
@@ -482,7 +482,7 @@ label:
 "RISK REGIME",
 
 color:
-"#fa8c16",
+"#fdba74",
 
 text:
 "Defensive risk management"
@@ -503,7 +503,7 @@ label:
 "DISTRIBUTION",
 
 color:
-"#faad14",
+"#fcd34d",
 
 text:
 "Late-cycle structural deterioration"
@@ -519,7 +519,7 @@ label:
 "NEUTRAL",
 
 color:
-"#777",
+"#94a3b8",
 
 text:
 "No extreme exit environment"
@@ -622,9 +622,9 @@ return (
 <div
 style={{
 
-background:"#0d0d0d",
+background:"#0e1722",
 
-border:"1px solid #222",
+border:"1px solid #334155",
 
 padding:"16px",
 
@@ -665,7 +665,7 @@ style={{
 
 margin:0,
 
-color:"#bbb",
+color:"#cbd5e1",
 
 fontSize:"15px"
 
@@ -682,7 +682,7 @@ style={{
 
 fontSize:"11px",
 
-color:"#666",
+color:"#64748b",
 
 marginTop:"3px"
 
@@ -734,7 +734,7 @@ padding:"14px",
 border:
 `1px solid ${getActionColor(net.action)}`,
 
-background:"#101010"
+background:"#121d2a"
 
 }}
 >
@@ -744,7 +744,7 @@ style={{
 
 fontSize:"10px",
 
-color:"#666",
+color:"#64748b",
 
 marginBottom:"5px"
 
@@ -799,10 +799,10 @@ fontSize:"12px",
 
 color:
 portfolioReduction >= 70
-? "#ff4d4f"
+? "#fda4af"
 : portfolioReduction >= 30
-? "#faad14"
-: "#52c41a"
+? "#fcd34d"
+: "#6ee7b7"
 
 }}
 >
@@ -829,7 +829,7 @@ marginTop:"8px",
 
 fontSize:"11px",
 
-color:"#777"
+color:"#94a3b8"
 
 }}
 >
@@ -870,7 +870,7 @@ fontSize:"11px",
 
 lineHeight:"1.45",
 
-color:"#888",
+color:"#94a3b8",
 
 wordBreak:"break-word"
 
@@ -947,9 +947,9 @@ marginBottom:"14px"
 <div
 style={{
 
-background:"#101010",
+background:"#121d2a",
 
-border:"1px solid #222",
+border:"1px solid #334155",
 
 padding:"9px"
 
@@ -961,7 +961,7 @@ style={{
 
 fontSize:"10px",
 
-color:"#666"
+color:"#64748b"
 
 }}
 >
@@ -981,8 +981,8 @@ fontWeight:"bold",
 
 color:
 (summary.shortReduction ?? 0) >= 50
-? "#ff4d4f"
-: "#ddd"
+? "#fda4af"
+: "#e2e8f0"
 
 }}
 >
@@ -997,9 +997,9 @@ color:
 <div
 style={{
 
-background:"#101010",
+background:"#121d2a",
 
-border:"1px solid #222",
+border:"1px solid #334155",
 
 padding:"9px"
 
@@ -1011,7 +1011,7 @@ style={{
 
 fontSize:"10px",
 
-color:"#666"
+color:"#64748b"
 
 }}
 >
@@ -1031,8 +1031,8 @@ fontWeight:"bold",
 
 color:
 (summary.longReduction ?? 0) >= 50
-? "#ff4d4f"
-: "#ddd"
+? "#fda4af"
+: "#e2e8f0"
 
 }}
 >
@@ -1047,9 +1047,9 @@ color:
 <div
 style={{
 
-background:"#101010",
+background:"#121d2a",
 
-border:"1px solid #222",
+border:"1px solid #334155",
 
 padding:"9px"
 
@@ -1061,7 +1061,7 @@ style={{
 
 fontSize:"10px",
 
-color:"#666"
+color:"#64748b"
 
 }}
 >
@@ -1079,7 +1079,7 @@ fontSize:"14px",
 
 fontWeight:"bold",
 
-color:"#ddd"
+color:"#e2e8f0"
 
 }}
 >
@@ -1102,13 +1102,13 @@ style={{
 
 padding:"10px",
 
-border:"1px solid #222",
+border:"1px solid #334155",
 
 fontSize:"11px",
 
 lineHeight:"1.5",
 
-color:"#999"
+color:"#94a3b8"
 
 }}
 >

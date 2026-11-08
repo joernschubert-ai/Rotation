@@ -96,8 +96,8 @@ switch (action) {
 case "AGGRESSIVE":
 return {
 text: "STRONG RUSSELL LONG",
-color: "#52c41a",
-border: "#52c41a",
+color: "#6ee7b7",
+border: "#6ee7b7",
 note: "High conviction rotation setup"
 };
 
@@ -105,7 +105,7 @@ note: "High conviction rotation setup"
 case "ADD":
 return {
 text: "ADD RUSSELL LONG",
-color: "#95de64",
+color: "#a7f3d0",
 border: "#389e0d",
 note: "Confirmed rotation – increase exposure"
 };
@@ -114,7 +114,7 @@ note: "Confirmed rotation – increase exposure"
 case "BUILD":
 return {
 text: "BUILD RUSSELL LONG",
-color: "#faad14",
+color: "#fcd34d",
 border: "#d48806",
 note: "Constructive long structure"
 };
@@ -123,7 +123,7 @@ note: "Constructive long structure"
 case "EARLY":
 return {
 text: "EARLY RUSSELL SETUP",
-color: "#fa8c16",
+color: "#fdba74",
 border: "#d46b08",
 note: "Early setup – confirmation still required"
 };
@@ -133,8 +133,8 @@ case "NO_TRADE":
 default:
 return {
 text: "NO RUSSELL EDGE",
-color: "#999",
-border: "#333",
+color: "#94a3b8",
+border: "#475569",
 note: "Russell CALL conditions are not sufficiently confirmed"
 };
 }
@@ -218,7 +218,7 @@ if (sizeReduction >= 80) {
 
 return {
 label: "EXIT LONG",
-color: "#ff4d4f",
+color: "#fda4af",
 note: "Risk-off / structural breakdown",
 sizeReduction
 };
@@ -229,7 +229,7 @@ if (sizeReduction >= 50) {
 
 return {
 label: "REDUCE LONG",
-color: "#fa8c16",
+color: "#fdba74",
 note: "Structure weakening",
 sizeReduction
 };
@@ -240,7 +240,7 @@ if (sizeReduction >= 30) {
 
 return {
 label: "TRIM POSITION",
-color: "#fadb14",
+color: "#fcd34d",
 note: "Momentum or structure deteriorating",
 sizeReduction
 };
@@ -251,7 +251,7 @@ if (action === "NO_TRADE") {
 
 return {
 label: "NO NEW ENTRY",
-color: "#999",
+color: "#94a3b8",
 note: "Existing position management only",
 sizeReduction
 };
@@ -260,7 +260,7 @@ sizeReduction
 
 return {
 label: "HOLD LONG",
-color: "#52c41a",
+color: "#6ee7b7",
 note: "Long structure remains valid",
 sizeReduction
 };
@@ -404,8 +404,8 @@ return (
 
 <div
 style={{
-background: "#0d0d0d",
-border: "1px solid #222",
+background: "#0e1722",
+border: "1px solid #334155",
 padding: "16px",
 width: "100%",
 boxSizing: "border-box",
@@ -421,7 +421,7 @@ HEADER
 
 <h3
 style={{
-color: "#888",
+color: "#94a3b8",
 marginBottom: "12px",
 marginTop: 0,
 fontSize: "16px"
@@ -441,7 +441,7 @@ marginBottom: "14px",
 padding: "11px",
 border:
 `1px solid ${superSignal.border}`,
-background: "#111",
+background: "#121d2a",
 textAlign: "center",
 wordBreak: "break-word"
 }}
@@ -542,15 +542,15 @@ LONG GATE
 <div
 style={{
 padding: "10px",
-background: "#111",
-border: "1px solid #222",
+background: "#121d2a",
+border: "1px solid #334155",
 marginBottom: "14px"
 }}
 >
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "10px",
 marginBottom: "6px"
 }}
@@ -568,7 +568,7 @@ gap: "10px"
 
 <span
 style={{
-color: "#aaa",
+color: "#cbd5e1",
 fontSize: "12px"
 }}
 >
@@ -579,10 +579,10 @@ Entry Status
 style={{
 color:
 gateOpen
-? "#52c41a"
+? "#6ee7b7"
 : blocked
-? "#ff4d4f"
-: "#999",
+? "#fda4af"
+: "#94a3b8",
 fontWeight: "bold",
 fontSize: "12px"
 }}
@@ -611,13 +611,13 @@ marginBottom: "14px",
 padding: "10px",
 border:
 `1px solid ${exitInfo.color}`,
-background: "#111"
+background: "#121d2a"
 }}
 >
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "10px",
 marginBottom: "5px"
 }}
@@ -650,25 +650,25 @@ marginTop: "3px"
 
 
 {/* Own Russell context only; never substitute the main Nasdaq breadth. */}
-<section aria-label="Russell Marktstruktur" style={{border: "1px solid #333", borderRadius: "6px", background: "#111820", padding: "12px", marginBottom: "14px"}}>
-  <div style={{fontSize: "11px", color: "#bbb", fontWeight: "bold", marginBottom: "10px"}}>RUSSELL · EIGENE MARKTSTRUKTUR</div>
+<section aria-label="Russell Marktstruktur" style={{border: "1px solid #475569", borderRadius: "6px", background: "#111820", padding: "12px", marginBottom: "14px"}}>
+  <div style={{fontSize: "11px", color: "#cbd5e1", fontWeight: "bold", marginBottom: "10px"}}>RUSSELL · EIGENE MARKTSTRUKTUR</div>
   {meta.independentContext ? <>
     <div style={{fontSize: "15px", color: "#e2e8f0", fontWeight: "bold", marginBottom: "10px"}}>{({PHASE_1_EXPANSION: "Phase 1 · Expansion", PHASE_2_WARNING: "Phase 2 · Warnung", PHASE_3_DISTRIBUTION: "Phase 3 · Distribution", PHASE_4_RISK: "Phase 4 · Risiko", PHASE_5_BREAKDOWN: "Phase 5 · Zusammenbruch", PHASE_6_ACCELERATION: "Phase 6 · Beschleunigung", PHASE_7_CAPITULATION: "Phase 7 · Kapitulation"} as Record<string,string>)[meta.independentContext.phase] ?? "Phase nicht verfügbar"}</div>
     <div style={{display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "6px"}}>
       {(["b20", "b50", "b200"] as const).map((key, index) => {
         const value = meta.independentContext.breadth?.[key]?.value;
         return <div key={key} style={{border: "1px solid #293441", borderRadius: "4px", padding: "8px 3px", textAlign: "center"}}>
-          <div style={{fontSize: "10px", color: "#999"}}>{[20,50,200][index]} Tage</div>
+          <div style={{fontSize: "10px", color: "#94a3b8"}}>{[20,50,200][index]} Tage</div>
           <div style={{fontSize: "18px", fontWeight: "bold", color: "#e2e8f0", marginTop: "4px"}}>{typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("de-DE", {maximumFractionDigits: 0}) + "%" : "—"}</div>
         </div>;
       })}
     </div>
-    <div style={{display: "flex", flexWrap: "wrap", gap: "8px 14px", marginTop: "10px", fontSize: "11px", color: "#bbb"}}>
+    <div style={{display: "flex", flexWrap: "wrap", gap: "8px 14px", marginTop: "10px", fontSize: "11px", color: "#cbd5e1"}}>
       <span>Participation {typeof meta.independentContext.participation === "number" ? meta.independentContext.participation : "—"}/100</span>
       <span>Marktqualität {typeof meta.independentContext.quality === "number" ? meta.independentContext.quality : "—"}/100</span>
     </div>
     <p style={{fontSize: "10px", color: "#8995a4", lineHeight: 1.5, marginBottom: 0}}>Anteil der Aktien über ihrem jeweiligen gleitenden Durchschnitt. Small-Cap-Näherung aus IWM-Aktienbeständen. Kursstand {meta.independentContext.referenceDate ?? "unbekannt"} · Abdeckung {typeof meta.independentContext.coverage === "number" && Number.isFinite(meta.independentContext.coverage) ? (meta.independentContext.coverage * 100).toLocaleString("de-DE", {maximumFractionDigits: 2}) + "%" : "—"}. Eigene Russell-Phase; die Hauptphase beschreibt den Nasdaq-Kontext.</p>
-  </> : <p style={{fontSize: "11px", color: "#999", lineHeight: 1.5}}>Eigene Russell-Strukturdaten derzeit nicht verfügbar. Die Nasdaq-Breite wird hier nicht als Ersatz angezeigt.</p>}
+  </> : <p style={{fontSize: "11px", color: "#94a3b8", lineHeight: 1.5}}>Eigene Russell-Strukturdaten derzeit nicht verfügbar. Die Nasdaq-Breite wird hier nicht als Ersatz angezeigt.</p>}
 </section>
 
 {/* =================================================
@@ -677,14 +677,14 @@ SETUP CHECK – ALWAYS VISIBLE
 
 <div
 style={{
-borderTop: "1px solid #222",
+borderTop: "1px solid #334155",
 paddingTop: "12px"
 }}
 >
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "10px",
 marginBottom: "9px"
 }}
@@ -698,11 +698,11 @@ SETUP CHECK
 const color =
 item.negative
 ? item.active
-? "#ff4d4f"
-: "#52c41a"
+? "#fda4af"
+: "#6ee7b7"
 : item.active
-? "#52c41a"
-: "#999";
+? "#6ee7b7"
+: "#94a3b8";
 
 const status =
 item.negative
@@ -729,7 +729,7 @@ fontSize: "12px"
 
 <span
 style={{
-color: "#bbb"
+color: "#cbd5e1"
 }}
 >
 {item.label}
@@ -762,7 +762,7 @@ EXECUTION NOTE
 style={{
 marginTop: "12px",
 fontSize: "11px",
-color: "#777"
+color: "#94a3b8"
 }}
 >
 {execution.note}
@@ -776,7 +776,7 @@ DETAILS ACCORDION
 <div
 style={{
 marginTop: "16px",
-borderTop: "1px solid #222"
+borderTop: "1px solid #334155"
 }}
 >
 
@@ -852,8 +852,8 @@ label="False Break Risk"
 value={`${formatNumber(meta.falseBreakRisk)}%`}
 color={
 meta.falseBreakRisk >= 60
-? "#ff4d4f"
-: "#ddd"
+? "#fda4af"
+: "#e2e8f0"
 }
 />
 
@@ -862,8 +862,8 @@ label="Rotation Decay"
 value={formatNumber(meta.rotationDecayScore)}
 color={
 meta.rotationDecayScore >= 75
-? "#ff4d4f"
-: "#ddd"
+? "#fda4af"
+: "#e2e8f0"
 }
 />
 
@@ -1110,7 +1110,7 @@ return (
 
 <div
 style={{
-borderBottom: "1px solid #222"
+borderBottom: "1px solid #334155"
 }}
 >
 
@@ -1120,7 +1120,7 @@ style={{
 width: "100%",
 background: "transparent",
 border: "none",
-color: "#888",
+color: "#94a3b8",
 padding: "13px 0",
 cursor: "pointer",
 display: "flex",
@@ -1138,7 +1138,7 @@ textAlign: "left"
 
 <span
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "14px"
 }}
 >
@@ -1183,15 +1183,15 @@ return (
 
 <div
 style={{
-background: "#111",
-border: "1px solid #222",
+background: "#121d2a",
+border: "1px solid #334155",
 padding: "9px"
 }}
 >
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "9px",
 marginBottom: "4px"
 }}
@@ -1223,7 +1223,7 @@ INFO ROW
 function InfoRow({
 label,
 value,
-color = "#ddd",
+color = "#e2e8f0",
 bold = false
 }: any) {
 
@@ -1242,7 +1242,7 @@ fontSize: "12px"
 
 <span
 style={{
-color: "#777",
+color: "#94a3b8",
 minWidth: 0
 }}
 >
@@ -1284,11 +1284,11 @@ negative = false
 const color =
 negative
 ? active
-? "#ff4d4f"
-: "#52c41a"
+? "#fda4af"
+: "#6ee7b7"
 : active
-? "#52c41a"
-: "#999";
+? "#6ee7b7"
+: "#94a3b8";
 
 const value =
 negative
@@ -1314,7 +1314,7 @@ fontSize: "12px"
 
 <span
 style={{
-color: "#ccc",
+color: "#e2e8f0",
 minWidth: 0,
 wordBreak: "break-word"
 }}
@@ -1393,7 +1393,7 @@ fontSize: "12px"
 <div
 style={{
 height: "6px",
-background: "#222",
+background: "#334155",
 marginTop: "4px",
 width: "100%"
 }}

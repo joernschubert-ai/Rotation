@@ -109,18 +109,18 @@ HELPERS
 function getScoreColor(value: number) {
 
 if (value >= 86) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (value >= 72) {
-return "#95de64";
+return "#a7f3d0";
 }
 
 if (value >= 52) {
-return "#faad14";
+return "#fcd34d";
 }
 
-return "#ff4d4f";
+return "#fda4af";
 }
 
 
@@ -129,19 +129,19 @@ function getQualityColor(value: string) {
 switch (value) {
 
 case "INSTITUTIONAL":
-return "#52c41a";
+return "#6ee7b7";
 
 case "CONFIRMED":
-return "#95de64";
+return "#a7f3d0";
 
 case "TACTICAL":
-return "#faad14";
+return "#fcd34d";
 
 case "LOW":
-return "#ff4d4f";
+return "#fda4af";
 
 default:
-return "#999";
+return "#94a3b8";
 }
 }
 
@@ -151,22 +151,22 @@ function getStateColor(value: string) {
 switch (value) {
 
 case "HIGH_CONVICTION":
-return "#52c41a";
+return "#6ee7b7";
 
 case "CONFIRMED":
-return "#95de64";
+return "#a7f3d0";
 
 case "BUILDING":
-return "#faad14";
+return "#fcd34d";
 
 case "EARLY":
-return "#fa8c16";
+return "#fdba74";
 
 case "INVALID":
-return "#666";
+return "#64748b";
 
 default:
-return "#999";
+return "#94a3b8";
 }
 }
 
@@ -176,16 +176,16 @@ function getPriorityColor(value: string) {
 switch (value) {
 
 case "HIGH":
-return "#ff4d4f";
+return "#fda4af";
 
 case "MEDIUM":
-return "#faad14";
+return "#fcd34d";
 
 case "LOW":
-return "#666";
+return "#64748b";
 
 default:
-return "#999";
+return "#94a3b8";
 }
 }
 
@@ -195,28 +195,28 @@ function getDirectionColor(value: string) {
 switch (value) {
 
 case "BULLISH":
-return "#52c41a";
+return "#6ee7b7";
 
 case "BEARISH":
-return "#ff4d4f";
+return "#fda4af";
 
 case "NEUTRAL":
-return "#999";
+return "#94a3b8";
 
 default:
-return "#999";
+return "#94a3b8";
 }
 }
 
 
 function getBooleanColor(
 value: boolean,
-positive = "#52c41a"
+positive = "#6ee7b7"
 ) {
 
 return value
 ? positive
-: "#555";
+: "#64748b";
 }
 
 
@@ -262,10 +262,10 @@ isLong
 
 const directionColor =
 isLong
-? "#52c41a"
+? "#6ee7b7"
 : isShort
-? "#ff4d4f"
-: "#999";
+? "#fda4af"
+: "#94a3b8";
 
 
 /* =====================================================
@@ -282,10 +282,10 @@ rotationConfirmed
 
 const rotationColor =
 rotationConfirmed
-? "#52c41a"
+? "#6ee7b7"
 : rotationConfirming
-? "#faad14"
-: "#666";
+? "#fcd34d"
+: "#64748b";
 
 
 /* =====================================================
@@ -316,7 +316,7 @@ return (
 style={{
 width: "100%",
 height: "6px",
-background: "#222",
+background: "#334155",
 borderRadius: "4px",
 overflow: "hidden"
 }}
@@ -360,8 +360,8 @@ return (
 
 <div
 style={{
-background: "#111",
-border: "1px solid #222",
+background: "#121d2a",
+border: "1px solid #334155",
 padding: "12px",
 minWidth: 0
 }}
@@ -370,7 +370,7 @@ minWidth: 0
 <div
 style={{
 fontSize: "10px",
-color: "#666",
+color: "#64748b",
 marginBottom: "6px",
 textTransform: "uppercase",
 letterSpacing: "0.5px"
@@ -383,7 +383,7 @@ letterSpacing: "0.5px"
 <div
 style={{
 fontWeight: "bold",
-color: color ?? "#ddd",
+color: color ?? "#e2e8f0",
 fontSize: "14px",
 wordBreak: "break-word"
 }}
@@ -398,7 +398,7 @@ wordBreak: "break-word"
 style={{
 marginTop: "5px",
 fontSize: "11px",
-color: "#777"
+color: "#94a3b8"
 }}
 >
 {subValue}
@@ -427,7 +427,7 @@ return (
 <div
 style={{
 fontSize: "11px",
-color: "#666",
+color: "#64748b",
 marginBottom: "8px",
 textTransform: "uppercase",
 letterSpacing: "0.8px"
@@ -446,7 +446,7 @@ HEADER COLOR
 
 const headerColor =
 !active
-? "#666"
+? "#64748b"
 : getScoreColor(institutionalScore);
 
 
@@ -458,7 +458,7 @@ return (
 
 <div
 style={{
-background: "#0d0d0d",
+background: "#0e1722",
 border: `1px solid ${headerColor}`,
 padding: "16px",
 width: "100%",
@@ -500,7 +500,7 @@ SUPER SIGNAL
 style={{
 marginTop: "4px",
 fontSize: "11px",
-color: "#666"
+color: "#64748b"
 }}
 >
 Institutional Signal Confirmation Engine
@@ -555,7 +555,7 @@ MAIN SIGNAL
 <div
 style={{
 padding: "16px",
-background: "#111",
+background: "#121d2a",
 border: `1px solid ${headerColor}`,
 marginBottom: "18px"
 }}
@@ -576,7 +576,7 @@ flexWrap: "wrap"
 <div
 style={{
 fontSize: "10px",
-color: "#666",
+color: "#64748b",
 textTransform: "uppercase",
 marginBottom: "6px"
 }}
@@ -620,7 +620,7 @@ textAlign: "right"
 <div
 style={{
 fontSize: "10px",
-color: "#666",
+color: "#64748b",
 textTransform: "uppercase"
 }}
 >
@@ -642,7 +642,7 @@ institutionalScore
 <span
 style={{
 fontSize: "13px",
-color: "#666"
+color: "#64748b"
 }}
 >
 /100
@@ -684,13 +684,13 @@ padding: "7px 10px",
 border:
 `1px solid ${
 active
-? "#52c41a"
-: "#444"
+? "#6ee7b7"
+: "#475569"
 }`,
 color:
 active
-? "#52c41a"
-: "#777",
+? "#6ee7b7"
+: "#94a3b8",
 fontSize: "11px",
 fontWeight: "bold"
 }}
@@ -709,13 +709,13 @@ padding: "7px 10px",
 border:
 `1px solid ${
 trigger
-? "#52c41a"
-: "#444"
+? "#6ee7b7"
+: "#475569"
 }`,
 color:
 trigger
-? "#52c41a"
-: "#777",
+? "#6ee7b7"
+: "#94a3b8",
 fontSize: "11px",
 fontWeight: "bold"
 }}
@@ -782,8 +782,8 @@ regimeAligned
 }
 color={
 regimeAligned
-? "#52c41a"
-: "#ff4d4f"
+? "#6ee7b7"
+: "#fda4af"
 }
 />
 
@@ -797,8 +797,8 @@ phaseConfirmed
 }
 color={
 phaseConfirmed
-? "#52c41a"
-: "#faad14"
+? "#6ee7b7"
+: "#fcd34d"
 }
 subValue={`${phaseConfidence}% confidence`}
 />
@@ -905,8 +905,8 @@ lowFragility
 }
 color={
 lowFragility
-? "#52c41a"
-: "#fa8c16"
+? "#6ee7b7"
+: "#fdba74"
 }
 />
 
@@ -948,8 +948,8 @@ rotationHealthy
 }
 color={
 rotationHealthy
-? "#52c41a"
-: "#fa8c16"
+? "#6ee7b7"
+: "#fdba74"
 }
 />
 
@@ -963,8 +963,8 @@ decayWarning
 }
 color={
 decayWarning
-? "#fa8c16"
-: "#52c41a"
+? "#fdba74"
+: "#6ee7b7"
 }
 />
 
@@ -978,8 +978,8 @@ breadthThrustActive
 }
 color={
 breadthThrustActive
-? "#52c41a"
-: "#666"
+? "#6ee7b7"
+: "#64748b"
 }
 />
 
@@ -993,8 +993,8 @@ megaCapRisk
 }
 color={
 megaCapRisk
-? "#fa8c16"
-: "#52c41a"
+? "#fdba74"
+: "#6ee7b7"
 }
 />
 
@@ -1036,8 +1036,8 @@ falseBreakRisk
 }
 color={
 falseBreakRisk
-? "#fa8c16"
-: "#52c41a"
+? "#fdba74"
+: "#6ee7b7"
 }
 />
 
@@ -1051,8 +1051,8 @@ squeezeRisk
 }
 color={
 squeezeRisk
-? "#fa8c16"
-: "#52c41a"
+? "#fdba74"
+: "#6ee7b7"
 }
 />
 
@@ -1087,8 +1087,8 @@ SUMMARY
 style={{
 marginTop: "18px",
 padding: "12px",
-background: "#141414",
-border: "1px solid #222"
+background: "#121d2a",
+border: "1px solid #334155"
 }}
 >
 
@@ -1100,7 +1100,7 @@ Engine Summary
 <div
 style={{
 fontSize: "12px",
-color: "#aaa",
+color: "#cbd5e1",
 lineHeight: 1.6,
 wordBreak: "break-word"
 }}

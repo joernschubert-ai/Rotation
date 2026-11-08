@@ -51,30 +51,30 @@ COLOR SYSTEM
 ===================================================== */
 
 const COLORS = {
-green: "#52c41a",
-greenSoft: "#95de64",
+green: "#6ee7b7",
+greenSoft: "#a7f3d0",
 
-yellow: "#fadb14",
+yellow: "#fcd34d",
 yellowSoft: "#ffe58f",
 
-orange: "#fa8c16",
+orange: "#fdba74",
 orangeSoft: "#ffc069",
 
-red: "#ff4d4f",
-redSoft: "#ff7875",
+red: "#fda4af",
+redSoft: "#fda4af",
 
-blue: "#40a9ff",
+blue: "#7dd3fc",
 
-text: "#ddd",
-textMuted: "#888",
-textDim: "#666",
+text: "#e2e8f0",
+textMuted: "#94a3b8",
+textDim: "#64748b",
 
-background: "#0d0d0d",
-backgroundCard: "#141414",
-backgroundStrong: "#111",
+background: "#0e1722",
+backgroundCard: "#121d2a",
+backgroundStrong: "#121d2a",
 
 border: "#242424",
-borderSoft: "#1d1d1d"
+borderSoft: "#162232"
 
 };
 
@@ -962,7 +962,7 @@ minWidth:
 
 const progressBackgroundStyle: CSSProperties = {
 background:
-"#222",
+"#334155",
 
 marginTop:
   "5px",
@@ -986,7 +986,7 @@ border:
   `1px solid ${COLORS.border}`,
 
 background:
-  "#101010",
+  "#121d2a",
 
 borderRadius:
   "3px",
@@ -1100,7 +1100,7 @@ return (
     <h3
       style={{
         color:
-          "#aaa",
+          "#cbd5e1",
 
         margin:
           0,
@@ -1301,7 +1301,7 @@ return (
           "5px",
 
         background:
-          `linear-gradient(to right, ${callAllowed ? "#52c41a" : "#fadb14"} 0%, ${callAllowed ? "#52c41a" : "#fadb14"} ${callThreshold}%, #fadb14 ${callThreshold}%, #fadb14 ${putThreshold}%, #ff4d4f ${putThreshold}%, #ff4d4f 100%)`,
+          `linear-gradient(to right, ${callAllowed ? "#6ee7b7" : "#fcd34d"} 0%, ${callAllowed ? "#6ee7b7" : "#fcd34d"} ${callThreshold}%, #fadb14 ${callThreshold}%, #fadb14 ${putThreshold}%, #ff4d4f ${putThreshold}%, #ff4d4f 100%)`,
 
         borderRadius:
           "3px",
@@ -1329,7 +1329,7 @@ return (
             "11px",
 
           background:
-            "#fff",
+            "#f8fafc",
 
           borderRadius:
             "2px",
@@ -1389,7 +1389,7 @@ return (
         )}`,
 
       background:
-        "#151515",
+        "#121d2a",
 
       padding:
         "10px",
@@ -1633,7 +1633,7 @@ return (
         getSummaryColor(),
 
       background:
-        "#111",
+        "#121d2a",
 
       fontSize:
         "10px",

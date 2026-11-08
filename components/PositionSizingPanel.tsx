@@ -90,10 +90,10 @@ function normalizeDirection(value: unknown): string | null {
 }
 
 function directionColor(value: string): string {
-  if (value === "SHORT") return "#ff7875";
-  if (value === "LONG") return "#95de64";
-  if (value === "MIXED") return "#fa8c16";
-  return "#888";
+  if (value === "SHORT") return "#fda4af";
+  if (value === "LONG") return "#a7f3d0";
+  if (value === "MIXED") return "#fdba74";
+  return "#94a3b8";
 }
 
 function stateColor(value: string): string {
@@ -104,11 +104,11 @@ function stateColor(value: string): string {
     normalized.includes("BREAKDOWN") ||
     normalized.includes("EXTREME")
   ) {
-    return "#ff7875";
+    return "#fda4af";
   }
 
   if (normalized.includes("NO_TRADE") || normalized === "UNKNOWN") {
-    return "#777";
+    return "#94a3b8";
   }
 
   if (normalized.includes("STARTER")) return "#69b1ff";
@@ -117,7 +117,7 @@ function stateColor(value: string): string {
     normalized.includes("DEFENSIVE") ||
     normalized.includes("SHORT")
   ) {
-    return "#fadb14";
+    return "#fcd34d";
   }
 
   if (
@@ -125,41 +125,41 @@ function stateColor(value: string): string {
     normalized.includes("EXPANSION") ||
     normalized === "STABLE"
   ) {
-    return "#95de64";
+    return "#a7f3d0";
   }
 
-  return "#aaa";
+  return "#cbd5e1";
 }
 
 function metricColor(value: unknown, kind: MetricKind): string {
   const parsed = numeric(value);
 
-  if (parsed === null) return "#555";
-  if (kind === "neutral") return "#aaa";
+  if (parsed === null) return "#64748b";
+  if (kind === "neutral") return "#cbd5e1";
 
   if (kind === "heat") {
-    return parsed > 0 ? "#95de64" : parsed < 0 ? "#ff7875" : "#aaa";
+    return parsed > 0 ? "#a7f3d0" : parsed < 0 ? "#fda4af" : "#cbd5e1";
   }
 
   if (kind === "improvement") {
-    return parsed > 0 ? "#95de64" : parsed < 0 ? "#fa8c16" : "#aaa";
+    return parsed > 0 ? "#a7f3d0" : parsed < 0 ? "#fdba74" : "#cbd5e1";
   }
 
   if (kind === "deterioration") {
-    return parsed > 0 ? "#fa8c16" : parsed < 0 ? "#95de64" : "#aaa";
+    return parsed > 0 ? "#fdba74" : parsed < 0 ? "#a7f3d0" : "#cbd5e1";
   }
 
   if (kind === "risk") {
-    if (parsed >= 80) return "#ff7875";
-    if (parsed >= 60) return "#fa8c16";
-    if (parsed >= 40) return "#fadb14";
-    return "#95de64";
+    if (parsed >= 80) return "#fda4af";
+    if (parsed >= 60) return "#fdba74";
+    if (parsed >= 40) return "#fcd34d";
+    return "#a7f3d0";
   }
 
-  if (parsed >= 70) return "#95de64";
-  if (parsed >= 50) return "#fadb14";
-  if (parsed >= 30) return "#fa8c16";
-  return "#ff7875";
+  if (parsed >= 70) return "#a7f3d0";
+  if (parsed >= 50) return "#fcd34d";
+  if (parsed >= 30) return "#fdba74";
+  return "#fda4af";
 }
 
 function Metric({
@@ -180,15 +180,15 @@ function Metric({
   return (
     <div
       style={{
-        border: "1px solid #222",
-        background: "#101010",
+        border: "1px solid #334155",
+        background: "#121d2a",
         padding: "8px",
         minWidth: 0,
       }}
     >
       <div
         style={{
-          color: "#666",
+          color: "#64748b",
           fontSize: "9px",
           marginBottom: "5px",
           overflowWrap: "anywhere",
@@ -236,7 +236,7 @@ function SectionTitle({ children }: { children: ReactNode }) {
   return (
     <div
       style={{
-        color: "#999",
+        color: "#94a3b8",
         fontSize: "10px",
         fontWeight: "bold",
         marginBottom: "8px",
@@ -254,13 +254,13 @@ function StateCard({ label, value }: { label: string; value: unknown }) {
   return (
     <div
       style={{
-        border: "1px solid #222",
-        background: "#101010",
+        border: "1px solid #334155",
+        background: "#121d2a",
         padding: "9px",
         minWidth: 0,
       }}
     >
-      <div style={{ color: "#666", fontSize: "9px" }}>{label}</div>
+      <div style={{ color: "#64748b", fontSize: "9px" }}>{label}</div>
       <div
         style={{
           color: stateColor(rendered),
@@ -288,18 +288,18 @@ function CollapsibleSection({
   return (
     <details
       style={{
-        borderTop: "1px solid #222",
+        borderTop: "1px solid #334155",
         paddingTop: "10px",
         marginTop: "10px",
       }}
     >
-      <summary style={{ cursor: "pointer", color: "#999", fontSize: "10px" }}>
+      <summary style={{ cursor: "pointer", color: "#94a3b8", fontSize: "10px" }}>
         {title}
         {subtitle && (
           <span
             style={{
               display: "block",
-              color: "#666",
+              color: "#64748b",
               fontSize: "9px",
               marginTop: "3px",
             }}
@@ -357,7 +357,7 @@ function FlowDiagnostics({ flow }: { flow: any }) {
         </MetricGrid>
       )}
 
-      <div style={{ color: "#888", fontSize: "10px", lineHeight: 1.5 }}>
+      <div style={{ color: "#94a3b8", fontSize: "10px", lineHeight: 1.5 }}>
         {text(flow?.reason, "No engine reason supplied")}
       </div>
     </>
@@ -367,9 +367,9 @@ function FlowDiagnostics({ flow }: { flow: any }) {
 function FlowCard({ title, flow }: { title: string; flow: any }) {
   if (!flow) {
     return (
-      <div style={{ border: "1px solid #222", background: "#101010", padding: "12px" }}>
+      <div style={{ border: "1px solid #334155", background: "#121d2a", padding: "12px" }}>
         <strong style={{ fontSize: "12px" }}>{title}</strong>
-        <div style={{ color: "#666", marginTop: "8px", fontSize: "10px" }}>
+        <div style={{ color: "#64748b", marginTop: "8px", fontSize: "10px" }}>
           NO DATA
         </div>
       </div>
@@ -383,8 +383,8 @@ function FlowCard({ title, flow }: { title: string; flow: any }) {
   return (
     <div
       style={{
-        border: `1px solid ${eligible ? directionColor(direction) : "#222"}`,
-        background: "#101010",
+        border: `1px solid ${eligible ? directionColor(direction) : "#334155"}`,
+        background: "#121d2a",
         padding: "12px",
         minWidth: 0,
       }}
@@ -403,11 +403,11 @@ function FlowCard({ title, flow }: { title: string; flow: any }) {
         </span>
       </div>
 
-      <div style={{ fontSize: "10px", color: "#666" }}>FINALER MODELLANTEIL</div>
-      <div style={{ fontSize: "28px", fontWeight: "bold", color: "#ddd" }}>
+      <div style={{ fontSize: "10px", color: "#64748b" }}>FINALER MODELLANTEIL</div>
+      <div style={{ fontSize: "28px", fontWeight: "bold", color: "#e2e8f0" }}>
         {display(finalSize, 0, "%")}
       </div>
-      <div style={{fontSize:"10px",color:"#999",marginTop:"4px"}}>Nach Risikoabschlägen und Begrenzungen. Modellwert, keine individuell berechnete Depotquote. Signalstufe und Modellgröße sind getrennte Angaben.</div>
+      <div style={{fontSize:"10px",color:"#94a3b8",marginTop:"4px"}}>Nach Risikoabschlägen und Begrenzungen. Modellwert, keine individuell berechnete Depotquote. Signalstufe und Modellgröße sind getrennte Angaben.</div>
 
       <div
         style={{
@@ -420,7 +420,7 @@ function FlowCard({ title, flow }: { title: string; flow: any }) {
         {text(flow.mode, "NO_TRADE")}
       </div>
 
-      <div style={{ color: eligible ? "#95de64" : "#777", fontSize: "10px", margin: "5px 0 10px" }}>
+      <div style={{ color: eligible ? "#a7f3d0" : "#94a3b8", fontSize: "10px", margin: "5px 0 10px" }}>
         {eligible ? "ELIGIBLE" : "NO TRADE"}
       </div>
 
@@ -435,7 +435,7 @@ function FlowCard({ title, flow }: { title: string; flow: any }) {
       </div>
 
       <details>
-        <summary style={{ fontSize: "10px", color: "#777", cursor: "pointer" }}>
+        <summary style={{ fontSize: "10px", color: "#94a3b8", cursor: "pointer" }}>
           {title} · SIZING DETAILS
         </summary>
         <div style={{ marginTop: "9px" }}>
@@ -491,19 +491,19 @@ export default function PositionSizingPanel({
   const allocationDirection = normalizeDirection(direction);
 
   let alignment = "RICHTUNG NICHT VERGLEICHBAR";
-  let alignmentColor = "#777";
+  let alignmentColor = "#94a3b8";
 
   if (allocationDirection === "NEUTRAL") {
     alignment = "NO EXPOSURE";
   } else if (directionalConflict || allocationDirection === "MIXED") {
     alignment = "DIRECTION CONFLICT";
-    alignmentColor = "#fa8c16";
+    alignmentColor = "#fdba74";
   } else if (decisionDirection === "NEUTRAL") {
     alignment = "NO DIRECTIONAL DECISION";
   } else if (decisionDirection && allocationDirection) {
     const aligned = decisionDirection === allocationDirection;
     alignment = aligned ? "ALIGNED" : "MISALIGNED";
-    alignmentColor = aligned ? "#95de64" : "#ff7875";
+    alignmentColor = aligned ? "#a7f3d0" : "#fda4af";
   }
 
   const confirmationCount =
@@ -562,9 +562,9 @@ export default function PositionSizingPanel({
     <div
       style={{
         background: "#090909",
-        border: "1px solid #222",
+        border: "1px solid #334155",
         padding: "clamp(10px, 2vw, 16px)",
-        color: "#ddd",
+        color: "#e2e8f0",
         width: "100%",
         minWidth: 0,
         boxSizing: "border-box",
@@ -580,23 +580,23 @@ export default function PositionSizingPanel({
         }}
       >
         <div>
-          <div style={{ color: "#aaa", fontSize: "14px", fontWeight: "bold" }}>
+          <div style={{ color: "#cbd5e1", fontSize: "14px", fontWeight: "bold" }}>
             POSITIONIERUNG
           </div>
-          <div style={{ color: "#666", fontSize: "9px", marginTop: "3px" }}>
+          <div style={{ color: "#64748b", fontSize: "9px", marginTop: "3px" }}>
             POSITION SIZING · PORTFOLIO ALLOCATION
           </div>
         </div>
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
           <Badge color={alignmentColor}>{alignment}</Badge>
-          {defensiveEnvironment && <Badge color="#fadb14">DEFENSIVE</Badge>}
+          {defensiveEnvironment && <Badge color="#fcd34d">DEFENSIVE</Badge>}
         </div>
       </div>
 
       <div
         style={{
           border: `1px solid ${directionColor(direction)}`,
-          background: "#101010",
+          background: "#121d2a",
           padding: "14px",
           marginBottom: "14px",
         }}
@@ -610,11 +610,11 @@ export default function PositionSizingPanel({
           }}
         >
           <div>
-            <div style={{ color: "#777", fontSize: "10px" }}>PORTFOLIO POSITION</div>
+            <div style={{ color: "#94a3b8", fontSize: "10px" }}>PORTFOLIO POSITION</div>
             <div style={{ color: directionColor(direction), fontSize: "24px", fontWeight: "bold" }}>
               {direction}
             </div>
-            <div style={{ color: "#777", fontSize: "10px", marginTop: "5px" }}>
+            <div style={{ color: "#94a3b8", fontSize: "10px", marginTop: "5px" }}>
               {activeFlows ? `${activeFlows.length} ACTIVE FLOW(S)` : "ACTIVE FLOWS —"}
             </div>
           </div>
@@ -629,7 +629,7 @@ export default function PositionSizingPanel({
         </div>
 
         {primary && (
-          <div style={{ borderTop: "1px solid #222", paddingTop: "10px", marginTop: "12px" }}>
+          <div style={{ borderTop: "1px solid #334155", paddingTop: "10px", marginTop: "12px" }}>
             <MetricGrid minWidth={110}>
               <Metric label="PRIMARY INSTRUMENT" formatted={instrumentLabel(primary.instrument)} />
               <Metric label="PRIMÄRER MODELLANTEIL" value={primary.size} suffix="%" />
@@ -643,14 +643,14 @@ export default function PositionSizingPanel({
           </div>
         )}
 
-        <div style={{ color: "#777", fontSize: "10px", lineHeight: 1.5 }}>
+        <div style={{ color: "#94a3b8", fontSize: "10px", lineHeight: 1.5 }}>
           Setup Support is an instrument-specific model score.
           It is not execution quality or a calibrated success probability.
         </div>
       </div>
 
       <SectionTitle>REGIME-KONTEXT</SectionTitle>
-      <p style={{fontSize: "11px", color: "#999", lineHeight: 1.5}}>Der Regime-Status ist die allgemeine Markteinschätzung. Instrumentfreigaben und Modellgrößen stehen unter Instrument Allocations; ein begrenzter Starter kann trotz WAIT freigegeben sein.</p>
+      <p style={{fontSize: "11px", color: "#94a3b8", lineHeight: 1.5}}>Der Regime-Status ist die allgemeine Markteinschätzung. Instrumentfreigaben und Modellgrößen stehen unter Instrument Allocations; ein begrenzter Starter kann trotz WAIT freigegeben sein.</p>
       <MetricGrid minWidth={130}>
         <StateCard label="PHASE" value={phase} />
         <StateCard label="REGIME-AUSFÜHRUNG" value={executionMode} />
@@ -667,17 +667,17 @@ export default function PositionSizingPanel({
         }}
       >
         <SectionTitle>DEFENSIVE MODEL EVIDENCE</SectionTitle>
-        <div style={{ color: "#fadb14", fontSize: "13px", fontWeight: "bold" }}>
+        <div style={{ color: "#fcd34d", fontSize: "13px", fontWeight: "bold" }}>
           {strongDefensiveConfirmed
             ? "STRONG DEFENSIVE EVIDENCE"
             : defensiveConfirmed
               ? "DEFENSIVE EVIDENCE"
               : "NOT CONFIRMED"}
         </div>
-        <div style={{ color: "#aaa", fontSize: "11px", marginTop: "6px" }}>
+        <div style={{ color: "#cbd5e1", fontSize: "11px", marginTop: "6px" }}>
           {display(confirmationCount)} MODEL FLAGS
         </div>
-        <div style={{ color: "#777", fontSize: "10px", marginTop: "5px" }}>
+        <div style={{ color: "#94a3b8", fontSize: "10px", marginTop: "5px" }}>
           Flags can share underlying inputs; the count is not independent statistical confirmation.
         </div>
       </div>
@@ -707,7 +707,7 @@ export default function PositionSizingPanel({
         <Metric label="MARKET QUALITY" value={risk.marketQualityScore} kind="health" />
       </MetricGrid>
 
-      <div style={{ color: "#777", fontSize: "10px", lineHeight: 1.5, marginBottom: "14px" }}>
+      <div style={{ color: "#94a3b8", fontSize: "10px", lineHeight: 1.5, marginBottom: "14px" }}>
         Sizing factors multiply the calculated allocation.
         For example, ×0,14 retains 14% of the size entering that step.
       </div>
@@ -721,10 +721,10 @@ export default function PositionSizingPanel({
             marginBottom: "14px",
           }}
         >
-          <div style={{ color: "#fa8c16", fontSize: "11px", fontWeight: "bold" }}>
+          <div style={{ color: "#fdba74", fontSize: "11px", fontWeight: "bold" }}>
             EXTREME POSITIONING INSTABILITY · {display(squeezeRisk)}/100
           </div>
-          <div style={{ color: "#888", fontSize: "10px", marginTop: "5px", lineHeight: 1.5 }}>
+          <div style={{ color: "#94a3b8", fontSize: "10px", marginTop: "5px", lineHeight: 1.5 }}>
             The squeeze model flags positioning instability.
             This score does not independently confirm a PUT or CALL direction.
           </div>
@@ -782,12 +782,12 @@ export default function PositionSizingPanel({
           ].map(({ title, flow }) => (
             <div
               key={title}
-              style={{ border: "1px solid #222", padding: "10px", minWidth: 0 }}
+              style={{ border: "1px solid #334155", padding: "10px", minWidth: 0 }}
             >
               <SectionTitle>{title}</SectionTitle>
               {flow
                 ? <FlowDiagnostics flow={flow} />
-                : <div style={{ color: "#666", fontSize: "10px" }}>NO DATA</div>}
+                : <div style={{ color: "#64748b", fontSize: "10px" }}>NO DATA</div>}
             </div>
           ))}
         </MetricGrid>
@@ -797,20 +797,20 @@ export default function PositionSizingPanel({
         style={{
           marginTop: "12px",
           paddingTop: "10px",
-          borderTop: "1px solid #222",
+          borderTop: "1px solid #334155",
           display: "flex",
           gap: "10px",
           flexWrap: "wrap",
-          color: "#666",
+          color: "#64748b",
           fontSize: "9px",
         }}
       >
         <span>ACTIVE {activeFlows ? activeFlows.length : "—"}</span>
         <span>INSTRUMENTS {activeInstruments ? activeInstruments.length : "—"}</span>
-        <span style={{ color: directionalConflict ? "#fa8c16" : "#666" }}>
+        <span style={{ color: directionalConflict ? "#fdba74" : "#64748b" }}>
           CONFLICT {directionalConflict ? "YES" : "NO"}
         </span>
-        <span style={{ color: allocationIssue ? "#fa8c16" : "#666" }}>
+        <span style={{ color: allocationIssue ? "#fdba74" : "#64748b" }}>
           ALLOCATION CHECK {dataStatus}
         </span>
       </div>

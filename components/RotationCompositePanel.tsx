@@ -83,22 +83,22 @@ const safeValue =
 clamp(value);
 
 if (safeValue >= 80) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (safeValue >= 65) {
-return "#95de64";
+return "#a7f3d0";
 }
 
 if (safeValue >= 50) {
-return "#faad14";
+return "#fcd34d";
 }
 
 if (safeValue >= 35) {
-return "#ff7875";
+return "#fda4af";
 }
 
-return "#ff4d4f";
+return "#fda4af";
 }
 
 /*
@@ -115,8 +115,8 @@ return metricColor(
 }
 
 function stateColor() {
-if (["BEARISH_CONFIRMING", "BEARISH_CONFIRMED"].includes(rotationConfirm?.state)) return "#ff7875";
-if (["BULLISH_CONFIRMING", "BULLISH_CONFIRMED"].includes(rotationConfirm?.state)) return "#52c41a";
+if (["BEARISH_CONFIRMING", "BEARISH_CONFIRMED"].includes(rotationConfirm?.state)) return "#fda4af";
+if (["BULLISH_CONFIRMING", "BULLISH_CONFIRMED"].includes(rotationConfirm?.state)) return "#6ee7b7";
 
 const state =
 rotationConfirm?.state ??
@@ -126,14 +126,14 @@ if (
 state ===
 "INSTITUTIONAL_CONFIRMATION"
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (
 state ===
 "CONFIRMED"
 ) {
-return "#95de64";
+return "#a7f3d0";
 }
 
 if (
@@ -147,24 +147,24 @@ if (
 state ===
 "MEGA_CAP_ONLY"
 ) {
-return "#ff7875";
+return "#fda4af";
 }
 
 if (
 state ===
 "INTERNAL_BREAKDOWN"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 if (
 state ===
 "ROTATION_FAILURE"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 }
 
 /* =====================================================
@@ -203,7 +203,7 @@ marginBottom: "5px",
 
 fontSize: "11px",
 
-color: "#666",
+color: "#64748b",
 }}
 >
 <span>
@@ -224,7 +224,7 @@ fontWeight: "bold",
 style={{
 height: "6px",
 
-background: "#222",
+background: "#334155",
 
 borderRadius: "4px",
 
@@ -408,16 +408,16 @@ function tacticalBiasColor() {
 if (
 tacticalBias === "BULLISH"
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (
 tacticalBias === "BEARISH"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 }
 
 /* =====================================================
@@ -429,16 +429,16 @@ function superSignalColor() {
 if (
 superSignalStrength >= 70
 ) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (
 superSignalStrength >= 45
 ) {
-return "#faad14";
+return "#fcd34d";
 }
 
-return "#ff4d4f";
+return "#fda4af";
 }
 
 /* =====================================================
@@ -457,7 +457,7 @@ MASTER HEADER
 
 <div
 style={{
-background: "#0d0d0d",
+background: "#0e1722",
 
 border:
 `1px solid ${stateColor()}`,
@@ -484,7 +484,7 @@ sm:justify-between
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 
 fontSize: "11px",
 
@@ -520,7 +520,7 @@ sm:text-right
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 
 fontSize: "11px",
 
@@ -565,10 +565,10 @@ xl:grid-cols-4
 
 <div
 style={{
-background: "#111",
+background: "#121d2a",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding: "12px",
 }}
@@ -576,7 +576,7 @@ padding: "12px",
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 
 fontSize: "11px",
 
@@ -588,7 +588,7 @@ EXECUTION
 
 <div
 style={{
-color: "#fff",
+color: "#f8fafc",
 
 fontWeight: "bold",
 }}
@@ -602,10 +602,10 @@ fontWeight: "bold",
 
 <div
 style={{
-background: "#111",
+background: "#121d2a",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding: "12px",
 }}
@@ -613,7 +613,7 @@ padding: "12px",
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 
 fontSize: "11px",
 
@@ -640,10 +640,10 @@ fontWeight: "bold",
 
 <div
 style={{
-background: "#111",
+background: "#121d2a",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding: "12px",
 }}
@@ -651,7 +651,7 @@ padding: "12px",
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 
 fontSize: "11px",
 
@@ -665,8 +665,8 @@ REGIME SYNC
 style={{
 color:
 institutionalAlignment
-? "#52c41a"
-: "#ff7875",
+? "#6ee7b7"
+: "#fda4af",
 
 fontWeight: "bold",
 }}
@@ -682,10 +682,10 @@ fontWeight: "bold",
 
 <div
 style={{
-background: "#111",
+background: "#121d2a",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding: "12px",
 }}
@@ -693,7 +693,7 @@ padding: "12px",
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 
 fontSize: "11px",
 
@@ -728,10 +728,10 @@ ROTATION QUALITY MATRIX
 
 <div
 style={{
-background: "#0d0d0d",
+background: "#0e1722",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding: "18px",
 }}
@@ -739,7 +739,7 @@ padding: "18px",
 
 <h3
 style={{
-color: "#888",
+color: "#94a3b8",
 
 marginBottom: "18px",
 
@@ -833,7 +833,7 @@ ist jetzt die einzige Quelle für:
 className="
 mb-3
 border-b
-border-[#222]
+border-[#334155]
 pb-2
 "
 >
@@ -843,7 +843,7 @@ className="
 text-[10px]
 uppercase
 tracking-[0.12em]
-text-[#666]
+text-[#64748b]
 "
 >
 Structural Rotation Deterioration

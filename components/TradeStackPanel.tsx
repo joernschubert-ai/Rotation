@@ -77,13 +77,13 @@ COLORS — DIRECTION
 function getDirectionColor(direction: string) {
 switch (direction) {
 case "SHORT":
-return "#ff4d4f";
+return "#fda4af";
 
 case "LONG":
-return "#52c41a";
+return "#6ee7b7";
 
 default:
-return "#777";
+return "#94a3b8";
 }
 }
 
@@ -94,28 +94,28 @@ STACK STATE COLOR
 function getStackStateColor(state: string) {
 switch (state) {
 case "SHORT_ATTACK":
-return "#ff4d4f";
+return "#fda4af";
 
 case "SHORT_BUILDING":
-return "#ff7875";
+return "#fda4af";
 
 case "EARLY_DEFENSIVE_SHORT":
-return "#fa8c16";
+return "#fdba74";
 
 case "LONG_ATTACK":
-return "#52c41a";
+return "#6ee7b7";
 
 case "LONG_BUILDING":
 return "#73d13d";
 
 case "EARLY_LONG":
-return "#95de64";
+return "#a7f3d0";
 
 case "CONFLICT":
-return "#faad14";
+return "#fcd34d";
 
 default:
-return "#777";
+return "#94a3b8";
 }
 }
 
@@ -146,7 +146,7 @@ direction: string,
 strength: number
 ) {
 if (strength < 20) {
-return "#666";
+return "#64748b";
 }
 
 return getDirectionColor(direction);
@@ -157,15 +157,15 @@ EDGE
 ====================================================== */
 
 function getEdgeColor(score: number) {
-if (score >= 80) return "#ff4d4f";
+if (score >= 80) return "#fda4af";
 
-if (score >= 60) return "#fa8c16";
+if (score >= 60) return "#fdba74";
 
-if (score >= 40) return "#fadb14";
+if (score >= 40) return "#fcd34d";
 
 if (score >= 20) return "#73d13d";
 
-return "#666";
+return "#64748b";
 }
 
 function getEdgeLabel(score: number) {
@@ -187,22 +187,22 @@ SIZING MODE
 function getModeColor(mode: string) {
 switch (mode) {
 case "AGGRESSIVE":
-return "#ff4d4f";
+return "#fda4af";
 
 case "ACTIVE":
-return "#fa8c16";
+return "#fdba74";
 
 case "PROBING":
-return "#fadb14";
+return "#fcd34d";
 
 case "DEFENSIVE":
-return "#40a9ff";
+return "#7dd3fc";
 
 case "WAIT":
-return "#777";
+return "#94a3b8";
 
 default:
-return "#888";
+return "#94a3b8";
 }
 }
 
@@ -213,31 +213,31 @@ ROTATION CONFIRMATION
 function getRotationColor(state: string) {
 switch (state) {
 case "INSTITUTIONAL_CONFIRMATION":
-return "#52c41a";
+return "#6ee7b7";
 
 case "CONFIRMED":
 return "#73d13d";
 
 case "CONFIRMING":
-return "#faad14";
+return "#fcd34d";
 
 case "EARLY":
-return "#999";
+return "#94a3b8";
 
 case "INTERNAL_BREAKDOWN":
-return "#ff7875";
+return "#fda4af";
 
 case "ROTATION_FAILURE":
-return "#ff4d4f";
+return "#fda4af";
 
 case "EXHAUSTED_ROTATION":
-return "#ff4d4f";
+return "#fda4af";
 
 case "DISTRIBUTION_ROTATION":
-return "#fa8c16";
+return "#fdba74";
 
 default:
-return "#666";
+return "#64748b";
 }
 }
 
@@ -250,27 +250,27 @@ if (
 state === "ROTATION_FAILURE" ||
 state === "EXHAUSTED_ROTATION"
 ) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 if (
 state === "INTERNAL_BREAKDOWN" ||
 state === "DISTRIBUTION_ROTATION"
 ) {
-return "#ff7875";
+return "#fda4af";
 }
 
 if (state === "EARLY_DECAY") {
-return "#faad14";
+return "#fcd34d";
 }
 
-if (score >= 75) return "#ff4d4f";
+if (score >= 75) return "#fda4af";
 
-if (score >= 50) return "#fa8c16";
+if (score >= 50) return "#fdba74";
 
-if (score >= 30) return "#faad14";
+if (score >= 30) return "#fcd34d";
 
-return "#52c41a";
+return "#6ee7b7";
 }
 
 function getDecayLabel(score: number, state: string) {
@@ -342,7 +342,7 @@ Math.round(strength / 20)
 
 const color =
 direction === "NONE"
-? "#faad14"
+? "#fcd34d"
 : getDirectionColor(direction);
 
 return (
@@ -375,7 +375,7 @@ flex: 1,
 height: "8px",
 background: active
 ? color
-: "#222",
+: "#334155",
 borderRadius: "2px",
 transition:
 "background 0.2s ease",
@@ -397,15 +397,15 @@ if (directionalConflict) {
 return {
 text:
 "Directional conflict detected → system prefers WAIT over forced exposure",
-color: "#faad14",
+color: "#fcd34d",
 };
 }
 
 if (size <= 0 || primary.instrument === "NONE") {
-return { text: "No new entry approved", color: "#777" };
+return { text: "No new entry approved", color: "#94a3b8" };
 }
 
-return { text: "Instrument setup approved; allocation comes from position sizing", color: "#888" };
+return { text: "Instrument setup approved; allocation comes from position sizing", color: "#94a3b8" };
 }
 
 const executionExplanation =
@@ -416,12 +416,12 @@ PRIMARY COLORS
 ====================================================== */
 
 const primaryColor = directionalConflict
-? "#faad14"
+? "#fcd34d"
 : getDirectionColor(primary.direction);
 
 const stackColor =
 directionalConflict
-? "#faad14"
+? "#fcd34d"
 : getStackStateColor(stackState);
 
 /* ======================================================
@@ -545,11 +545,11 @@ grid-template-columns: 1fr;
 <div
 className="trade-stack-panel"
 style={{
-background: "#0d0d0d",
+background: "#0e1722",
 border: `1px solid ${
 directionalConflict
 ? "#5a4a20"
-: "#222"
+: "#334155"
 }`,
 padding: "16px",
 borderRadius: "8px",
@@ -568,7 +568,7 @@ marginBottom: "14px",
 >
 <div
 style={{
-color: "#999",
+color: "#94a3b8",
 fontWeight: "bold",
 fontSize: "14px",
 letterSpacing: "0.5px",
@@ -616,13 +616,13 @@ style={{
 marginBottom: "16px",
 padding: "14px",
 border: `1px solid ${primaryColor}`,
-background: "#111",
+background: "#121d2a",
 borderRadius: "6px",
 }}
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 marginBottom: "8px",
 letterSpacing: "0.5px",
@@ -654,7 +654,7 @@ primary.instrument
 
 <div
 style={{
-color: "#888",
+color: "#94a3b8",
 fontSize: "12px",
 marginTop: "5px",
 }}
@@ -674,7 +674,7 @@ textAlign: "right",
 <div
 style={{
 color: directionalConflict
-? "#faad14"
+? "#fcd34d"
 : getConvictionColor(
 primary.direction,
 primaryStrength
@@ -690,7 +690,7 @@ fontSize: "26px",
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginTop: "2px",
 }}
@@ -716,7 +716,7 @@ justifyContent: "space-between",
 gap: "10px",
 flexWrap: "wrap",
 marginTop: "9px",
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 }}
 >
@@ -729,8 +729,8 @@ fontSize: "11px",
 <span
 style={{
 color: directionalConflict
-? "#faad14"
-: "#888",
+? "#fcd34d"
+: "#94a3b8",
 }}
 >
 {directionalConflict
@@ -745,8 +745,8 @@ primaryStrength
 style={{
 marginTop: "7px",
 color: directionalConflict
-? "#faad14"
-: "#555",
+? "#fcd34d"
+: "#64748b",
 fontSize: "10px",
 wordBreak: "break-word",
 }}
@@ -769,7 +769,7 @@ marginBottom: "16px",
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 marginBottom: "8px",
 letterSpacing: "0.5px",
@@ -805,11 +805,11 @@ return (
 <div
 key={candidate.instrument}
 style={{
-background: "#111",
+background: "#121d2a",
 border: `1px solid ${
 isPrimary
 ? directionColor
-: "#222"
+: "#334155"
 }`,
 padding: "11px",
 minWidth: 0,
@@ -819,7 +819,7 @@ boxSizing: "border-box",
 >
 <div
 style={{
-color: "#888",
+color: "#94a3b8",
 fontSize: "10px",
 marginBottom: "7px",
 }}
@@ -841,7 +841,7 @@ fontWeight: "bold",
 
 <div
 style={{
-color: "#555",
+color: "#64748b",
 fontSize: "9px",
 }}
 >
@@ -872,7 +872,7 @@ fontWeight: "bold",
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "9px",
 marginTop: "5px",
 lineHeight: 1.35,
@@ -885,7 +885,7 @@ wordBreak: "break-word",
 {isPrimary && (
 <div
 style={{
-color: "#40a9ff",
+color: "#7dd3fc",
 fontSize: "9px",
 marginTop: "8px",
 fontWeight: "bold",
@@ -912,13 +912,13 @@ padding: "14px",
 border: `1px solid ${getEdgeColor(
 edgeScore
 )}`,
-background: "#111",
+background: "#121d2a",
 borderRadius: "6px",
 }}
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 }}
 >
@@ -956,7 +956,7 @@ fontWeight: "bold",
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "10px",
 marginTop: "4px",
 }}
@@ -989,13 +989,13 @@ padding: "12px",
 border: `1px solid ${getRotationColor(
 activeRotationConfirm.state
 )}`,
-background: "#111",
+background: "#121d2a",
 borderRadius: "6px",
 }}
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 marginBottom: "5px",
 }}
@@ -1023,13 +1023,13 @@ wordBreak: "break-word",
 style={{
 marginTop: "7px",
 fontSize: "12px",
-color: "#888",
+color: "#94a3b8",
 }}
 >
 Confidence:{" "}
 <span
 style={{
-color: "#ccc",
+color: "#e2e8f0",
 fontWeight: "bold",
 }}
 >
@@ -1055,15 +1055,15 @@ marginBottom: "16px",
 
 <div
 style={{
-background: "#111",
+background: "#121d2a",
 padding: "12px",
-border: "1px solid #222",
+border: "1px solid #334155",
 borderRadius: "5px",
 }}
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 }}
 >
@@ -1072,7 +1072,7 @@ ROTATION CONF.
 
 <div
 style={{
-color: "#40a9ff",
+color: "#7dd3fc",
 fontWeight: "bold",
 marginTop: "4px",
 }}
@@ -1085,7 +1085,7 @@ marginTop: "4px",
 
 <div
 style={{
-background: "#111",
+background: "#121d2a",
 padding: "12px",
 border: `1px solid ${decayColor}`,
 borderRadius: "5px",
@@ -1093,7 +1093,7 @@ borderRadius: "5px",
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 }}
 >
@@ -1129,15 +1129,15 @@ decayState
 
 <div
 style={{
-background: "#111",
+background: "#121d2a",
 padding: "12px",
-border: "1px solid #222",
+border: "1px solid #334155",
 borderRadius: "5px",
 }}
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 }}
 >
@@ -1147,8 +1147,8 @@ REGIME ALIGNMENT
 <div
 style={{
 color: meta.regimeAligned
-? "#52c41a"
-: "#ff4d4f",
+? "#6ee7b7"
+: "#fda4af",
 fontWeight: "bold",
 marginTop: "4px",
 }}
@@ -1163,15 +1163,15 @@ marginTop: "4px",
 
 <div
 style={{
-background: "#111",
+background: "#121d2a",
 padding: "12px",
-border: "1px solid #222",
+border: "1px solid #334155",
 borderRadius: "5px",
 }}
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 }}
 >
@@ -1182,8 +1182,8 @@ INSTITUTIONAL
 style={{
 color:
 meta.institutionalAligned
-? "#52c41a"
-: "#ff4d4f",
+? "#6ee7b7"
+: "#fda4af",
 fontWeight: "bold",
 marginTop: "4px",
 }}
@@ -1204,15 +1204,15 @@ POSITIONING
 
 <div
 style={{
-border: "1px solid #222",
-background: "#111",
+border: "1px solid #334155",
+background: "#121d2a",
 padding: "12px",
 borderRadius: "5px",
 }}
 >
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 }}
 >
@@ -1221,7 +1221,7 @@ POSITION SIZE
 
 <div
 style={{
-color: "#40a9ff",
+color: "#7dd3fc",
 fontWeight: "bold",
 fontSize: "22px",
 marginTop: "4px",
@@ -1249,7 +1249,7 @@ fontWeight: "bold",
 <div
 style={{
 border: `1px solid ${primaryColor}`,
-background: "#111",
+background: "#121d2a",
 padding: "12px",
 borderRadius: "5px",
 }}
@@ -1257,7 +1257,7 @@ borderRadius: "5px",
 <div
 style={{
 color: directionalConflict
-? "#faad14"
+? "#fcd34d"
 : primaryColor,
 fontWeight: "bold",
 fontSize: "18px",
@@ -1270,7 +1270,7 @@ fontSize: "18px",
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "11px",
 marginTop: "4px",
 }}
@@ -1296,7 +1296,7 @@ borderRadius: "5px",
 >
 <div
 style={{
-color: "#ff7875",
+color: "#fda4af",
 fontSize: "10px",
 fontWeight: "bold",
 marginBottom: "7px",
@@ -1318,7 +1318,7 @@ gap: "4px",
 <div
 key={`${flag.label}-${index}`}
 style={{
-color: "#aaa",
+color: "#cbd5e1",
 fontSize: "10px",
 }}
 >

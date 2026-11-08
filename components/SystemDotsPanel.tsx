@@ -12,9 +12,9 @@ if (!drivers) return null;
 /* ================= HELPERS ================= */
 
 function getColor(state: string) {
-if (state === "positive") return "#52c41a";
-if (state === "negative") return "#ff4d4f";
-return "#faad14";
+if (state === "positive") return "#6ee7b7";
+if (state === "negative") return "#fda4af";
+return "#fcd34d";
 }
 
 function getSize(weight: number) {
@@ -24,8 +24,8 @@ return 10;
 }
 
 function getPulse(level?: string) {
-if (level === "EXTREME") return "0 0 12px #ff4d4f";
-if (level === "HIGH") return "0 0 8px #fa8c16";
+if (level === "EXTREME") return "0 0 12px #fda4af";
+if (level === "HIGH") return "0 0 8px #fdba74";
 return "none";
 }
 
@@ -179,15 +179,15 @@ level: dangerZone?.level,
 return (
 <div
 style={{
-background: "#0d0d0d",
-border: "1px solid #333",
+background: "#0e1722",
+border: "1px solid #475569",
 padding: "12px",
 }}
 >
 <div
 style={{
 fontSize: "12px",
-color: "#888",
+color: "#94a3b8",
 marginBottom: "10px",
 }}
 >
@@ -219,7 +219,7 @@ item.level
 <div
 style={{
 fontSize: "10px",
-color: "#888",
+color: "#94a3b8",
 }}
 >
 {item.label}
@@ -233,13 +233,13 @@ color: "#888",
 style={{
 marginTop: "12px",
 paddingTop: "10px",
-borderTop: "1px solid #222",
+borderTop: "1px solid #334155",
 display: "flex",
 justifyContent: "space-between",
 fontSize: "11px",
 }}
 >
-<span style={{ color: "#777" }}>
+<span style={{ color: "#94a3b8" }}>
 Danger: {dangerZone.level}
 </span>
 
@@ -247,10 +247,10 @@ Danger: {dangerZone.level}
 style={{
 color:
 dangerZone.level === "EXTREME"
-? "#ff4d4f"
+? "#fda4af"
 : dangerZone.level === "HIGH"
-? "#fa8c16"
-: "#888",
+? "#fdba74"
+: "#94a3b8",
 fontWeight: "bold",
 }}
 >

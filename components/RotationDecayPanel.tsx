@@ -114,22 +114,22 @@ DECAY COLOR
 function decayColor(value: number) {
 
 if (value >= 80) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 if (value >= 65) {
-return "#ff7875";
+return "#fda4af";
 }
 
 if (value >= 50) {
-return "#faad14";
+return "#fcd34d";
 }
 
 if (value >= 35) {
 return "#ffd666";
 }
 
-return "#52c41a";
+return "#6ee7b7";
 }
 
 function decayBackground(value: number) {
@@ -163,22 +163,22 @@ Hoher Wert = gut
 function qualityColor(value: number) {
 
 if (value >= 75) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (value >= 60) {
-return "#95de64";
+return "#a7f3d0";
 }
 
 if (value >= 45) {
-return "#faad14";
+return "#fcd34d";
 }
 
 if (value >= 30) {
-return "#ff7875";
+return "#fda4af";
 }
 
-return "#ff4d4f";
+return "#fda4af";
 }
 
 /* ============================================================
@@ -188,8 +188,8 @@ BOOLEAN BADGE
 function booleanColor(value: boolean) {
 
 return value
-? "#ff4d4f"
-: "#52c41a";
+? "#fda4af"
+: "#6ee7b7";
 }
 
 function booleanLabel(
@@ -215,7 +215,7 @@ case "EXHAUSTED_ROTATION":
 
 return {
 label: "EXHAUSTED ROTATION",
-color: "#ff4d4f",
+color: "#fda4af",
 description:
 "Internal deterioration broadly confirmed"
 };
@@ -224,7 +224,7 @@ case "DISTRIBUTION_ROTATION":
 
 return {
 label: "DISTRIBUTION ROTATION",
-color: "#ff7875",
+color: "#fda4af",
 description:
 "Distribution characteristics dominate"
 };
@@ -233,7 +233,7 @@ case "NARROW_ROTATION":
 
 return {
 label: "NARROW ROTATION",
-color: "#faad14",
+color: "#fcd34d",
 description:
 "Market increasingly dependent on narrow leadership"
 };
@@ -251,7 +251,7 @@ case "MATURE_ROTATION":
 
 return {
 label: "MATURE ROTATION",
-color: "#95de64",
+color: "#a7f3d0",
 description:
 "Rotation maturing; internals beginning to soften"
 };
@@ -262,7 +262,7 @@ default:
 
 return {
 label: "HEALTHY ROTATION",
-color: "#52c41a",
+color: "#6ee7b7",
 description:
 "Healthy rotational market structure"
 };
@@ -323,7 +323,7 @@ fontSize: "13px"
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginTop: "2px"
 }}
@@ -350,7 +350,7 @@ fontSize: "14px"
 <div
 style={{
 height: "7px",
-background: "#222",
+background: "#334155",
 borderRadius: "6px",
 overflow: "hidden"
 }}
@@ -426,7 +426,7 @@ fontSize: "13px"
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginTop: "2px"
 }}
@@ -453,7 +453,7 @@ fontSize: "14px"
 <div
 style={{
 height: "7px",
-background: "#222",
+background: "#334155",
 borderRadius: "6px",
 overflow: "hidden"
 }}
@@ -516,7 +516,7 @@ padding: "12px"
 <div
 style={{
 fontSize: "10px",
-color: "#777",
+color: "#94a3b8",
 marginBottom: "6px",
 letterSpacing: "0.5px"
 }}
@@ -862,7 +862,7 @@ return (
 
 <div
 style={{
-background: "#0d0d0d",
+background: "#0e1722",
 
 border:
 `2px solid ${decayColor(decayScore)}`,
@@ -895,7 +895,7 @@ marginBottom: "18px"
 
 <h3
 style={{
-color: "#ddd",
+color: "#e2e8f0",
 margin: 0,
 fontSize: "18px",
 fontWeight: 800,
@@ -908,7 +908,7 @@ ROTATION DECAY
 <div
 style={{
 fontSize: "10px",
-color: "#666",
+color: "#64748b",
 marginTop: "5px",
 letterSpacing: "1px",
 textTransform: "uppercase"
@@ -943,7 +943,7 @@ fontWeight: 900
 <div
 style={{
 fontSize: "10px",
-color: "#666",
+color: "#64748b",
 marginTop: "5px"
 }}
 >
@@ -984,7 +984,7 @@ alignItems: "center"
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "10px",
 marginBottom: "5px"
 }}
@@ -1015,7 +1015,7 @@ textAlign: "right"
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "10px"
 }}
 >
@@ -1044,7 +1044,7 @@ marginTop: "4px"
 <div
 style={{
 height: "9px",
-background: "#1d1d1d",
+background: "#162232",
 marginTop: "15px",
 borderRadius: "8px",
 overflow: "hidden"
@@ -1079,7 +1079,7 @@ marginBottom: "24px"
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginBottom: "14px",
 letterSpacing: "1px",
@@ -1115,7 +1115,7 @@ STRUCTURAL DECAY COMPONENTS
 
 <div
 style={{
-borderTop: "1px solid #222",
+borderTop: "1px solid #334155",
 paddingTop: "20px",
 marginBottom: "24px"
 }}
@@ -1123,7 +1123,7 @@ marginBottom: "24px"
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginBottom: "16px",
 letterSpacing: "1px",
@@ -1189,7 +1189,7 @@ CRITICAL STRUCTURE
 
 <div
 style={{
-borderTop: "1px solid #222",
+borderTop: "1px solid #334155",
 paddingTop: "20px",
 marginBottom: "24px"
 }}
@@ -1197,7 +1197,7 @@ marginBottom: "24px"
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginBottom: "14px",
 letterSpacing: "1px",
@@ -1233,7 +1233,7 @@ STRUCTURE FLAGS
 
 <div
 style={{
-borderTop: "1px solid #222",
+borderTop: "1px solid #334155",
 paddingTop: "20px",
 marginBottom: "24px"
 }}
@@ -1241,7 +1241,7 @@ marginBottom: "24px"
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginBottom: "14px",
 letterSpacing: "1px",
@@ -1299,7 +1299,7 @@ HISTORICAL CONTEXT
 
 <div
 style={{
-borderTop: "1px solid #222",
+borderTop: "1px solid #334155",
 paddingTop: "20px",
 marginBottom: "24px"
 }}
@@ -1307,7 +1307,7 @@ marginBottom: "24px"
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginBottom: "14px",
 letterSpacing: "1px",
@@ -1357,7 +1357,7 @@ LONG TERM STRUCTURE
 
 <div
 style={{
-borderTop: "1px solid #222",
+borderTop: "1px solid #334155",
 paddingTop: "20px",
 marginBottom: "24px"
 }}
@@ -1365,7 +1365,7 @@ marginBottom: "24px"
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginBottom: "14px",
 letterSpacing: "1px",
@@ -1398,7 +1398,7 @@ EXTERNAL CONTEXT
 
 <div
 style={{
-borderTop: "1px solid #222",
+borderTop: "1px solid #334155",
 paddingTop: "20px",
 marginBottom: "24px"
 }}
@@ -1406,7 +1406,7 @@ marginBottom: "24px"
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginBottom: "14px",
 letterSpacing: "1px",
@@ -1468,7 +1468,7 @@ paddingTop: "16px"
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "10px",
 marginBottom: "8px",
 letterSpacing: "1px",
@@ -1511,25 +1511,25 @@ signed?: boolean;
 const numeric =
 Number(value ?? 0);
 
-let color = "#aaa";
+let color = "#cbd5e1";
 
 if (signed) {
 
 color =
 numeric < 0
-? "#ff7875"
+? "#fda4af"
 : numeric > 0
-? "#52c41a"
-: "#888";
+? "#6ee7b7"
+: "#94a3b8";
 
 } else {
 
 color =
 numeric >= 65
-? "#ff7875"
+? "#fda4af"
 : numeric >= 40
-? "#faad14"
-: "#aaa";
+? "#fcd34d"
+: "#cbd5e1";
 }
 
 return (
@@ -1544,7 +1544,7 @@ marginBottom: "9px"
 
 <span
 style={{
-color: "#888",
+color: "#94a3b8",
 fontSize: "12px"
 }}
 >
@@ -1597,15 +1597,15 @@ return (
 
 <div
 style={{
-border: "1px solid #222",
-background: "#111",
+border: "1px solid #334155",
+background: "#121d2a",
 padding: "12px"
 }}
 >
 
 <div
 style={{
-color: "#666",
+color: "#64748b",
 fontSize: "10px",
 marginBottom: "5px"
 }}

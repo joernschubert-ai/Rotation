@@ -9,14 +9,14 @@ export default function SystemDiagnosticsPanel({ engine }: any) {
 if (!engine) return null;
 
 const panel = {
-background: "#0d0d0d",
-border: "1px solid #222",
+background: "#0e1722",
+border: "1px solid #334155",
 padding: "16px"
 };
 
 /* ================= HELPERS ================= */
 
-function labelStyle(color = "#888") {
+function labelStyle(color = "#94a3b8") {
 return {
 fontSize: "11px",
 color,
@@ -24,7 +24,7 @@ marginBottom: "2px"
 };
 }
 
-function valueStyle(color = "#fff") {
+function valueStyle(color = "#f8fafc") {
 return {
 fontWeight: "bold",
 color,
@@ -34,12 +34,12 @@ marginBottom: "6px"
 
 function metricColor(value: number) {
 
-if (value >= 80) return "#52c41a";
-if (value >= 65) return "#95de64";
-if (value >= 50) return "#faad14";
-if (value >= 35) return "#ff7875";
+if (value >= 80) return "#6ee7b7";
+if (value >= 65) return "#a7f3d0";
+if (value >= 50) return "#fcd34d";
+if (value >= 35) return "#fda4af";
 
-return "#ff4d4f";
+return "#fda4af";
 }
 
 /* ================= DATA ================= */
@@ -80,11 +80,11 @@ function decayColor() {
 const score =
 rotationDecay?.score ?? 0;
 
-if (score >= 75) return "#ff4d4f";
-if (score >= 55) return "#ff7875";
-if (score >= 35) return "#faad14";
+if (score >= 75) return "#fda4af";
+if (score >= 55) return "#fda4af";
+if (score >= 35) return "#fcd34d";
 
-return "#52c41a";
+return "#6ee7b7";
 }
 
 function syncColor() {
@@ -93,18 +93,18 @@ const state =
 regimeSync?.state ?? "TRANSITION";
 
 if (state === "ALIGNED") {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (state === "DIVERGING") {
-return "#ff4d4f";
+return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 }
 
 function boolColor(v: boolean) {
-return v ? "#ff7875" : "#52c41a";
+return v ? "#fda4af" : "#6ee7b7";
 }
 
 /* ================= RENDER ================= */
@@ -112,7 +112,7 @@ return v ? "#ff7875" : "#52c41a";
 return (
 <div style={panel}>
 
-<h3 style={{ color: "#888", marginBottom: "12px" }}>
+<h3 style={{ color: "#94a3b8", marginBottom: "12px" }}>
 SYSTEM DIAGNOSTICS
 </h3>
 
@@ -140,8 +140,8 @@ Realized: {state.realized?.toFixed?.(0) ?? 0}%
 
 <div style={valueStyle(
 state.isRunner
-? "#52c41a"
-: "#999"
+? "#6ee7b7"
+: "#94a3b8"
 )}>
 Runner: {state.isRunner ? "YES" : "NO"}
 </div>
@@ -176,7 +176,7 @@ Direction: {sizing.direction ?? "NEUTRAL"}
 Rotation Insight
 </div>
 
-<div style={valueStyle("#52c41a")}>
+<div style={valueStyle("#6ee7b7")}>
 {rotation.signal ?? "No signal"}
 </div>
 
@@ -406,7 +406,7 @@ getSignalColor(crash.score ?? 0, 100)
 Score: {crash.score ?? 0}
 </div>
 
-<div style={valueStyle("#ff7875")}>
+<div style={valueStyle("#fda4af")}>
 Modell-Risikowert: {crash.probability ?? 0}/100 (unkalibriert)
 </div>
 

@@ -18,22 +18,22 @@ function getSignalColor(type: string) {
 switch (type) {
 
 case "SHORT_SETUP":
-return "#ff4d4f";
+return "#fda4af";
 
 case "LONG_SETUP":
-return "#52c41a";
+return "#6ee7b7";
 
 case "ROTATION_SIGNAL":
 return "#1677ff";
 
 case "RISK_WARNING":
-return "#faad14";
+return "#fcd34d";
 
 case "NONE":
-return "#666";
+return "#64748b";
 
 default:
-return "#888";
+return "#94a3b8";
 
 }
 
@@ -45,16 +45,16 @@ function getPriorityColor(priority: string) {
 switch (priority) {
 
 case "HIGH":
-return "#ff4d4f";
+return "#fda4af";
 
 case "MEDIUM":
-return "#faad14";
+return "#fcd34d";
 
 case "LOW":
-return "#666";
+return "#64748b";
 
 default:
-return "#666";
+return "#64748b";
 
 }
 
@@ -69,19 +69,19 @@ case "INSTITUTIONAL":
 return "#9254de";
 
 case "CONFIRMED":
-return "#52c41a";
+return "#6ee7b7";
 
 case "STRUCTURAL":
 return "#1677ff";
 
 case "EARLY":
-return "#faad14";
+return "#fcd34d";
 
 case "LOW":
-return "#666";
+return "#64748b";
 
 default:
-return "#888";
+return "#94a3b8";
 
 }
 
@@ -93,19 +93,19 @@ function getPhaseColor(phase: string) {
 switch (phase) {
 
 case "PHASE_1_EXPANSION":
-return "#52c41a";
+return "#6ee7b7";
 
 case "PHASE_2_WARNING":
-return "#95de64";
+return "#a7f3d0";
 
 case "PHASE_3_DISTRIBUTION":
-return "#faad14";
+return "#fcd34d";
 
 case "PHASE_4_RISK":
-return "#fa8c16";
+return "#fdba74";
 
 case "PHASE_5_BREAKDOWN":
-return "#ff4d4f";
+return "#fda4af";
 
 case "PHASE_6_ACCELERATION":
 return "#cf1322";
@@ -114,7 +114,7 @@ case "PHASE_7_CAPITULATION":
 return "#820014";
 
 default:
-return "#666";
+return "#64748b";
 
 }
 
@@ -124,18 +124,18 @@ return "#666";
 function getStrengthColor(value: number) {
 
 if (value >= 80)
-return "#52c41a";
+return "#6ee7b7";
 
 if (value >= 70)
-return "#95de64";
+return "#a7f3d0";
 
 if (value >= 50)
-return "#faad14";
+return "#fcd34d";
 
 if (value >= 30)
-return "#fa8c16";
+return "#fdba74";
 
-return "#666";
+return "#64748b";
 
 }
 
@@ -222,8 +222,8 @@ return (
 
 <div
 style={{
-background: "#0d0d0d",
-border: "1px solid #222",
+background: "#0e1722",
+border: "1px solid #334155",
 padding: "16px",
 width: "100%",
 boxSizing: "border-box"
@@ -249,7 +249,7 @@ marginBottom: "16px"
 <h3
 style={{
 margin: 0,
-color: "#bbb",
+color: "#cbd5e1",
 fontSize: "14px",
 letterSpacing: "0.5px"
 }}
@@ -260,7 +260,7 @@ AUTO SIGNAL
 <div
 style={{
 fontSize: "10px",
-color: "#666",
+color: "#64748b",
 marginTop: "3px"
 }}
 >
@@ -273,7 +273,7 @@ Market Setup Classification
 <div
 style={{
 fontSize: "10px",
-color: "#666"
+color: "#64748b"
 }}
 >
 {formatTimestamp(signal.timestamp)}
@@ -291,7 +291,7 @@ style={{
 borderLeft:
 `4px solid ${color}`,
 
-background: "#101010",
+background: "#121d2a",
 
 padding: "12px",
 
@@ -348,7 +348,7 @@ marginTop: "8px",
 
 fontSize: "12px",
 
-color: "#bbb",
+color: "#cbd5e1",
 
 lineHeight: "1.5"
 }}
@@ -406,7 +406,7 @@ marginBottom: "5px"
 
 <div
 style={{
-color: "#777"
+color: "#94a3b8"
 }}
 >
 SIGNAL STRENGTH
@@ -430,7 +430,7 @@ fontWeight: "bold"
 style={{
 height: "6px",
 
-background: "#222",
+background: "#334155",
 
 overflow: "hidden"
 }}
@@ -527,8 +527,8 @@ earlyWarning.active
 }
 color={
 earlyWarning.active
-? "#faad14"
-: "#666"
+? "#fcd34d"
+: "#64748b"
 }
 />
 
@@ -548,13 +548,13 @@ setShowDetails(
 style={{
 width: "100%",
 
-background: "#151515",
+background: "#121d2a",
 
-border: "1px solid #222",
+border: "1px solid #334155",
 
 padding: "8px",
 
-color: "#777",
+color: "#94a3b8",
 
 fontSize: "11px",
 
@@ -772,9 +772,9 @@ return (
 
 <div
 style={{
-background: "#101010",
+background: "#121d2a",
 
-border: "1px solid #222",
+border: "1px solid #334155",
 
 padding: "9px"
 }}
@@ -784,7 +784,7 @@ padding: "9px"
 style={{
 fontSize: "9px",
 
-color: "#666",
+color: "#64748b",
 
 marginBottom: "4px"
 }}
@@ -798,7 +798,7 @@ style={{
 fontSize: "11px",
 
 color:
-color ?? "#ddd",
+color ?? "#e2e8f0",
 
 fontWeight: "bold",
 
@@ -817,7 +817,7 @@ marginTop: "3px",
 
 fontSize: "9px",
 
-color: "#666"
+color: "#64748b"
 }}
 >
 {sub}
@@ -850,7 +850,7 @@ marginTop: "16px",
 paddingTop: "12px",
 
 borderTop:
-"1px solid #222"
+"1px solid #334155"
 }}
 >
 
@@ -858,7 +858,7 @@ borderTop:
 style={{
 fontSize: "10px",
 
-color: "#666",
+color: "#64748b",
 
 letterSpacing: "0.5px",
 
@@ -920,9 +920,9 @@ return (
 
 <div
 style={{
-background: "#101010",
+background: "#121d2a",
 
-border: "1px solid #1d1d1d",
+border: "1px solid #162232",
 
 padding: "8px"
 }}
@@ -932,7 +932,7 @@ padding: "8px"
 style={{
 fontSize: "9px",
 
-color: "#666"
+color: "#64748b"
 }}
 >
 {label}
@@ -945,7 +945,7 @@ marginTop: "3px",
 
 fontSize: "11px",
 
-color: "#ccc",
+color: "#e2e8f0",
 
 wordBreak: "break-word"
 }}

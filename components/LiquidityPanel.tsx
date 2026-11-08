@@ -138,22 +138,22 @@ value: number
 ) {
 
 if (value >= 80) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (value >= 65) {
-return "#95de64";
+return "#a7f3d0";
 }
 
 if (value >= 48) {
-return "#faad14";
+return "#fcd34d";
 }
 
 if (value >= 30) {
-return "#ff7875";
+return "#fda4af";
 }
 
-return "#ff4d4f";
+return "#fda4af";
 
 }
 
@@ -169,8 +169,8 @@ active: boolean
 ) {
 
 return active
-? "#ff4d4f"
-: "#52c41a";
+? "#fda4af"
+: "#6ee7b7";
 
 }
 
@@ -190,26 +190,26 @@ case "HEALTHY":
 case "STRONG":
 case "LOW":
 
-return "#52c41a";
+return "#6ee7b7";
 
 case "SUPPORTIVE":
 case "MODERATE":
 
-return "#95de64";
+return "#a7f3d0";
 
 case "NEUTRAL":
 case "PASSIVE":
 case "FRAGILE":
 case "ELEVATED":
 
-return "#faad14";
+return "#fcd34d";
 
 case "TIGHTENING":
 case "NARROW":
 case "DETERIORATING":
 case "WEAK":
 
-return "#ff7875";
+return "#fda4af";
 
 case "LIQUIDITY_STRESS":
 case "ILLUSION":
@@ -217,11 +217,11 @@ case "INTERNALLY_WEAK":
 case "NEGATIVE":
 case "HIGH":
 
-return "#ff4d4f";
+return "#fda4af";
 
 default:
 
-return "#999";
+return "#94a3b8";
 
 }
 
@@ -471,20 +471,20 @@ positiveIsGood = true
 ) {
 
 if (value === 0) {
-return "#faad14";
+return "#fcd34d";
 }
 
 if (positiveIsGood) {
 
 return value > 0
-? "#52c41a"
-: "#ff4d4f";
+? "#6ee7b7"
+: "#fda4af";
 
 }
 
 return value > 0
-? "#ff4d4f"
-: "#52c41a";
+? "#fda4af"
+: "#6ee7b7";
 
 }
 
@@ -506,7 +506,7 @@ description:
 "Headline liquidity is masking severe internal weakness",
 
 color:
-"#ff4d4f",
+"#fda4af",
 };
 
 }
@@ -523,7 +523,7 @@ description:
 "Market liquidity conditions are materially deteriorating",
 
 color:
-"#ff4d4f",
+"#fda4af",
 };
 
 }
@@ -541,7 +541,7 @@ description:
 "Liquidity support exists but market internals are weakening",
 
 color:
-"#ff7875",
+"#fda4af",
 };
 
 }
@@ -558,7 +558,7 @@ description:
 "Liquidity participation is concentrated in limited market leadership",
 
 color:
-"#ff7875",
+"#fda4af",
 };
 
 }
@@ -576,7 +576,7 @@ description:
 "Broad participation supports institutional market liquidity",
 
 color:
-"#52c41a",
+"#6ee7b7",
 };
 
 }
@@ -593,7 +593,7 @@ description:
 "Liquidity conditions remain supportive for market structure",
 
 color:
-"#95de64",
+"#a7f3d0",
 };
 
 }
@@ -606,7 +606,7 @@ description:
 "Liquidity conditions are balanced but require monitoring",
 
 color:
-"#faad14",
+"#fcd34d",
 };
 
 }
@@ -635,10 +635,10 @@ return (
 <div
 style={{
 background:
-"#111",
+"#121d2a",
 
 border:
-"1px solid #222",
+"1px solid #334155",
 
 padding:
 "12px",
@@ -651,7 +651,7 @@ minWidth:
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -700,7 +700,7 @@ marginTop:
 "5px",
 
 color:
-"#555",
+"#64748b",
 
 fontSize:
 "10px",
@@ -771,7 +771,7 @@ minWidth:
 <div
 style={{
 color:
-"#aaa",
+"#cbd5e1",
 
 fontSize:
 "12px",
@@ -786,7 +786,7 @@ fontWeight:
 <div
 style={{
 color:
-"#555",
+"#64748b",
 
 fontSize:
 "10px",
@@ -863,7 +863,7 @@ borderBottom:
 <span
 style={{
 color:
-"#888",
+"#94a3b8",
 
 fontSize:
 "12px",
@@ -1009,7 +1009,7 @@ height:
 "7px",
 
 background:
-"#222",
+"#334155",
 
 borderRadius:
 "5px",
@@ -1063,7 +1063,7 @@ background:
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -1099,7 +1099,7 @@ marginBottom:
 <div
 style={{
 color:
-"#aaa",
+"#cbd5e1",
 
 fontSize:
 "12px",
@@ -1209,8 +1209,8 @@ institutionalLiquidity
 }
 color={
 institutionalLiquidity
-? "#52c41a"
-: "#faad14"
+? "#6ee7b7"
+: "#fcd34d"
 }
 subLabel="Multi-factor institutional confirmation"
 />
@@ -1272,10 +1272,10 @@ label="CREDIT"
 value={formatNumber(credit, 2)}
 color={
 credit >= 1.10
-? "#ff4d4f"
+? "#fda4af"
 : credit >= 1.00
-? "#faad14"
-: "#52c41a"
+? "#fcd34d"
+: "#6ee7b7"
 }
 />
 
@@ -1284,12 +1284,12 @@ label="VIX TERM"
 value={formatNumber(vixTerm, 2)}
 color={
 vixTerm < 0.92
-? "#ff4d4f"
+? "#fda4af"
 : vixTerm < 0.95
-? "#ff7875"
+? "#fda4af"
 : vixTerm > 1
-? "#52c41a"
-: "#faad14"
+? "#6ee7b7"
+: "#fcd34d"
 }
 />
 
@@ -1298,10 +1298,10 @@ label="RAW GAMMA"
 value={formatNumber(rawGamma)}
 color={
 rawGamma > 0
-? "#52c41a"
+? "#6ee7b7"
 : rawGamma < 0
-? "#ff4d4f"
-: "#faad14"
+? "#fda4af"
+: "#fcd34d"
 }
 />
 
@@ -1310,8 +1310,8 @@ label="EFFECTIVE GAMMA"
 value={formatNumber(effectiveGamma)}
 color={
 effectiveGamma > 0
-? "#52c41a"
-: "#ff4d4f"
+? "#6ee7b7"
+: "#fda4af"
 }
 subLabel={
 structuralGammaFloor > 0
@@ -1327,10 +1327,10 @@ label="VOL OF VOL"
 value={formatNumber(volOfVol, 2)}
 color={
 volOfVol > 1.3
-? "#ff4d4f"
+? "#fda4af"
 : volOfVol > 1.1
-? "#faad14"
-: "#52c41a"
+? "#fcd34d"
+: "#6ee7b7"
 }
 />
 
@@ -1393,8 +1393,8 @@ Structural Risk Controls
 style={{
 color:
 structuralRiskActive
-? "#ff4d4f"
-: "#52c41a",
+? "#fda4af"
+: "#6ee7b7",
 
 fontSize:
 "10px",
@@ -1564,10 +1564,10 @@ label="INSTITUTIONAL PRESSURE"
 value={formatNumber(institutionalPressure)}
 color={
 institutionalPressure > 70
-? "#ff4d4f"
+? "#fda4af"
 : institutionalPressure > 50
-? "#faad14"
-: "#52c41a"
+? "#fcd34d"
+: "#6ee7b7"
 }
 />
 
@@ -1582,7 +1582,7 @@ SUMMARY
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 
 paddingTop:
 "16px",
@@ -1592,7 +1592,7 @@ paddingTop:
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",

@@ -75,30 +75,30 @@ return "neutral";
 
 function rsColor(state: string) {
 if (state === "positive") {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (state === "negative") {
-return "#ff4d4f";
+return "#fda4af";
 }
 
-return "#faad14";
+return "#fcd34d";
 }
 
 function qualityColor(value: number) {
 if (value >= 70) {
-return "#52c41a";
+return "#6ee7b7";
 }
 
 if (value >= 50) {
-return "#faad14";
+return "#fcd34d";
 }
 
 if (value >= 35) {
-return "#ff7875";
+return "#fda4af";
 }
 
-return "#ff4d4f";
+return "#fda4af";
 }
 
 /*
@@ -109,18 +109,18 @@ Deshalb eigene Farbkonvention.
 
 function decayColor(value: number) {
 if (value >= 75) {
-return "#ff4d4f";
+return "#fda4af";
 }
 
 if (value >= 60) {
-return "#ff7875";
+return "#fda4af";
 }
 
 if (value >= 40) {
-return "#faad14";
+return "#fcd34d";
 }
 
-return "#52c41a";
+return "#6ee7b7";
 }
 
 function decayBackground(value: number) {
@@ -370,7 +370,7 @@ return {
 label: "BROAD MARKET LEADERSHIP",
 subLabel:
 "Russell / Equal Weight participation improving",
-color: "#52c41a",
+color: "#6ee7b7",
 };
 }
 
@@ -402,8 +402,8 @@ narrowLeadershipRisk
 
 color:
 narrowLeadershipRisk
-? "#ff7875"
-: "#ff4d4f",
+? "#fda4af"
+: "#fda4af",
 };
 }
 
@@ -411,7 +411,7 @@ return {
 label: "ROTATIONAL TRANSITION",
 subLabel:
 "No dominant broad capital rotation",
-color: "#faad14",
+color: "#fcd34d",
 };
 }, [
 smallVsTech,
@@ -431,7 +431,7 @@ growthVsValue > 1.02
 return {
 label:
 "GROWTH LEADERSHIP",
-color: "#52c41a",
+color: "#6ee7b7",
 };
 }
 
@@ -441,14 +441,14 @@ growthVsValue < 0.98
 return {
 label:
 "DEFENSIVE / VALUE ROTATION",
-color: "#ff4d4f",
+color: "#fda4af",
 };
 }
 
 return {
 label:
 "NEUTRAL STYLE ROTATION",
-color: "#faad14",
+color: "#fcd34d",
 };
 }, [
 growthVsValue,
@@ -495,7 +495,7 @@ let flowLabel =
 "BALANCED";
 
 let flowColor =
-"#faad14";
+"#fcd34d";
 
 if (
 clampedFlow > 0.01
@@ -504,7 +504,7 @@ flowLabel =
 "BROAD MARKET FLOW";
 
 flowColor =
-"#52c41a";
+"#6ee7b7";
 }
 
 if (
@@ -517,8 +517,8 @@ narrowLeadershipRisk
 
 flowColor =
 narrowLeadershipRisk
-? "#ff7875"
-: "#ff4d4f";
+? "#fda4af"
+: "#fda4af";
 }
 
 /* ==========================================================
@@ -548,7 +548,7 @@ description:
 "Internal deterioration is broadly confirmed",
 
 color:
-"#ff4d4f",
+"#fda4af",
 };
 }
 
@@ -565,7 +565,7 @@ description:
 "Institutional distribution pressure dominates",
 
 color:
-"#ff7875",
+"#fda4af",
 };
 }
 
@@ -582,7 +582,7 @@ description:
 "Index performance depends on increasingly few leaders",
 
 color:
-"#faad14",
+"#fcd34d",
 };
 }
 
@@ -598,7 +598,7 @@ description:
 "Rotation requires further confirmation",
 
 color:
-"#faad14",
+"#fcd34d",
 };
 }
 
@@ -613,7 +613,7 @@ description:
 "Internal structure is attempting to improve",
 
 color:
-"#95de64",
+"#a7f3d0",
 };
 }
 
@@ -629,7 +629,7 @@ description:
 "Rotation remains intact but is losing momentum",
 
 color:
-"#faad14",
+"#fcd34d",
 };
 }
 
@@ -641,7 +641,7 @@ description:
 "Broad participation supports market leadership",
 
 color:
-"#52c41a",
+"#6ee7b7",
 };
 }, [
 decayState,
@@ -732,7 +732,7 @@ label:
 "CRITICAL INTERNAL DETERIORATION",
 
 color:
-"#ff4d4f",
+"#fda4af",
 };
 }
 
@@ -744,7 +744,7 @@ label:
 "MULTIPLE INTERNAL WARNINGS",
 
 color:
-"#ff7875",
+"#fda4af",
 };
 }
 
@@ -756,7 +756,7 @@ label:
 "EARLY INTERNAL WARNING",
 
 color:
-"#faad14",
+"#fcd34d",
 };
 }
 
@@ -765,7 +765,7 @@ label:
 "INTERNAL STRUCTURE STABLE",
 
 color:
-"#52c41a",
+"#6ee7b7",
 };
 }, [
 narrowLeadershipRisk,
@@ -811,7 +811,7 @@ marginBottom: "5px",
 >
 <span
 style={{
-color: "#777",
+color: "#94a3b8",
 }}
 >
 {label}
@@ -837,7 +837,7 @@ style={{
 height: "6px",
 
 background:
-"#222",
+"#334155",
 
 borderRadius:
 "5px",
@@ -894,7 +894,7 @@ marginBottom: "5px",
 >
 <span
 style={{
-color: "#777",
+color: "#94a3b8",
 }}
 >
 {label}
@@ -920,7 +920,7 @@ style={{
 height: "6px",
 
 background:
-"#222",
+"#334155",
 
 borderRadius:
 "5px",
@@ -978,7 +978,7 @@ marginBottom:
 <span
 style={{
 color:
-"#888",
+"#94a3b8",
 
 fontSize:
 "12px",
@@ -1037,8 +1037,8 @@ critical
 
 color:
 critical
-? "#ff7875"
-: "#faad14",
+? "#fda4af"
+: "#fcd34d",
 
 fontSize:
 "11px",
@@ -1063,7 +1063,7 @@ return (
 <div
 style={{
 background:
-"#0d0d0d",
+"#0e1722",
 
 border:
 `2px solid ${rotationStatus.color}`,
@@ -1100,7 +1100,7 @@ marginBottom:
 <h3
 style={{
 color:
-"#ddd",
+"#e2e8f0",
 
 margin:
 "0 0 5px 0",
@@ -1124,7 +1124,7 @@ fontSize:
 "11px",
 
 color:
-"#666",
+"#64748b",
 
 textTransform:
 "uppercase",
@@ -1170,7 +1170,7 @@ fontSize:
 "10px",
 
 color:
-"#777",
+"#94a3b8",
 
 marginTop:
 "5px",
@@ -1206,7 +1206,7 @@ border:
 <div
 style={{
 color:
-"#777",
+"#94a3b8",
 
 fontSize:
 "10px",
@@ -1245,7 +1245,7 @@ marginBottom:
 <div
 style={{
 color:
-"#aaa",
+"#cbd5e1",
 
 fontSize:
 "12px",
@@ -1290,7 +1290,7 @@ marginBottom:
 <div
 style={{
 color:
-"#777",
+"#94a3b8",
 
 fontSize:
 "11px",
@@ -1345,7 +1345,7 @@ fontSize:
 "11px",
 
 color:
-"#666",
+"#64748b",
 }}
 >
 <span>
@@ -1366,7 +1366,7 @@ height:
 "7px",
 
 background:
-"#222",
+"#334155",
 
 marginTop:
 "6px",
@@ -1393,7 +1393,7 @@ width:
 "1px",
 
 background:
-"#555",
+"#64748b",
 }}
 />
 
@@ -1460,7 +1460,7 @@ RELATIVE STRENGTH
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 
 paddingTop:
 "16px",
@@ -1473,7 +1473,7 @@ marginBottom:
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -1518,7 +1518,7 @@ ROTATION QUALITY
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 
 paddingTop:
 "16px",
@@ -1531,7 +1531,7 @@ marginBottom:
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -1573,7 +1573,7 @@ ROTATION DECAY
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 
 paddingTop:
 "16px",
@@ -1586,7 +1586,7 @@ marginTop:
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -1644,7 +1644,7 @@ paddingTop:
 "16px",
 
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 }}
 >
 
@@ -1663,7 +1663,7 @@ marginBottom:
 <span
 style={{
 color:
-"#888",
+"#94a3b8",
 
 fontSize:
 "12px",
@@ -1694,7 +1694,7 @@ height:
 "7px",
 
 background:
-"#222",
+"#334155",
 
 borderRadius:
 "5px",
@@ -1737,14 +1737,14 @@ paddingTop:
 "16px",
 
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 }}
 >
 
 <div
 style={{
 color:
-"#666",
+"#64748b",
 
 fontSize:
 "10px",
@@ -1874,7 +1874,7 @@ background:
 "rgba(82,196,26,0.05)",
 
 color:
-"#52c41a",
+"#6ee7b7",
 
 fontSize:
 "11px",
@@ -1930,7 +1930,7 @@ marginBottom:
 <span
 style={{
 color:
-"#777",
+"#94a3b8",
 
 fontSize:
 "10px",
@@ -1977,7 +1977,7 @@ marginTop:
 "7px",
 
 color:
-"#95de64",
+"#a7f3d0",
 
 fontSize:
 "11px",
@@ -2002,7 +2002,7 @@ marginTop:
 "16px",
 
 color:
-"#555",
+"#64748b",
 
 fontSize:
 "10px",

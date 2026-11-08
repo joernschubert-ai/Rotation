@@ -64,7 +64,7 @@ switch (decision) {
 case "PANIC_SHORT":
 return {
 label: "PANIC / EXTENDED",
-color: "#ff4d4f",
+color: "#fda4af",
 note:
 "Move extended – avoid chasing new puts"
 };
@@ -73,7 +73,7 @@ note:
 case "STRONG_BUILD":
 return {
 label: "STRONG PUT BUILD",
-color: "#ff4d4f",
+color: "#fda4af",
 note:
 "Strong structure with price confirmation"
 };
@@ -91,7 +91,7 @@ note:
 case "STRUCTURAL_BUILD":
 return {
 label: "STRUCTURAL PUT BUILD",
-color: "#fa8c16",
+color: "#fdba74",
 note:
 "Structural short edge – price timing still developing"
 };
@@ -100,7 +100,7 @@ note:
 case "DEFENSIVE_BUILD":
 return {
 label: "DEFENSIVE PUT BUILD",
-color: "#fadb14",
+color: "#fcd34d",
 note:
 "Early structural deterioration"
 };
@@ -110,7 +110,7 @@ case "WAIT":
 default:
 return {
 label: "WAIT",
-color: "#999",
+color: "#94a3b8",
 note:
 "No immediate put entry"
 };
@@ -136,7 +136,7 @@ if (decision === "WAIT") {
 
 return {
 label: "NO NEW ENTRY",
-color: "#999",
+color: "#94a3b8",
 note:
 "Wait for better timing"
 };
@@ -147,7 +147,7 @@ if (decision === "PANIC_SHORT") {
 
 return {
 label: "REDUCE RISK",
-color: "#ff4d4f",
+color: "#fda4af",
 note:
 "Move may already be extended"
 };
@@ -158,7 +158,7 @@ if (exit?.action) {
 
 return {
 label: exit.action,
-color: "#fa8c16",
+color: "#fdba74",
 note:
 exit.summary ??
 exit.reason ??
@@ -169,7 +169,7 @@ exit.reason ??
 
 return {
 label: "STRUCTURE ACTIVE",
-color: "#fa8c16",
+color: "#fdba74",
 note:
 "Short structure remains valid"
 };
@@ -303,15 +303,15 @@ return (
 
 <div
 style={{
-background: "#0d0d0d",
-border: "1px solid #222",
+background: "#0e1722",
+border: "1px solid #334155",
 padding: "16px"
 }}
 >
 
 <h3
 style={{
-color: "#888",
+color: "#94a3b8",
 marginBottom: "12px"
 }}
 >
@@ -329,7 +329,7 @@ marginBottom: "14px",
 padding: "10px",
 border:
 `1px solid ${info.color}`,
-background: "#111"
+background: "#121d2a"
 }}
 >
 
@@ -364,7 +364,7 @@ marginBottom: "12px"
 }}
 >
 
-<div style={{ color: "#777" }}>
+<div style={{ color: "#94a3b8" }}>
 Decision
 </div>
 
@@ -390,7 +390,7 @@ marginBottom: "12px"
 }}
 >
 
-<div style={{ color: "#777" }}>
+<div style={{ color: "#94a3b8" }}>
 Execution
 </div>
 
@@ -400,24 +400,24 @@ fontWeight: "bold",
 
 color:
 execution === "FULL SIZE"
-? "#ff4d4f"
+? "#fda4af"
 
 : execution === "PARTIAL SIZE"
-? "#fa8c16"
+? "#fdba74"
 
 : execution === "SMALL STARTER"
-? "#fadb14"
+? "#fcd34d"
 
 : execution === "REDUCE RISK"
-? "#ff4d4f"
+? "#fda4af"
 
-: "#999"
+: "#94a3b8"
 }}
 >
 {execution === "FULL SIZE" ? "STARKES EINSTIEGSSIGNAL" : execution}
 </div>
-<div style={{color:"#888",fontSize:"10px",marginTop:"4px"}}>Signalstufe, keine Positionsgröße. Maßgeblich ist der risikobereinigte Modellanteil im Positionspanel. </div>
-<details style={{fontSize:"10px",color:"#777"}}><summary>Originale Signalstufe</summary>{execution}</details>
+<div style={{color:"#94a3b8",fontSize:"10px",marginTop:"4px"}}>Signalstufe, keine Positionsgröße. Maßgeblich ist der risikobereinigte Modellanteil im Positionspanel. </div>
+<details style={{fontSize:"10px",color:"#94a3b8"}}><summary>Originale Signalstufe</summary>{execution}</details>
 
 </div>
 
@@ -432,7 +432,7 @@ marginBottom: "12px"
 }}
 >
 
-<div style={{ color: "#777" }}>
+<div style={{ color: "#94a3b8" }}>
 Timing
 </div>
 
@@ -453,7 +453,7 @@ marginBottom: "12px"
 }}
 >
 
-<div style={{ color: "#777" }}>
+<div style={{ color: "#94a3b8" }}>
 Entry Window
 </div>
 
@@ -462,12 +462,12 @@ style={{
 color:
 
 entryWindow === "OPEN"
-? "#fa8c16"
+? "#fdba74"
 
 : entryWindow === "EXTENDED"
-? "#ff4d4f"
+? "#fda4af"
 
-: "#999",
+: "#94a3b8",
 
 fontWeight: "bold"
 }}
@@ -488,7 +488,7 @@ marginBottom: "12px"
 }}
 >
 
-<div style={{ color: "#777" }}>
+<div style={{ color: "#94a3b8" }}>
 Trigger Quality
 </div>
 
@@ -513,7 +513,7 @@ marginBottom: "14px"
 }}
 >
 
-<div style={{ color: "#777" }}>
+<div style={{ color: "#94a3b8" }}>
 Position State
 </div>
 
@@ -549,7 +549,7 @@ marginBottom: "14px"
 }}
 >
 
-<div style={{ color: "#777" }}>
+<div style={{ color: "#94a3b8" }}>
 Put Timing Score
 </div>
 
@@ -564,7 +564,7 @@ fontSize: "18px"
 
 <div
 style={{
-background: "#222",
+background: "#334155",
 height: "6px",
 marginTop: "5px"
 }}
@@ -589,7 +589,7 @@ STRUCTURAL LAYERS
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 paddingTop:
 "12px"
 }}
@@ -597,7 +597,7 @@ paddingTop:
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 marginBottom: "10px"
 }}
 >
@@ -646,7 +646,7 @@ EXECUTION LAYERS
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 paddingTop:
 "12px",
 marginTop:
@@ -656,7 +656,7 @@ marginTop:
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 marginBottom: "10px"
 }}
 >
@@ -672,7 +672,7 @@ bar={bar}
 available={priceComplete && putTiming.layers?.price?.available === true}
 />
 
-<div style={{ fontSize: "11px", color: priceComplete ? "#bbb" : "#faad14", marginBottom: "12px", lineHeight: 1.6 }}>
+<div style={{ fontSize: "11px", color: priceComplete ? "#cbd5e1" : "#fcd34d", marginBottom: "12px", lineHeight: 1.6 }}>
   <div>{priceComplete ? "Price timing data complete" : "Price timing data incomplete"}</div>
   <div>5D: {priceValue("momentum5D", "momentum5DAvailable", true)}</div>
   <div>20D: {priceValue("momentum20D", "momentum20DAvailable", true)}</div>
@@ -708,7 +708,7 @@ INSTITUTIONAL STATE
 <div
 style={{
 borderTop:
-"1px solid #222",
+"1px solid #334155",
 paddingTop:
 "12px",
 marginTop:
@@ -718,7 +718,7 @@ marginTop:
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "11px",
 marginBottom: "6px"
 }}
@@ -732,7 +732,7 @@ fontSize: "12px",
 marginBottom: "4px"
 }}
 >
-<span style={{ color: "#666" }}>
+<span style={{ color: "#64748b" }}>
 Bias:
 </span>{" "}
 <b>
@@ -746,7 +746,7 @@ fontSize: "12px",
 marginBottom: "4px"
 }}
 >
-<span style={{ color: "#666" }}>
+<span style={{ color: "#64748b" }}>
 Rotation Decay:
 </span>{" "}
 {rotationDecayState}
@@ -757,7 +757,7 @@ style={{
 fontSize: "12px"
 }}
 >
-<span style={{ color: "#666" }}>
+<span style={{ color: "#64748b" }}>
 Rotation Confirm:
 </span>{" "}
 {rotationConfirmState}
@@ -775,13 +775,13 @@ style={{
 marginTop: "14px",
 paddingTop: "10px",
 borderTop:
-"1px solid #222"
+"1px solid #334155"
 }}
 >
 
 <div
 style={{
-color: "#777",
+color: "#94a3b8",
 fontSize: "11px",
 marginBottom: "4px"
 }}
@@ -862,7 +862,7 @@ fontSize: "12px"
 
 <div
 style={{
-background: "#222",
+background: "#334155",
 height: "6px",
 marginTop: "4px"
 }}
