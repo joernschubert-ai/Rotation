@@ -1,3 +1,4 @@
+import {auditRecoveryStatements} from './aiResearchRecoveryMeaning';
 import type {AppFact} from './aiResearchAppFacts';
 /** Only the direct context of the supplied price relation, never an entry rule or forecast. */
 export function directRelationEffect(fact:AppFact,instrument:string):'STRENGTHENS'|'WEAKENS'|null{
@@ -10,11 +11,12 @@ export interface MeaningIssue {instrument:string;code:string;quote:string;explan
 /** Narrow diagnostics. No repair, no proof of truth when nothing is detected. */
 export function auditSelectionMeaning(raw:unknown,facts:AppFact[]){
  const findings:MeaningIssue[]=[];
- let root:any;try{root=typeof raw==='string'?JSON.parse(raw):null;}catch{return {version:'SELECTION_MEANING_V8',findings,scope:'Keine prüfbare JSON-Antwort.',semanticTruthVerified:false};}
+ let root:any;try{root=typeof raw==='string'?JSON.parse(raw):null;}catch{return {version:'SELECTION_MEANING_V9',findings,scope:'Keine prüfbare JSON-Antwort.',semanticTruthVerified:false};}
  for(const row of Array.isArray(root?.instruments)?root.instruments:[]){
   if(!['NASDAQ_PUT','NASDAQ_CALL','RUSSELL_CALL'].includes(row?.instrument)||typeof row.hypothesis!=='string')continue;
   const market=row.instrument==='RUSSELL_CALL'?'RUSSELL_2000':'NASDAQ';
   const own=facts.filter(f=>f.market===market);
+  findings.push(...auditRecoveryStatements(row.hypothesis,row.instrument,own));
   const selected=Array.isArray(row.arguments)?row.arguments.filter((a:any)=>a&&typeof a.sourceId==='string').map((a:any)=>a.sourceId):[...(Array.isArray(row.supports)?row.supports:[]),...(Array.isArray(row.opposes)?row.opposes:[])];
   const add=(code:string,quote:string,explanation:string)=>findings.push({instrument:row.instrument,code,quote,explanation});
   for(const group of [{name:'LEVERAGED_MONEY',pattern:/Leveraged[ -]?Money/i},{name:'ASSET_MANAGER',pattern:/Asset[ -]?Manager/i}]){const source=own.find(f=>f.domain==='COT'&&f.values.group===group.name);if(source&&group.pattern.test(row.hypothesis)&&!selected.includes(source.id))add('COT_GROUP_WITHOUT_SELECTED_SOURCE',row.hypothesis,'Die genannte COT-Gruppe stammt aus '+source.id+', ist aber nicht als eigener Beleg mit Teilbefunden gebunden. Das belegt keine falsche Nettozahl, sondern eine fehlende Quellenbindung.');}
@@ -46,5 +48,5 @@ export function auditSelectionMeaning(raw:unknown,facts:AppFact[]){
     add('REFERENCE_NOT_MANDATORY',sentence,'Eine allgemeine MA-Referenz kann eine These stärken; ihre Notwendigkeit für eine frühe Gegenidee ist nicht belegt.');
   }
  }
- return {version:'SELECTION_MEANING_V8',findings,status:findings.length?'REVIEW_REQUIRED':'NO_COVERED_ISSUES_FOUND',scope:'Ausgewählte ausdrückliche MA-Relationen, MA-Steigung/Unterstützung, Phasen-/Volatilitätsableitung und Pflichtreferenzen. Keine vollständige Sprach- oder COT-Prüfung; kein Befund bestätigt keine Richtigkeit.',semanticTruthVerified:false};
+ return {version:'SELECTION_MEANING_V9',findings,status:findings.length?'REVIEW_REQUIRED':'NO_COVERED_ISSUES_FOUND',scope:'Ausgewählte ausdrückliche MA-Relationen, MA-Steigung/Unterstützung, Phasen-/Volatilitätsableitung, Pflichtreferenzen, falsche RSI30-Rückkehrrichtung und historische Rendite als Volatilität. Keine vollständige Sprach- oder COT-Prüfung; kein Befund bestätigt keine Richtigkeit.',semanticTruthVerified:false};
 }
