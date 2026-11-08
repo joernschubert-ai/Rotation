@@ -1,3 +1,4 @@
+import {buildPriceReversalReading,PRICE_READING_VERSION} from './aiResearchPriceReversalReading';
 import {buildRecoveryStudy,cleanRecoveryPoints,RECOVERY_POLICY,type RecoveryPoint} from './aiResearchAnticyclicalStudy';
 import {completedDailyCutoff} from './aiResearchChartContext';
 type Source={symbol:string;ok:boolean;points:RecoveryPoint[];firstDate:string|null;lastDate:string|null;rejectedNullRows:number;errorCode:string|null};
@@ -27,7 +28,7 @@ export async function fetchRecoverySeries(symbol:string,cutoff:string):Promise<S
   return {symbol,ok:cleaned.length>0,points:cleaned,firstDate:cleaned[0]?.date??null,lastDate:cleaned.at(-1)?.date??null,rejectedNullRows,errorCode:cleaned.length?null:'EMPTY_SERIES'};
  }catch(error){return fail(error instanceof Error&&error.message==='RECOVERY_CONFLICTING_DATE'?'CONFLICTING_DAILY_ROWS':'PRICE_READ_FAILED');}
 }
-let cached:{cutoff:string;expires:number;value:ReturnType<typeof buildRecoveryStudy>&{sources:Omit<Source,'points'>[];retrievedAt:string;servedFromCache:boolean}}|undefined;
+let cached:{cutoff:string;expires:number;value:ReturnType<typeof buildRecoveryStudy>&{sources:Omit<Source,'points'>[];retrievedAt:string;servedFromCache:boolean;priceReversalReadings?:{version:string;markets:ReturnType<typeof buildPriceReversalReading>[]}}}|undefined;
 let pending:{cutoff:string;promise:Promise<NonNullable<typeof cached>['value']>}|undefined;
 export async function loadRecoveryStudy(now=new Date()){
  const cutoff=completedDailyCutoff(now);
@@ -35,7 +36,9 @@ export async function loadRecoveryStudy(now=new Date()){
  if(pending?.cutoff===cutoff)return pending.promise;
  const promise=(async()=>{
   const [nasdaq,russell,vix]=await Promise.all(['^NDX','^RUT','^VIX'].map(s=>fetchRecoverySeries(s,cutoff)));
-  const value={...buildRecoveryStudy({nasdaq:nasdaq.points,russell:russell.points,vix:vix.points},cutoff),sources:[nasdaq,russell,vix].map(({points,...source})=>source),retrievedAt:now.toISOString(),servedFromCache:false};
+  let priceReversalReadings: {version:string;markets:ReturnType<typeof buildPriceReversalReading>[]} | undefined;
+  try{priceReversalReadings={version:PRICE_READING_VERSION,markets:[buildPriceReversalReading('NASDAQ',nasdaq.points,cutoff),buildPriceReversalReading('RUSSELL_2000',russell.points,cutoff)]};}catch{/* New diagnostics must not block existing studies. */}
+  const value={...buildRecoveryStudy({nasdaq:nasdaq.points,russell:russell.points,vix:vix.points},cutoff),...(priceReversalReadings?{priceReversalReadings}:{}),sources:[nasdaq,russell,vix].map(({points,...source})=>source),retrievedAt:now.toISOString(),servedFromCache:false};
   // Failures remain visible and do not poison the long-lived successful-result cache.
   if([nasdaq,russell,vix].every(s=>s.ok&&s.lastDate===nasdaq.lastDate)&&value.markets.every(m=>m.status==='AVAILABLE'))cached={cutoff,expires:Date.now()+6*3600000,value};
   return value;

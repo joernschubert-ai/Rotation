@@ -29,7 +29,7 @@ export { validateSynthesis } from "./aiResearchLiveQwen";
 
 const MODEL = RESEARCH_MODEL;
 // Isolate the sampling comparison from prompts, schema, specialist and quota policy.
-export const SYNTHESIS_GENERATION_PROFILE = { id: "V79_15_GEMMA_TWO_HORIZONS_07", temperature: 0.7, maxTokens: 2200 } as const;
+export const SYNTHESIS_GENERATION_PROFILE = { id: "V79_16_GEMMA_PRICE_FOLLOW_THROUGH_07", temperature: 0.7, maxTokens: 2200 } as const;
 const PREFIX = "rotation:research:cf:v1";
 // Keep the quota namespace unchanged so the deployment cannot reset daily limits.
 const DAILY_LIMIT = 20;

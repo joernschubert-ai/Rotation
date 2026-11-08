@@ -1,3 +1,4 @@
+import {compactPriceReversalReading,validPriceReversalReading,PRICE_READING_VERSION} from './aiResearchPriceReversalReading';
 import {assessAsymmetricRecovery} from './aiResearchAsymmetricEvidence';
 import {recoveryBreadthRows,breadthRecoverySignals} from './aiResearchEarlyRecoverySignals';
 import type {AppFacts,AppFact} from './aiResearchAppFacts';
@@ -32,7 +33,10 @@ function bindMarket(facts:AppFacts,study:unknown,market:string,entry:AppFact,his
  if(!finite(f.rsi14)||f.rsi14<0||f.rsi14>100||!finite(f.drawdown252)||f.drawdown252>0)throw Error('ANTI_CURRENT_FEATURE_INVALID');
  const selected=rules.map(id=>{const found=Array.isArray(m.studies)?m.studies.filter((r:any)=>r.id===id):[];if(found.length!==1)throw Error('ANTI_RULE_MISSING');return summarizeRule(found[0]);});
  for(const r of selected)if(r.current.latestSignalDate!==null&&r.current.latestSignalDate>entry.asOf)throw Error('ANTI_FUTURE_SIGNAL');
+ const priceRoot=obj(root.priceReversalReadings),priceRows=Array.isArray(priceRoot.markets)?priceRoot.markets.filter((r:any)=>r.market===market):[],price=obj(priceRows[0]);
+ const priceReading=priceRoot.version===PRICE_READING_VERSION&&priceRows.length===1&&validPriceReversalReading(price,entry.asOf,close.values.close)?{...price,version:PRICE_READING_VERSION}:null;
  return {version:ANTI_CONTEXT_VERSION,status:'AVAILABLE',market,asOf:entry.asOf,source:'ANTICYCLICAL_CLOSE_STUDY_V1',
+  ...(priceReading?{priceReversals:priceReading}:{}),
   earlyRecovery:m.earlyRecovery?.version==='EARLY_RECOVERY_SIGNALS_V1'&&m.earlyRecovery.asOf===entry.asOf?{...m.earlyRecovery,signals:[...m.earlyRecovery.signals,...breadthRecoverySignals(recoveryBreadthRows(history,market,Array.isArray(m.recoverySessions)?m.recoverySessions:[],facts.snapshotTimestamp),entry.asOf)]}:null,
   asymmetricEvidence:m.asymmetricEvidence?.version==='ASYMMETRIC_INDEX_EVIDENCE_V1'&&m.asymmetricEvidence.asOf===entry.asOf?m.asymmetricEvidence:null,
   sourceCoverage:m.coverage,rsi14:f.rsi14,drawdown252Pct:f.drawdown252,rules:selected,ruleSelection:'FIXED_DRAWDOWN_252_AND_RSI_RECLAIM_NOT_BEST_RETURN',
@@ -63,5 +67,6 @@ export function compactAnticyclicalContext(value:unknown){
  }
  if(a.earlyRecovery?.version==='EARLY_RECOVERY_SIGNALS_V1')result.early={rsiChange:round(a.earlyRecovery.rsiChange),events:a.earlyRecovery.signals.filter((s:any)=>s.status==='TODAY'||s.status==='RECENT').map((s:any)=>[s.id,s.ageIntervals])};
  if(a.asymmetricDecision?.version==='ASYMMETRIC_DECISION_V1'){const d=a.asymmetricDecision;result.asym=[({POSSIBLE_RECOVERY:'P',UNFAVORABLE_HISTORY:'U',NO_RECENT_SETUP:'N',NO_PRICE_SETUP:'N',OPEN:'O',UNKNOWN:'?'} as Record<string,string>)[d.status]??'?',d.weight,d.confluence.areas,({RSI_RECLAIM:'R',RSI_FAILURE_SWING:'F',RSI_DIVERGENCE:'D',MA20_RECLAIM_STRESS:'M'} as Record<string,string>)[d.basisId??'']??null];}
+ const price=compactPriceReversalReading(a.priceReversals);if(price){result.priceReversals=price;delete result.columns;}
  return result;
 }
