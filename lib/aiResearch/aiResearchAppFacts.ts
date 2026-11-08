@@ -1,3 +1,4 @@
+import {compactEntryWeighing} from './aiResearchEntryWeighingFacts';
 import {compactAnticyclicalContext} from './aiResearchAnticyclicalContext';
 import {entryPairs} from './aiResearchEntryPairs';
 import {newsRelevance} from './aiResearchNewsRelevance';
@@ -111,7 +112,7 @@ export function appFactsForModel(facts:AppFacts):string{
     const v=f.values;
     const ec=obj(v.context),round=(v:unknown)=>num(v)===null?null:Number((v as number).toFixed(2));
     const binding=pairs.find(p=>p.sourceId===f.id);
-    const entry=f.domain==='Einstiegskontext'?{indexDate:ec.cashDate,lastSessionPct:round(ec.return1D),futures:ec.futuresReferenceMovePct===null?`aktuell unbekannt: ${ec.futuresAvailabilityReason??'MISSING_REFERENCE'}`:{pctVs1600NyBar:round(ec.futuresReferenceMovePct),asOf:ec.futuresAsOf},pairs:binding?.pairs.map(p=>({id:p.id,refs:p.sourceIds,contrast:p.text}))??[],openId:binding?.openId??null,...(compactAnticyclicalContext(v.anticyclical)?{anti:compactAnticyclicalContext(v.anticyclical)}:{})}:null;
+    const entry=f.domain==='Einstiegskontext'?{...(compactEntryWeighing(v.entryWeighing,f.asOf,f.market)?{weighing:compactEntryWeighing(v.entryWeighing,f.asOf,f.market)}:{}),indexDate:ec.cashDate,lastSessionPct:round(ec.return1D),futures:ec.futuresReferenceMovePct===null?`aktuell unbekannt: ${ec.futuresAvailabilityReason??'MISSING_REFERENCE'}`:{pctVs1600NyBar:round(ec.futuresReferenceMovePct),asOf:ec.futuresAsOf},pairs:binding?.pairs.map(p=>({id:p.id,refs:p.sourceIds,contrast:p.text}))??[],openId:binding?.openId??null,...(compactAnticyclicalContext(v.anticyclical)?{anti:compactAnticyclicalContext(v.anticyclical)}:{})}:null;
     const cot=f.domain==='COT'?{group:v.group,net:v.net,state:v.state,changes:rows(v.changes).map(c=>({weeks:c.weeks,delta:c.delta,meaning:c.meaning})),conflictPairs:v.conflictPairs,publicationTime:v.publicationTime}:null;
     const quote=f.domain==='Snapshotkurs'?{current:obj(v.quote).current??null,observedMarketDate:obj(v.quote).observedMarketDate??null,quoteTimestamp:obj(v.quote).quoteTimestamp??null,momentum5D:obj(v.quote).momentum5D??null,momentum20D:obj(v.quote).momentum20D??null,note:'Separate Kursbeobachtung, kein automatisch aktueller Livekurs.'}:null;
     const magnitude=f.domain==='Bewegungsgröße'?Object.fromEntries(['latest','largestInLast10ObservedIntervals'].map(key=>{const r=obj(obj(v.magnitude)[key]);return [key,{fromDate:r.fromDate??null,date:r.date??null,returnPct:r.returnPct??null,historicalComparisonCount:r.historicalComparisonCount??null,priorAbsoluteMovesStrictlySmallerPct:r.priorAbsoluteMovesStrictlySmallerPct??null}]})):null;

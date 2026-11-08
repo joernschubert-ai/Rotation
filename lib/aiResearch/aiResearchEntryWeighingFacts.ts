@@ -1,0 +1,32 @@
+import type {AppFacts,AppFact} from './aiResearchAppFacts';
+const finite=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
+const day=(v:unknown):v is string=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T00:00:00Z'))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;
+const f=(v:unknown)=>finite(v)?v.toFixed(2):'?';
+export const ENTRY_WEIGHING_FACTS_VERSION='APP_ENTRY_WEIGHING_V1';
+/** Describes conflicts and available samples, never decides which trade wins. */
+export function buildEntryWeighingFacts(facts:AppFacts,entry:AppFact){
+ const a=entry.values?.anticyclical as Record<string,any>|undefined;
+ if(entry.status!=='CALCULATED'||a?.version!=='ANTICYCLICAL_ENTRY_CONTEXT_V1'||a.status!=='AVAILABLE'||!day(entry.asOf)||a.asOf!==entry.asOf||!finite(a.rsi14)||!Array.isArray(a.rules))return null;
+ const prefix=entry.market==='NASDAQ'?'N-F':entry.market==='RUSSELL_2000'?'R-F':null;if(!prefix)return null;
+ if(!Number.isFinite(Date.parse(facts.snapshotTimestamp))||entry.asOf>facts.snapshotTimestamp.slice(0,10))return null;
+ const asOf=entry.asOf,rsi=a.rules.find((r:any)=>r.id==='RSI_RECLAIM');if(typeof rsi?.current?.active!=='boolean')return null;const fresh=rsi.current.active===true;
+ const history=a.rules.find((r:any)=>r.id===(fresh?'RSI_RECLAIM':'DRAWDOWN_252'));
+ if(!history||typeof history.current?.active!=='boolean'||!Array.isArray(history.horizons)||![60,80].every(h=>history.horizons.filter((x:any)=>x.horizonIntervals===h&&Number.isInteger(x.statistics?.matureCases)).length===1))return null;
+ const horizons=[60,80].map(h=>{const x=history.horizons.find((x:any)=>x.horizonIntervals===h);return {intervals:h,...x.statistics,baseline:x.baseline};});
+ if(!horizons.every(h=>h.matureCases>=0&&(h.matureCases===0?h.medianReturnPct===null:finite(h.medianReturnPct)&&finite(h.medianWorstFurtherCloseChangePct))))return null;
+ const own=facts.facts.filter(x=>x.market===entry.market&&x.asOf===asOf&&x.status!=='MISSING');
+ const structure=[20,50,200].map(p=>{const row=own.find(x=>x.id===prefix+'-MA'+p);return {sourceId:row?.id??null,period:p,relation:row?.values.relation??null};});
+ const price=a.priceReversals?.version==='PRICE_REVERSAL_READINGS_V1'&&a.priceReversals.status==='AVAILABLE'&&a.priceReversals.asOf===asOf&&a.priceReversals.market===entry.market&&Array.isArray(a.priceReversals.signals)?a.priceReversals.signals.filter((x:any)=>['FAILED_LOW_RECLAIM','BAND_REENTRY'].includes(x.id)&&x.asOf===asOf):[];
+ const pnf=own.filter(x=>/^([NR])-F-PF\d+-ADV$/.test(x.id)).map(x=>{const match=/Auslösung (\d{4}-\d{2}-\d{2})/.exec(x.text),date=match?.[1];return {sourceId:x.id,triggerDate:day(date)&&date<=asOf?date:null,ageCalendarDays:day(date)&&date<=asOf?Math.round((Date.parse(asOf+'T00:00:00Z')-Date.parse(date+'T00:00:00Z'))/86400000):null,counterToCurrentColumn:x.text.includes('COUNTER_TO_CURRENT_COLUMN'),invalidated:x.text.includes('INVALIDATED'),confirmed:/\bCONFIRMED\b/.test(x.text),direction:/Richtung (BULLISH|BEARISH)/.exec(x.text)?.[1]??null};});
+ const oldCounter=pnf.filter(x=>x.counterToCurrentColumn&&x.ageCalendarDays!==null&&x.ageCalendarDays>0&&!x.invalidated);
+ const stateNames:Record<string,string>={FRESH:'neu',HELD:'gehalten',AT_REFERENCE:'auf Referenz',REFERENCE_LOST:'Referenz verloren',RECOVERED_AFTER_LOSS:'nach Verlust zurück, nicht neu',HISTORICAL:'nur älterer Kontext',NO_EVENT:'kein Befund',UNAVAILABLE:'unbekannt'};
+ const priceText=price.map((s:any)=>(s.id==='FAILED_LOW_RECLAIM'?'Tief-Rückeroberung':'Band-Rückkehr')+': '+(stateNames[s.status]??'unbekannt')).join('; ');
+ const now=`RSI14 ${f(a.rsi14)}: ${fresh?'Rückkehr über30 neu':'heute keine neue Rückkehr über30'}. ${priceText||'Zusätzlicher Preisverlauf unbekannt'}.`;
+ const long=`${history.id}, ${history.current?.active===true?'heute erfüllt':'heute nicht erfüllt; nur Vergleich'}, alle Marktphasen: `+horizons.map(h=>h.matureCases?`${h.intervals}: Median${f(h.medianReturnPct)}%, n${h.matureCases}, weiterer Rückgang Median${f(h.medianWorstFurtherCloseChangePct)}%`:`${h.intervals}: n0, keine reifen Vergleichsfälle`).join('; ')+'.';
+ const pnfText=oldCounter.length?oldCounter.map(x=>`${x.sourceId}: ${x.ageCalendarDays} Kalendertage alt, gegen aktuelle Säule`).join('; ')+'. Keine heutige Auslösung.':'Alter und Säulenrelation der eigenen P&F-Quellen getrennt prüfen.';
+ return {version:ENTRY_WEIGHING_FACTS_VERSION,asOf,market:entry.market,sourceId:entry.id,structure,rsi14:a.rsi14,rsiReclaimToday:fresh,priceReferences:price,historySelection:'TODAY_RSI_RECLAIM_ELSE_FIXED_DRAWDOWN_252',history:{id:history.id,currentMatch:history.current?.active===true,allMarketRegimes:true,horizons},pnf,
+  nowText:now,historyText:long,pnfText,
+  interpretation:'Die heutige Phase/MA-Lage ist Gegenkontext, kein Nachweis fehlender oder unbrauchbarer historischer Daten. Verlorene ältere Preiszeichen und ein neuer RSI-Befund können zugleich vorliegen. Historische Folgen sind keine heutigen Impulse. Datenlücke, schwache Stichprobe und ungünstige Schlussfolgerung sind verschiedene Aussagen. Kein Handelsurteil oder Zusatzgewicht.'};
+}
+export function attachEntryWeighingFacts(facts:AppFacts):AppFacts{return {...facts,facts:facts.facts.map(entry=>{if(!/^[NR]-F-ENTRY-TIMING$/.test(entry.id))return entry;const weighing=buildEntryWeighingFacts(facts,entry);if(!weighing){if(!('entryWeighing' in entry.values))return entry;const {entryWeighing,...values}=entry.values;return {...entry,values};}return {...entry,values:{...entry.values,entryWeighing:weighing}};})};}
+export function compactEntryWeighing(value:any,asOf:string|null,market:string){return value?.version===ENTRY_WEIGHING_FACTS_VERSION&&value.asOf===asOf&&value.market===market?{now:value.nowText,long:value.historyText,pnf:value.pnfText}:undefined;}

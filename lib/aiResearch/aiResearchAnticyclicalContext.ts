@@ -1,3 +1,4 @@
+import {attachEntryWeighingFacts} from './aiResearchEntryWeighingFacts';
 import {compactPriceReversalReading,validPriceReversalReading,PRICE_READING_VERSION} from './aiResearchPriceReversalReading';
 import {assessAsymmetricRecovery} from './aiResearchAsymmetricEvidence';
 import {recoveryBreadthRows,breadthRecoverySignals} from './aiResearchEarlyRecoverySignals';
@@ -54,7 +55,7 @@ export function attachAnticyclicalContext(facts:AppFacts,study:unknown,history:a
   const baseText=typeof f.values.anticyclicalBaseText==='string'?f.values.anticyclicalBaseText:f.text;
   return {...f,text:baseText+sentence,values:{...f.values,anticyclicalBaseText:baseText,anticyclical:anti}};
  });
- return {...facts,facts:changed};
+ return attachEntryWeighingFacts({...facts,facts:changed});
 }
 /** One small named block inside the existing entry fact, not another source or vote. */
 export function compactAnticyclicalContext(value:unknown){
