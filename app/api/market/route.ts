@@ -1,3 +1,4 @@
+import {buildConstituentExtremesObservation} from '@/lib/market/constituentExtremes';
 import {calculateDatedCredit, type CreditBar} from '@/lib/market/datedCredit';
 import {prepareFuturesObservation} from '@/lib/market/futuresObservation';
 import { selectVolatilityContext } from "@/lib/market/volatilityContext";
@@ -218,6 +219,7 @@ function summarizeNasdaqBreadth(symbols: string[], bars: Map<string, BreadthBars
       definition: "NASDAQ100_CURRENT_CONSTITUENTS_EQUAL_WEIGHT", constituentSource: NASDAQ_MEMBERS_SOURCE,
       referenceDate, unit: "FRACTION", sourceIsOfficial: false,
       available: result.dataQuality.coverage >= 0.98 && result.dataQuality.valid > 0 && result.dataQuality.referenceDate === referenceDate,
+      highLowObservation: buildConstituentExtremesObservation(symbols, result.dataQuality.accepted, aligned, referenceDate),
       highLowValid252: annual.length, highLowExpected: symbols.length,
       highLowCoverage: annual.length / symbols.length, historicalMembershipReconstructed: false,
       countsAboveMovingAverage: result.dataQuality.countsAboveMovingAverage,
