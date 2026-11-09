@@ -1,3 +1,4 @@
+import {newLowDivergence} from './aiResearchNewLowDivergence';
 import {attachEntryWeighingFacts} from './aiResearchEntryWeighingFacts';
 import {compactPriceReversalReading,validPriceReversalReading,PRICE_READING_VERSION} from './aiResearchPriceReversalReading';
 import {assessAsymmetricRecovery} from './aiResearchAsymmetricEvidence';
@@ -38,7 +39,7 @@ function bindMarket(facts:AppFacts,study:unknown,market:string,entry:AppFact,his
  const priceReading=priceRoot.version===PRICE_READING_VERSION&&priceRows.length===1&&validPriceReversalReading(price,entry.asOf,close.values.close)?{...price,version:PRICE_READING_VERSION}:null;
  return {version:ANTI_CONTEXT_VERSION,status:'AVAILABLE',market,asOf:entry.asOf,source:'ANTICYCLICAL_CLOSE_STUDY_V1',
   ...(priceReading?{priceReversals:priceReading}:{}),
-  earlyRecovery:m.earlyRecovery?.version==='EARLY_RECOVERY_SIGNALS_V1'&&m.earlyRecovery.asOf===entry.asOf?{...m.earlyRecovery,signals:[...m.earlyRecovery.signals,...breadthRecoverySignals(recoveryBreadthRows(history,market,Array.isArray(m.recoverySessions)?m.recoverySessions:[],facts.snapshotTimestamp),entry.asOf)]}:null,
+  earlyRecovery:m.earlyRecovery?.version==='EARLY_RECOVERY_SIGNALS_V1'&&m.earlyRecovery.asOf===entry.asOf?{...m.earlyRecovery,signals:[...m.earlyRecovery.signals,...breadthRecoverySignals(recoveryBreadthRows(history,market,Array.isArray(m.recoverySessions)?m.recoverySessions:[],facts.snapshotTimestamp),entry.asOf),newLowDivergence(history,market,Array.isArray(m.recoverySessions)?m.recoverySessions:[],facts.snapshotTimestamp,entry.asOf)]}:null,
   asymmetricEvidence:m.asymmetricEvidence?.version==='ASYMMETRIC_INDEX_EVIDENCE_V1'&&m.asymmetricEvidence.asOf===entry.asOf?m.asymmetricEvidence:null,
   sourceCoverage:m.coverage,rsi14:f.rsi14,drawdown252Pct:f.drawdown252,rules:selected,ruleSelection:'FIXED_DRAWDOWN_252_AND_RSI_RECLAIM_NOT_BEST_RETURN',
   historicalReturnsAreOptionsReturns:false,calibratedProbability:false,positionSizingChanged:false,
