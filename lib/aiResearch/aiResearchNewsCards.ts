@@ -42,10 +42,11 @@ function hints(text: string) {
   if (/\bnasdaq\b|\bnvidia\b|\bmicrosoft\b|\bsemiconductors?\b|halbleiter/iu.test(text)) marketHints.push('NASDAQ');
   if (/\brussell\b|\bsmall[ -]?caps?\b|\bregional banks?\b|regionalbanken/iu.test(text)) marketHints.push('RUSSELL_2000');
   const rules: Array<[string,RegExp]> = [
-    ['INFLATION', /\bcpi\b|\bppi\b|inflation|verbraucherpreis/iu],
+    ['INFLATION', /\bcpi\b|\bppi\b|\bpce\b|personal consumption expenditures|inflation|verbraucherpreis/iu],
     ['MONETARY_POLICY', /\bfed\b|\bfomc\b|zinsentscheid|\brate (?:cut|hike)s?\b/iu],
     ['BOND_YIELDS', /\btreasur(?:y|ies)\b|\bbond yields?\b|anleiherendite/iu],
-    ['LABOUR', /\bpayrolls?\b|unemployment|arbeitsmarkt/iu],
+    ['LABOUR', /\bpayrolls?\b|unemployment|employment report|jobs report|arbeitsmarkt/iu],
+    ['GROWTH', /\bgdp\b|gross domestic product|retail sales|\bism\b|bruttoinlandsprodukt|einzelhandelsumsatz/iu],
     ['EARNINGS', /\bearnings\b|\bguidance\b|quartalszahlen/iu],
     ['GEOPOLITICS', /\bwar\b|\bsanctions?\b|\btariffs?\b|krieg|sanktion|zölle/iu]
   ];

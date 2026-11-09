@@ -5,7 +5,7 @@ type Instrument='NASDAQ_PUT'|'NASDAQ_CALL'|'RUSSELL_CALL';
 const obj=(v:unknown):Record<string,any>=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,any>:{};
 const finite=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
 const sign=(v:unknown)=>finite(v)?v>0?'UP':v<0?'DOWN':'FLAT':'UNKNOWN';
-const topicNames:Record<string,string>={INFLATION:'Inflation',MONETARY_POLICY:'Fed / Geldpolitik',BOND_YIELDS:'Anleiherenditen',LABOUR:'Arbeitsmarkt',EARNINGS:'Unternehmenszahlen',GEOPOLITICS:'Geopolitik'};
+const topicNames:Record<string,string>={INFLATION:'Inflation',MONETARY_POLICY:'Fed / Geldpolitik',BOND_YIELDS:'Anleiherenditen',LABOUR:'Arbeitsmarkt',GROWTH:'Wachstum / Konjunktur',EARNINGS:'Unternehmenszahlen',GEOPOLITICS:'Geopolitik'};
 /** Display-only projection. Entry labels describe existing app permissions, never grant new ones. */
 export function instrumentDashboard(report:AIResearchReport,instrument:Instrument,frameCurrent:boolean,modelStance?:string){
  const market=instrument==='RUSSELL_CALL'?'RUSSELL_2000':'NASDAQ',prefix=market==='NASDAQ'?'N-F':'R-F',favorable=instrument==='NASDAQ_PUT'?'DOWN':'UP',name=instrument==='NASDAQ_PUT'?'Nasdaq Put':instrument==='NASDAQ_CALL'?'Nasdaq Call':'Russell Call';
@@ -41,7 +41,7 @@ export function instrumentDashboard(report:AIResearchReport,instrument:Instrumen
  });
  const known=pnf.filter(p=>p.available&&p.columnDirection),effects=new Set(known.map(p=>p.effect));
  const pnfSummary=!known.length?'P&F-Richtung nicht eindeutig':effects.size>1?'P&F: gemischte Säulenlage':effects.has('FAVORABLE')?'P&F-Säule stützt die Idee':'P&F-Säule liefert Gegenwind';
- const relevance=(f:any)=>{const v=obj(f.values),source=report.sources.find(s=>s.url===v.url),title=source?.title??f.text.split(/\. Nur Überschrift;|\. Auszug:/)[0];return newsRelevance(title,'',market);};
+ const relevance=(f:any)=>{const v=obj(f.values),source=report.sources.find(s=>s.url===v.url),title=source?.title??f.text.split(/\. Nur Überschrift;|\. Auszug:/)[0];return newsRelevance(title,source?.summary??'',market);};
  const newsCandidates=usable.filter(f=>f.domain==='Nachrichten'&&f.market==='SHARED');
  const newsFacts=newsCandidates.filter(f=>relevance(f).eligibleForBrief&&Array.isArray(obj(f.values).marketHints)&&(obj(f.values).marketHints.includes(market)||obj(f.values).marketHints.includes('SHARED_MACRO'))).sort((a,b)=>Number(Date.parse(stamp)-Date.parse(a.asOf!)>168*3600000)-Number(Date.parse(stamp)-Date.parse(b.asOf!)>168*3600000)||relevance(a).priority-relevance(b).priority||Date.parse(b.asOf!)-Date.parse(a.asOf!)||a.id.localeCompare(b.id));
  const shared=(id:string)=>obj(usable.find(f=>f.id===id&&f.market==='SHARED')?.values.context);
