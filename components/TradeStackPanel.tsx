@@ -592,7 +592,7 @@ fontSize: "11px",
 fontWeight: "bold",
 }}
 >
-{stackState.replaceAll("_", " ")}
+        {size <= 0 && primary.instrument !== "NONE" ? "SETUP DEVELOPING · NO TRADE" : stackState.replaceAll("_", " ")}
 </span>
 
 <span
@@ -608,7 +608,7 @@ SIZE: {sizingMode}
 </div>
 
 {/* ==================================================
-PRIMARY FLOW
+{size <= 0 ? "LEADING CANDIDATE · NOT APPROVED" : "PRIMARY FLOW"}
 ================================================== */}
 
 <div
@@ -661,7 +661,7 @@ marginTop: "5px",
 >
 {directionalConflict
 ? "WAIT / NO FORCED DIRECTION"
-: primary.state}
+: size <= 0 ? "SETUP DEVELOPING · NO ENTRY APPROVED" : primary.state}
 </div>
 </div>
 
@@ -695,7 +695,7 @@ fontSize: "10px",
 marginTop: "2px",
 }}
 >
-CONVICTION
+CANDIDATE SCORE
 </div>
 </div>
 </div>
@@ -735,7 +735,7 @@ color: directionalConflict
 >
 {directionalConflict
 ? "CONFLICT"
-: getStrengthLabel(
+: size <= 0 ? "CANDIDATE · NO ENTRY" : getStrengthLabel(
 primaryStrength
 )}
 </span>
@@ -856,7 +856,7 @@ marginTop: "7px",
 fontWeight: "bold",
 }}
 >
-{getStrengthLabel(strength)}
+{size <= 0 && isPrimary ? "CANDIDATE · NOT APPROVED" : getStrengthLabel(strength)}
 </div>
 
 <div
@@ -879,7 +879,7 @@ lineHeight: 1.35,
 wordBreak: "break-word",
 }}
 >
-{candidate.state}
+{size <= 0 && isPrimary ? "SHORT SETUP DEVELOPING" : candidate.state}
 </div>
 
 {isPrimary && (
@@ -891,7 +891,7 @@ marginTop: "8px",
 fontWeight: "bold",
 }}
 >
-★ PRIMARY
+★ {size <= 0 ? "LEADING CANDIDATE · NO TRADE" : "PRIMARY"}
 </div>
 )}
 </div>
