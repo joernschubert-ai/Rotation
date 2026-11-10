@@ -11,7 +11,6 @@ import { validateEngineData } from "@/lib/engine/validateEngineData";
 import { historyEngine } from "@/lib/history/historyEngine";
 import { createMarketSnapshot } from "@/lib/history/snapshotEngine";
 
-import MarketDataStatus from "@/components/MarketDataStatus";
 import MarketDrivers from "@/components/MarketDrivers";
 import StructurePanel from "@/components/StructurePanel";
 import CrashPanel from "@/components/CrashPanel";
@@ -332,13 +331,6 @@ export default function Home() {
       </div>
 
       <MarketOverviewRibbon engine={engine} map={loadedMarket.map} snapshotTimestamp={loadedMarket.snapshot.timestamp} />
-      <MarketDataStatus map={loadedMarket.map} />
-
-      {loadedMarket.map.volatilityDataQuality?.fallbackUsed === true && (
-        <div role="status" className="mb-4 border border-amber-800 p-3 text-sm text-amber-200">
-          {loadedMarket.map.volatilityDataQuality.message}
-        </div>
-      )}
 
       {loadError && (
         <div role="alert" className="mb-4 border border-red-800 p-3 text-sm text-red-300">
@@ -398,6 +390,7 @@ export default function Home() {
           />
           <PutTimingPanel
             putTiming={engine.putTiming}
+            sizing={engine.sizing}
             exit={engine.exit?.short}
           />
           <RussellPanel
