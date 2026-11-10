@@ -4,6 +4,7 @@ import { getSignalColor } from "@/lib/engine/colorEngine";
 
 export default function PutTimingPanel({
 putTiming,
+ sizing,
 exit
 }: any) {
 
@@ -31,6 +32,10 @@ putTiming.timing ?? "WAIT";
 
 const execution =
 putTiming.execution ?? "NONE";
+
+const finalPutSize = sizing?.nasdaqPut?.size;
+const hasFinalSizing = typeof finalPutSize === "number" && Number.isFinite(finalPutSize);
+const finalPutEligible = hasFinalSizing && finalPutSize > 0 && sizing?.nasdaqPut?.eligible === true;
 
 const entryWindow =
 putTiming.entryWindow ?? "CLOSED";
@@ -117,7 +122,12 @@ note:
 }
 }
 
-const info = getInfo();
+const baseInfo = getInfo();
+const info = hasFinalSizing && !finalPutEligible
+  ? { label: "PUT-KANDIDAT · KEIN EINSTIEG", color: "#94a3b8", note: "Vorläufiges Timing; Trade Stack und Positionsgröße geben derzeit keinen Einstieg frei." }
+  : finalPutEligible
+    ? { label: `PUT-EINSTIEG FREIGEGEBEN · ${finalPutSize}%`, color: "#fcd34d", note: "Die finale Positionsgröße ist positiv und der Einstieg ist freigegeben." }
+    : baseInfo;
 
 
 /* =====================================================
@@ -131,6 +141,14 @@ exit.short, sondern zeigt primär den Timing-State.
 ===================================================== */
 
 function getPositionState() {
+
+if (hasFinalSizing && !finalPutEligible) {
+return { label: "KEIN EINSTIEG · 0%", color: "#94a3b8", note: "Die finale Positionsgröße blockiert derzeit einen Einstieg." };
+}
+
+if (finalPutEligible) {
+return { label: `EINSTIEG FREIGEGEBEN · ${finalPutSize}%`, color: "#fcd34d", note: "Freigegebene finale Positionsgröße für Nasdaq Put." };
+}
 
 if (decision === "WAIT") {
 
@@ -390,9 +408,7 @@ marginBottom: "12px"
 }}
 >
 
-<div style={{ color: "#94a3b8" }}>
-Execution
-</div>
+<div style={{ color: "#94a3b8" }}>Finale Freigabe</div>
 
 <div
 style={{
@@ -414,10 +430,10 @@ execution === "FULL SIZE"
 : "#94a3b8"
 }}
 >
-{execution === "FULL SIZE" ? "STARKES EINSTIEGSSIGNAL" : execution}
+{hasFinalSizing ? finalPutEligible ? `${execution} · ${finalPutSize}%` : "KEIN EINSTIEG · 0%" : execution === "FULL SIZE" ? "STARKES EINSTIEGSSIGNAL" : execution}
 </div>
-<div style={{color:"#94a3b8",fontSize:"10px",marginTop:"4px"}}>Signalstufe, keine Positionsgröße. Maßgeblich ist der risikobereinigte Modellanteil im Positionspanel. </div>
-<details style={{fontSize:"10px",color:"#94a3b8"}}><summary>Originale Signalstufe</summary>{execution}</details>
+<div style={{color:"#94a3b8",fontSize:"10px",marginTop:"4px"}}>{hasFinalSizing ? finalPutEligible ? "Finale Freigabe aus Trade Stack und risikobereinigter Positionsgröße." : "Timing-Kandidat vorhanden, aber aktuell keine freigegebene Positionsgröße." : "Signalstufe; finale Positionsgröße entscheidet über die Freigabe."}</div>
+<details style={{fontSize:"10px",color:"#94a3b8"}}><summary>Originale Timing-Signalstufe</summary>{execution} · Entry Window {entryWindow}</details>
 
 </div>
 
@@ -461,7 +477,7 @@ Entry Window
 style={{
 color:
 
-entryWindow === "OPEN"
+hasFinalSizing && !finalPutEligible ? "#94a3b8" : finalPutEligible ? "#fcd34d" : entryWindow === "OPEN"
 ? "#fdba74"
 
 : entryWindow === "EXTENDED"
@@ -472,7 +488,7 @@ entryWindow === "OPEN"
 fontWeight: "bold"
 }}
 >
-{entryWindow}
+{hasFinalSizing ? finalPutEligible ? "FREIGEGEBEN" : "KEIN EINSTIEG" : entryWindow}
 </div>
 
 </div>
