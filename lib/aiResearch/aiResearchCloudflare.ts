@@ -76,7 +76,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
   const structuredInput=buildNarrativeFacts(evidence);
   domainConcepts=buildResearchConcepts(structuredInput);
   let sourceRequest:ReturnType<typeof prepareSourceReview>;
-  try{sourceRequest=prepareSourceReview(report.appFacts,input.context.task,text(input.context.question,500));}catch{return unavailable('Die App-Belege können nicht vollständig aufbereitet werden oder überschreiten die Eingabegrenze. Keine KI-Anfrage ausgelöst.');}
+  try{sourceRequest=prepareSourceReview(report.appFacts,input.context.task,text(input.context.question,500));}catch(error){const reason=error instanceof Error?error.message:'';if(reason==='SOURCE_REVIEW_INPUT_LIMIT')return unavailable('APP_FACT_INPUT_LIMIT · Die App-Belege überschreiten die festgelegte Eingabegrenze von 26.000 Zeichen. Keine KI-Anfrage ausgelöst.');return unavailable('APP_FACT_PREPARATION_FAILED · Die App-Fakten konnten für die Quellenwahl nicht vollständig aufbereitet werden. Keine KI-Anfrage ausgelöst.');}
   const identity = JSON.stringify({sourcePayloadHash:createHash("sha256").update(sourceRequest.payload).digest("hex"),model:MODEL,transportProfile:RESEARCH_TRANSPORT_PROFILE,generationProfile:SYNTHESIS_GENERATION_PROFILE,prompt:SOURCE_REVIEW_PROMPT,domainVersion:CONCEPT_VERSION,contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
     question:text(input.context.question,500),appFactsPolicy:APP_FACTS_POLICY,appFacts:report.appFacts??null,...structuredInput});
   let payload=sourceRequest.payload;
@@ -89,7 +89,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
       requestElapsedMs: execution.requestStartedAt === undefined ? null : Date.now() - execution.requestStartedAt,
     }
   } });
-  if (payload.length > 26000) return unavailable("Die Belege überschreiten die festgelegte Eingabegrenze. Keine KI-Anfrage ausgelöst.");
+  if (payload.length > 26000) return unavailable("APP_FACT_INPUT_LIMIT · Die App-Belege überschreiten die festgelegte Eingabegrenze von 26.000 Zeichen. Keine KI-Anfrage ausgelöst.");
   // Response diagnostics changed; do not reuse a rejection whose wording was discarded.
   // Daily quota, cooldown and lock namespaces deliberately remain unchanged.
   const cacheKey = `${PREFIX}:cache:${SYNTHESIS_CONTRACT}:cot-horizons-v1:${createHash("sha256").update(identity).digest("hex")}`;
