@@ -21,10 +21,14 @@ export function selectVolatilityContext(input:Series[],now=Date.now()){
  const alignedWindows=windows.every(w=>w.rows.length===5&&w.rows.every((r,i)=>positive(r.close)&&r.day===windows[0].rows[i]?.day));
  const available=selected!==null&&alignedWindows&&Number.isFinite(now)&&Number.isFinite(asOfTime)&&asOfTime<=now&&now-asOfTime<=5*86400000;
  const fallbackUsed=available&&maps.some(m=>!m.endpoint?.available||m.endpoint.day!==selected);
- const quality={policy:'DATED_VOLATILITY_FALLBACK_CONTINUES_V2',available,asOfDate:available?selected:null,asOfTimestamp:available?new Date(asOfTime).toISOString():null,
+ const vixRows=windows[0].rows;
+ const vixLast=vixRows.at(-1),vixPrevious=vixRows.at(-2);
+ const vixPeak=vixRows.reduce((best,row)=>!best||row.close>best.close?row:best,null as typeof vixRows[number]|null);
+ const vixMovement=available&&vixLast?{date:vixLast.day,current:vixLast.close,previous:vixPrevious?.close??null,changePoints:vixPrevious?+(vixLast.close-vixPrevious.close).toFixed(2):null,changePercent:vixPrevious?+((vixLast.close/vixPrevious.close-1)*100).toFixed(2):null,windowSessions:vixRows.length,peak:vixPeak?.close??null,peakDate:vixPeak?.day??null,retreatPoints:vixPeak?+(vixLast.close-vixPeak.close).toFixed(2):null,retreatPercent:vixPeak?+((vixLast.close/vixPeak.close-1)*100).toFixed(2):null,contextOnly:true,directionalSignal:false,thresholdCalibration:'UNVALIDATED'}:null;
+ const quality={policy:'DATED_VOLATILITY_FALLBACK_CONTINUES_V2',available,asOfDate:available?selected:null,asOfTimestamp:available?new Date(asOfTime).toISOString():null,vixMovement,
   retrievedAt:new Date(now).toISOString(),fallbackUsed,entryBlocked:!available,calendarAgeLimitDays:5,
   sourceEndpoints:maps.map(m=>({symbol:m.symbol,date:m.endpoint?.day??null,available:m.endpoint?.available??false})),
   windowDates:available?windows[0].rows.map(r=>r.day):[],datedFallback:fallbackUsed,syntheticBarsInserted:0,
-  message:!available?'Kein ausreichend frischer, gemeinsamer Volatilitätsstand verfügbar.':fallbackUsed?`Volatilitätsdaten: letzter gemeinsamer gültiger Stand ${selected}. Aktueller Anbieter-Endpunkt fehlt oder ist zeitlich uneinheitlich. Berechnungen verwenden diesen datierten Stand; kein aktueller Livekurs.`:`Volatilitätsdaten auf gemeinsamem beobachteten Handelstag ${selected}; kein Nachweis eines Echtzeitkurses.`};
+  message:!available?'VIX: kein gemeinsamer Datenstand.':fallbackUsed?`VIX-Datenstand: ${selected}.`:`VIX-Datenstand: ${selected}.`};
  return {quality,series:Object.fromEntries(windows.map(w=>[w.symbol,available?w.rows.map(r=>r.close):[]])) as Record<string,number[]>};
 }
