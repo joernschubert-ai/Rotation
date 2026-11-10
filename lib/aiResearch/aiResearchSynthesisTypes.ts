@@ -5,7 +5,7 @@ import type { InstrumentPriceReferences } from "./aiResearchPriceReferences";
 import type { WeightingContext, WeightedReview } from "./aiResearchWeighting";
 import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
 import type { ResearchTrigger } from "./aiResearchTriggers";
-export const SYNTHESIS_CONTRACT = "GEMMA_SOURCE_REVIEW_V79";
+export const SYNTHESIS_CONTRACT = "GEMMA_SOURCE_REVIEW_V80_ANTICYCLICAL_CONTEXT";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -110,3 +110,4 @@ export interface ResearchSynthesis {
     };
   };
 }
+
