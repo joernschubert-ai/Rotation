@@ -342,6 +342,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       </div>
     </div>
     {copyStatus && <p role="status" className="text-xs text-slate-400">{copyStatus}</p>}
+    {latestAttempt?.aiStatus === "UNAVAILABLE" && latestAttempt.message && <p role="alert" className="border border-amber-800 bg-amber-950/30 p-3 text-xs leading-relaxed text-amber-200"><strong>Letzter Research-Versuch · keine aktuelle KI-Ausgabe</strong><br />{latestAttempt.message} <span className="text-amber-300">Snapshot: {date(latestAttempt.snapshotTimestamp)} · KI-Aufrufe: {latestAttempt.modelRequestsUsed ?? "unbekannt"}</span></p>}
     {error && !report && <p role="alert" className="border border-red-900 p-3 text-xs text-red-300">{error}{report ? " Angezeigt wird der vorherige Bericht; seine Einstiegsaussage ist ausgesetzt." : ""}</p>}
     {!report && !marketReady && <p className="text-xs text-slate-400">{archiveLoading?"Letzter gespeicherter Bericht wird gelesen …":"Kein lesbarer früherer Bericht gefunden. Beim Lesen wurde keine KI gestartet."}</p>}
     {!report && marketReady && <p className="border border-[#292929] p-4 text-xs text-[#999]">{loading ? "Research wird geladen …" : "Noch kein Research-Bericht verfügbar."}</p>}
