@@ -112,7 +112,22 @@ async function loadBroadBreadth(symbols: string[], priceObservationDate: string 
       if (data) bars.set(symbol, data);
     }
   }));
-  const main = summarizeBreadth(symbols, bars);
+  let main = summarizeBreadth(symbols, bars);
+  const requiredBreadthCount = Math.ceil(symbols.length * 0.98);
+  if (main.dataQuality.valid < requiredBreadthCount) {
+    // Retry only a few transiently missing or stale rows directly, bypassing the 15-minute cache.
+    // Keep the 98% quality threshold; never substitute stale or synthetic breadth values.
+    const retryableReasons = new Set(["UNAVAILABLE", "DIFFERENT_SESSION_DATE", "STALE_OR_FUTURE_BAR"]);
+    const retryTarget = Math.max(1, requiredBreadthCount - main.dataQuality.valid + 1);
+    const retrySymbols = symbols.filter(symbol => retryableReasons.has(main.dataQuality.excluded[symbol]));
+    const selectedRetries = retrySymbols.slice(0, Math.min(3, retryTarget));
+    const retried = await Promise.all(selectedRetries.map(async symbol => {
+      const fresh = await fetchBreadthBarsUncached(symbol, cacheScope).catch(() => null);
+      return fresh ? [symbol, fresh] as const : null;
+    }));
+    for (const item of retried) if (item) bars.set(item[0], item[1]);
+    if (retried.length) main = summarizeBreadth(symbols, bars);
+  }
   const referenceDate = main.dataQuality.referenceDate;
   const aligned = new Map([...bars].filter(([, value]) => value.sessionDate === referenceDate));
   const etf = summarizeBreadth(SUPPLEMENTAL_ETF_UNIVERSE, aligned);
@@ -3998,3 +4013,4 @@ details: String(err)
 });
 }
 }
+
