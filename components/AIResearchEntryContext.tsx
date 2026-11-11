@@ -3,7 +3,8 @@ export function anticyclicalInstrumentReading(fact:any,instrument?:string){
  const a=fact?.values?.anticyclical;
  if(a?.version!=='ANTICYCLICAL_ENTRY_CONTEXT_V1'||a.status!=='AVAILABLE'||a.asOf!==fact?.asOf||!Number.isFinite(a.rsi14))return null;
  const d=a.asymmetricDecision?.version==='ASYMMETRIC_DECISION_V1'?a.asymmetricDecision:null,put=instrument==='NASDAQ_PUT';
- return {tone:put?(d?.tone==='good'?'bad':'neutral'):(d?.tone??'neutral'),label:put?(d?.tone==='good'?'Erholung · Gegenwind für neue Puts':'Put-Einstieg separat prüfen'):(d?.label??'Antizyklische Einordnung offen'),areas:d?.confluence?.areas??null,rsi:a.rsi14,asOf:a.asOf};
+ const signalAreas=Array.isArray(d?.families)?d.families.filter((x:any)=>Array.isArray(x.signals)&&x.signals.length>0).map((x:any)=>x.name):[];
+ return {tone:put?(d?.tone==='good'?'bad':'neutral'):(d?.tone??'neutral'),label:put?(d?.tone==='good'?'Erholung · Gegenwind für neue Puts':'Put-Einstieg separat prüfen'):(d?.label??'Antizyklische Einordnung offen'),areas:d?.confluence?.areas??signalAreas.length,signalAreas,rsi:a.rsi14,asOf:a.asOf};
 }
 const pp=(v:any)=>typeof v==='number'&&Number.isFinite(v)?`${v>0?'+':''}${v.toLocaleString('de-DE',{maximumFractionDigits:2})} Prozentpunkte`:'unbekannt';
 export function AIResearchAnticyclicalSummary({fact,instrument}:{fact:any;instrument?:string}){
