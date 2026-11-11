@@ -1,6 +1,7 @@
 import type { SynthesisEvidence } from './aiResearchSynthesisEvidence';
 export interface ChartPriceLevel { id:string;price:number;label:string;asOfDate:string;basis:'DAILY_CLOSE_REFERENCE';distancePct:number; }
-export interface InstrumentPriceReferences { instrument:'NASDAQ_PUT'|'NASDAQ_CALL'|'RUSSELL_CALL';market:'NASDAQ'|'RUSSELL_2000';status:'AVAILABLE'|'UNAVAILABLE';asOfDate:string|null;lastClose:number|null;upLevels:ChartPriceLevel[];downLevels:ChartPriceLevel[];note:string; }
+export interface PnfPriceObjective { id:string;boxPercent:number;direction:'UP'|'DOWN';price:number;status:'PRELIMINARY'|'FIXED';knownAt:string;countFixedAt:string|null;signalDate:string|null;family:string;signalStatus:string;currentRelation:string|null;distancePct:number; }
+export interface InstrumentPriceReferences { instrument:'NASDAQ_PUT'|'NASDAQ_CALL'|'RUSSELL_CALL';market:'NASDAQ'|'RUSSELL_2000';status:'AVAILABLE'|'UNAVAILABLE';asOfDate:string|null;lastClose:number|null;upLevels:ChartPriceLevel[];downLevels:ChartPriceLevel[];pnfObjectives:PnfPriceObjective[];note:string; }
 const obj=(v:unknown):Record<string,any>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,any>:{};
 const positive=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v)&&v>0;
 /** Existing observed references only. No fitted lines, targets or newly invented support levels. */
@@ -9,7 +10,7 @@ export function buildInstrumentPriceReferences(evidence:SynthesisEvidence[],refe
   const market=instrument==='RUSSELL_CALL'?'RUSSELL_2000':'NASDAQ',row=evidence.find(e=>e.id==='CHART_'+market&&e.available),c=obj(row?.data);
   const date=typeof c.asOfDate==='string'?c.asOfDate:null,time=date?Date.parse(date+'T00:00:00Z'):NaN,at=Date.parse(reference);
   const validDate=!!date&&/^\d{4}-\d{2}-\d{2}$/.test(date)&&Number.isFinite(time)&&new Date(time).toISOString().slice(0,10)===date&&time<=at&&at-time<=5*86400000;
-  const available=Boolean(row&&validDate&&positive(c.lastClose)),levels:ChartPriceLevel[]=[];
+  const available=Boolean(row&&validDate&&positive(c.lastClose)),levels:ChartPriceLevel[]=[],pnfObjectives:PnfPriceObjective[]=[];
   const add=(id:string,value:unknown,label:string)=>{if(available&&positive(value))levels.push({id,price:value,label,asOfDate:date!,basis:'DAILY_CLOSE_REFERENCE',distancePct:(value/c.lastClose-1)*100});};
   if(available){
    add('PRIOR20_LOW',obj(c.prior20).lowClose,'Tiefster Schlusskurs der vorherigen 20 Sitzungen');
@@ -20,6 +21,9 @@ export function buildInstrumentPriceReferences(evidence:SynthesisEvidence[],refe
    const formations=obj(c.formations);
    for(const p of Array.isArray(formations.pointFigure)?formations.pointFigure:[]){
     const latest=p.latest??(Array.isArray(p.signals)?p.signals[p.signals.length-1]:null);
+    const target=obj(latest?.target),direction=latest?.bias==='BULLISH'?'UP':latest?.bias==='BEARISH'?'DOWN':null;
+    const knownAt=typeof target.knownAt==='string'?target.knownAt:null;
+    if(latest&&direction&&positive(target.price)&&['PRELIMINARY','FIXED'].includes(target.status)&&knownAt&&/^\d{4}-\d{2}-\d{2}$/.test(knownAt)&&Date.parse(knownAt+'T00:00:00Z')<=time&&latest.status!=='INVALIDATED'&&((direction==='UP'&&target.price>c.lastClose)||(direction==='DOWN'&&target.price<c.lastClose)))pnfObjectives.push({id:String(latest.id??('PNF'+p.boxPercent)),boxPercent:p.boxPercent,direction,price:target.price,status:target.status,knownAt,countFixedAt:typeof target.countFixedAt==='string'?target.countFixedAt:null,signalDate:typeof latest.discoveredAt==='string'?latest.discoveredAt:null,family:String(latest.family??'P&F-Muster'),signalStatus:String(latest.status??'UNKNOWN'),currentRelation:typeof latest.currentRelation==='string'?latest.currentRelation:null,distancePct:(target.price/c.lastClose-1)*100});
     for(const [kind,f]of [['FORMING',p.forming],['ALIGNED',latest]] as const){
      if(!f||f.status==='INVALIDATED'||kind==='ALIGNED'&&f.currentRelation!=='ALIGNED_WITH_CURRENT_COLUMN')continue;
      const prefix='PNF'+p.boxPercent+'_'+kind;
@@ -36,7 +40,7 @@ export function buildInstrumentPriceReferences(evidence:SynthesisEvidence[],refe
   }
   const unique=(items:ChartPriceLevel[])=>items.filter((v,i)=>!items.slice(0,i).some(old=>Math.abs(old.price-v.price)<=Math.max(0.005,v.price*0.0000001))).slice(0,3);
   return {instrument,market,status:available?'AVAILABLE':'UNAVAILABLE',asOfDate:available?date:null,lastClose:available?c.lastClose:null,
-   upLevels:unique(levels.filter(l=>l.price>c.lastClose).sort((a,b)=>a.price-b.price)),downLevels:unique(levels.filter(l=>l.price<c.lastClose).sort((a,b)=>b.price-a.price)),
+   upLevels:unique(levels.filter(l=>l.price>c.lastClose).sort((a,b)=>a.price-b.price)),downLevels:unique(levels.filter(l=>l.price<c.lastClose).sort((a,b)=>b.price-a.price)),pnfObjectives:pnfObjectives.sort((a,b)=>a.boxPercent-b.boxPercent),
    note:'Datierte Schlusskursreferenzen, keine geprüften Unterstützungen/Widerstände. Rückkehr über bzw. Unterschreiten einer Marke ist ein bedingter Hinweis, kein garantierter Kursverlauf oder automatischer Einstieg.'};
  });
 }
