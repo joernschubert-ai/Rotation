@@ -44,7 +44,7 @@ export async function barsForForecast(plan:MemoryForecast){
 }
 export async function storeMemoryAssessment(plan:MemoryForecast,assessment:any){
  const redis=Redis.fromEnv();
- const terminal=assessment.outcomes.every((o:any)=>o.status==='MATURED_OBSERVED'||o.status==='SOURCE_CONFLICT'||o.status==='INVALID_NUMERIC_PATH');
+ const terminal=assessment.outcomes.every((o:any)=>o.status==='MATURED_OBSERVED'||o.status==='INVALID_NUMERIC_PATH');
  const rows=assessment.outcomes.filter((o:any)=>o.status==='MATURED_OBSERVED').map((o:any)=>({horizon:o.horizon,value:JSON.stringify({...o,evaluationPolicy:assessment.version,forecastId:plan.id,evaluatedAt:assessment.evaluatedAt,anchor:assessment.anchor})}));
  await memoryBounded(redis.eval(
   "-- MEMORY_ASSESSMENTS_NX_V1\nlocal rows=cjson.decode(ARGV[1]) for _,r in ipairs(rows) do redis.call('SET',ARGV[2]..':assessment:'..ARGV[3]..':'..r.horizon,r.value,'NX') end if ARGV[5]=='1' then redis.call('ZREM',KEYS[1],ARGV[3]) else redis.call('ZADD',KEYS[1],ARGV[4],ARGV[3]) end return 1",
