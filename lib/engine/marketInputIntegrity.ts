@@ -13,7 +13,9 @@ export function engineDataIssues(data: any): string[] {
     if (data.indices?.[key]?.priceMetrics?.dataQuality?.stale === true) issues.push(`${key}_STALE`);
   }
   if (!positive(data.marketData?.["^VIX"]?.current)) issues.push("VIX_MISSING");
-  for (const key of ["moveIndex", "vixTermRatio", "volOfVolRatio"]) if (!positive(data[key])) issues.push(`${key}_MISSING`);
+  // MOVE is supplemental: missing provider data must not invalidate the whole market snapshot.
+  if (data.moveIndex !== null && data.moveIndex !== undefined && !positive(data.moveIndex)) issues.push("moveIndex_INVALID");
+  for (const key of ["vixTermRatio", "volOfVolRatio"]) if (!positive(data[key])) issues.push(`${key}_MISSING`);
   if (!finite(data.marketLiquidityScore) || data.marketLiquidityScore < 0 || data.marketLiquidityScore > 100) issues.push("RAW_LIQUIDITY_MISSING");
   if (data.creditDataQuality?.available !== true) issues.push("CREDIT_CONTEXT_INCOMPLETE");
   if (data.volatilityDataQuality && data.volatilityDataQuality.available !== true) issues.push("VOLATILITY_CONTEXT_UNAVAILABLE");
@@ -66,3 +68,4 @@ export function guardVolatilityContext(engine:any,data:any){
   executionState:{...engine.executionState,tacticalBias:'NONE',executionMode:'WAIT',summary:message}
  };
 }
+
