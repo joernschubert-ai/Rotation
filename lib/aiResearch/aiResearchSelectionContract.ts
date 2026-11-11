@@ -19,7 +19,10 @@ export function validateSelection(raw:unknown,context:base.SelectionContext){
  const valid:Selection[]=[],seenInstruments=new Set<string>();
  for(const [index,item]of root.instruments.entries()){
   const row=object(item),p='instruments.'+index;
-  if(!exact(row,['instrument','stance','arguments','hypothesis','changeConditionId'])||!base.INSTRUMENTS.includes(row.instrument)||seenInstruments.has(row.instrument)){issue(p,'INSTRUMENT_SCHEMA','Genau eigene Instrumentfelder erwartet; keine alten supports/opposes/readings und keine doppelten Instrumente.');continue;}
+  const hasChangeCondition=Object.hasOwn(row,'changeConditionId');
+  const allowedKeys=hasChangeCondition?['instrument','stance','arguments','hypothesis','changeConditionId']:['instrument','stance','arguments','hypothesis'];
+  if(!exact(row,allowedKeys)||!base.INSTRUMENTS.includes(row.instrument)||seenInstruments.has(row.instrument)){issue(p,'INSTRUMENT_SCHEMA','Genau eigene Instrumentfelder erwartet; changeConditionId darf fehlen und gilt dann als null. Keine alten supports/opposes/readings oder doppelten Instrumente.');continue;}
+  const normalizedRow={...row,changeConditionId:hasChangeCondition?row.changeConditionId:null};
   seenInstruments.add(row.instrument);
   if(!Array.isArray(row.arguments)){issue(p+'.arguments','ARGUMENT_LIST','Eine einzige Argumentliste wird benötigt.');continue;}
   if(row.arguments.length>8)advisories.push({path:p+'.arguments',code:'MANY_ARGUMENTS',message:'Mehr als acht Quellen gewählt. Dies ist ein Darstellungshinweis, kein fachlicher Fehler. Abhängige MA-/P&F-Befunde nicht als unabhängige Stimmen zählen.'});
@@ -32,11 +35,11 @@ export function validateSelection(raw:unknown,context:base.SelectionContext){
 
   }
   // Existing source/side checks inspect every structurally valid argument, including overlong lists.
-  const projected=project({...row,arguments:usable} as Selection);
+  const projected=project({...normalizedRow,arguments:usable} as Selection);
   const peers=base.INSTRUMENTS.filter(x=>x!==row.instrument).map(instrument=>({instrument,stance:'UNCLEAR',supports:[],opposes:[],hypothesis:'Ungeprüfte Platzhalterhypothese nur zur internen Prüfung des eigenen Instruments.',changeConditionId:null}));
   const result=base.validateSelection(JSON.stringify({version:base.SELECTION_CONTRACT,instruments:[projected,...peers]}),context);
   for(const problem of result.issues){if(problem.path.startsWith('instruments.0'))issue(problem.path.replace('instruments.0',p).replace('.supports','.arguments.SUPPORTS').replace('.opposes','.arguments.OPPOSES'),problem.code,problem.message);else issue(p,problem.code,problem.message);}
-  valid.push(row as Selection);
+  valid.push({...normalizedRow,arguments:usable} as Selection);
  }
  if(seenInstruments.size!==3)issue('$','MISSING_INSTRUMENT','Alle drei Instrumente müssen genau einmal vorkommen.');
  return {ok:issues.length===0,issues,selections:issues.length===0?valid:[],advisories};
