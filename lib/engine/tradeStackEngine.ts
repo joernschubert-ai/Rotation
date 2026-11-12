@@ -292,8 +292,19 @@ export function tradeStackEngine(input: any) {
     const own = data.russellFlowOverride;
     if (own?.instrument === "RUSSELL_CALL") {
       const sharedPanic = data.crash?.panicState?.state === "PANIC" || numeric(data.crash?.probability) > 70;
+      const ownBreadth = russell.meta?.independentContext?.historySnapshot?.structure?.breadth ?? {};
+      const ownParticipation = russell.meta?.independentContext?.historySnapshot?.structure?.advanceDecline;
+      const ownMomentumComplete = rutQuality.complete;
+      const recoveryWatch = ownMomentumComplete && rutMomentum20D > 0 &&
+        numeric(ownBreadth.b20, -1) >= 55 && numeric(ownParticipation, -1) > 0 &&
+        !sharedPanic && !hardLongRisk && !hardLongPhase;
       return { ...own, eligible: own.eligible === true && !sharedPanic, strength: sharedPanic ? 0 : own.strength,
-        blockReasons: [...(own.blockReasons ?? []), ...(sharedPanic ? ["SHARED_SYSTEMIC_RISK"] : [])], independentRussellContext: true };
+        blockReasons: [...(own.blockReasons ?? []), ...(sharedPanic ? ["SHARED_SYSTEMIC_RISK"] : [])], independentRussellContext: true,
+        recoveryWatch: { active: recoveryWatch, status: recoveryWatch ? "RECOVERY_ATTEMPT_TO_OBSERVE" : "NO_EARLY_RECOVERY_WATCH",
+          referenceDate: russell.meta?.independentContext?.referenceDate ?? null,
+          evidence: recoveryWatch ? [`20T ${rutMomentum20D.toFixed(2)}%`, `Breite 20T ${numeric(ownBreadth.b20).toFixed(0)}%`, `A/D ${numeric(ownParticipation) > 0 ? "+" : ""}${numeric(ownParticipation)}`] : [],
+          affectsEligibilityOrSize: false }
+      };
     }
     const blocks = longBlocks(russellDecision);
     if (bearishRotation || (!bullishConfirmed && !bullishConfirming)) blocks.push("NO_BULLISH_ROTATION_CONFIRMATION");
