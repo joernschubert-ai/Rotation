@@ -9,6 +9,11 @@ function Fact({label,value,sub,className='text-slate-100',hint}:{label:string;va
 }
 export default function MarketOverviewRibbon({engine,map,snapshotTimestamp}:{engine:any;map:any;snapshotTimestamp?:string}){
  const v=marketOverview(engine,map,snapshotTimestamp),p=v.participation;
+ const leadership=v.relativeLeadership;
+ const leader=(value:number|null,positive:string,negative:string)=>value===null?'Daten nicht verfügbar':value>0?positive:value<0?negative:'gleichauf';
+ const smallLeader=leader(leadership.smallVsTech,'Russell vor Tech','Tech vor Russell');
+ const equalLeader=leader(leadership.equalVsMega,'Equal Weight vor Mega Caps','Mega Caps vor Equal Weight');
+ const leadershipSummary=leadership.smallVsTech===null||leadership.equalVsMega===null?'Relative Führung teilweise nicht verfügbar':leadership.smallVsTech>0&&leadership.equalVsMega>0?'Breite Marktwerte führen relativ zu Tech und Mega Caps':leadership.smallVsTech<0&&leadership.equalVsMega<0?'Tech und Mega Caps führen relativ zum breiten Markt':`Gemischte Führung · ${smallLeader} · ${equalLeader}`;
  const vm=map?.volatilityDataQuality?.vixMovement;
  const phaseColor=v.phase.tone==='good'?'border-emerald-700 bg-emerald-950/30 text-emerald-200':v.phase.tone==='bad'?'border-rose-700 bg-rose-950/30 text-rose-200':v.phase.tone==='watch'?'border-amber-700 bg-amber-950/30 text-amber-200':'border-slate-600 text-slate-300';
  return <section aria-label="Markt auf einen Blick" className="mb-6 overflow-hidden rounded-xl border border-slate-700 bg-[#0e1722] p-3 shadow-lg shadow-black/10 sm:p-4">
@@ -23,6 +28,12 @@ export default function MarketOverviewRibbon({engine,map,snapshotTimestamp}:{eng
    <Fact label="A/D Momentum" value={signed(p.momentum,0)} sub="Δ vorige Beobachtung" className={tone(p.momentum)} hint="Unverändert gelieferte Engine-Änderung gegenüber der Vorbeobachtung; kein neuer Kalendervergleich."/>
    <Fact label="Neue Hochs / Tiefs" value={signed(p.netHL,0)} sub={'H '+num(p.highs)+' / T '+num(p.lows)+' · Stärke '+signed(p.hlStrength,0)+(p.hlStrength!==null?' %':'')} className={tone(p.netHL)} hint="Neue Hochs minus neue Tiefs. H/L-Stärke = (Hochs−Tiefs)/(Hochs+Tiefs); −100 % kann bereits bei 0 Hochs und 3 Tiefs entstehen."/>
    <Fact label="Distribution" value={num(p.distribution)+' / '+num(p.distributionMax)} sub="Hoch = mehr Druck" className={p.distribution===null?'text-slate-500':p.distribution>=4?'text-amber-200':'text-emerald-300'} hint="Bestehender Distributionsdruck der Engine, keine Wahrscheinlichkeit."/>
+  </div>
+  <div className="mb-2 mt-3 flex flex-wrap items-center justify-between gap-1"><p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">BROAD MARKET FLOW · Relative Führung</p><span className="text-[9px] text-slate-300">{leadershipSummary}</span></div>
+  <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
+   <Fact label="Russell vs Tech" value={signed(leadership.smallVsTech,1)+' Pp.'} sub={leader(leadership.smallVsTech,'Russell 2000 führte QQQ voraus','QQQ führte Russell 2000 voraus')+' · 20 Sitzungen'} className={tone(leadership.smallVsTech)} hint="Differenz der Renditen von IWM (Russell 2000) und QQQ über 20 Beobachtungen. Prozentpunkte, kein gemessener Kapitalfluss."/>
+   <Fact label="Growth vs Value" value={signed(leadership.growthVsValue,1)+' Pp.'} sub={leader(leadership.growthVsValue,'Growth führte Value voraus','Value führte Growth voraus')+' · 20 Sitzungen'} className={tone(leadership.growthVsValue)} hint="Differenz der Renditen von IVW (Growth) und IVE (Value) über 20 Beobachtungen. Negative Werte bedeuten relative Führung von Value, kein gemessener Kapitalfluss."/>
+   <Fact label="Equal Weight vs Mega Caps" value={signed(leadership.equalVsMega,1)+' Pp.'} sub={leader(leadership.equalVsMega,'Equal Weight führte voraus','Mega Caps führten voraus')+' · 20 Sitzungen'} className={tone(leadership.equalVsMega)} hint="Differenz der Renditen von RSP (S&P 500 Equal Weight) und SPY (S&P 500 nach Marktkapitalisierung) über 20 Beobachtungen. Prozentpunkte, kein gemessener Kapitalfluss."/>
   </div>
   <details className="mt-2 text-[10px] text-slate-500"><summary className="cursor-pointer">Datenstand und Begriffe</summary><p className="mt-2">{v.limit} H/L bezeichnet neue Hochs/Tiefs, keine Higher-High-/Lower-Low-Formation.</p><p className="mt-1">Futures: {v.rows.map(r=>`${r.name} ${stamp(r.futureTimestamp)} (${r.paused?'Handelspause':r.futurePeriod})`).join(' · ')}. 5-Minuten-Werte sind keine Tagesrenditen; 16:00-NY-Vergleiche sind keine offiziellen Settlementrenditen.</p><p className="mt-1">Geladener App-Stand: {stamp(v.snapshotTimestamp)}. Beobachtungsdaten können abweichen; es werden keine neuen Abrufe ausgelöst.</p></details>
  </section>;
