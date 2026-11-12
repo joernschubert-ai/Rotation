@@ -59,6 +59,18 @@ const stackStrength = Number(stack?.strength ?? 0);
 
 const primaryStrength = Number(primary?.strength ?? 0);
 
+const instrumentOrder = [
+  { key: "NASDAQ_PUT", sizeKey: "nasdaqPut" },
+  { key: "NASDAQ_CALL", sizeKey: "nasdaqCall" },
+  { key: "RUSSELL_CALL", sizeKey: "russellCall" },
+];
+
+function modelFlowSize(sizeKey: string) {
+  const flow = sizing?.[sizeKey] ?? {};
+  const value = Number(flow?.size ?? flow?.finalSize ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
 const activeRotationConfirm =
 rotationConfirm ??
 {
@@ -509,6 +521,18 @@ grid-template-columns: repeat(3, minmax(0, 1fr));
 gap: 8px;
 }
 
+.trade-stack-overview {
+display: grid;
+grid-template-columns: repeat(3, minmax(0, 1fr));
+gap: 10px;
+margin: 0 0 16px;
+}
+
+.trade-stack-legacy-primary,
+.trade-stack-legacy-matrix {
+display: none;
+}
+
 .trade-stack-grid-two {
 display: grid;
 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -531,6 +555,10 @@ text-align: left !important;
 }
 
 .trade-stack-matrix {
+grid-template-columns: 1fr;
+}
+
+.trade-stack-overview {
 grid-template-columns: 1fr;
 }
 }
@@ -587,31 +615,57 @@ flexWrap: "wrap",
 >
 <span
 style={{
-color: stackColor,
-fontSize: "11px",
-fontWeight: "bold",
-}}
->
-        {size <= 0 && primary.instrument !== "NONE" ? "SETUP DEVELOPING · NO TRADE" : stackState.replaceAll("_", " ")}
-</span>
-
-<span
-style={{
 color: getModeColor(sizingMode),
 fontSize: "11px",
 fontWeight: "bold",
 }}
 >
-SIZE: {sizingMode}
+GESAMTRAHMEN: {sizingMode}
 </span>
 </div>
 </div>
 
-{/* ==================================================
-{size <= 0 ? "LEADING CANDIDATE · NOT APPROVED" : "PRIMARY FLOW"}
-================================================== */}
+<div style={{ color: "#94a3b8", fontSize: "11px", letterSpacing: "0.5px", marginBottom: "8px", fontWeight: "bold" }}>
+THREE INSTRUMENTS · SCORE, STATUS, MODEL SIZE
+</div>
+<div className="trade-stack-overview">
+{instrumentOrder.map(({ key, sizeKey }) => {
+  const candidate = candidates.find((item: any) => item?.instrument === key) ?? {};
+  const strength = Number(candidate?.strength ?? 0);
+  const modelSize = modelFlowSize(sizeKey);
+  const recoveryWatch = key === "RUSSELL_CALL" && candidate?.recoveryWatch?.active === true;
+  const countertrend = key === "NASDAQ_CALL" ? candidate?.countertrendOpportunity : null;
+  const tone = modelSize > 0 ? getDirectionColor(candidate?.direction) : recoveryWatch ? "#fcd34d" : "#94a3b8";
+  const status = modelSize > 0
+    ? "MODELLGRÖSSE AKTIV"
+    : recoveryWatch
+      ? "ERHOLUNGSVERSUCH BEOBACHTEN"
+      : candidate?.eligible === false && (candidate?.blockReasons?.length ?? 0) > 0
+        ? "KEINE FREIGABE"
+        : strength >= 20 ? "KANDIDAT · KEINE GRÖSSE" : "NO TRADE";
+  return <div key={key} style={{ background: "#121d2a", border: `1px solid ${tone}66`, padding: "12px", minWidth: 0, borderRadius: "6px", boxSizing: "border-box" }}>
+    <div style={{ color: "#e2e8f0", fontSize: "13px", fontWeight: "bold", overflowWrap: "anywhere" }}>{getInstrumentLabel(key)}</div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "10px" }}>
+      <div><div style={{ color: "#64748b", fontSize: "9px" }}>KANDIDATENWERT</div><div style={{ color: getConvictionColor(candidate?.direction, strength), fontWeight: "bold", fontSize: "22px" }}>{strength}<span style={{ color: "#64748b", fontSize: "10px" }}> / 100</span></div></div>
+      <div><div style={{ color: "#64748b", fontSize: "9px" }}>GRÖSSENPUNKTE / 100</div><div style={{ color: modelSize > 0 ? getDirectionColor(candidate?.direction) : "#94a3b8", fontWeight: "bold", fontSize: "22px" }}>{modelSize}</div></div>
+    </div>
+    <div style={{ color: tone, fontSize: "10px", fontWeight: "bold", marginTop: "8px", overflowWrap: "anywhere" }}>{status}</div>
+    {recoveryWatch && <div style={{ color: "#cbd5e1", fontSize: "9px", lineHeight: 1.4, marginTop: "6px", overflowWrap: "anywhere" }}>
+      {candidate.recoveryWatch.referenceDate ? `Russell-Daten ${candidate.recoveryWatch.referenceDate} · ` : ""}{candidate.recoveryWatch.evidence?.join(" · ")}. Nur Beobachtung; ändert Freigabe und Größe nicht.
+    </div>}
+    {countertrend?.version === "NASDAQ_COUNTERTREND_OPPORTUNITY_V1" && <div style={{ marginTop: "8px", padding: "7px", borderRadius: "4px", background: countertrend.status === "SMALL_STARTER" ? "#08251c" : "#1b1b1b", border: `1px solid ${countertrend.status === "SMALL_STARTER" ? "#187a55" : countertrend.status === "BLOCKED" ? "#7f1d1d" : "#475569"}` }}>
+      <div style={{ color: countertrend.status === "SMALL_STARTER" ? "#6ee7b7" : countertrend.status === "BLOCKED" ? "#fda4af" : "#fcd34d", fontSize: "9px", fontWeight: "bold" }}>ANTIZYKLISCH · {countertrend.status === "SMALL_STARTER" ? "KLEINER FRÜHSTARTER" : countertrend.status === "BLOCKED" ? "GESPERRT" : countertrend.status === "DATA_UNAVAILABLE" ? "DATEN FEHLEN" : countertrend.status === "NONE" ? "KEIN FRÜHSIGNAL" : "BEOBACHTEN"}</div>
+      <div style={{ color: "#cbd5e1", fontSize: "9px", marginTop: "4px", lineHeight: 1.35, overflowWrap: "anywhere" }}>{countertrend.evidence?.slice(0, 3).join(" · ") || "Noch keine bestätigenden Bereiche."}</div>
+      <div style={{ color: "#94a3b8", fontSize: "8px", marginTop: "4px", lineHeight: 1.35 }}>Trendfreigabe bleibt separat.</div>
+    </div>}
+  </div>;
+})}
+</div>
+
+{/* Detaillierte ältere Einzelansichten bleiben als Quelle im Code erhalten. */}
 
 <div
+className="trade-stack-legacy-primary"
 style={{
 marginBottom: "16px",
 padding: "14px",
@@ -763,6 +817,7 @@ THREE-WAY TRADE MATRIX
 ================================================== */}
 
 <div
+className="trade-stack-legacy-matrix"
 style={{
 marginBottom: "16px",
 }}
