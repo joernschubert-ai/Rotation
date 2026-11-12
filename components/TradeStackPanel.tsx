@@ -499,6 +499,7 @@ return (
 .trade-stack-panel {
 width: 100%;
 box-sizing: border-box;
+container-type: inline-size;
 }
 
 .trade-stack-header {
@@ -558,8 +559,23 @@ text-align: left !important;
 grid-template-columns: 1fr;
 }
 
+}
+
+@container (max-width: 620px) {
 .trade-stack-overview {
-grid-template-columns: 1fr;
+grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.trade-stack-overview > :last-child {
+grid-column: 1 / -1;
+}
+}
+
+@container (max-width: 360px) {
+.trade-stack-overview {
+grid-template-columns: minmax(0, 1fr);
+}
+.trade-stack-overview > :last-child {
+grid-column: auto;
 }
 }
 
@@ -645,10 +661,11 @@ THREE INSTRUMENTS · SCORE, STATUS, MODEL SIZE
         : strength >= 20 ? "KANDIDAT · KEINE GRÖSSE" : "NO TRADE";
   return <div key={key} style={{ background: "#121d2a", border: `1px solid ${tone}66`, padding: "12px", minWidth: 0, borderRadius: "6px", boxSizing: "border-box" }}>
     <div style={{ color: "#e2e8f0", fontSize: "13px", fontWeight: "bold", overflowWrap: "anywhere" }}>{getInstrumentLabel(key)}</div>
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "10px" }}>
-      <div><div style={{ color: "#64748b", fontSize: "9px" }}>KANDIDATENWERT</div><div style={{ color: getConvictionColor(candidate?.direction, strength), fontWeight: "bold", fontSize: "22px" }}>{strength}<span style={{ color: "#64748b", fontSize: "10px" }}> / 100</span></div></div>
-      <div><div style={{ color: "#64748b", fontSize: "9px" }}>GRÖSSENPUNKTE / 100</div><div style={{ color: modelSize > 0 ? getDirectionColor(candidate?.direction) : "#94a3b8", fontWeight: "bold", fontSize: "22px" }}>{modelSize}</div></div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px", marginTop: "10px", minWidth: 0 }}>
+      <div style={{ minWidth: 0 }}><div style={{ color: "#64748b", fontSize: "8px", lineHeight: 1.3, overflowWrap: "anywhere" }}>KANDIDATENWERT</div><div style={{ color: getConvictionColor(candidate?.direction, strength), fontWeight: "bold", fontSize: "22px", overflowWrap: "anywhere" }}>{strength}<span style={{ color: "#64748b", fontSize: "10px" }}> / 100</span></div></div>
+      <div style={{ minWidth: 0 }}><div style={{ color: "#64748b", fontSize: "8px", lineHeight: 1.3, overflowWrap: "anywhere" }}>GRÖSSENPUNKTE / 100</div><div style={{ color: modelSize > 0 ? getDirectionColor(candidate?.direction) : "#94a3b8", fontWeight: "bold", fontSize: "22px", overflowWrap: "anywhere" }}>{modelSize}</div></div>
     </div>
+    {renderFlowBar(candidate?.direction ?? "NONE", strength)}
     <div style={{ color: tone, fontSize: "10px", fontWeight: "bold", marginTop: "8px", overflowWrap: "anywhere" }}>{status}</div>
     {recoveryWatch && <div style={{ color: "#cbd5e1", fontSize: "9px", lineHeight: 1.4, marginTop: "6px", overflowWrap: "anywhere" }}>
       {candidate.recoveryWatch.referenceDate ? `Russell-Daten ${candidate.recoveryWatch.referenceDate} · ` : ""}{candidate.recoveryWatch.evidence?.join(" · ")}. Nur Beobachtung; ändert Freigabe und Größe nicht.
