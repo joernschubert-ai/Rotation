@@ -31,9 +31,10 @@ export function buildAIResearchDecisionSupport(
     const finalFlow = object(pipelineFlows[key]);
     const hasFinalFlow = Object.keys(finalFlow).length > 0;
     const modelSize = numeric(finalFlow.finalSize) ?? numeric(allocation.size);
-    const execution = text(timing.execution) || text(finalFlow.mode) || text(allocation.mode) || "UNKNOWN";
+    const timingExecution = text(timing.execution);
+    const execution = text(finalFlow.mode) || text(allocation.mode) || timingExecution || "UNKNOWN";
     const blocks = Array.isArray(candidate.blockReasons) ? candidate.blockReasons.filter(item => typeof item === "string") as string[] : [];
-    const putOpen = key !== "nasdaqPut" || (timing.entryWindow === "OPEN" && ["SMALL STARTER", "PARTIAL SIZE", "FULL SIZE"].includes(text(timing.execution)));
+    const putOpen = key !== "nasdaqPut" || (timing.entryWindow === "OPEN" && ["SMALL STARTER", "PARTIAL SIZE", "FULL SIZE"].includes(timingExecution));
     const sizingEligible = typeof finalFlow.eligible === "boolean"
       ? finalFlow.eligible
       : typeof allocation.eligible === "boolean"
