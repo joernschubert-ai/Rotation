@@ -2289,15 +2289,12 @@ SORT
  */
 function sourceCoverageGroup(source: AIResearchSource): string | null {
 const text = `${source.title} ${source.summary ?? ""}`.toLocaleLowerCase("en");
-const month = text.match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)\b/);
-if (/\b(?:cpi|consumer price index|inflation|pce|personal consumption expenditures)\b/.test(text)) return `INFLATION_RELEASE:${month?.[1] ?? "unspecified"}`;
+if (/\b(?:cpi|consumer price index|inflation|pce|personal consumption expenditures|treasury yields?|bond yields?|10-year yield|2-year yield|fed|fomc|federal reserve|rate hikes?|rate cuts?|interest rate decision|monetary policy|central bank)\b/.test(text)) return "MACRO_RATES_POLICY";
 if (/\b(?:nvidia|nvda)\b/.test(text)) return "COMPANY:NVIDIA";
 if (/\bcoreweave\b/.test(text)) return "COMPANY:COREWEAVE";
 if (/\b(?:amd|advanced micro devices)\b/.test(text)) return "COMPANY:AMD";
 if (/\b(?:broadcom|avgo)\b/.test(text)) return "COMPANY:BROADCOM";
 if (/\b(?:payrolls?|employment report|jobs report|unemployment|jobless claims)\b/.test(text)) return "US_LABOR_DATA";
-if (/\b(?:fed|fomc|federal reserve|rate hikes?|rate cuts?|interest rate decision)\b/.test(text)) return "FED_POLICY";
-if (/\b(?:treasury yields?|bond yields?|10-year yield|2-year yield)\b/.test(text)) return "BOND_YIELDS";
 if (/\b(?:semiconductors?|chipmakers?|chip stocks|artificial intelligence|ai trade)\b/.test(text)) return "SEMICONDUCTOR_AI";
 if (/\b(?:tariffs?|sanctions?|geopolitics|export controls?)\b/.test(text)) return "TRADE_POLICY_GEOPOLITICS";
 return null;

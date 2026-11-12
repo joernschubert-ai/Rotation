@@ -5610,7 +5610,7 @@ positioningEvidence?.state === "NEUTRAL"
 ) {
 
 counterEvidence.push(
-"Aggregate COT positioning is neutral and currently provides neither directional confirmation nor directional contradiction."
+`Aggregate COT positioning is classified ${cot.overallDirection}; its relationship to the current structural thesis is neutral and provides neither directional confirmation nor directional contradiction.`
 );
 
 }
