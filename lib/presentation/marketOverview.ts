@@ -18,10 +18,16 @@ export function marketOverview(engine:any,map:any,snapshotTimestamp?:string){
  const structure=engine?.structure??{},ad=structure.advanceDecline??{},hl=structure.highsLows??{},b=structure.breadth??{},d=structure.distribution??{};
  const advances=n(ad.advances),declines=n(ad.declines),highs=n(hl.highs),lows=n(hl.lows),hasHL=highs!==null&&lows!==null&&(highs!==0||lows!==0),sum=hasHL?highs!+lows!:null;
  const rawVix=map?.marketData?.['^VIX'];
+ // Adapter values are relative-return ratios: 1.096 means +9.6 pp versus the comparator.
+ // The Equal Weight value is RSP minus SPY, already expressed in percentage points.
+ const rotation=map?.rotation??{};
+ const spread=(v:any)=>finite(v)?(v-1)*100:null;
+ const relativeLeadership={smallVsTech:spread(rotation.rsSmall),growthVsValue:spread(rotation.rsGrowth),equalVsMega:spread(rotation.rsEqual)};
  return {snapshotTimestamp:snapshotTimestamp??null,phase:overviewPhase(engine?.phase),rows,
   vix:{value:map?.volatilityDataQuality?.available===false?null:price(rawVix),date:day(map?.volatilityDataQuality?.asOfDate),change:typeof rawVix==='object'&&rawVix!==null?n(rawVix.change):null,termRatio:n(map?.vixTermRatio)},
   breadth:[20,50,200].map(period=>({period,value:n(b['b'+period]?.value),delta:n(b['b'+period]?.delta)})),
   participation:{ad:n(ad.value)??(advances!==null&&declines!==null?advances-declines:null),advances,declines,momentum:n(ad.delta),highs,lows,netHL:hasHL?highs!-lows!:null,hlStrength:sum!==null&&sum>0?100*(highs!-lows!)/sum:null,distribution:n(d.value??d.score),distributionMax:n(d.max)},
+  relativeLeadership,
   breadthDate:day(map?.breadthDataQuality?.referenceDate),breadthUniverse:map?.breadthDataQuality?.definition??null,
   limit:'Marktbreite und Teilnahme beziehen sich auf das bestehende Nasdaq-Universum. Änderungen stammen unverändert aus der Engine; kein neuer Börsenkalendervergleich.'};
 }
