@@ -882,6 +882,24 @@ wordBreak: "break-word",
 {size <= 0 && isPrimary ? "SHORT SETUP DEVELOPING" : candidate.state}
 </div>
 
+{candidate.instrument === "NASDAQ_CALL" && candidate.countertrendOpportunity?.version === "NASDAQ_COUNTERTREND_OPPORTUNITY_V1" && (
+<div style={{
+  marginTop: "8px",
+  padding: "7px",
+  borderRadius: "4px",
+  background: candidate.countertrendOpportunity.status === "SMALL_STARTER" ? "#08251c" : "#1b1b1b",
+  border: `1px solid ${candidate.countertrendOpportunity.status === "SMALL_STARTER" ? "#187a55" : candidate.countertrendOpportunity.status === "BLOCKED" ? "#7f1d1d" : "#475569"}`,
+}}>
+  <div style={{ color: candidate.countertrendOpportunity.status === "SMALL_STARTER" ? "#6ee7b7" : candidate.countertrendOpportunity.status === "BLOCKED" ? "#fda4af" : "#fcd34d", fontSize: "9px", fontWeight: "bold" }}>
+    ANTIZYKLISCH · {candidate.countertrendOpportunity.status === "SMALL_STARTER" ? "KLEINER FRÜHSTARTER" : candidate.countertrendOpportunity.status === "BLOCKED" ? "GESPERRT" : candidate.countertrendOpportunity.status === "DATA_UNAVAILABLE" ? "DATEN FEHLEN" : candidate.countertrendOpportunity.status === "NONE" ? "KEIN FRÜHSIGNAL" : "BEOBACHTEN"}
+  </div>
+  <div style={{ color: "#cbd5e1", fontSize: "9px", marginTop: "4px", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+    {candidate.countertrendOpportunity.evidence?.slice(0, 3).join(" · ") || "Noch keine bestätigenden Bereiche."}
+  </div>
+  {candidate.structuralAssessment && <div style={{ color: "#94a3b8", fontSize: "8px", marginTop: "4px", lineHeight: 1.35 }}>Trendfreigabe bleibt separat und ist noch nicht bestätigt.</div>}
+</div>
+)}
+
 {isPrimary && (
 <div
 style={{
