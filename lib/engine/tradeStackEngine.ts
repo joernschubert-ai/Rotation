@@ -27,6 +27,7 @@ export function tradeStackEngine(input: any) {
   const data = input ?? {};
   const putTiming = data.putTiming ?? {};
   const nasdaqCall = data.nasdaqCall ?? {};
+  const countertrendOpportunity = data.countertrendOpportunity ?? {};
   const russell = data.russell ?? {};
   const priceMomentum = data.priceMomentum ?? {};
   const edgeState = data.edgeState ?? {};
@@ -256,10 +257,36 @@ export function tradeStackEngine(input: any) {
     let cap = nasdaqCallDecision === "EARLY" ? 35 : 100;
     if (phase === "PHASE_3_DISTRIBUTION") cap = Math.min(cap, 35);
     if (phaseRisk) cap = Math.min(cap, 20);
-    return finish("NASDAQ_CALL", "LONG", strength,
+    const structuralCandidate = finish("NASDAQ_CALL", "LONG", strength,
       longBases[nasdaqCallDecision] === undefined ? "NONE" : nasdaqCallDecision === "EARLY" ? "NASDAQ_REBOUND" : "NASDAQ_CALL", cap, blocks,
       {score: ndxPriceScore, momentum5D: ndxMomentum5D, momentum20D: ndxMomentum20D,
         acceleration: ndxAcceleration, state: ndxQuality.complete ? ndx.trend ?? priceState : "UNKNOWN", dataQuality: ndxQuality});
+    const preserved = { ...structuralCandidate, countertrendOpportunity };
+    if (countertrendOpportunity.status !== "SMALL_STARTER") return preserved;
+
+    // This is a separate, capped countertrend probe. It may bypass phase-3
+    // trend/execution blocks, while crisis, breakdown, capitulation and crash
+    // limits remain hard vetoes.
+    const probeBlocks: string[] = [];
+    if (hardLongRisk) probeBlocks.push("LONG_RISK_BLOCK");
+    if (hardLongPhase) probeBlocks.push("LONG_PHASE_BLOCK");
+    if (mode === "CRASH") probeBlocks.push("MASTER_CRASH_MODE");
+    if (numeric(data.crash?.probability) >= 55) probeBlocks.push("CRASH_RISK_LIMIT");
+    if (riskState === "UNKNOWN") probeBlocks.push("RISK_STATE_UNAVAILABLE");
+    if (!/^PHASE_[1-7]_/.test(phase)) probeBlocks.push("UNKNOWN_MARKET_PHASE");
+    if (probeBlocks.length) return { ...preserved, countertrendOpportunity: { ...countertrendOpportunity, status: "BLOCKED", evidence: [...(countertrendOpportunity.evidence ?? []), ...probeBlocks] } };
+
+    const probeStrength = Math.min(40, 25 + Math.max(0, Number(countertrendOpportunity.familyCount ?? 0) - 1) * 5);
+    const probe = finish("NASDAQ_CALL", "LONG", probeStrength, "COUNTERTREND_SMALL_STARTER", 40, [],
+      {score: ndxPriceScore, momentum5D: ndxMomentum5D, momentum20D: ndxMomentum20D,
+        acceleration: ndxAcceleration, state: ndxQuality.complete ? ndx.trend ?? priceState : "UNKNOWN", dataQuality: ndxQuality});
+    return { ...probe, countertrendOpportunity, structuralAssessment: {
+      strength: structuralCandidate.strength,
+      state: structuralCandidate.state,
+      eligible: structuralCandidate.eligible,
+      blockReasons: structuralCandidate.blockReasons,
+      note: "Structural confirmation remains separate; the current flow is only an early countertrend starter.",
+    } };
   }
   function evaluateRussellCall() {
     const own = data.russellFlowOverride;
@@ -315,7 +342,9 @@ export function tradeStackEngine(input: any) {
   const assessedCandidates = [evaluatePut(), evaluateNasdaqCall(), evaluateRussellCall()];
   const shortStrength = assessedCandidates[0].strength;
   const longStrength = Math.max(assessedCandidates[1].strength, assessedCandidates[2].strength);
-  const directionalConflict = shortStrength >= 40 && longStrength >= 40 && Math.abs(shortStrength - longStrength) < 10;
+  const earlyCountertrendCall = assessedCandidates[1]?.countertrendOpportunity?.status === "SMALL_STARTER" &&
+    assessedCandidates[1]?.driver === "COUNTERTREND_SMALL_STARTER";
+  const directionalConflict = !earlyCountertrendCall && shortStrength >= 40 && longStrength >= 40 && Math.abs(shortStrength - longStrength) < 10;
   // Enforce WAIT for new entries in the actual flows consumed by position sizing.
   const candidates = directionalConflict ? assessedCandidates.map(candidate => ({...candidate,
     assessmentState: candidate.state, assessmentStrength: candidate.strength,

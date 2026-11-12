@@ -625,12 +625,24 @@ export function positionSizingV2(engine: any) {
       ndxShortAvailable && ndxMediumAvailable && ndxAccelerationAvailable && ndxScoreAvailable &&
       !ndxBullishImpulse;
 
+    const earlyCountertrendCallStarter = flow === "NASDAQ_CALL" &&
+      candidate?.eligible === true && direction === "LONG" &&
+      candidate?.driver === "COUNTERTREND_SMALL_STARTER" &&
+      candidate?.countertrendOpportunity?.version === "NASDAQ_COUNTERTREND_OPPORTUNITY_V1" &&
+      candidate?.countertrendOpportunity?.status === "SMALL_STARTER";
+    const earlyCountertrendCallHardBlocked = earlyCountertrendCallStarter &&
+      (["PHASE_5_BREAKDOWN", "PHASE_6_ACCELERATION", "PHASE_7_CAPITULATION"].includes(phase) ||
+       ["BREAKDOWN", "INTERNAL_BREAKDOWN", "CRISIS", "UNKNOWN"].includes(riskState) ||
+       num(engine?.crash?.probability) >= 55);
+
     let eligible = strength >= 20;
 
     if (direction === "NONE") eligible = false;
 
     if (flow === "NASDAQ_PUT") {
       eligible = isDefensivePutEligible(strength, direction) || earlyCurrentPutStarter;
+    } else if (flow === "NASDAQ_CALL" && earlyCountertrendCallStarter) {
+      eligible = !earlyCountertrendCallHardBlocked;
     } else if (executionMode === "WAIT" && strength < 65) {
       eligible = false;
     }
@@ -652,7 +664,7 @@ export function positionSizingV2(engine: any) {
         Array.isArray(candidate?.blockReasons) &&
         candidate.blockReasons.length > 0
       ) ||
-      tradeStackDirectionalConflict ||
+      (tradeStackDirectionalConflict && !earlyCountertrendCallStarter) ||
       candidate?.managementAction === "REDUCE_RISK" ||
       (
         flow === "NASDAQ_PUT" &&
@@ -661,6 +673,7 @@ export function positionSizingV2(engine: any) {
 
     const longExecutionBlocked =
       flow !== "NASDAQ_PUT" &&
+      !(earlyCountertrendCallStarter && !earlyCountertrendCallHardBlocked) &&
       (
         !["BUILD_POSITION", "ADD_ON_PULLBACKS"].includes(executionMode) ||
         ["BREAKDOWN", "INTERNAL_BREAKDOWN", "CRISIS", "UNKNOWN"].includes(riskState) ||
@@ -848,6 +861,7 @@ export function positionSizingV2(engine: any) {
       engine?.putTiming?.execution === "SMALL STARTER") {
       maxFlowSize = Math.min(maxFlowSize, 5);
     }
+    if (earlyCountertrendCallStarter) maxFlowSize = Math.min(maxFlowSize, 5);
     rawSize = Math.min(rawSize, maxFlowSize);
 
     const earlyStarterState =
@@ -900,9 +914,12 @@ export function positionSizingV2(engine: any) {
       state,
       reason: size <= 0
         ? "Risk-adjusted allocation rounds to zero"
+        : earlyCountertrendCallStarter
+          ? "Antizyklischer Frühstarter; separat von der Trendfreigabe und auf 5 Größenpunkte begrenzt"
         : candidate?.driver ?? candidate?.reason ?? "TradeStack candidate",
       diagnostics: {
         earlyCurrentPutStarter,
+        earlyCountertrendCallStarter,
         baseSize,
         supportAdjustedSize,
         flowEdge,

@@ -47,6 +47,7 @@ import { engineDataIssues, guardOwnPriceEntry, guardVolatilityContext } from "./
 import { gammaEngine } from "./gammaEngine";
 import { historicalReplay } from "./historicalReplay";
 import { historyEngine } from "../history/historyEngine";
+import { nasdaqCountertrendOpportunity } from "./nasdaqCountertrendOpportunity";
 
 export function marketEngine(
   data: any,
@@ -1537,6 +1538,17 @@ export function marketEngine(
     master, gamma
   }), priceMomentum.ndx, "NASDAQ_CALL", isHistoricalScenario);
 
+  const countertrendOpportunity = nasdaqCountertrendOpportunity({
+    phase,
+    crash,
+    executionState,
+    indices: data.indices ?? {},
+    structure,
+    marketData: data.marketData ?? {},
+    volatilityDataQuality: data.volatilityDataQuality ?? {},
+    futures: data.futures ?? {},
+  });
+
   /* =====================================================
   POSITIONING
   ===================================================== */
@@ -1573,6 +1585,7 @@ export function marketEngine(
 
   const tradeStack = tradeStackEngine({
     russellFlowOverride: independentRussell?.tradeStack?.russellCall,
+    countertrendOpportunity,
     phase, putTiming, nasdaqCall, russell, priceMomentum,
     edgeState, master, marketQuality, phaseConfirmation,
     rotationConfirm, rotationDecay, executionState, regimeSync,
@@ -1745,6 +1758,7 @@ export function marketEngine(
     earlyWarning,
     structure,
     tradeStack,
+    countertrendOpportunity,
     edgeState,
     divergence,
     driversCore,
