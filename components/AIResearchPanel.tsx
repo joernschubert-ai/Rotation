@@ -352,8 +352,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       <Detail title="Gespeicherte Szenarien und Kontextabwägung · ohne neue KI"><AIResearchStoredWeighing report={report} displayedSnapshotTimestamp={expectedSnapshotTimestamp ?? reportSnapshotTimestamp} suspended={suspended} /></Detail>
       <Detail title="Weitere Modell-, Chart- und Syntheseansichten">
       <ResearchWeightingPanel synthesis={report.aiSynthesis} suspended={suspended} />
-      <ResearchChartPanel context={report.historicalEvidence?.chartContext} suspended={suspended} />
-      {!suspended&&<PnfProjectionWatch references={report.aiSynthesis?.snapshotTimestamp===reportSnapshotTimestamp?report.aiSynthesis?.priceReferences:undefined} />}
+      <ResearchChartPanel context={report.historicalEvidence?.chartContext} priceReferences={report.aiSynthesis?.snapshotTimestamp===reportSnapshotTimestamp?report.aiSynthesis?.priceReferences:undefined} suspended={suspended} />
       <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={suspended} />
       </Detail>
       <Detail title="App · Freigaben, Modellanteile und Einstiegsbedingungen">
@@ -431,7 +430,7 @@ export function AIResearchReviewNotes({synthesis}:{synthesis:ResearchSynthesis})
   </section>;
 }
 
-export function ResearchChartPanel({context,suspended=false}:{context?:import('@/lib/aiResearch/aiResearchChartContext').ResearchChartContext;suspended?:boolean}){
+export function ResearchChartPanel({context,priceReferences,suspended=false}:{context?:import('@/lib/aiResearch/aiResearchChartContext').ResearchChartContext;priceReferences?:ResearchSynthesis['priceReferences'];suspended?:boolean}){
  if(suspended)return <section className="rounded-xl border border-slate-700 p-4 text-xs text-slate-400">Chartkontext wartet auf den passenden gespeicherten Marktstand.</section>;
  if(!context)return <section className="rounded-xl border border-slate-700 p-4 text-xs text-slate-400">Chart- und Momentumkontext derzeit nicht verfügbar.</section>;
  const labels:Record<string,string>={UPTREND_CONTEXT:'21 Börsentage: positiv · 252 Börsentage: positiv',CORRECTION_CONTEXT:'21 Börsentage: negativ · 252 Börsentage: positiv',DOWNTREND_CONTEXT:'21 Börsentage: negativ · 252 Börsentage: negativ',REBOUND_CONTEXT:'21 Börsentage: positiv · 252 Börsentage: negativ',FLAT_OR_MIXED:'21 oder 252 Börsentage: unveränderte Kursentwicklung',INSUFFICIENT_DATA:'Für 252 Börsentage fehlen noch Vergleichskurse'};
@@ -451,40 +450,31 @@ export function ResearchChartPanel({context,suspended=false}:{context?:import('@
     <p className="mt-2">Rückkehr nach Schlusskursausbruch nach oben: {chart.observations.failedPrior20CloseBreakout?'erkannt':'nicht erkannt'}; nach unten: {chart.observations.failedPrior20CloseBreakdown?'erkannt':'nicht erkannt'}.</p>
     <p className="mt-2 text-slate-500">Diese Kursbereiche allein bestätigen keinen Boden. Zielprojektionen stehen gesondert bei den P&F-Mustern. Ein nicht erkanntes Rückkehrmuster schließt einen laufenden Trend nicht aus.</p>
    </details>
-   <FormationContextPanel context={chart.formations} />
+   <FormationContextPanel context={chart.formations} priceReference={priceReferences?.find(item=>item.market===(name==='Russell 2000'?'RUSSELL_2000':'NASDAQ'))} />
    <FormationHistoryPanel history={chart.formationHistory} />
   </article>)}</div>
   <p className="px-4 py-3 text-xs text-slate-500">*Höchster Schlusskurs der letzten 252 Sitzungen. Positiv/negativ bezeichnet die Kursveränderung über den jeweils genannten Zeitraum, keinen bestätigten Trend oder eine App-Phase. Mehrere Kursindikatoren sind keine unabhängigen Bestätigungen.</p>
  </section>;
 }
 
-/** P&F price-height objectives are shown only in the expanded research detail for observation. */
-function PnfProjectionWatch({references}:{references?:ResearchSynthesis['priceReferences']}){
- const markets=[
-  {key:'NASDAQ_CALL',name:'Nasdaq-100',row:references?.find(item=>item.instrument==='NASDAQ_CALL')},
-  {key:'RUSSELL_CALL',name:'Russell 2000',row:references?.find(item=>item.instrument==='RUSSELL_CALL')},
- ] as const;
- return <section className="border-t border-slate-700 px-4 py-4" aria-label="P&F-Kursprojektionen zur Beobachtung">
-  <h4 className="text-sm font-semibold text-slate-100">P&amp;F-Kursprojektionen · Beobachtung</h4>
-  <p className="mt-1 text-xs text-slate-400">Nur in der ausführlichen Ansicht. Diese zusätzliche Anzeige ändert weder KI-Gewichtung noch Freigabe oder Positionsgröße.</p>
-  <div className="mt-3 grid gap-3 md:grid-cols-2">{markets.map(({key,name,row})=>{
-   const objectives=row?.status==='AVAILABLE'?row.pnfObjectives??[]:[];
-   return <article key={key} className="rounded-lg border border-slate-700 bg-[#111a23] p-3 text-xs text-slate-300">
-    <div className="flex flex-wrap items-baseline justify-between gap-2"><h5 className="font-semibold text-slate-100">{name}</h5><span className="text-slate-500">Schlusskursstand {row?.asOfDate??'nicht verfügbar'} · {typeof row?.lastClose==='number'?row.lastClose.toLocaleString('de-DE',{maximumFractionDigits:2})+' Punkte':'Kurs nicht verfügbar'}</span></div>
-    {!objectives.length?<p className="mt-2 text-slate-400">Für diesen Datenstand keine gültige P&amp;F-Projektion verfügbar.</p>:<div className="mt-2 grid gap-2 sm:grid-cols-2">{objectives.map(target=><div key={target.id} className="rounded border border-slate-700/80 p-2">
-     <p className={target.direction==='UP'?'font-semibold text-emerald-200':'font-semibold text-rose-200'}>{target.direction==='UP'?'Aufwärtsprojektion':'Abwärtsprojektion'} · P&amp;F {target.boxPercent.toLocaleString('de-DE')}%</p>
-     <p className="mt-1 text-sm font-semibold text-slate-100">{target.price.toLocaleString('de-DE',{maximumFractionDigits:2})} Punkte <span className="text-xs font-normal text-slate-400">({target.distancePct>0?'+':''}{target.distancePct.toLocaleString('de-DE',{maximumFractionDigits:2})}%)</span></p>
-     <p className="mt-1 text-slate-400">{target.status==='FIXED'?'Zählsäule fixiert':'Vorläufig · Zählsäule noch offen'} · bekannt {target.knownAt}{target.signalDate?` · Muster ${target.signalDate}`:''}</p>
-     <p className="mt-1 text-slate-500">{target.family.replace(/_/g,' ').toLowerCase()}{target.currentRelation==='COUNTER_TO_CURRENT_COLUMN'?' · Säule gegenläufig':''}</p>
-    </div>)}</div>}
-   </article>;
-  })}</div>
-  <p className="mt-3 text-[11px] leading-relaxed text-slate-500">App-eigene vertikale Preis-Höhen-Projektion aus Schlusskurs-P&amp;F. „Fixiert“ bedeutet nur, dass die Zählsäule abgeschlossen ist. Kein Zeithorizont, keine Trefferwahrscheinlichkeit und keine Optionsrendite; spätere Kursdaten können die Einschätzung widerlegen.</p>
+/** P&F price-height objectives sit beside formations in the expanded detail only. */
+function PnfProjectionWatch({reference}:{reference?:NonNullable<ResearchSynthesis['priceReferences']>[number]}){
+ const objectives=reference?.status==='AVAILABLE'?reference.pnfObjectives??[]:[];
+ return <section className="mt-3 rounded border border-slate-700 bg-[#111a23] p-3 text-xs text-slate-300" aria-label="P&F-Kursprojektionen zur Beobachtung">
+  <h6 className="font-semibold text-slate-100">P&amp;F-Kursprojektionen · Beobachtung</h6>
+  <p className="mt-1 text-slate-500">Schlusskursstand {reference?.asOfDate??'nicht verfügbar'} · {typeof reference?.lastClose==='number'?reference.lastClose.toLocaleString('de-DE',{maximumFractionDigits:2})+' Punkte':'Kurs nicht verfügbar'}</p>
+  {!objectives.length?<p className="mt-2 text-slate-400">Für diesen Datenstand keine gültige P&amp;F-Projektion verfügbar.</p>:<div className="mt-2 grid gap-2 sm:grid-cols-2">{objectives.map(target=><div key={target.id} className="rounded border border-slate-700/80 p-2">
+   <p className={target.direction==='UP'?'font-semibold text-emerald-200':'font-semibold text-rose-200'}>{target.direction==='UP'?'Aufwärtsprojektion':'Abwärtsprojektion'} · P&amp;F {target.boxPercent.toLocaleString('de-DE')}%</p>
+   <p className="mt-1 text-sm font-semibold text-slate-100">{target.price.toLocaleString('de-DE',{maximumFractionDigits:2})} Punkte <span className="text-xs font-normal text-slate-400">({target.distancePct>0?'+':''}{target.distancePct.toLocaleString('de-DE',{maximumFractionDigits:2})}%)</span></p>
+   <p className="mt-1 text-slate-400">{target.status==='FIXED'?'Zählsäule fixiert':'Vorläufig · Zählsäule noch offen'} · bekannt {target.knownAt}{target.signalDate?` · Muster ${target.signalDate}`:''}</p>
+   <p className="mt-1 text-slate-500">{target.family.replace(/_/g,' ').toLowerCase()}{target.currentRelation==='COUNTER_TO_CURRENT_COLUMN'?' · Säule gegenläufig':''}</p>
+  </div>)}</div>}
+  <p className="mt-2 text-[10px] leading-relaxed text-slate-500">Vertikale Preis-Höhen-Projektion aus Schlusskurs-P&amp;F; nur Beobachtung. „Fixiert“ heißt abgeschlossene Zählsäule, nicht erreichtes Kursziel. Kein Zeithorizont, keine Trefferwahrscheinlichkeit oder Optionsrendite; die Anzeige ändert weder KI-Gewichtung noch Freigabe oder Positionsgröße.</p>
  </section>;
 }
 
 
-export function FormationContextPanel({context}:{context?:import('@/lib/aiResearch/aiResearchFormations').FormationContext}){
+export function FormationContextPanel({context,priceReference}:{context?:import('@/lib/aiResearch/aiResearchFormations').FormationContext;priceReference?:NonNullable<ResearchSynthesis['priceReferences']>[number]}){
  if(!context)return null;
  const family:Record<string,string>={DOUBLE_BOTTOM:'Doppelboden aus Schlusskursen',DOUBLE_TOP:'Doppelhoch aus Schlusskursen',PNF_DOUBLE_TOP_BREAKOUT:'P&F-Ausbruch über vorheriges X-Hoch',PNF_DOUBLE_BOTTOM_BREAKDOWN:'P&F-Bruch unter vorheriges O-Tief',PNF_TRIPLE_TOP_BREAKOUT:'P&F-Ausbruch über zwei gleiche X-Hochs',PNF_TRIPLE_BOTTOM_BREAKDOWN:'P&F-Bruch unter zwei gleiche O-Tiefs'};
  const status:Record<string,string>={FORMING:'Entstehend · Bestätigung offen',CONFIRMED:'Preisbedingung ausgelöst',INVALIDATED:'Ungültig'};
@@ -493,6 +483,7 @@ export function FormationContextPanel({context}:{context?:import('@/lib/aiResear
  })];
  return <div className="mt-3 border-t border-slate-700 pt-3">
   <h5 className="text-xs font-semibold text-slate-200">Formationen & bedingte Szenarien</h5>
+  <PnfProjectionWatch reference={priceReference} />
   {!entries.length&&<p className="mt-2 text-xs text-slate-400">Keine Formation nach den eingebauten Regeln erkannt.</p>}
   {entries.map(({scale,f})=><details key={f.id} className="mt-2 rounded border border-slate-700 p-2 text-xs text-slate-300">
    <summary className="cursor-pointer"><span className="text-slate-400">{scale}</span> · {family[f.family]??f.family}<br/><span className={f.status==='INVALIDATED'?'text-amber-300':'text-sky-200'}>{f.status==='CONFIRMED'?`Ausgelöst am ${f.confirmedAt}`:status[f.status]} · {f.bias==='BULLISH'?'Aufwärtsszenario':'Abwärtsszenario'}</span>{f.currentRelation==='COUNTER_TO_CURRENT_COLUMN'&&<span className="block text-amber-200">Aktuell Gegenbewegung zur früher ausgelösten Formation.</span>}</summary>
