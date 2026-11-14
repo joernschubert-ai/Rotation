@@ -84,6 +84,26 @@ export function mapBackendToEngine(data: any) {
 
   const rsEqual = concentrationDivergence === null ? null : 1 + concentrationDivergence / 100;
 
+  const relativePp = (value: unknown, available: unknown): number | null => {
+    const delta = finiteNumber(value);
+    return available === true && delta !== null ? Number((delta * 100).toFixed(4)) : null;
+  };
+  const small20Pp = relativePp(details.rsSmall20, details.rsSmall20Available);
+  const small60Pp = relativePp(details.rsSmall60, details.rsSmall60Available);
+  const growth20Pp = relativePp(details.rsGrowth20, details.rsGrowth20Available);
+  const growth60Pp = relativePp(details.rsGrowth60, details.rsGrowth60Available);
+  const relativeLeadership = {
+    definition: "RELATIVE_TOTAL_RETURN_DIFFERENCE",
+    unit: "percentage_points",
+    observations: [20, 60],
+    source: details.source ?? "ETF_DAILY_CLOSES_PROVIDER_SOURCE_UNVERIFIED",
+    dateAlignmentVerified: details.dateAlignmentVerified === true,
+    sourceBarDateKnown: details.sourceBarDateKnown === true,
+    latestBarFinality: details.latestBarFinality ?? "UNVERIFIED",
+    smallVsTech: { relativeReturnDifference20Pp: small20Pp, relativeReturnDifference60Pp: small60Pp, twentyMinusSixtyPp: small20Pp !== null && small60Pp !== null ? Number((small20Pp - small60Pp).toFixed(4)) : null },
+    growthVsValue: { relativeReturnDifference20Pp: growth20Pp, relativeReturnDifference60Pp: growth60Pp, twentyMinusSixtyPp: growth20Pp !== null && growth60Pp !== null ? Number((growth20Pp - growth60Pp).toFixed(4)) : null },
+  };
+
   // Convert the discrete backend level 0..3 exactly once.
   const rawConcentration = finiteNumber(
     details.concentrationScore
@@ -218,6 +238,7 @@ export function mapBackendToEngine(data: any) {
 
   return {
     rotation,
+    relativeLeadership,
     breadthDataQuality,
     indexBreadth: data.indexBreadth ?? null,
 
