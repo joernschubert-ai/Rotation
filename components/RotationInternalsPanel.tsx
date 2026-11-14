@@ -26,6 +26,7 @@ rotation,
 rotationConfirm,
 rotationDecay,
 structureFlags,
+rotationDetails,
 }: any) {
 if (!rotation) return null;
 
@@ -75,30 +76,30 @@ return "neutral";
 
 function rsColor(state: string) {
 if (state === "positive") {
-return "#6ee7b7";
+return "#52c41a";
 }
 
 if (state === "negative") {
-return "#fda4af";
+return "#ff4d4f";
 }
 
-return "#fcd34d";
+return "#faad14";
 }
 
 function qualityColor(value: number) {
 if (value >= 70) {
-return "#6ee7b7";
+return "#52c41a";
 }
 
 if (value >= 50) {
-return "#fcd34d";
+return "#faad14";
 }
 
 if (value >= 35) {
-return "#fda4af";
+return "#ff7875";
 }
 
-return "#fda4af";
+return "#ff4d4f";
 }
 
 /*
@@ -109,18 +110,18 @@ Deshalb eigene Farbkonvention.
 
 function decayColor(value: number) {
 if (value >= 75) {
-return "#fda4af";
+return "#ff4d4f";
 }
 
 if (value >= 60) {
-return "#fda4af";
+return "#ff7875";
 }
 
 if (value >= 40) {
-return "#fcd34d";
+return "#faad14";
 }
 
-return "#6ee7b7";
+return "#52c41a";
 }
 
 function decayBackground(value: number) {
@@ -160,6 +161,32 @@ safeNumber(
 rotation?.rsEqual,
 1
 );
+
+// Rolling relative-performance context for display only; never feeds model scores.
+const rollingRotationRows = [
+  { label: "Russell vs Tech", short: rotationDetails?.rsSmall20, long: rotationDetails?.rsSmall60, left: "Russell", right: "Tech" },
+  { label: "Growth vs Value", short: rotationDetails?.rsGrowth20, long: rotationDetails?.rsGrowth60, left: "Growth", right: "Value" },
+].filter((row) => Number.isFinite(row.short) && Number.isFinite(row.long));
+
+function rotationDirection(value: number) {
+  if (value > 0.0005) return "#52c41a";
+  if (value < -0.0005) return "#ff7875";
+  return "#d0d5dd";
+}
+
+function rotationShiftText(row: { short: number; long: number; left: string; right: string }) {
+  if (row.short > row.long && row.short > 0 && row.long < 0) return `${row.left} gewinnt kurzfristig gegenüber ${row.right}; der längere Vergleich ist noch negativ.`;
+  if (row.short > row.long && row.short > 0) return `${row.left} gewinnt kurzfristig stärker gegenüber ${row.right}; der 60-Tage-Vergleich bleibt der längere Bezug.`;
+  if (row.short > row.long) return `Die relative Schwäche von ${row.left} gegenüber ${row.right} lässt kurzfristig nach; positive Führung ist noch nicht belegt.`;
+  if (row.short < row.long && row.short < 0) return `${row.left} verliert kurzfristig relativ zu ${row.right}; die längere Führung lässt nach.`;
+  if (row.short < row.long) return `Die kurzfristige relative Führung von ${row.left} gegenüber ${row.right} ist schwächer als der 60-Tage-Vergleich.`;
+  return `Kurz- und 60-Tage-Vergleich von ${row.left} gegenüber ${row.right} sind ähnlich.`;
+}
+
+function formatRelativeReturn(value: number) {
+  const percent = value * 100;
+  return `${percent > 0 ? "+" : ""}${percent.toFixed(1)} Pp.`;
+}
 
 const rotationScore =
 clamp(
@@ -370,7 +397,7 @@ return {
 label: "BROAD MARKET LEADERSHIP",
 subLabel:
 "Russell / Equal Weight participation improving",
-color: "#6ee7b7",
+color: "#52c41a",
 };
 }
 
@@ -402,8 +429,8 @@ narrowLeadershipRisk
 
 color:
 narrowLeadershipRisk
-? "#fda4af"
-: "#fda4af",
+? "#ff7875"
+: "#ff4d4f",
 };
 }
 
@@ -411,7 +438,7 @@ return {
 label: "ROTATIONAL TRANSITION",
 subLabel:
 "No dominant broad capital rotation",
-color: "#fcd34d",
+color: "#faad14",
 };
 }, [
 smallVsTech,
@@ -431,7 +458,7 @@ growthVsValue > 1.02
 return {
 label:
 "GROWTH LEADERSHIP",
-color: "#6ee7b7",
+color: "#52c41a",
 };
 }
 
@@ -441,14 +468,14 @@ growthVsValue < 0.98
 return {
 label:
 "DEFENSIVE / VALUE ROTATION",
-color: "#fda4af",
+color: "#ff4d4f",
 };
 }
 
 return {
 label:
 "NEUTRAL STYLE ROTATION",
-color: "#fcd34d",
+color: "#faad14",
 };
 }, [
 growthVsValue,
@@ -495,7 +522,7 @@ let flowLabel =
 "BALANCED";
 
 let flowColor =
-"#fcd34d";
+"#faad14";
 
 if (
 clampedFlow > 0.01
@@ -504,7 +531,7 @@ flowLabel =
 "BROAD MARKET FLOW";
 
 flowColor =
-"#6ee7b7";
+"#52c41a";
 }
 
 if (
@@ -517,8 +544,8 @@ narrowLeadershipRisk
 
 flowColor =
 narrowLeadershipRisk
-? "#fda4af"
-: "#fda4af";
+? "#ff7875"
+: "#ff4d4f";
 }
 
 /* ==========================================================
@@ -548,7 +575,7 @@ description:
 "Internal deterioration is broadly confirmed",
 
 color:
-"#fda4af",
+"#ff4d4f",
 };
 }
 
@@ -565,7 +592,7 @@ description:
 "Institutional distribution pressure dominates",
 
 color:
-"#fda4af",
+"#ff7875",
 };
 }
 
@@ -582,7 +609,7 @@ description:
 "Index performance depends on increasingly few leaders",
 
 color:
-"#fcd34d",
+"#faad14",
 };
 }
 
@@ -598,7 +625,7 @@ description:
 "Rotation requires further confirmation",
 
 color:
-"#fcd34d",
+"#faad14",
 };
 }
 
@@ -613,7 +640,7 @@ description:
 "Internal structure is attempting to improve",
 
 color:
-"#a7f3d0",
+"#95de64",
 };
 }
 
@@ -629,7 +656,7 @@ description:
 "Rotation remains intact but is losing momentum",
 
 color:
-"#fcd34d",
+"#faad14",
 };
 }
 
@@ -641,7 +668,7 @@ description:
 "Broad participation supports market leadership",
 
 color:
-"#6ee7b7",
+"#52c41a",
 };
 }, [
 decayState,
@@ -732,7 +759,7 @@ label:
 "CRITICAL INTERNAL DETERIORATION",
 
 color:
-"#fda4af",
+"#ff4d4f",
 };
 }
 
@@ -744,7 +771,7 @@ label:
 "MULTIPLE INTERNAL WARNINGS",
 
 color:
-"#fda4af",
+"#ff7875",
 };
 }
 
@@ -756,7 +783,7 @@ label:
 "EARLY INTERNAL WARNING",
 
 color:
-"#fcd34d",
+"#faad14",
 };
 }
 
@@ -765,7 +792,7 @@ label:
 "INTERNAL STRUCTURE STABLE",
 
 color:
-"#6ee7b7",
+"#52c41a",
 };
 }, [
 narrowLeadershipRisk,
@@ -811,7 +838,7 @@ marginBottom: "5px",
 >
 <span
 style={{
-color: "#94a3b8",
+color: "#777",
 }}
 >
 {label}
@@ -837,7 +864,7 @@ style={{
 height: "6px",
 
 background:
-"#334155",
+"#222",
 
 borderRadius:
 "5px",
@@ -894,7 +921,7 @@ marginBottom: "5px",
 >
 <span
 style={{
-color: "#94a3b8",
+color: "#777",
 }}
 >
 {label}
@@ -920,7 +947,7 @@ style={{
 height: "6px",
 
 background:
-"#334155",
+"#222",
 
 borderRadius:
 "5px",
@@ -978,7 +1005,7 @@ marginBottom:
 <span
 style={{
 color:
-"#94a3b8",
+"#888",
 
 fontSize:
 "12px",
@@ -1037,8 +1064,8 @@ critical
 
 color:
 critical
-? "#fda4af"
-: "#fcd34d",
+? "#ff7875"
+: "#faad14",
 
 fontSize:
 "11px",
@@ -1063,7 +1090,7 @@ return (
 <div
 style={{
 background:
-"#0e1722",
+"#0d0d0d",
 
 border:
 `2px solid ${rotationStatus.color}`,
@@ -1100,7 +1127,7 @@ marginBottom:
 <h3
 style={{
 color:
-"#e2e8f0",
+"#ddd",
 
 margin:
 "0 0 5px 0",
@@ -1124,7 +1151,7 @@ fontSize:
 "11px",
 
 color:
-"#64748b",
+"#666",
 
 textTransform:
 "uppercase",
@@ -1170,7 +1197,7 @@ fontSize:
 "10px",
 
 color:
-"#94a3b8",
+"#777",
 
 marginTop:
 "5px",
@@ -1206,7 +1233,7 @@ border:
 <div
 style={{
 color:
-"#94a3b8",
+"#777",
 
 fontSize:
 "10px",
@@ -1245,7 +1272,7 @@ marginBottom:
 <div
 style={{
 color:
-"#cbd5e1",
+"#aaa",
 
 fontSize:
 "12px",
@@ -1290,7 +1317,7 @@ marginBottom:
 <div
 style={{
 color:
-"#94a3b8",
+"#777",
 
 fontSize:
 "11px",
@@ -1300,6 +1327,28 @@ fontSize:
 </div>
 
 </div>
+
+{rollingRotationRows.length > 0 && (
+<div style={{ marginBottom: "16px", padding: "12px", background: "rgba(24, 144, 255, 0.05)", border: "1px solid rgba(24, 144, 255, 0.24)", borderRadius: "8px", minWidth: 0 }}>
+  <div style={{ color: "#8ab4f8", fontSize: "10px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" }}>
+    Rollierende Führungsverschiebung · ganzjährig
+  </div>
+  {rollingRotationRows.map((row) => (
+    <div key={row.label} style={{ marginBottom: "9px", overflowWrap: "anywhere" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px", fontSize: "11px", marginBottom: "3px" }}>
+        <span style={{ color: "#ddd", fontWeight: 700 }}>{row.label}</span>
+        <span style={{ color: rotationDirection(row.short) }}>20T {formatRelativeReturn(row.short)}</span>
+        <span style={{ color: rotationDirection(row.long) }}>60T {formatRelativeReturn(row.long)}</span>
+        <span style={{ color: rotationDirection(row.short - row.long) }}>Veränderung {formatRelativeReturn(row.short - row.long)}</span>
+      </div>
+      <div style={{ color: "#aaa", fontSize: "11px", lineHeight: 1.45 }}>{rotationShiftText(row)}</div>
+    </div>
+  ))}
+  <div style={{ color: "#777", fontSize: "10px", lineHeight: 1.4 }}>
+    Relative Kursentwicklung, keine gemessenen Kapitalflüsse. Reiner Kontext-Hinweis; keine Änderung an Marktgesundheit, Einstieg oder Positionsgröße.
+  </div>
+</div>
+)}
 
 {/* ======================================================
 CAPITAL CHARACTER
@@ -1345,7 +1394,7 @@ fontSize:
 "11px",
 
 color:
-"#64748b",
+"#666",
 }}
 >
 <span>
@@ -1366,7 +1415,7 @@ height:
 "7px",
 
 background:
-"#334155",
+"#222",
 
 marginTop:
 "6px",
@@ -1393,7 +1442,7 @@ width:
 "1px",
 
 background:
-"#64748b",
+"#555",
 }}
 />
 
@@ -1460,7 +1509,7 @@ RELATIVE STRENGTH
 <div
 style={{
 borderTop:
-"1px solid #334155",
+"1px solid #222",
 
 paddingTop:
 "16px",
@@ -1473,7 +1522,7 @@ marginBottom:
 <div
 style={{
 color:
-"#64748b",
+"#666",
 
 fontSize:
 "10px",
@@ -1518,7 +1567,7 @@ ROTATION QUALITY
 <div
 style={{
 borderTop:
-"1px solid #334155",
+"1px solid #222",
 
 paddingTop:
 "16px",
@@ -1531,7 +1580,7 @@ marginBottom:
 <div
 style={{
 color:
-"#64748b",
+"#666",
 
 fontSize:
 "10px",
@@ -1573,7 +1622,7 @@ ROTATION DECAY
 <div
 style={{
 borderTop:
-"1px solid #334155",
+"1px solid #222",
 
 paddingTop:
 "16px",
@@ -1586,7 +1635,7 @@ marginTop:
 <div
 style={{
 color:
-"#64748b",
+"#666",
 
 fontSize:
 "10px",
@@ -1644,7 +1693,7 @@ paddingTop:
 "16px",
 
 borderTop:
-"1px solid #334155",
+"1px solid #222",
 }}
 >
 
@@ -1663,7 +1712,7 @@ marginBottom:
 <span
 style={{
 color:
-"#94a3b8",
+"#888",
 
 fontSize:
 "12px",
@@ -1694,7 +1743,7 @@ height:
 "7px",
 
 background:
-"#334155",
+"#222",
 
 borderRadius:
 "5px",
@@ -1737,14 +1786,14 @@ paddingTop:
 "16px",
 
 borderTop:
-"1px solid #334155",
+"1px solid #222",
 }}
 >
 
 <div
 style={{
 color:
-"#64748b",
+"#666",
 
 fontSize:
 "10px",
@@ -1874,7 +1923,7 @@ background:
 "rgba(82,196,26,0.05)",
 
 color:
-"#6ee7b7",
+"#52c41a",
 
 fontSize:
 "11px",
@@ -1930,7 +1979,7 @@ marginBottom:
 <span
 style={{
 color:
-"#94a3b8",
+"#777",
 
 fontSize:
 "10px",
@@ -1977,7 +2026,7 @@ marginTop:
 "7px",
 
 color:
-"#a7f3d0",
+"#95de64",
 
 fontSize:
 "11px",
@@ -2002,7 +2051,7 @@ marginTop:
 "16px",
 
 color:
-"#64748b",
+"#555",
 
 fontSize:
 "10px",
