@@ -351,6 +351,8 @@ export function createMarketSnapshot({
       squeezeDriven: rotation.squeezeDriven,
     },
 
+    relativeLeadership: map?.relativeLeadership ?? null,
+
     /* ROTATION DECAY */
 
     rotationDecay: {
