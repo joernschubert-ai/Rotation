@@ -99,6 +99,18 @@ function ownStructuralObservations(input: AIResearchInput, market: SynthesisMark
 /** Only allowlisted market evidence is sent. No raw snapshot or provider credentials. */
 export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearchReport): SynthesisEvidence[] {
   const snapshot = object(input.snapshot);
+  const leadership = object(snapshot.relativeLeadership);
+  const smallLeadership = object(leadership.smallVsTech);
+  const growthLeadership = object(leadership.growthVsValue);
+  const relativeLeadershipEvidence = {
+    available: [smallLeadership.relativeReturnDifference20Pp, smallLeadership.relativeReturnDifference60Pp, growthLeadership.relativeReturnDifference20Pp, growthLeadership.relativeReturnDifference60Pp].some(value => finite(value) !== null),
+    definition: text(leadership.definition, 80), unit: text(leadership.unit, 40), source: text(leadership.source, 100),
+    snapshotTimestamp: iso(snapshot.timestamp), sourceBarDateKnown: leadership.sourceBarDateKnown === true,
+    dateAlignmentVerified: leadership.dateAlignmentVerified === true, latestBarFinality: text(leadership.latestBarFinality, 40),
+    smallVsTech: pick(smallLeadership, ["relativeReturnDifference20Pp", "relativeReturnDifference60Pp", "twentyMinusSixtyPp"]),
+    growthVsValue: pick(growthLeadership, ["relativeReturnDifference20Pp", "relativeReturnDifference60Pp", "twentyMinusSixtyPp"]),
+    interpretation: "Positive means the first-listed ETF outperformed the second over that observation window. The 20D-minus-60D spread can flag improving relative leadership even while the longer comparison remains negative. Descriptive context only: not measured fund flows, absolute market health, an entry gate, or position sizing."
+  };
   const reference = Date.parse(snapshot.timestamp);
   const evidence: SynthesisEvidence[] = [
     { id: "APP", kind: "APP", available: true, data: {
@@ -120,6 +132,7 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
         interpretation: "Raw HYG/IEF is a price ratio, not an absolute stress threshold. Interpret its verified signal/ratioToMA50 and data quality." },
       gammaDiagnostics: { ...pick(snapshot.gamma, ["score", "effectiveGamma", "structuralGammaFloor"]), measurementStatus: "Producer model diagnostics; not independently verified dealer exposure" },
       rotation: pick(snapshot.rotation, ["score", "signal", "rsSmall", "rsEqual", "rsGrowth"]),
+      relativeLeadership: relativeLeadershipEvidence,
       rotationComparison: {asOfDate: verifiedResearchMarketDate(snapshot,"NASDAQ")===verifiedResearchMarketDate(snapshot,"RUSSELL_2000")?verifiedResearchMarketDate(snapshot,"NASDAQ"):null, rsSmall:finite(object(snapshot.rotation).rsSmall)},
       instrumentStructure: {
         NASDAQ: { source: "NASDAQ100_PRIMARY_CONSTITUENT_BREADTH", rotationConfirm:text(object(snapshot.rotationConfirm).state), phase: typeof snapshot.phase === "string" ? snapshot.phase : object(snapshot.phase).phase,
