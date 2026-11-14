@@ -30,17 +30,49 @@ export async function storeMemoryBars(bars:MemoryBar[]){
  if(!bars.length)return 0;
  if(bars.some(b=>!b||!['NASDAQ','RUSSELL_2000'].includes(b.market)||!validDay(b.date)||!finite(b.close)||b.close<=0||typeof b.source!=='string'||!b.source||!Number.isFinite(Date.parse(b.observedAt))||Date.parse(b.observedAt)<Date.parse(b.date+'T00:00:00Z')))throw Error('MEMORY_INVALID_BAR_BATCH');
  return Number(await memoryBounded(Redis.fromEnv().eval(
-  "-- MEMORY_CLOSES_FIRST_OBSERVATION_V2\nlocal rows=cjson.decode(ARGV[1]) local n=0 local tolerance=tonumber(ARGV[3])\nfor _,b in ipairs(rows) do\n local k=ARGV[2]..':bar:'..b.market..':'..b.date\n local prev=redis.call('GET',k)\n if not prev then\n  redis.call('SET',k,cjson.encode(b)) redis.call('ZADD',ARGV[2]..':bars:'..b.market,b.score,b.date) n=n+1\n  if b.conflict==true then redis.call('SET',k..':conflict',cjson.encode({policy=ARGV[4],status='INPUT_CONFLICT',first=b}),'NX') end\n else\n  local old=cjson.decode(prev)\n  if old.close~=b.close or b.conflict==true or old.conflict==true then\n   local delta=math.abs(old.close-b.close)\n   local material=delta>tolerance or b.conflict==true or old.conflict==true\n   local evidence={policy=ARGV[4],status=material and 'MATERIAL_CONFLICT' or 'WITHIN_ABSOLUTE_TOLERANCE',absoluteDifference=delta,tolerance=tolerance,first=old,incoming=b}\n   redis.call('SET',k..':comparison:latest',cjson.encode(evidence))\n   if material then redis.call('SET',k..':conflict',cjson.encode(evidence),'NX') end\n  end\n end\nend\nreturn n",
+  `-- MEMORY_CLOSES_FIRST_OBSERVATION_V3
+local rows=cjson.decode(ARGV[1]) local n=0 local tolerance=tonumber(ARGV[3])
+for _,b in ipairs(rows) do
+ local k=ARGV[2]..':bar:'..b.market..':'..b.date
+ local prev=redis.call('GET',k)
+ if not prev then
+  redis.call('SET',k,cjson.encode(b)) redis.call('ZADD',ARGV[2]..':bars:'..b.market,b.score,b.date) n=n+1
+  if b.conflict==true then redis.call('SET',k..':conflict',cjson.encode({policy=ARGV[4],status='INPUT_CONFLICT',first=b})) end
+ else
+  local old=cjson.decode(prev)
+  if old.close~=b.close or b.conflict==true or old.conflict==true or redis.call('EXISTS',k..':conflict')==1 then
+   local rawDelta=math.abs(old.close-b.close)
+   local normalizedDelta=math.abs(math.floor(old.close*100+0.5)-math.floor(b.close*100+0.5))/100
+   local material=normalizedDelta>tolerance or b.conflict==true
+   local evidence={policy=ARGV[4],status=material and 'MATERIAL_CONFLICT' or 'WITHIN_ROUNDED_CENT',absoluteDifference=rawDelta,normalizedDifference=normalizedDelta,tolerance=tolerance,first=old,incoming=b}
+   local prior=redis.call('GET',k..':conflict')
+   if material then
+    if prior then evidence.previousConflict=cjson.decode(prior) end
+    redis.call('SET',k..':conflict',cjson.encode(evidence))
+   elseif prior or old.conflict==true then
+    evidence.status='RESOLVED_WITHIN_ROUNDED_CENT'
+    if prior then
+     local previous=cjson.decode(prior)
+     if type(previous)=='table' and previous.status=='RESOLVED_WITHIN_ROUNDED_CENT' then evidence.previousConflict=previous.previousConflict else evidence.previousConflict=previous end
+    else
+     evidence.previousConflict={policy='LEGACY_EXACT_COMPARISON_V1',status='UNRESOLVED_LEGACY_FLAG'}
+    end
+    redis.call('SET',k..':conflict',cjson.encode(evidence))
+   end
+   redis.call('SET',k..':comparison:latest',cjson.encode(evidence))
+  end
+ end
+end
+return n`,
   [],[JSON.stringify(bars.map(b=>({...b,score:Date.parse(b.date+'T00:00:00Z')}))),MEMORY_PREFIX,String(MEMORY_CLOSE_ABSOLUTE_TOLERANCE),MEMORY_CLOSE_COMPARISON_POLICY])));
-}
-export async function barsForForecast(plan:MemoryForecast){
+}export async function barsForForecast(plan:MemoryForecast){
  const redis=Redis.fromEnv(),start=Date.parse(plan.createdAt)-86400000;
  const dates=await memoryBounded(redis.zrange<string[]>(MEMORY_PREFIX+':bars:'+plan.market,start,'+inf',{byScore:true,offset:0,count:64}));
  if(!dates.length)return [];
  const keys=dates.map(d=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(d))throw Error('MEMORY_INVALID_BAR_DATE');return MEMORY_PREFIX+':bar:'+plan.market+':'+d;});
  const [raw,conflicts]=await Promise.all([memoryBounded(redis.mget<Array<MemoryBar|null>>(...keys)),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':conflict')))]);
  if(raw.some(b=>!b))throw Error('MEMORY_BAR_INDEX_GAP');
- return raw.map((b,i)=>({...b!,conflict:b!.conflict===true||!!conflicts[i]}));
+ return raw.map((b,i)=>{const flag=conflicts[i]!==null&&typeof conflicts[i]==='object'?conflicts[i] as Record<string,unknown>:{};const resolved=flag.status==='RESOLVED_WITHIN_ROUNDED_CENT';return {...b!,conflict:!resolved&&(b!.conflict===true||!!conflicts[i])};});
 }
 export async function storeMemoryAssessment(plan:MemoryForecast,assessment:any){
  const redis=Redis.fromEnv();
