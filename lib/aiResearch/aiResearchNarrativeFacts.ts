@@ -43,7 +43,7 @@ export function buildNarrativeFacts(evidence:SynthesisEvidence[]){
     historicalStudies:(Array.isArray(history.studies)?history.studies:[]).map((s:any)=>({family:s.family,state:s.state,asOfDate:s.asOfDate,currentMatch:s.currentMatch,focus20D:s.focus20D})),
     historyMeaning:'20-session historical INDEX forward returns: meanPct absolute, baselineMeanPct comparison, excessMeanPp difference in percentage points. Not current trend or next-return forecast.'}];
   })),
-  sharedContext:{rotationComparison:app.rotationComparison,master:app.master,volatility:app.volatility,volatilityDataQuality:app.volatilityDataQuality,credit:app.credit,
+  sharedContext:{rotationComparison:app.rotationComparison,relativeLeadership:app.relativeLeadership,master:app.master,volatility:app.volatility,volatilityDataQuality:app.volatilityDataQuality,credit:app.credit,
    nasdaqOnly:{rotation:app.rotation,fragility:app.fragility,liquidity:app.liquidity},appFlows:app.flows},
   news:evidence.filter(e=>e.kind==='NEWS'&&e.available).map(e=>e.data),
   weights:{marketStructure:35,chart:35,cot:10,history:15,news:5},
