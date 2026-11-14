@@ -16,6 +16,7 @@ import PutTimingPanel from "@/components/PutTimingPanel";
 import RussellPanel from "@/components/RussellPanel";
 import NasdaqPanel from "@/components/NasdaqPanel";
 import MasterPanel from "@/components/MasterPanel";
+import MarketOverviewRibbon from "@/components/MarketOverviewRibbon";
 import PositionSizingPanel from "@/components/PositionSizingPanel";
 import PhaseBar from "@/components/PhaseBar";
 import IndicesPanel from "@/components/IndicesPanel";
@@ -325,7 +326,17 @@ export default function Home() {
         </div>
       )}
 
-      <section className="mb-8">
+            <div className="mb-4">
+        <SystemDotsPanel
+          drivers={engine.marketDrivers}
+          structure={engine.structure}
+          crash={engine.crash}
+          dangerZone={engine.dangerZone}
+          regimeSync={engine.regimeSync}
+        />
+      </div>
+      <MarketOverviewRibbon engine={engine} map={loadedMarket.map} snapshotTimestamp={loadedMarket.snapshot.timestamp} />
+<section className="mb-8">
         <SectionHeader
           title="RESEARCH · ENTSCHEIDUNGSHILFE"
           subtitle="Marktlage, frühe Einstiegskandidaten, Modellanteile und Gegenargumente"
@@ -425,13 +436,7 @@ export default function Home() {
           <div style={panel}>
             <h3 className="mb-4 text-sm text-[#888]">SYSTEM HEAT</h3>
             <SystemHeatPanel heat={engine.systemHeat} />
-            <div className="mt-4">
-              <SystemDotsPanel
-                drivers={engine.marketDrivers}
-                structure={engine.structure}
-                crash={engine.crash}
-              />
-            </div>
+            
           </div>
         </div>
 
