@@ -3105,6 +3105,10 @@ const rsSmall20 = relativePerformance(iwm, qqq, 20);
 const rsSmall60 = relativePerformance(iwm, qqq, 60);
 const rsGrowth20 = relativePerformance(ivw, ive, 20);
 const rsGrowth60 = relativePerformance(ivw, ive, 60);
+const rsSmall20Available = iwm.length >= 21 && qqq.length >= 21;
+const rsSmall60Available = iwm.length >= 61 && qqq.length >= 61;
+const rsGrowth20Available = ivw.length >= 21 && ive.length >= 21;
+const rsGrowth60Available = ivw.length >= 61 && ive.length >= 61;
 
 const rsShiftSmall = rsSmall20 - rsSmall60;
 const rsShiftGrowth = rsGrowth20 - rsGrowth60;
@@ -3890,6 +3894,14 @@ rsSmall20,
 rsSmall60,
 rsGrowth20,
 rsGrowth60,
+rsSmall20Available,
+rsSmall60Available,
+rsGrowth20Available,
+rsGrowth60Available,
+source: "ETF_DAILY_CLOSES_YAHOO_WITH_STOOQ_FALLBACK",
+dateAlignmentVerified: false,
+sourceBarDateKnown: false,
+latestBarFinality: "UNVERIFIED",
 rsShiftSmall,
 rsShiftGrowth,
 concentrationScore: concentration.score,
