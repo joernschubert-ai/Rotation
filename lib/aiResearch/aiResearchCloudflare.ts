@@ -215,7 +215,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
     const result:ResearchSynthesis={status:accepted?'SUCCESS':'UNAVAILABLE',model:MODEL,generatedAt:new Date().toISOString(),snapshotTimestamp,cached:false,
       message:accepted?'Quellenwahl geprüft. Sachliche Zustandsbeschreibung aus App-Daten; KI-Abwägung bleibt ungeprüft. Keine zusätzliche Einstiegsfreigabe.':sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; App-Fakten und unveränderte Originalantwort bleiben sichtbar. Keine automatische Wiederholung.':'Die Quellenantwort ist unvollständig oder ungültig. App-Fakten bleiben verfügbar; keine automatische Wiederholung.',
       sourceReview,quality:{...quality,providerDiagnostics,providerText:typeof raw==='string'?raw:undefined,
-       issues:accepted?[]:[...sourceReview.validation.issues.map(i=>i.code),...(sourceReview.status==='OUTPUT_INCOMPLETE'?['PROVIDER_OUTPUT_LIMIT_REACHED']:[])],
+       issues:accepted?[]:[...sourceReview.validation.issues.map(i=>`${i.code} @ ${i.path}: ${i.message}`),...(sourceReview.status==='OUTPUT_INCOMPLETE'?['PROVIDER_OUTPUT_LIMIT_REACHED']:[])],
        normalizations:[...quality.normalizations,'APP_DERIVED_STATE_AND_SOURCE_FRAGMENTS','UNMODIFIED_HYPOTHESIS_UNVERIFIED']}};
     stage=accepted?'APPROVED_ANSWER_CACHE_WRITE':'REJECTED_ANSWER_CACHE_WRITE';
     const diagnosed=withTiming(result);
