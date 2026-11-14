@@ -353,6 +353,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       <Detail title="Weitere Modell-, Chart- und Syntheseansichten">
       <ResearchWeightingPanel synthesis={report.aiSynthesis} suspended={suspended} />
       <ResearchChartPanel context={report.historicalEvidence?.chartContext} suspended={suspended} />
+      {!suspended&&<PnfProjectionWatch references={report.aiSynthesis?.snapshotTimestamp===reportSnapshotTimestamp?report.aiSynthesis?.priceReferences:undefined} />}
       <AIResearchSynthesisSummary synthesis={report.aiSynthesis} snapshotTimestamp={reportSnapshotTimestamp} suspended={suspended} />
       </Detail>
       <Detail title="App · Freigaben, Modellanteile und Einstiegsbedingungen">
@@ -454,6 +455,31 @@ export function ResearchChartPanel({context,suspended=false}:{context?:import('@
    <FormationHistoryPanel history={chart.formationHistory} />
   </article>)}</div>
   <p className="px-4 py-3 text-xs text-slate-500">*Höchster Schlusskurs der letzten 252 Sitzungen. Positiv/negativ bezeichnet die Kursveränderung über den jeweils genannten Zeitraum, keinen bestätigten Trend oder eine App-Phase. Mehrere Kursindikatoren sind keine unabhängigen Bestätigungen.</p>
+ </section>;
+}
+
+/** P&F price-height objectives are shown only in the expanded research detail for observation. */
+function PnfProjectionWatch({references}:{references?:ResearchSynthesis['priceReferences']}){
+ const markets=[
+  {key:'NASDAQ_CALL',name:'Nasdaq-100',row:references?.find(item=>item.instrument==='NASDAQ_CALL')},
+  {key:'RUSSELL_CALL',name:'Russell 2000',row:references?.find(item=>item.instrument==='RUSSELL_CALL')},
+ ] as const;
+ return <section className="border-t border-slate-700 px-4 py-4" aria-label="P&F-Kursprojektionen zur Beobachtung">
+  <h4 className="text-sm font-semibold text-slate-100">P&amp;F-Kursprojektionen · Beobachtung</h4>
+  <p className="mt-1 text-xs text-slate-400">Nur in der ausführlichen Ansicht. Diese zusätzliche Anzeige ändert weder KI-Gewichtung noch Freigabe oder Positionsgröße.</p>
+  <div className="mt-3 grid gap-3 md:grid-cols-2">{markets.map(({key,name,row})=>{
+   const objectives=row?.status==='AVAILABLE'?row.pnfObjectives??[]:[];
+   return <article key={key} className="rounded-lg border border-slate-700 bg-[#111a23] p-3 text-xs text-slate-300">
+    <div className="flex flex-wrap items-baseline justify-between gap-2"><h5 className="font-semibold text-slate-100">{name}</h5><span className="text-slate-500">Schlusskursstand {row?.asOfDate??'nicht verfügbar'} · {typeof row?.lastClose==='number'?row.lastClose.toLocaleString('de-DE',{maximumFractionDigits:2})+' Punkte':'Kurs nicht verfügbar'}</span></div>
+    {!objectives.length?<p className="mt-2 text-slate-400">Für diesen Datenstand keine gültige P&amp;F-Projektion verfügbar.</p>:<div className="mt-2 grid gap-2 sm:grid-cols-2">{objectives.map(target=><div key={target.id} className="rounded border border-slate-700/80 p-2">
+     <p className={target.direction==='UP'?'font-semibold text-emerald-200':'font-semibold text-rose-200'}>{target.direction==='UP'?'Aufwärtsprojektion':'Abwärtsprojektion'} · P&amp;F {target.boxPercent.toLocaleString('de-DE')}%</p>
+     <p className="mt-1 text-sm font-semibold text-slate-100">{target.price.toLocaleString('de-DE',{maximumFractionDigits:2})} Punkte <span className="text-xs font-normal text-slate-400">({target.distancePct>0?'+':''}{target.distancePct.toLocaleString('de-DE',{maximumFractionDigits:2})}%)</span></p>
+     <p className="mt-1 text-slate-400">{target.status==='FIXED'?'Zählsäule fixiert':'Vorläufig · Zählsäule noch offen'} · bekannt {target.knownAt}{target.signalDate?` · Muster ${target.signalDate}`:''}</p>
+     <p className="mt-1 text-slate-500">{target.family.replace(/_/g,' ').toLowerCase()}{target.currentRelation==='COUNTER_TO_CURRENT_COLUMN'?' · Säule gegenläufig':''}</p>
+    </div>)}</div>}
+   </article>;
+  })}</div>
+  <p className="mt-3 text-[11px] leading-relaxed text-slate-500">App-eigene vertikale Preis-Höhen-Projektion aus Schlusskurs-P&amp;F. „Fixiert“ bedeutet nur, dass die Zählsäule abgeschlossen ist. Kein Zeithorizont, keine Trefferwahrscheinlichkeit und keine Optionsrendite; spätere Kursdaten können die Einschätzung widerlegen.</p>
  </section>;
 }
 
