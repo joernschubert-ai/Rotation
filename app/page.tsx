@@ -1,7 +1,5 @@
 "use client";
 
-import MarketOverviewRibbon from "@/components/MarketOverviewRibbon";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -40,11 +38,13 @@ import SqueezeRiskPanel from "@/components/SqueezeRiskPanel";
 import GammaPanel from "@/components/GammaPanel";
 import RotationCompositePanel from "@/components/RotationCompositePanel";
 import RotationInternalsPanel from "@/components/RotationInternalsPanel";
+import HistoricalReplayPanel from "@/components/HistoricalReplayPanel";
 
 type LoadedMarket = {
   engine: any;
   map: any;
   snapshot: any;
+  rotationDetails?: any;
 };
 
 function SectionHeader({
@@ -55,12 +55,12 @@ function SectionHeader({
   subtitle?: string;
 }) {
   return (
-    <div className="mb-3 border-b border-slate-700/70 pb-2">
-      <h2 className="text-sm font-semibold tracking-wide text-slate-300 md:text-base">
+    <div className="mb-3 border-b border-[#222] pb-2">
+      <h2 className="text-sm font-bold tracking-[0.12em] text-[#888] md:text-base">
         {title}
       </h2>
       {subtitle && (
-        <div className="mt-1 text-[10px] tracking-wide text-slate-500">
+        <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#555]">
           {subtitle}
         </div>
       )}
@@ -94,9 +94,7 @@ export default function Home() {
       });
 
       if (!marketRes.ok) {
-        const failure = await marketRes.json().catch(() => null);
-        const reason = typeof failure?.error === "string" ? failure.error.slice(0, 200) : "Keine Fehlerbeschreibung vom Datenabruf";
-        throw new Error(`Marktdaten HTTP ${marketRes.status}: ${reason}`);
+        throw new Error(`MARKET REQUEST FAILED: ${marketRes.status}`);
       }
 
       const marketJson = await marketRes.json();
@@ -148,13 +146,8 @@ export default function Home() {
         engine: result,
         map: mappedWithHistory,
         snapshot,
+        rotationDetails: marketJson.rotationDetails ?? null,
       });
-
-      if (mappedWithHistory.volatilityDataQuality?.entryBlocked === true) {
-        setResearchSnapshotTimestamp(null);
-        setSaveError(mappedWithHistory.volatilityDataQuality.message);
-        return;
-      }
 
       try {
         const saveRes = await fetch("/api/history", {
@@ -211,8 +204,7 @@ export default function Home() {
     } catch (error) {
       console.error("LOAD ERROR", error);
       setLoadError(
-        "Markt-Aktualisierung fehlgeschlagen. Angezeigte Werte bleiben vom letzten erfolgreichen Abruf. " +
-        (error instanceof Error ? error.message.slice(0, 300) : "Keine weitere Fehlerbeschreibung verfügbar.")
+        "Market refresh failed. Any displayed values remain from the previous successful load."
       );
     } finally {
       loadingRef.current = false;
@@ -270,21 +262,20 @@ export default function Home() {
   const engine = loadedMarket.engine;
 
   const panel = {
-    background: "#0e1722",
-    border: "1px solid #334155",
-    borderRadius: "12px",
+    background: "#111",
+    border: "1px solid #222",
     padding: "16px",
   };
 
   return (
-    <main className="rotation-dashboard min-h-screen bg-[#0b1120] p-3 font-sans text-slate-200 sm:p-4 md:p-6 lg:p-8">
-      <header className="mb-5 flex flex-col gap-3 border-b border-slate-700/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <main className="min-h-screen bg-black p-3 font-mono text-white sm:p-4 md:p-6 lg:p-8">
+      <header className="mb-6 flex flex-col gap-4 border-b border-[#222] pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-wide md:text-2xl">
-            ROTATION · MARKET DASHBOARD
+            MARKET DASHBOARD
           </h1>
-          <div className="mt-1 text-[10px] tracking-wide text-slate-500">
-            Marktüberblick · Rotation · Research
+          <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#555]">
+            Institutional Market Structure Engine
           </div>
         </div>
 
@@ -294,7 +285,7 @@ export default function Home() {
             onClick={() => void load()}
             disabled={isReloading}
             title={isReloading ? "Market data is refreshing" : "Refresh market data"}
-            className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isReloading ? "↻ ..." : "↻"}
           </button>
@@ -303,7 +294,7 @@ export default function Home() {
             type="button"
             onClick={copySnapshot}
             title="Copy the snapshot of the displayed market result"
-            className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm transition hover:bg-slate-700"
+            className="border border-[#444] bg-[#222] px-3 py-2 text-sm transition hover:bg-[#333]"
           >
             📸
           </button>
@@ -315,22 +306,12 @@ export default function Home() {
               localStorage.removeItem("auth");
               router.push("/login");
             }}
-            className="rounded-lg border border-rose-900 bg-rose-950/50 px-3 py-2 text-sm transition hover:bg-rose-900"
+            className="border border-[#444] bg-[#8b0000] px-3 py-2 text-sm transition hover:bg-[#a00000]"
           >
             🔒
           </button>
         </div>
       </header>
-
-      <div className="mb-4">
-        <SystemDotsPanel
-          drivers={engine.marketDrivers}
-          structure={engine.structure}
-          crash={engine.crash}
-        />
-      </div>
-
-      <MarketOverviewRibbon engine={engine} map={loadedMarket.map} snapshotTimestamp={loadedMarket.snapshot.timestamp} />
 
       {loadError && (
         <div role="alert" className="mb-4 border border-red-800 p-3 text-sm text-red-300">
@@ -351,7 +332,6 @@ export default function Home() {
         />
         <AIResearchPanel
           expectedSnapshotTimestamp={loadedMarket.snapshot.timestamp}
-          marketPending={isReloading}
           marketReady={!isReloading && !loadError && researchSnapshotTimestamp === loadedMarket.snapshot.timestamp}
         />
       </section>
@@ -390,7 +370,6 @@ export default function Home() {
           />
           <PutTimingPanel
             putTiming={engine.putTiming}
-            sizing={engine.sizing}
             exit={engine.exit?.short}
           />
           <RussellPanel
@@ -446,18 +425,22 @@ export default function Home() {
           <div style={panel}>
             <h3 className="mb-4 text-sm text-[#888]">SYSTEM HEAT</h3>
             <SystemHeatPanel heat={engine.systemHeat} />
-
+            <div className="mt-4">
+              <SystemDotsPanel
+                drivers={engine.marketDrivers}
+                structure={engine.structure}
+                crash={engine.crash}
+              />
+            </div>
           </div>
         </div>
 
         <div style={panel}>
-          <details>
-            <summary className="cursor-pointer text-sm font-medium text-slate-300">Indizes und Futures · ausführliche Ansicht</summary>
-            <div className="mt-3"><IndicesPanel
-              indices={engine.indices}
-              futures={engine.futures}
-            /></div>
-          </details>
+          <h3 className="mb-4 text-sm text-[#888]">INDEX MARKETS</h3>
+          <IndicesPanel
+            indices={engine.indices}
+            futures={engine.futures}
+          />
         </div>
       </section>
 
@@ -485,6 +468,7 @@ export default function Home() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <RotationInternalsPanel
             rotation={engine.rotation}
+            rotationDetails={loadedMarket.rotationDetails}
             rotationConfirm={engine.rotationConfirm}
             rotationDecay={engine.rotationDecay}
             structureFlags={engine.structureFlags}
@@ -522,6 +506,13 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="mb-8">
+        <SectionHeader
+          title="MARKET HISTORY & REPLAY"
+          subtitle="Historical structural development and regime validation"
+        />
+        <HistoricalReplayPanel replay={engine.replay} />
+      </section>
 
     </main>
   );
