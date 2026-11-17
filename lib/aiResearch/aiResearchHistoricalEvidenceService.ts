@@ -1,5 +1,4 @@
 import { buildChartContext, completedDailyCutoff } from "./aiResearchChartContext";
-import { verifiedResearchMarketDate } from "./aiResearchSynthesisEvidence";
 import {
 loadHistoricalRegimeMarketData,
 } from "@/lib/historicalRegime/historicalRegimeProvider";
@@ -42,6 +41,23 @@ AIResearchHistoricalEvidence,
 import { buildHistoricalMarketStudies } from "./aiResearchHistoricalMarketStudies";
 import { buildHistoricalTemporalValidation } from "./aiResearchHistoricalTemporalValidation";
 
+const recordOf = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+function verifiedResearchMarketDate(value: unknown, market: string): string | null {
+  const snapshot = recordOf(value), indices = recordOf(snapshot.indices);
+  const indexKey = market === "NASDAQ" ? "nasdaq" : market === "RUSSELL_2000" ? "russell" : market === "SP500" ? "sp500" : null;
+  if (!indexKey) return null;
+  const index = recordOf(indices[indexKey]);
+  const priceMetrics = recordOf(index.priceMetrics);
+  const quality = recordOf(priceMetrics.dataQuality);
+  const stamp = [quality.currentObservationTimestamp, quality.lastValidBarTimestamp, quality.latestBarTimestamp]
+    .find(item => typeof item === "string" && /(?:Z|[+-]\d{2}:\d{2})$/.test(item) && Number.isFinite(Date.parse(item)));
+  if (typeof stamp !== "string") return null;
+  const observedAt = Date.parse(stamp), reference = typeof snapshot.timestamp === "string" ? Date.parse(snapshot.timestamp) : NaN;
+  if (!Number.isFinite(observedAt) || !Number.isFinite(reference) || observedAt > reference || reference - observedAt > 5 * 86400000 || quality.stale === true || quality.freshnessVerified !== true) return null;
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(observedAt));
+  const part = (name: string) => parts.find(item => item.type === name)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
 /* =====================================================
 AI RESEARCH - HISTORICAL EVIDENCE SERVICE
 ===================================================== */

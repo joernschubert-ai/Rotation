@@ -1,11 +1,34 @@
-import type { ScenarioReview } from "./aiResearchScenarioState";
+import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
+import type { ResearchTrigger } from "./aiResearchTriggers";
+import type { SourceReview } from "./aiResearchSourceReview";
+import type { ResearchConcepts } from "./aiResearchConcepts";
 import type { COTExpertReport } from "./aiResearchCOTExpert";
 import type { COTDataQuality } from "./aiResearchCOTTypes";
 import type { InstrumentPriceReferences } from "./aiResearchPriceReferences";
-import type { WeightingContext, WeightedReview } from "./aiResearchWeighting";
-import type { InstrumentBrief } from "./aiResearchInstrumentBriefs";
-import type { ResearchTrigger } from "./aiResearchTriggers";
-export const SYNTHESIS_CONTRACT = "GEMMA_SOURCE_REVIEW_V80_ANTICYCLICAL_CONTEXT";
+import type { WeightingContext } from "./aiResearchWeighting";
+import type { ScenarioReview } from "./aiResearchScenarioState";
+
+export interface ResearchNarrative {
+  format: "PLAIN_RESEARCH_V34";
+  text: string;
+  truncated: boolean;
+  audit?: { findings: Array<{ correction: string; quote?: string }>; scope: string };
+}
+export interface ResearchInstrumentReview {
+  instrument: "NASDAQ_PUT" | "NASDAQ_CALL" | "RUSSELL_CALL";
+  status: string;
+  issues: string[];
+  draft?: { reasoning?: string; assessment?: string; whyNow?: string; counterargument?: string; confirmation?: string; invalidation?: string };
+}
+export interface PreviousSuccessfulResearchSynthesis {
+  snapshotTimestamp: string;
+  generatedAt?: string;
+  model: string;
+  sourceReview?: SourceReview;
+  content?: ResearchSynthesisContent;
+  narrative?: ResearchNarrative;
+}
+export const SYNTHESIS_CONTRACT = "INDEPENDENT_INSTRUMENT_REVIEW_V11_HISTORICAL_PATTERNS";
 
 export interface ResearchSynthesisContent {
   conclusion: "WATCH_ONLY" | "PREPARATION" | "CANDIDATES" | "RISK_REVIEW";
@@ -13,30 +36,23 @@ export interface ResearchSynthesisContent {
   asymmetry: string;
   flows: Array<{
     instrument: "NASDAQ_PUT" | "NASDAQ_CALL" | "RUSSELL_CALL";
-    weightedReview?: WeightedReview;
-    interpretationNotes?: string[];
-    originalAssessment?: string;
-    assessmentExplanation?: string;
     assessment: "WATCH" | "PREPARE" | "STARTER_CANDIDATE" | "CONFIRM" | "REDUCE";
     reasoning: string;
-    reasoningParts?: { supporting: string; opposing: string; earlyOpportunity: string };
     whyNow: string;
     counterargument: string;
     confirmation: string;
-    conditionOrigin?: "SERVER_INSTRUMENT_AND_ASSESSMENT";
+    invalidation: string;
+    assessmentExplanation?: string;
+    originalAssessment?: string;
+    interpretationNotes?: string[];
+    cotInterpretations?: Partial<Record<"ASSET_MANAGER" | "LEVERAGED_MONEY", string>>;
     confirmationDirection?: "UP" | "DOWN";
     invalidationDirection?: "UP" | "DOWN";
-    invalidation: string;
+    conditionOrigin?: "SERVER_INSTRUMENT_AND_ASSESSMENT";
+    weightedReview?: import("./aiResearchWeighting").WeightedReview;
     evidenceRefs: string[];
     confirmationRefs: string[];
     invalidationRefs: string[];
-    timingFocus?: "ALREADY_MOVED" | "EARLY_DIVERGENCE" | "WAIT_FOR_TURN" | "DIRECTION_CONFIRMED" | "DATA_INCOMPLETE";
-    structureFocus?: "BREADTH" | "PARTICIPATION" | "PHASE" | "QUALITY";
-    historyEffect?: "SUPPORTS_DIRECTION" | "OPPOSES_DIRECTION" | "NEUTRAL" | "UNKNOWN";
-    opportunityMechanism?: "CONTINUATION" | "REVERSAL" | "NONE";
-    riskMechanism?: string;
-    cotReview?: Partial<Record<"ASSET_MANAGER" | "LEVERAGED_MONEY", {horizon: "WEEK" | "FOUR_WEEKS" | "THIRTEEN_WEEKS"; interpretation: string}>>;
-    cotInterpretations?: Partial<Record<"ASSET_MANAGER" | "LEVERAGED_MONEY", string>>;
     historyStudyId?: string;
     cotGroups?: string[];
     historyMeanVsBaseline?: "ABOVE" | "BELOW" | "EQUAL" | "UNKNOWN";
@@ -54,33 +70,33 @@ export interface ResearchSynthesisContent {
 }
 
 export interface ResearchSynthesis {
-  sourceReview?:import('./aiResearchSourceReview').SourceReview;
-  domainConcepts?:import("./aiResearchConcepts").ResearchConcepts;
-  narrative?:{format:'PLAIN_RESEARCH_V34';text:string;truncated:boolean;audit?:import('./aiResearchNarrativeAudit').NarrativeAudit};
-  cotAnalysis?:COTExpertReport;
-  modelRequestsUsed?:number;
-  indexScenarios?:Record<string,ScenarioReview>;
-  previousSuccessful?:{sourceReview?:ResearchSynthesis['sourceReview'];snapshotTimestamp:string;generatedAt?:string;model:string;content?:ResearchSynthesisContent;narrative?:ResearchSynthesis["narrative"]};
   status: "SUCCESS" | "UNAVAILABLE";
-  weightingContexts?: WeightingContext[];
-  priceReferences?: InstrumentPriceReferences[];
-  cotDataQuality?:COTDataQuality;
   model: string;
   generatedAt?: string;
   snapshotTimestamp: string;
   cached: boolean;
   message: string;
   content?: ResearchSynthesisContent;
-  instrumentReviews?: Array<{instrument: "NASDAQ_PUT" | "NASDAQ_CALL" | "RUSSELL_CALL"; status: "CHECKED" | "WITHHELD" | "MISSING"; issues: string[]; draft?: ResearchSynthesisContent["flows"][number]}>;
+  sourceReview?: SourceReview;
+  narrative?: ResearchNarrative;
+  modelRequestsUsed?: number;
+  previousSuccessful?: PreviousSuccessfulResearchSynthesis;
+  weightingContexts?: WeightingContext[];
+  priceReferences?: InstrumentPriceReferences[];
+  cotDataQuality?: COTDataQuality;
+  cotAnalysis?: COTExpertReport;
+  domainConcepts?: ResearchConcepts;
+  indexScenarios?: Record<string, ScenarioReview>;
+  instrumentReviews?: ResearchInstrumentReview[];
   quality?: {
     contractVersion: string;
-    providerText?: string;
-    providerDiagnostics?: {finishReason: string | null; completionTokens: number | null; promptTokens: number | null; responseCharacters: number; outputLimitReported: boolean};
     issues: string[];
     availableEvidenceIds: string[];
     missingOwnPriceMarkets: string[];
     semanticTruthVerified: false;
     normalizations?: string[];
+    providerText?: string;
+    providerDiagnostics?: Record<string, unknown>;
     responseShape?: { rootKeys: string[]; flowsIsArray: boolean; flowCount: number | null };
     instrumentBriefs?: InstrumentBrief[];
     timing?: {
@@ -99,7 +115,7 @@ export interface ResearchSynthesis {
       counterarguments: string[];
       limitations: string[];
       references: Array<{ instrument: string; evidenceRefs: string[]; confirmationRefs: string[]; invalidationRefs: string[];
-        structuredReview?: Record<string, unknown>; historyStudyId?: string; cotGroups?: string[]; reasoning?: string; whyNow?: string; counterargument?: string; cotInterpretations?: Partial<Record<"ASSET_MANAGER" | "LEVERAGED_MONEY", string>>;
+        historyStudyId?: string; cotGroups?: string[]; reasoning?: string; counterargument?: string;
         historyMeanVsBaseline?: string; confirmationTrigger?: string; invalidationTrigger?: string }>;
     };
     inputSummary?: {
@@ -110,4 +126,3 @@ export interface ResearchSynthesis {
     };
   };
 }
-
