@@ -27,7 +27,7 @@ export function makeScenarioEpisode(entry:Entry,request:FrozenResearch,original:
 type Episode=ReturnType<typeof makeScenarioEpisode>;
 function encode(episode:Episode){const text=JSON.stringify(episode);if(Buffer.byteLength(text)>4000000)throw Error('SCENARIO_EPISODE_TOO_LARGE');const payload=gzipSync(text).toString('base64');if(payload.length>900000)throw Error('SCENARIO_EPISODE_COMPRESSED_LIMIT');return {payload,payloadHash:digest(text)};}
 function decode(raw:unknown):Episode{const e=object(raw);const text=gunzipSync(Buffer.from(e.payload,'base64'),{maxOutputLength:4000000}).toString('utf8');if(digest(text)!==e.payloadHash)throw Error('SCENARIO_EPISODE_HASH');return JSON.parse(text);}
-export async function readScenarioEpisode(id:string){const raw=await memoryBounded(Redis.fromEnv().get(key(id)));return raw?decode(raw):null;}
+export async function readScenarioEpisode(id:string,timeoutMs=1200){const raw=await memoryBounded(Redis.fromEnv().get(key(id)),timeoutMs);return raw?decode(raw):null;}
 export async function claimScenarioRequest(id:string,token:string){return Boolean(await memoryBounded(Redis.fromEnv().set(key(id)+':attempt',{token,claimedAt:new Date().toISOString()},{nx:true})));}
 export async function releaseUnstartedScenario(id:string,token:string){return memoryBounded(Redis.fromEnv().eval("-- SCENARIO_RELEASE_UNSTARTED_V1\nlocal p=redis.call('GET',KEYS[1]) if p and cjson.decode(p).token==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0",[key(id)+':attempt'],[token]));}
 export async function storeScenarioEpisode(episode:Episode){

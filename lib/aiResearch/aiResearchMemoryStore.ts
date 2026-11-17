@@ -11,20 +11,20 @@ export async function storeMemoryRecord(entry:ReturnType<typeof makeMemoryRecord
   "-- MEMORY_RECORD_NX_V1\nif redis.call('EXISTS',KEYS[1])==1 then return 0 end redis.call('SET',KEYS[1],ARGV[1]) redis.call('SET',KEYS[2],ARGV[2]) redis.call('ZADD',KEYS[3],ARGV[3],ARGV[4]) return 1",
   [key,MEMORY_PREFIX+':meta:'+entry.meta.id,MEMORY_PREFIX+':records:'+lane],[JSON.stringify(entry),JSON.stringify(entry.meta),String(Date.parse(entry.meta.capturedAt)),entry.meta.id])))===1;
 }
-export async function readMemoryRecord(recordId:string){return memoryBounded(Redis.fromEnv().get<ReturnType<typeof makeMemoryRecord>>(MEMORY_PREFIX+':record:'+id(recordId)));}
-export async function listMemoryRecords(offset=0){
- const redis=Redis.fromEnv(),ids=await memoryBounded(redis.zrange<string[]>(MEMORY_PREFIX+':records:normal',offset,offset+19,{rev:true}));
- return ids.length?memoryBounded(redis.mget<unknown[]>(...ids.map(s=>MEMORY_PREFIX+':meta:'+id(s)))):[];
+export async function readMemoryRecord(recordId:string,timeoutMs=1200){return memoryBounded(Redis.fromEnv().get<ReturnType<typeof makeMemoryRecord>>(MEMORY_PREFIX+':record:'+id(recordId)),timeoutMs);}
+export async function listMemoryRecords(offset=0,timeoutMs=1200){
+ const redis=Redis.fromEnv(),ids=await memoryBounded(redis.zrange<string[]>(MEMORY_PREFIX+':records:normal',offset,offset+19,{rev:true}),timeoutMs);
+ return ids.length?memoryBounded(redis.mget<unknown[]>(...ids.map(s=>MEMORY_PREFIX+':meta:'+id(s))),timeoutMs):[];
 }
 export async function storeMemoryForecast(plan:MemoryForecast){
  return Number(await memoryBounded(Redis.fromEnv().eval(
   "-- MEMORY_FORECAST_NX_V1\nif redis.call('EXISTS',KEYS[1])==1 then return 0 end redis.call('SET',KEYS[1],ARGV[1]) redis.call('ZADD',KEYS[2],ARGV[2],ARGV[3]) redis.call('ZADD',KEYS[3],ARGV[2],ARGV[3]) return 1",
   [MEMORY_PREFIX+':forecast:'+id(plan.id),MEMORY_PREFIX+':forecasts',MEMORY_PREFIX+':pending'],[JSON.stringify(plan),String(Date.parse(plan.createdAt)),plan.id])))===1;
 }
-export async function readMemoryForecast(forecastId:string){return memoryBounded(Redis.fromEnv().get<MemoryForecast>(MEMORY_PREFIX+':forecast:'+id(forecastId)));}
-export async function listMemoryForecasts(pending=false,offset=0){
- const redis=Redis.fromEnv(),ids=await memoryBounded(redis.zrange<string[]>(MEMORY_PREFIX+(pending?':pending':':forecasts'),pending?0:offset,pending?5:offset+9,pending?{}:{rev:true}));
- return ids.length?memoryBounded(redis.mget<Array<MemoryForecast|null>>(...ids.map(s=>MEMORY_PREFIX+':forecast:'+id(s)))):[];
+export async function readMemoryForecast(forecastId:string,timeoutMs=1200){return memoryBounded(Redis.fromEnv().get<MemoryForecast>(MEMORY_PREFIX+':forecast:'+id(forecastId)),timeoutMs);}
+export async function listMemoryForecasts(pending=false,offset=0,timeoutMs=1200){
+ const redis=Redis.fromEnv(),ids=await memoryBounded(redis.zrange<string[]>(MEMORY_PREFIX+(pending?':pending':':forecasts'),pending?0:offset,pending?5:offset+9,pending?{}:{rev:true}),timeoutMs);
+ return ids.length?memoryBounded(redis.mget<Array<MemoryForecast|null>>(...ids.map(s=>MEMORY_PREFIX+':forecast:'+id(s))),timeoutMs):[];
 }
 export async function storeMemoryBars(bars:MemoryBar[]){
  if(!bars.length)return 0;
@@ -65,12 +65,12 @@ for _,b in ipairs(rows) do
 end
 return n`,
   [],[JSON.stringify(bars.map(b=>({...b,score:Date.parse(b.date+'T00:00:00Z')}))),MEMORY_PREFIX,String(MEMORY_CLOSE_ABSOLUTE_TOLERANCE),MEMORY_CLOSE_COMPARISON_POLICY])));
-}export async function barsForForecast(plan:MemoryForecast){
+}export async function barsForForecast(plan:MemoryForecast,timeoutMs=1200){
  const redis=Redis.fromEnv(),start=Date.parse(plan.createdAt)-86400000;
- const dates=await memoryBounded(redis.zrange<string[]>(MEMORY_PREFIX+':bars:'+plan.market,start,'+inf',{byScore:true,offset:0,count:64}));
+ const dates=await memoryBounded(redis.zrange<string[]>(MEMORY_PREFIX+':bars:'+plan.market,start,'+inf',{byScore:true,offset:0,count:64}),timeoutMs);
  if(!dates.length)return [];
  const keys=dates.map(d=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(d))throw Error('MEMORY_INVALID_BAR_DATE');return MEMORY_PREFIX+':bar:'+plan.market+':'+d;});
- const [raw,conflicts]=await Promise.all([memoryBounded(redis.mget<Array<MemoryBar|null>>(...keys)),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':conflict')))]);
+ const [raw,conflicts]=await Promise.all([memoryBounded(redis.mget<Array<MemoryBar|null>>(...keys),timeoutMs),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':conflict')),timeoutMs)]);
  if(raw.some(b=>!b))throw Error('MEMORY_BAR_INDEX_GAP');
  return raw.map((b,i)=>{const flag=conflicts[i]!==null&&typeof conflicts[i]==='object'?conflicts[i] as Record<string,unknown>:{};const resolved=flag.status==='RESOLVED_WITHIN_ROUNDED_CENT';return {...b!,conflict:!resolved&&(b!.conflict===true||!!conflicts[i])};});
 }
@@ -82,4 +82,4 @@ export async function storeMemoryAssessment(plan:MemoryForecast,assessment:any){
   "-- MEMORY_ASSESSMENTS_NX_V1\nlocal rows=cjson.decode(ARGV[1]) for _,r in ipairs(rows) do redis.call('SET',ARGV[2]..':assessment:'..ARGV[3]..':'..r.horizon,r.value,'NX') end if ARGV[5]=='1' then redis.call('ZREM',KEYS[1],ARGV[3]) else redis.call('ZADD',KEYS[1],ARGV[4],ARGV[3]) end return 1",
   [MEMORY_PREFIX+':pending'],[JSON.stringify(rows),MEMORY_PREFIX,plan.id,String(Date.parse(assessment.evaluatedAt)),terminal?'1':'0']));
 }
-export async function storedMemoryAssessments(plan:MemoryForecast){return memoryBounded(Redis.fromEnv().mget<unknown[]>(...plan.horizons.map(h=>MEMORY_PREFIX+':assessment:'+id(plan.id)+':'+h)));}
+export async function storedMemoryAssessments(plan:MemoryForecast,timeoutMs=1200){return memoryBounded(Redis.fromEnv().mget<unknown[]>(...plan.horizons.map(h=>MEMORY_PREFIX+':assessment:'+id(plan.id)+':'+h)),timeoutMs);}

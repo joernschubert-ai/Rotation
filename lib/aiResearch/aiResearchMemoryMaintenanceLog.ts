@@ -14,10 +14,10 @@ export async function recordMemoryMaintenance(record:MemoryMaintenanceLog){
   [PREFIX+':run:'+id,PREFIX+':runs',PREFIX+':latest'],[payload,String(score),id,JSON.stringify({id,startedMs:score})]),600);
  return {id,persisted:Number(result)===1};
 }
-export async function readMemoryMaintenanceAudit(){
- const pointer=object(await memoryBounded(Redis.fromEnv().get(PREFIX+':latest')));
+export async function readMemoryMaintenanceAudit(timeoutMs=1200){
+ const pointer=object(await memoryBounded(Redis.fromEnv().get(PREFIX+':latest'),timeoutMs));
  if(typeof pointer.id!=='string'||!/^[a-f0-9]{64}$/.test(pointer.id))return {status:'NOT_RECORDED',latest:null,readOnly:true,modelRequestsUsed:0,memoryWritten:false,meaning:'Noch kein Wartungsdiagnoseeintrag vorhanden. Das ist vor dem ersten Lauf nach Installation erwartbar.'};
- const envelope=object(await memoryBounded(Redis.fromEnv().get(PREFIX+':run:'+pointer.id)));
+ const envelope=object(await memoryBounded(Redis.fromEnv().get(PREFIX+':run:'+pointer.id),timeoutMs));
  if(typeof envelope.text!=='string'||Buffer.byteLength(envelope.text)>20000||digest(envelope.text)!==envelope.hash)throw Error('MAINTENANCE_LOG_HASH');const record=JSON.parse(envelope.text);
  if(record.id!==pointer.id||record.version!=='MEMORY_MAINTENANCE_LOG_V1'||Date.parse(record.startedAt)!==pointer.startedMs)throw Error('MAINTENANCE_LOG_FRAME');
  return {status:'AVAILABLE',latest:record,readOnly:true,modelRequestsUsed:0,memoryWritten:false,meaning:'Letzter protokollierter Wartungsaufruf nach Startzeit. Der Eintrag beweist nicht, ob Vercel ihn geplant oder manuell gestartet hat; dafür die Vercel-Logs abgleichen.'};

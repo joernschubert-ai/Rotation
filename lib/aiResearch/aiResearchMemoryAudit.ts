@@ -11,13 +11,13 @@ import {digest,object,finite,validDay,EVALUATION_POLICY,type MemoryForecast} fro
 const stable=(v:unknown):unknown=>Array.isArray(v)?v.map(stable):v!==null&&typeof v==='object'?Object.fromEntries(Object.entries(v as Record<string,unknown>).sort(([a],[b])=>a.localeCompare(b)).map(([k,value])=>[k,stable(value)])):v;
 const same=(a:unknown,b:unknown)=>digest(stable(a))===digest(stable(b));
 const nyDay=(time:string)=>{const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(time));const get=(k:string)=>parts.find(p=>p.type===k)!.value;return get('year')+'-'+get('month')+'-'+get('day');};
-async function ledger(market:'NASDAQ'|'RUSSELL_2000',at:string){
+async function ledger(market:'NASDAQ'|'RUSSELL_2000',at:string,timeoutMs=1200){
  const redis=Redis.fromEnv(),key=MEMORY_PREFIX+':bars:'+market;
- const dates=await memoryBounded(redis.zrange<string[]>(key,0,11,{rev:true}));
+ const dates=await memoryBounded(redis.zrange<string[]>(key,0,11,{rev:true}),timeoutMs);
  if(dates.some(d=>!validDay(d)))return {market,status:'INVALID_INDEX_DATES',newestObservedCloseDate:null,recent:[],issue:'Ungültiges Datumsformat im Kursindex. Keine Reparatur ausgelöst.'};
  if(!dates.length)return {market,status:'EMPTY',newestObservedCloseDate:null,recent:[],issue:'Kein Kurs im Prüfgedächtnis gespeichert; keine Aussage über den separaten Marktverlauf.'};
  const keys=dates.map(d=>MEMORY_PREFIX+':bar:'+market+':'+d);
- const [bars,flags,comparisons]=await Promise.all([memoryBounded(redis.mget<unknown[]>(...keys)),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':conflict'))),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':comparison:latest')))]);
+ const [bars,flags,comparisons]=await Promise.all([memoryBounded(redis.mget<unknown[]>(...keys),timeoutMs),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':conflict')),timeoutMs),memoryBounded(redis.mget<unknown[]>(...keys.map(k=>k+':comparison:latest')),timeoutMs)]);
  const recent=dates.map((date,i)=>{const b=object(bars[i]);const flag=object(flags[i]);const resolved=flag.status==='RESOLVED_WITHIN_ROUNDED_CENT';const valid=b.market===market&&b.date===date&&finite(b.close)&&b.close>0&&typeof b.observedAt==='string'&&Number.isFinite(Date.parse(b.observedAt))&&Date.parse(b.observedAt)>=Date.parse(date+'T00:00:00Z')&&Date.parse(b.observedAt)<=Date.parse(at);return {date,close:finite(b.close)?b.close:null,firstObservedAt:b.observedAt??null,source:b.source??null,conflict:!resolved&&(!!flags[i]||b.conflict===true),conflictResolved:resolved,conflictEvidence:memoryConflictEvidence(flags[i]),latestComparison:comparisons[i]??null,status:valid?'OBSERVED':'MISSING_OR_INVALID_ROW'};});
  return {market,comparisonPolicy:MEMORY_CLOSE_COMPARISON_POLICY,absoluteTolerance:MEMORY_CLOSE_ABSOLUTE_TOLERANCE,resolvedPriorConflictCount:recent.filter(r=>r.conflictResolved).length,status:recent.some(r=>r.status!=='OBSERVED'||r.conflict)?'REVIEW_REQUIRED':'OBSERVATIONS_PRESENT',newestObservedCloseDate:recent.find(r=>r.status==='OBSERVED')?.date??null,recent,issue:null};
 }
@@ -26,12 +26,13 @@ export async function inspectMemoryAudit(recordOffset=0,forecastOffset=0){
  const evaluatedAt=new Date().toISOString(),cutoff=completedDailyCutoff(new Date(evaluatedAt));
  const priorUtcDay=new Date(Date.parse(evaluatedAt.slice(0,10)+'T00:00:00Z')-86400000).toISOString().slice(0,10);
  const evaluationAvailabilityCutoff=cutoff<priorUtcDay?cutoff:priorUtcDay;
- const results=await Promise.allSettled([inspectResearchMemory(recordOffset,forecastOffset),ledger('NASDAQ',evaluatedAt),ledger('RUSSELL_2000',evaluatedAt),readMemoryMaintenanceAudit(),readCronAudit()] as const);
+ const auditReadTimeoutMs=3000;
+ const results=await Promise.allSettled([inspectResearchMemory(recordOffset,forecastOffset,auditReadTimeoutMs),ledger('NASDAQ',evaluatedAt,auditReadTimeoutMs),ledger('RUSSELL_2000',evaluatedAt,auditReadTimeoutMs),readMemoryMaintenanceAudit(auditReadTimeoutMs),readCronAudit(auditReadTimeoutMs)] as const);
  if(results[0].status==='rejected')throw Error('MEMORY_INSPECTION_UNAVAILABLE');
  const memory=results[0].value;
  const episodeCache=new Map<string,ReturnType<typeof readScenarioEpisode>>(),sourceCache=new Map<string,ReturnType<typeof readMemoryRecord>>();
- const episode=(id:string)=>{if(!episodeCache.has(id))episodeCache.set(id,readScenarioEpisode(id));return episodeCache.get(id)!;};
- const source=(id:string)=>{if(!sourceCache.has(id))sourceCache.set(id,readMemoryRecord(id));return sourceCache.get(id)!;};
+ const episode=(id:string)=>{if(!episodeCache.has(id))episodeCache.set(id,readScenarioEpisode(id,auditReadTimeoutMs));return episodeCache.get(id)!;};
+ const source=(id:string)=>{if(!sourceCache.has(id))sourceCache.set(id,readMemoryRecord(id,auditReadTimeoutMs));return sourceCache.get(id)!;};
  const forecasts=await Promise.all(memory.forecasts.map(async item=>{
   const plan=item.plan as MemoryForecast,issues:string[]=[];let sourceSnapshotTimestamp:string|null=null;let sourceCheck='UNAVAILABLE',scenarioCheck=plan.attribution==='AI_GENERATED'?'UNAVAILABLE':'NOT_AN_AI_SCENARIO';
   try{const r=await source(plan.sourceRecordId);if(!r)issues.push('SOURCE_RECORD_MISSING');else if(r.meta.id!==plan.sourceRecordId||!r.meta.eligibleForForecast)issues.push('SOURCE_RECORD_NOT_ELIGIBLE');else if(Date.parse(plan.createdAt)<Date.parse(r.meta.capturedAt))issues.push('FORECAST_PRECEDES_SOURCE_CAPTURE');else {sourceCheck='SOURCE_META_MATCHES';sourceSnapshotTimestamp=r.meta.snapshotTimestamp;}}catch{issues.push('SOURCE_RECORD_READ_FAILED');}

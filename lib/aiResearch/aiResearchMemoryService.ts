@@ -17,14 +17,14 @@ export async function registerMemoryForecast(input:unknown){
  const plan=makeMemoryForecast(record.meta,input,new Date().toISOString()),written=await storeMemoryForecast(plan);
  return {ok:true,newForecast:written,forecast:written?plan:await readMemoryForecast(plan.id),modelRequestsUsed:0,attribution:'USER_REGISTERED'};
 }
-async function inspectForecast(plan:MemoryForecast){
- const bars=await barsForForecast(plan),current=evaluateMemoryForecast(plan,bars,new Date().toISOString()),stored=await storedMemoryAssessments(plan);
+async function inspectForecast(plan:MemoryForecast,readTimeoutMs=1200){
+ const bars=await barsForForecast(plan,readTimeoutMs),current=evaluateMemoryForecast(plan,bars,new Date().toISOString()),stored=await storedMemoryAssessments(plan,readTimeoutMs);
  return {plan,currentSourceAssessment:current,storedAssessments:stored.map((s:any,i)=>{if(!s)return null;const c=current.outcomes[i];const samePath=c.metrics&&digest(c.metrics.sourceDates)===digest(s.metrics?.sourceDates)&&current.anchor?.date===s.anchor?.date;return {original:s,currentSourceCheck:c.status==='SOURCE_CONFLICT'?'SOURCE_CONFLICT':samePath?'SAME_OBSERVED_PATH':'OBSERVED_PATH_CHANGED_REVIEW'};})};
 }
-export async function inspectResearchMemory(recordOffset=0,forecastOffset=0){
+export async function inspectResearchMemory(recordOffset=0,forecastOffset=0,readTimeoutMs=1200){
  if(![recordOffset,forecastOffset].every(v=>Number.isInteger(v)&&v>=0&&v<=100000))throw Error('MEMORY_INVALID_PAGE');
- const [records,forecasts]=await Promise.all([listMemoryRecords(recordOffset),listMemoryForecasts(false,forecastOffset)]);
- return {ok:true,version:MEMORY_VERSION,readOnly:true,modelRequestsUsed:0,page:{recordOffset,forecastOffset,recordPageSize:20,forecastPageSize:10},records,forecasts:await Promise.all(forecasts.filter((p):p is MemoryForecast=>!!p).map(async plan=>{try{return await inspectForecast(plan!);}catch{return {plan:plan!,currentSourceAssessment:null,storedAssessments:[],evaluationMessage:'Auswertung derzeit nicht verfügbar; Szenario bleibt unverändert gespeichert.'};}})),
+ const [records,forecasts]=await Promise.all([listMemoryRecords(recordOffset,readTimeoutMs),listMemoryForecasts(false,forecastOffset,readTimeoutMs)]);
+ return {ok:true,version:MEMORY_VERSION,readOnly:true,modelRequestsUsed:0,page:{recordOffset,forecastOffset,recordPageSize:20,forecastPageSize:10},records,forecasts:await Promise.all(forecasts.filter((p):p is MemoryForecast=>!!p).map(async plan=>{try{return await inspectForecast(plan!,readTimeoutMs);}catch{return {plan:plan!,currentSourceAssessment:null,storedAssessments:[],evaluationMessage:'Auswertung derzeit nicht verfügbar; Szenario bleibt unverändert gespeichert.'};}})),
   limits:'Seitenweise 20 normale Protokolle und 10 Szenarien; ältere Einträge werden nicht gelöscht. Quellenlisten sind keine Prognosen. USER_REGISTERED ist keine KI-Prognose. AI_GENERATED sind ausdrücklich erzeugte, inhaltlich ungeprüfte Szenarien; primär 20 Intervalle, 5/10 sekundär. ABSTAIN bleibt im getrennten Szenarioarchiv, ohne Richtungsauswertung. Keine gepoolte Trefferquote, Optionsrendite oder aktive Erinnerungsnutzung.'};
 }
 export async function readResearchMemoryRecord(id:string){const entry=await readMemoryRecord(id);return entry?{ok:true,readOnly:true,modelRequestsUsed:0,meta:entry.meta,original:unpackMemoryRecord(entry)}:{ok:false,readOnly:true,modelRequestsUsed:0,message:'Protokolleintrag nicht vorhanden.'};}

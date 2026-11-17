@@ -30,11 +30,11 @@ export async function finishCronAudit(start:Start|null,finish:Finish){
  return {id:start.id,startPersisted:start.startPersisted,persisted,status:record.status,maintenanceStatus:record.maintenanceStatus,modelRequestsUsed:0};
 }
 function decode(raw:unknown,id:string){const e=object(raw);if(typeof e.text!=='string'||Buffer.byteLength(e.text)>16000||digest(e.text)!==e.hash)throw Error('CRON_AUDIT_HASH');const r=object(JSON.parse(e.text));if(r.id!==id||r.version!=='CRON_AUDIT_V1')throw Error('CRON_AUDIT_FRAME');return r;}
-export async function readCronAudit(){
- const pointer=object(await memoryBounded(Redis.fromEnv().get(PREFIX+':latest')));
+export async function readCronAudit(timeoutMs=1200){
+ const pointer=object(await memoryBounded(Redis.fromEnv().get(PREFIX+':latest'),timeoutMs));
  if(pointer.id===undefined)return {status:'NOT_RECORDED',latest:null,readOnly:true,modelRequestsUsed:0,memoryWritten:false,meaning:'Noch kein autorisierter Routenstart protokolliert. Kein Nachweis eines erfolgreichen oder ausgebliebenen geplanten Laufs.'};
  if(typeof pointer.id!=='string'||!/^[a-f0-9]{64}$/.test(pointer.id))throw Error('CRON_AUDIT_POINTER');
- const rows=await memoryBounded(Redis.fromEnv().mget<unknown[]>(PREFIX+':run:'+pointer.id+':start',PREFIX+':run:'+pointer.id+':finish'));
+ const rows=await memoryBounded(Redis.fromEnv().mget<unknown[]>(PREFIX+':run:'+pointer.id+':start',PREFIX+':run:'+pointer.id+':finish'),timeoutMs);
  const start=decode(rows[0],pointer.id);if(Date.parse(String(start.startedAt))!==pointer.startedMs||start.status!=='STARTED')throw Error('CRON_AUDIT_START_FRAME');
  const end=rows[1]===null?null:decode(rows[1],pointer.id);
  if(end&&(end.startedAt!==start.startedAt||!['COMPLETED','FAILED'].includes(String(end.status))))throw Error('CRON_AUDIT_FINISH_FRAME');

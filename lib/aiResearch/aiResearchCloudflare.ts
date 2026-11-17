@@ -93,7 +93,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
     }
   }
   const effectiveSystemPrompt = memoryIncluded ? SOURCE_REVIEW_PROMPT + "\n\n" + MEMORY_RETRIEVAL_SYSTEM_RULES : SOURCE_REVIEW_PROMPT;
-  quality.normalizations.push(memoryIncluded ? `FORECAST_MEMORY_RETRIEVAL_V2_INCLUDED_${memoryCasesIncluded}_CASES` : memoryContext?.caseCount === -1 ? "FORECAST_MEMORY_RETRIEVAL_V2_READ_UNAVAILABLE" : memoryContext?.caseCount ? "FORECAST_MEMORY_RETRIEVAL_V2_OMITTED_INPUT_BUDGET" : "FORECAST_MEMORY_RETRIEVAL_V2_NO_ELIGIBLE_CASES");
+  quality.normalizations.push(memoryIncluded ? `FORECAST_MEMORY_RETRIEVAL_V3_INCLUDED_${memoryCasesIncluded}_CASES` : memoryContext?.caseCount === -1 ? "FORECAST_MEMORY_RETRIEVAL_V3_READ_UNAVAILABLE" : memoryContext?.caseCount ? "FORECAST_MEMORY_RETRIEVAL_V3_OMITTED_INPUT_BUDGET" : "FORECAST_MEMORY_RETRIEVAL_V3_NO_ELIGIBLE_CASES");
   const identity = JSON.stringify({sourcePayloadHash:createHash("sha256").update(sourceRequest.payload).digest("hex"),model:MODEL,transportProfile:RESEARCH_TRANSPORT_PROFILE,generationProfile:SYNTHESIS_GENERATION_PROFILE,prompt:effectiveSystemPrompt,domainVersion:CONCEPT_VERSION,contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
     question:text(input.context.question,500),appFactsPolicy:APP_FACTS_POLICY,appFacts:report.appFacts??null,...structuredInput});
   let payload=sourceRequest.payload;
