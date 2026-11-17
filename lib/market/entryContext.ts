@@ -1,13 +1,23 @@
 const num=(v:any):number|null=>typeof v==='number'&&Number.isFinite(v)?v:null;
 const day=(v:any):string|null=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T00:00:00Z'))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v?v:null;
+const completedDailyCutoff=(now:Date):string=>{
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(now);
+ const get=(name:string)=>parts.find(p=>p.type===name)?.value??'';
+ const date=`${get('year')}-${get('month')}-${get('day')}`;
+ return Number(get('hour'))>=18?date:new Date(Date.parse(date+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+};
 export function buildEntryContext(frame:any){
  const now=Date.parse(frame?.timestamp??''),indices=frame?.indices??{},futures=frame?.futures??{};
+ const cutoff=Number.isFinite(now)?completedDailyCutoff(new Date(now)):null;
  const specs=[{market:'NASDAQ',index:indices.nasdaq??indices.ndx,future:futures.nasdaq??futures.nq,symbol:'NQ=F'},{market:'RUSSELL_2000',index:indices.russell??indices.rut,future:futures.russell??futures.rty,symbol:'RTY=F'}];
  return {version:'STRUCTURE_VS_NEW_ENTRY_CONTEXT_V2',snapshotTimestamp:frame?.timestamp??null,productionEntryRulesChanged:false,heuristicCalibrated:false,markets:specs.map(s=>{
-  const q=s.index?.priceMetrics?.dataQuality??{},rows=Array.isArray(q.observedSessions)?q.observedSessions:[];
-  const ordered=rows.length>=2&&rows.every((r:any,i:number)=>day(r.date)!==null&&(i===0||rows[i-1].date<r.date));
+  const q=s.index?.priceMetrics?.dataQuality??{},allRows=Array.isArray(q.observedSessions)?q.observedSessions:[];
+  const ordered=allRows.length>=2&&allRows.every((r:any,i:number)=>day(r.date)!==null&&(i===0||allRows[i-1].date<r.date));
+  // Match the exact same New York completed-session cutoff as the Research chart.
+  // A newer provider bar can exist before its daily close is eligible for Research.
+  const rows=ordered&&cutoff?allRows.filter((r:any)=>r.date<=cutoff):[];
   const last=rows.at(-1),prior=rows.at(-2),cashDate=ordered&&q.latestEndpointAvailable!==false?day(last?.date):null;
-  const priceOK=cashDate!==null&&Number.isFinite(now)&&cashDate<=new Date(now).toISOString().slice(0,10)&&num(last?.close)!==null&&last.close>0&&num(prior?.close)!==null&&prior.close>0;
+  const priceOK=cashDate!==null&&cutoff!==null&&Number.isFinite(now)&&cashDate<=cutoff&&num(last?.close)!==null&&last.close>0&&num(prior?.close)!==null&&prior.close>0;
   const return1D=priceOK?(last.close/prior.close-1)*100:null;
   const earlier:number[]=[];
   if(priceOK)for(let i=1;i<rows.length-1;i++)if(num(rows[i].close)!==null&&rows[i].close>0&&num(rows[i-1].close)!==null&&rows[i-1].close>0)earlier.push((rows[i].close/rows[i-1].close-1)*100);
