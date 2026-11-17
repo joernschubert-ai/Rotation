@@ -3,7 +3,7 @@ import {inspectMemoryAudit} from './aiResearchMemoryAudit';
 export interface ForecastMemoryContext { text:string; caseCount:number; }
 export const MEMORY_RETRIEVAL_SYSTEM_RULES = "Wenn der folgende historische Gedächtnisblock vorhanden ist, nutze ihn ausschließlich als datierten Vergleich früherer App-Prognosen mit beobachteten Indexschlusskursen. Vergleiche Abfolge und Kontext mit dem heutigen Stand, nenne Unterschiede und Unsicherheit. Die kleine oder überlappende Stichprobe liefert weder Trefferquote noch Wahrscheinlichkeit. Überstimme keine aktuellen App-Fakten und ändere keine App-Freigabe, Scores, Trade-Stack- oder Positionsgrößenentscheidung. Ein ähnlicher Fall ist kein Wiederholungsversprechen.";
 const pct=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)?`${v>0?'+':''}${v.toFixed(2)}%`:'unavailable';
-async function bounded<T>(work:Promise<T>,ms=1800):Promise<T>{let timer:ReturnType<typeof setTimeout>|undefined;try{return await Promise.race([work,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('MEMORY_RETRIEVAL_TIMEOUT')),ms);})]);}finally{if(timer)clearTimeout(timer);}}
+async function bounded<T>(work:Promise<T>,ms=6000):Promise<T>{let timer:ReturnType<typeof setTimeout>|undefined;try{return await Promise.race([work,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('MEMORY_RETRIEVAL_TIMEOUT')),ms);})]);}finally{if(timer)clearTimeout(timer);}}
 
 /** Read-only pilot retrieval. Only exact, clean forecasts from the fixed clean-start cohort enter a model request. */
 export async function loadResearchMemoryContext():Promise<ForecastMemoryContext>{
@@ -21,14 +21,14 @@ export async function loadResearchMemoryContext():Promise<ForecastMemoryContext>
   const lines=eligible.map((row:any)=>{
    const p=row.plan,assessment=row.currentSourceAssessment,anchor=assessment?.anchor;
    const outcomes=Array.isArray(assessment?.outcomes)?assessment.outcomes.filter((o:any)=>o?.status==='MATURED_OBSERVED'&&o?.metrics&&[5,10,20].includes(o.horizon)).map((o:any)=>{
-    const m=o.metrics;return `${o.horizon} observed closes through ${m.endDate}: index ${pct(m.indexReturnPct)}, directionalHit ${m.directionalHit===true?'yes':m.directionalHit===false?'no':'unknown'}, max/min close path ${pct(m.maxCloseReturnPct)}/${pct(m.minCloseReturnPct)}`;
+    const m=o.metrics;return `${o.horizon}@${String(m.endDate).slice(5)} ${pct(m.indexReturnPct)} hit=${m.directionalHit===true?'yes':m.directionalHit===false?'no':'?'} path=${pct(m.maxCloseReturnPct)}/${pct(m.minCloseReturnPct)}`;
    }):[];
-   return `- ${p.market} ${p.direction}; issued ${String(p.createdAt).slice(0,10)}; first eligible observed close ${anchor?.date??'not observed'}${outcomes.length?'; '+outcomes.join('; '):'; outcome still waiting'}; thesis: ${String(p.statement).slice(0,220)}; counterpoint: ${String(p.counterargument).slice(0,160)}`;
+   return `- ${p.market}/${p.direction} ${String(p.createdAt).slice(5,10)} anchor=${anchor?.date?.slice(5)??'?'} ${outcomes.join(' ')} T:${String(p.statement).slice(0,55)} C:${String(p.counterargument).slice(0,35)}`;
   });
   return {caseCount:eligible.length,text:[
-   `Fixed clean-start cohort; ${eligible.length} provenance-checked forecast(s), ${episodeCount} originating episode(s). Include all selected cases regardless of direction or result; this is a tiny, potentially overlapping sample, not a hit rate or calibrated probability. Dates/outcomes are observed index closes, not option returns or actionable entry prices.`,
+   `${eligible.length} geprüfte Fälle/${episodeCount} Ursprungsfolge(n); kleine Stichprobe, keine Trefferquote.`,
    ...lines,
    'Description: historical close-based cases; tiny or overlapping sample; not a hit rate, probability, option return, or actionable entry price.'
   ].join('\n')};
- }catch{return {text:'',caseCount:0};}
+ }catch{return {text:'',caseCount:-1};}
 }

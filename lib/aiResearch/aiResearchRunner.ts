@@ -127,7 +127,7 @@ export async function runAIResearchFromHistory(
       historicalEvidence,
     });
     const result = runAIResearch(researchInput);
-    const forecastMemory = memoryLoad.status === "fulfilled" ? memoryLoad.value : { text: "", caseCount: 0 };
+    const forecastMemory = memoryLoad.status === "fulfilled" ? memoryLoad.value : { text: "", caseCount: -1 };
     if (result.status === "SUCCESS" && result.report && historicalEvidence) {
       // Always retain dated descriptive data, including baselines and failures.
       // A missing current-day match must not silently remove the whole dataset.
