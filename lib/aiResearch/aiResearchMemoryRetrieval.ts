@@ -3,19 +3,19 @@ import {inspectMemoryAudit} from './aiResearchMemoryAudit';
 export interface ForecastMemoryContext { text:string; caseCount:number; }
 export const MEMORY_RETRIEVAL_SYSTEM_RULES = "Wenn der folgende historische Gedächtnisblock vorhanden ist, nutze ihn ausschließlich als datierten Vergleich früherer App-Prognosen mit beobachteten Indexschlusskursen. Vergleiche Abfolge und Kontext mit dem heutigen Stand, nenne Unterschiede und Unsicherheit. Die kleine oder überlappende Stichprobe liefert weder Trefferquote noch Wahrscheinlichkeit. Überstimme keine aktuellen App-Fakten und ändere keine App-Freigabe, Scores, Trade-Stack- oder Positionsgrößenentscheidung. Ein ähnlicher Fall ist kein Wiederholungsversprechen.";
 const pct=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)?`${v>0?'+':''}${v.toFixed(2)}%`:'unavailable';
-async function bounded<T>(work:Promise<T>,ms=6000):Promise<T>{let timer:ReturnType<typeof setTimeout>|undefined;try{return await Promise.race([work,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('MEMORY_RETRIEVAL_TIMEOUT')),ms);})]);}finally{if(timer)clearTimeout(timer);}}
+async function bounded<T>(work:Promise<T>,ms=12000):Promise<T>{let timer:ReturnType<typeof setTimeout>|undefined;try{return await Promise.race([work,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('MEMORY_RETRIEVAL_TIMEOUT')),ms);})]);}finally{if(timer)clearTimeout(timer);}}
 
 /** Read-only pilot retrieval. Only exact, clean forecasts from the fixed clean-start cohort enter a model request. */
 export async function loadResearchMemoryContext():Promise<ForecastMemoryContext>{
  try{
   const audit:any=await bounded(inspectMemoryAudit(0,0));
   const rows=Array.isArray(audit?.forecasts)?audit.forecasts:[];
-  const eligible=rows.filter((row:any)=>row?.plan?.attribution==='AI_GENERATED'&&
-    ['NEW_GROUP_OBSERVED','NEW_GROUP_WAITING'].includes(row?.evaluationCohort?.group)&&
-    Array.isArray(row?.audit?.issues)&&row.audit.issues.length===0&&
-    row.audit.sourceCheck==='SOURCE_META_MATCHES'&&row.audit.scenarioCheck==='EXACT_ORIGINAL_FORECAST'&&
-    row?.plan?.scenarioEpisodeId&&row?.plan?.market&&row?.plan?.direction)
-   .sort((a:any,b:any)=>Date.parse(b.plan.createdAt)-Date.parse(a.plan.createdAt)).slice(0,4);
+  const check=audit?.retrievalCheck;
+  if(check?.version!=='FORECAST_MEMORY_RETRIEVAL_DIAGNOSTIC_V1'||!Array.isArray(check.selectedCases))return {text:'',caseCount:-1};
+  const selectedIds=new Set(check.selectedCases.map((item:any)=>item?.forecastId).filter((id:any)=>typeof id==='string'));
+  const eligible=rows.filter((row:any)=>selectedIds.has(row?.plan?.id));
+  if(eligible.length!==selectedIds.size)return {text:'',caseCount:-1};
+  eligible.sort((a:any,b:any)=>Date.parse(b.plan.createdAt)-Date.parse(a.plan.createdAt));
   if(!eligible.length)return {text:'',caseCount:0};
   const episodeCount=new Set(eligible.map((row:any)=>row.plan.scenarioEpisodeId)).size;
   const lines=eligible.map((row:any)=>{
