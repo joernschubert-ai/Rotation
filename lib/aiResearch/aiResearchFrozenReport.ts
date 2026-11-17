@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {gzipSync,gunzipSync} from 'node:zlib';
 import {Redis} from '@upstash/redis';
 import type {AIResearchResult,AIResearchTask} from './aiResearchTypes';
-import {recheckSourceReview,sourceFactsHash} from './aiResearchSourceReview';
+import {recheckSourceReview,sourceFactsHash,sourceReviewUsable} from './aiResearchSourceReview';
 const VERSION='FROZEN_RESEARCH_V79_3',PREFIX='rotation:research:frozen:v79.3';
 const MAX_RAW_BYTES=4_000_000,MAX_COMPRESSED_CHARACTERS=900_000;
 interface FrozenFrame {version:string;snapshotTimestamp:string;task:AIResearchTask;questionHash:string;snapshotHash:string;preparedAt:number;priority:number;factsHash:string;payloadHash:string;payload:string;}
@@ -41,7 +41,7 @@ export async function readFrozenResearchReport(snapshotTimestamp:string,task:AIR
   const synthesis=result.report.aiSynthesis;
   if(synthesis){
    if(synthesis.snapshotTimestamp!==snapshotTimestamp)return null;
-   if(synthesis.sourceReview){const review=recheckSourceReview(synthesis.sourceReview,facts);if(!review)return null;synthesis.sourceReview=review;synthesis.status=review.status==='VALID_SELECTION'?'SUCCESS':'UNAVAILABLE';}
+   if(synthesis.sourceReview){const review=recheckSourceReview(synthesis.sourceReview,facts);if(!review)return null;synthesis.sourceReview=review;synthesis.status=sourceReviewUsable(review)?'SUCCESS':'UNAVAILABLE';}
    synthesis.modelRequestsUsed=0;synthesis.cached=true;
   }
   result.diagnostics={...result.diagnostics,snapshotTimestamp,warnings:[...new Set([...(result.diagnostics?.warnings??[]),'Gespeicherter vollständiger Researchstand: Nachrichten, App-Fakten und KI-Antwort stammen gemeinsam aus diesem Bericht. Beim Lesen wurden keine Quellen neu abgerufen und kein KI-Aufruf gestartet.'])]};

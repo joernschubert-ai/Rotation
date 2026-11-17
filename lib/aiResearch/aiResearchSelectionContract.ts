@@ -22,7 +22,10 @@ export function validateSelection(raw:unknown,context:base.SelectionContext){
   const hasChangeCondition=Object.hasOwn(row,'changeConditionId');
   const allowedKeys=hasChangeCondition?['instrument','stance','arguments','hypothesis','changeConditionId']:['instrument','stance','arguments','hypothesis'];
   if(!exact(row,allowedKeys)||!base.INSTRUMENTS.includes(row.instrument)||seenInstruments.has(row.instrument)){issue(p,'INSTRUMENT_SCHEMA','Genau eigene Instrumentfelder erwartet; changeConditionId darf fehlen und gilt dann als null. Keine alten supports/opposes/readings oder doppelten Instrumente.');continue;}
-  const normalizedRow={...row,changeConditionId:hasChangeCondition?row.changeConditionId:null};
+  const stanceAliases:Partial<Record<string,base.Stance>>={SUPPORTS:'CONTEXT_SUPPORTS',OPPOSES:'CONTEXT_OPPOSES'};
+  const normalizedStance=typeof row.stance==='string'?stanceAliases[row.stance]??row.stance:row.stance;
+  const normalizedRow={...row,stance:normalizedStance,changeConditionId:hasChangeCondition?row.changeConditionId:null};
+  if(normalizedStance!==row.stance)advisories.push({path:p+'.stance',code:'STANCE_ALIAS_NORMALIZED',message:`${row.stance} wurde als ${normalizedStance} übernommen; die Originalantwort bleibt unverändert.`});
   seenInstruments.add(row.instrument);
   if(!Array.isArray(row.arguments)){issue(p+'.arguments','ARGUMENT_LIST','Eine einzige Argumentliste wird benötigt.');continue;}
   if(row.arguments.length>8)advisories.push({path:p+'.arguments',code:'MANY_ARGUMENTS',message:'Mehr als acht Quellen gewählt. Dies ist ein Darstellungshinweis, kein fachlicher Fehler. Abhängige MA-/P&F-Befunde nicht als unabhängige Stimmen zählen.'});

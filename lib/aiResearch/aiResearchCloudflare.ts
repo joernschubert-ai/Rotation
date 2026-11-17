@@ -1,4 +1,4 @@
-import {prepareSourceReview,evaluateSourceReview,recheckSourceReview} from './aiResearchSourceReview';
+import {prepareSourceReview,evaluateSourceReview,recheckSourceReview,sourceReviewUsable} from './aiResearchSourceReview';
 import {SOURCE_REVIEW_PROMPT} from './aiResearchSourceReviewPrompt';
 import { RESEARCH_MODEL, RESEARCH_TRANSPORT_PROFILE, researchTransport } from './aiResearchModel';
 import { buildResearchConcepts, CONCEPT_VERSION, type ResearchConcepts } from "./aiResearchConcepts";
@@ -131,7 +131,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
     await saveFrozenRequest(redis,freezeRequest(snapshotTimestamp,effectiveSystemPrompt,sourceRequest.payload,SYNTHESIS_GENERATION_PROFILE.temperature,SYNTHESIS_GENERATION_PROFILE.maxTokens));
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
     if (cached?.model === MODEL && cached.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
-      if (cached.sourceReview) {const sourceReview=recheckSourceReview(cached.sourceReview,report.appFacts);if(!sourceReview)return unavailable('Der gespeicherte Quellenbericht gehört zu einem anderen Faktenbestand. Keine Anfrage ausgelöst.');if(sourceReview.status==='VALID_SELECTION'||!allowGeneration)return {...cached,status:sourceReview.status==='VALID_SELECTION'?'SUCCESS':'UNAVAILABLE',sourceReview,message:sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; Originalantwort unverändert.':cached.message,narrative:undefined,content:undefined,cached:true,weightingContexts,priceReferences,cotDataQuality,cotAnalysis,domainConcepts,modelRequestsUsed};}
+      if (cached.sourceReview) {const sourceReview=recheckSourceReview(cached.sourceReview,report.appFacts);if(!sourceReview)return unavailable('Der gespeicherte Quellenbericht gehört zu einem anderen Faktenbestand. Keine Anfrage ausgelöst.');if(sourceReviewUsable(sourceReview)||!allowGeneration)return {...cached,status:sourceReviewUsable(sourceReview)?'SUCCESS':'UNAVAILABLE',sourceReview,message:sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; Originalantwort unverändert.':cached.message,narrative:undefined,content:undefined,cached:true,weightingContexts,priceReferences,cotDataQuality,cotAnalysis,domainConcepts,modelRequestsUsed};}
       if (!allowGeneration && cached.status === "UNAVAILABLE" && cached.quality.issues.length) {
         if (allowGeneration) await storeRejectedDiagnosis(cached);
         return { ...cached, cached: true, weightingContexts, priceReferences, cotDataQuality, cotAnalysis, domainConcepts, modelRequestsUsed };
@@ -153,7 +153,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
     stage = "CACHE_RECHECK";
     const completed = await redis.get<ResearchSynthesis>(cacheKey);
     if (completed?.model === MODEL && completed.snapshotTimestamp === snapshotTimestamp && completed.quality?.contractVersion === SYNTHESIS_CONTRACT) {
-      if (completed.sourceReview) {const sourceReview=recheckSourceReview(completed.sourceReview,report.appFacts);if(!sourceReview)return unavailable('Der gespeicherte Quellenbericht gehört zu einem anderen Faktenbestand. Keine Anfrage ausgelöst.');if(sourceReview.status==='VALID_SELECTION'||!allowGeneration)return {...completed,status:sourceReview.status==='VALID_SELECTION'?'SUCCESS':'UNAVAILABLE',sourceReview,message:sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; Originalantwort unverändert.':completed.message,narrative:undefined,content:undefined,cached:true,weightingContexts,priceReferences,cotDataQuality,cotAnalysis,domainConcepts,modelRequestsUsed};}
+      if (completed.sourceReview) {const sourceReview=recheckSourceReview(completed.sourceReview,report.appFacts);if(!sourceReview)return unavailable('Der gespeicherte Quellenbericht gehört zu einem anderen Faktenbestand. Keine Anfrage ausgelöst.');if(sourceReviewUsable(sourceReview)||!allowGeneration)return {...completed,status:sourceReviewUsable(sourceReview)?'SUCCESS':'UNAVAILABLE',sourceReview,message:sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; Originalantwort unverändert.':completed.message,narrative:undefined,content:undefined,cached:true,weightingContexts,priceReferences,cotDataQuality,cotAnalysis,domainConcepts,modelRequestsUsed};}
       if (!allowGeneration && completed.status === "UNAVAILABLE" && completed.quality.issues.length) {
         await storeRejectedDiagnosis(completed);
         return { ...completed, cached: true, weightingContexts, priceReferences, cotDataQuality, cotAnalysis, domainConcepts, modelRequestsUsed };
@@ -229,14 +229,15 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
     stage='ANSWER_VALIDATION';
     const sourceReview=evaluateSourceReview(raw,providerDiagnostics.finishReason,report.appFacts);
     const accepted=sourceReview.status==='VALID_SELECTION';
-    const result:ResearchSynthesis={status:accepted?'SUCCESS':'UNAVAILABLE',model:MODEL,generatedAt:new Date().toISOString(),snapshotTimestamp,cached:false,
-      message:accepted?'Quellenwahl geprüft. Sachliche Zustandsbeschreibung aus App-Daten; KI-Abwägung bleibt ungeprüft. Keine zusätzliche Einstiegsfreigabe.':sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; App-Fakten und unveränderte Originalantwort bleiben sichtbar. Keine automatische Wiederholung.':'Die Quellenantwort ist unvollständig oder ungültig. App-Fakten bleiben verfügbar; keine automatische Wiederholung.',
+    const usable=sourceReviewUsable(sourceReview);
+    const result:ResearchSynthesis={status:usable?'SUCCESS':'UNAVAILABLE',model:MODEL,generatedAt:new Date().toISOString(),snapshotTimestamp,cached:false,
+      message:accepted?'Quellenwahl geprüft. Sachliche Zustandsbeschreibung aus App-Daten; KI-Abwägung bleibt ungeprüft. Keine zusätzliche Einstiegsfreigabe.':usable?'Quellenwahl teilweise übernommen. Gültige Instrumente bleiben sichtbar; nur fehlerhafte Teile werden zurückgehalten.':'Die Quellenantwort ist unvollständig oder ungültig. App-Fakten bleiben verfügbar; keine automatische Wiederholung.',
       sourceReview,quality:{...quality,providerDiagnostics,providerText:typeof raw==='string'?raw:undefined,
        issues:accepted?[]:[...sourceReview.validation.issues.map(i=>`${i.code} @ ${i.path}: ${i.message}`),...(sourceReview.status==='OUTPUT_INCOMPLETE'?['PROVIDER_OUTPUT_LIMIT_REACHED']:[])],
        normalizations:[...quality.normalizations,'APP_DERIVED_STATE_AND_SOURCE_FRAGMENTS','UNMODIFIED_HYPOTHESIS_UNVERIFIED']}};
-    stage=accepted?'APPROVED_ANSWER_CACHE_WRITE':'REJECTED_ANSWER_CACHE_WRITE';
+    stage=usable?'APPROVED_ANSWER_CACHE_WRITE':'REJECTED_ANSWER_CACHE_WRITE';
     const diagnosed=withTiming(result);
-    if(!accepted)await storeRejectedDiagnosis(diagnosed);
+    if(!usable)await storeRejectedDiagnosis(diagnosed);
     await redis.set(cacheKey,diagnosed,{ex:900});
     return diagnosed;
   } catch (error) {
@@ -283,14 +284,14 @@ export async function synthesizeResearch(input:AIResearchInput,report:AIResearch
  };
  try{
   const redis=Redis.fromEnv();
-  if(result.status==='SUCCESS'&&!result.narrative?.truncated&&(result.sourceReview?.status==='VALID_SELECTION'||result.content||hasNarrative(result.narrative))){
+  if(result.status==='SUCCESS'&&!result.narrative?.truncated&&(sourceReviewUsable(result.sourceReview)||result.content||hasNarrative(result.narrative))){
    const previousSuccessful={snapshotTimestamp:result.snapshotTimestamp,generatedAt:result.generatedAt,model:result.model,sourceReview:result.sourceReview,content:result.content,narrative:result.narrative};
    await bounded(redis.eval<string[],number>(
     "-- LAST_SUCCESS_V27\nlocal prev=redis.call('GET',KEYS[1]) if prev then local ok,v=pcall(cjson.decode,prev) if ok and type(v)=='table' and tonumber(v.snapshotTime or '0')>tonumber(ARGV[2]) then return 0 end end redis.call('SET',KEYS[1],ARGV[1],'EX',2592000) return 1",
     [key],[JSON.stringify({...previousSuccessful,snapshotTime:Date.parse(result.snapshotTimestamp)}),String(Date.parse(result.snapshotTimestamp))]));
   }else{
    const previous=await bounded(redis.get<ResearchSynthesis['previousSuccessful']>(key));
-   if(previous&&typeof previous.snapshotTimestamp==='string'&&(previous.sourceReview?.status==='VALID_SELECTION'||(Array.isArray(previous.content?.flows)&&previous.content.flows.length)||hasNarrative(previous.narrative))&&Date.parse(previous.snapshotTimestamp)<=Date.now())result.previousSuccessful=previous;
+   if(previous&&typeof previous.snapshotTimestamp==='string'&&(sourceReviewUsable(previous.sourceReview)|| (Array.isArray(previous.content?.flows)&&previous.content.flows.length)||hasNarrative(previous.narrative))&&Date.parse(previous.snapshotTimestamp)<=Date.now())result.previousSuccessful=previous;
   }
  }catch{/* Optional last-report preservation does not trigger model calls or suppress the current result. */}
  return result;

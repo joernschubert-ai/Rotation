@@ -20,6 +20,9 @@ export interface SourceReview {
  view:ReturnType<typeof renderSelection>;
  semanticTruthVerified:false;
 }
+export function sourceReviewUsable(review:Pick<SourceReview,'status'|'view'>|null|undefined):boolean{
+ return !!review&&(review.status==='VALID_SELECTION'||(review.status==='PARTIAL_SELECTION'&&!!review.view?.length));
+}
 export function sourceFactsHash(facts:AppFacts){return createHash('sha256').update(JSON.stringify(facts)).digest('hex');}
 /** Uses only canonical app text; model hypotheses never enter the state description. */
 export function buildAppStateCards(facts:AppFacts):AppStateCard[]{
