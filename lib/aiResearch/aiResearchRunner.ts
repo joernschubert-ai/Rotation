@@ -2,6 +2,7 @@ import {loadRecoveryStudy} from './aiResearchAnticyclicalService';
 import {attachAnticyclicalContext} from './aiResearchAnticyclicalContext';
 import {buildEntryContext} from '../market/entryContext';
 import {archiveResearchMemory} from './aiResearchMemoryService';
+import {loadResearchMemoryContext, MEMORY_RETRIEVAL_SYSTEM_RULES} from './aiResearchMemoryRetrieval';
 import {digest} from './aiResearchMemoryProtocol';
 import {SOURCE_REVIEW_PROMPT} from './aiResearchSourceReviewPrompt';
 import {RESEARCH_TRANSPORT_PROFILE} from './aiResearchModel';
@@ -56,6 +57,7 @@ export async function runAIResearchFromHistory(
       if(saved)return saved;
       return {status:'INSUFFICIENT_DATA',report:null,diagnostics:{snapshotTimestamp:latest.timestamp,historyCount:frames.length,sourceCount:0,warnings:['Noch kein eingefrorener Bericht für diesen Snapshot, diese Aufgabe und Frage gespeichert. Nachrichten wurden nicht neu abgerufen. Einmal bewusst Research aktualisieren, um einen zusammengehörigen Bericht zu erzeugen. Kein KI-Aufruf beim Lesen.']}};
     }
+    const memoryPromise = input.allowAIGeneration === true ? timed("memoryRetrievalMs", () => loadResearchMemoryContext()) : Promise.resolve({ text: "", caseCount: 0 });
     // Historical loading only needs the saved snapshot, not news or COT.
     // Start it as soon as history is ready instead of waiting for all providers.
     const historicalPromise = historyPromise.then(history => {
@@ -68,12 +70,13 @@ export async function runAIResearchFromHistory(
     });
     // Optional providers fail independently. History remains the required basis.
     // Promise.resolve also captures a provider that throws synchronously.
-    const [historyLoad, newsLoad, cotLoad, historicalLoad, recoveryLoad] = await Promise.allSettled([
+    const [historyLoad, newsLoad, cotLoad, historicalLoad, recoveryLoad, memoryLoad] = await Promise.allSettled([
       historyPromise,
       timed("newsMs", () => fetchExternalResearchSources({ task: input.task })),
       timed("cotMs", () => fetchCOTData()),
       historicalPromise,
       timed("anticyclicalMs",()=>loadRecoveryStudy()),
+      memoryPromise,
     ]);
     if (historyLoad.status === "rejected") {
       throw new Error(`Required market history unavailable: ${message(historyLoad.reason)}`);
@@ -124,6 +127,7 @@ export async function runAIResearchFromHistory(
       historicalEvidence,
     });
     const result = runAIResearch(researchInput);
+    const forecastMemory = memoryLoad.status === "fulfilled" ? memoryLoad.value : { text: "", caseCount: 0 };
     if (result.status === "SUCCESS" && result.report && historicalEvidence) {
       // Always retain dated descriptive data, including baselines and failures.
       // A missing current-day match must not silently remove the whole dataset.
@@ -168,7 +172,7 @@ export async function runAIResearchFromHistory(
         timings.preparationMs = Date.now() - startedAt;
         result.report.aiSynthesis = await timed("synthesisMs", () => synthesizeResearch(researchInput, result.report!, input.allowAIGeneration === true, {
           requestStartedAt: startedAt, deadlineAt: startedAt + 55000, preparationMs: timings.preparationMs,
-        }));
+        }, forecastMemory));
       } catch {
         warnings.push("KI-Synthese nicht verfügbar; regelbasierter Bericht bleibt unverändert.");
       }
@@ -183,7 +187,7 @@ export async function runAIResearchFromHistory(
     if(input.allowAIGeneration===true&&result.status==='SUCCESS'&&result.report?.appFacts){
       const saved=await saveFrozenResearchReport(currentSnapshot.timestamp,input.task,input.question,result,startedAt,researchSnapshotHash(currentSnapshot));
       if(!saved)result.diagnostics.warnings=[...(result.diagnostics.warnings??[]),'Der neue Bericht konnte nicht als eingefrorener Lesestand gespeichert werden oder ein neuerer/vollständigerer Bericht blieb erhalten. Keine zusätzliche KI-Anfrage ausgelöst.'];
-      try{const memory=await archiveResearchMemory(result,input.task,{origin:'NORMAL_RESEARCH_PIPELINE',question:typeof input.question==='string'?input.question.slice(0,500):'',snapshotHash:researchSnapshotHash(currentSnapshot),generationProfile:result.report.aiSynthesis?.cached===false?SYNTHESIS_GENERATION_PROFILE:null,systemPromptHash:result.report.aiSynthesis?.cached===false?digest(SOURCE_REVIEW_PROMPT):null,transportProfile:result.report.aiSynthesis?.cached===false?RESEARCH_TRANSPORT_PROFILE:null,providerRequestId:null});
+      try{const memory=await archiveResearchMemory(result,input.task,{origin:'NORMAL_RESEARCH_PIPELINE',question:typeof input.question==='string'?input.question.slice(0,500):'',snapshotHash:researchSnapshotHash(currentSnapshot),generationProfile:result.report.aiSynthesis?.cached===false?SYNTHESIS_GENERATION_PROFILE:null,systemPromptHash:result.report.aiSynthesis?.cached===false?digest(SOURCE_REVIEW_PROMPT+(result.report.aiSynthesis.quality?.normalizations?.some(x=>x.startsWith("FORECAST_MEMORY_RETRIEVAL_V1_INCLUDED_"))?"\n\n"+MEMORY_RETRIEVAL_SYSTEM_RULES:"")):null,transportProfile:result.report.aiSynthesis?.cached===false?RESEARCH_TRANSPORT_PROFILE:null,providerRequestId:null});
       if(!memory.ok)result.diagnostics.warnings=[...(result.diagnostics.warnings??[]),'Gedächtnisablage nicht bestätigt; keine zusätzliche KI-Anfrage ausgelöst.'];}catch{result.diagnostics.warnings=[...(result.diagnostics.warnings??[]),'Gedächtnisablage nicht bestätigt; Bericht bleibt unverändert verfügbar.'];}
     }
     return result;

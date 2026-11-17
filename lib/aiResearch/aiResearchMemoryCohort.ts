@@ -39,7 +39,7 @@ export function summarizeMemoryCohort(rows:Array<{evaluationCohort:ReturnType<ty
  newGroupTotal:rows.filter(r=>r.evaluationCohort.group.startsWith('NEW_GROUP_')).length,
  waiting:count('NEW_GROUP_WAITING'),reviewRequired:count('NEW_GROUP_REVIEW_REQUIRED'),withObservedHorizon:count('NEW_GROUP_OBSERVED'),
  observedHorizonResults:rows.reduce((n,r)=>n+r.evaluationCohort.observedMatureHorizons.length,0),
- modelRequestsUsed:0,memoryWritten:false,activeRetrieval:false,hitRateCalculated:false,
- limits:'Nur diese Archivseite. Alte und blockierte neue Faelle bleiben sichtbar. Horizonte und wiederholte Ausgaben sind keine unabhaengigen Faelle. Keine Trefferquote, Optionsrendite oder aktive Lernnutzung. Feste Zeitgrenze verschiebt keine urspruengliche Prognoseuhr.'};
+ modelRequestsUsed:0,memoryWritten:false,activeRetrieval:true,hitRateCalculated:false,
+ limits:'Nur diese Archivseite. Alte und blockierte neue Faelle bleiben sichtbar. Horizonte und wiederholte Ausgaben sind keine unabhaengigen Faelle. Keine Trefferquote, Optionsrendite oder automatisches Training. Geprüfte Beispiele werden begrenzt in neue KI-Berichte zurückgespielt. Feste Zeitgrenze verschiebt keine ursprüngliche Prognoseuhr.'};
 }
 

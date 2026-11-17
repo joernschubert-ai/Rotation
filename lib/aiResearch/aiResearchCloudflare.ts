@@ -24,6 +24,7 @@ import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, normalizeSynthesisEnvelope, SYNTHESIS_CONTRACT } from "./aiResearchLiveQwen";
 import { buildLiveInput, LIVE_RESEARCH_PROMPT as RESEARCH_SYSTEM_PROMPT } from "./aiResearchLiveQwen";
 import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
+import { MEMORY_RETRIEVAL_SYSTEM_RULES } from "./aiResearchMemoryRetrieval";
 export { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 export { validateSynthesis } from "./aiResearchLiveQwen";
 
@@ -36,7 +37,8 @@ const DAILY_LIMIT = 20;
 const text = (value: unknown, limit = 650): string => typeof value === "string" ? value.slice(0, limit) : "";
 
 async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResearchReport, allowGeneration = false,
-  execution: { requestStartedAt?: number; deadlineAt?: number; preparationMs?: number } = {}): Promise<ResearchSynthesis> {
+  execution: { requestStartedAt?: number; deadlineAt?: number; preparationMs?: number } = {},
+  memoryContext?: { text: string; caseCount: number }): Promise<ResearchSynthesis> {
   const synthesisStartedAt = Date.now();
   // Reserve five seconds for validation, storage and returning the response.
   // The dashboard route keeps its existing 60-second limit.
@@ -77,7 +79,22 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
   domainConcepts=buildResearchConcepts(structuredInput);
   let sourceRequest:ReturnType<typeof prepareSourceReview>;
   try{sourceRequest=prepareSourceReview(report.appFacts,input.context.task,text(input.context.question,500));}catch(error){const reason=error instanceof Error?error.message:'';if(reason.startsWith('SOURCE_REVIEW_INPUT_LIMIT:')){let diagnostic:any={};try{diagnostic=JSON.parse(reason.slice('SOURCE_REVIEW_INPUT_LIMIT:'.length));}catch{}const largest=Array.isArray(diagnostic.largestRows)?diagnostic.largestRows.map((row:any)=>row.id+': '+row.characters+' Zeichen').join(', '):'';return unavailable('APP_FACT_INPUT_LIMIT · App-Befundblock '+(diagnostic.characters??'>26.000')+' Zeichen; Grenze 26.000. '+(diagnostic.observationCount??'?')+' Beobachtungen, '+(diagnostic.contextCardCount??'?')+' Kontextkarten. Groesste Faktenzeilen: '+(largest||'nicht verfügbar')+'. Keine KI-Anfrage ausgelöst.');}if(reason==='SOURCE_REVIEW_INPUT_LIMIT')return unavailable('APP_FACT_INPUT_LIMIT · Die App-Belege überschreiten die festgelegte Eingabegrenze von 26.000 Zeichen. Keine KI-Anfrage ausgelöst.');return unavailable('APP_FACT_PREPARATION_FAILED · Die App-Fakten konnten für die Quellenwahl nicht vollständig aufbereitet werden. Keine KI-Anfrage ausgelöst.');}
-  const identity = JSON.stringify({sourcePayloadHash:createHash("sha256").update(sourceRequest.payload).digest("hex"),model:MODEL,transportProfile:RESEARCH_TRANSPORT_PROFILE,generationProfile:SYNTHESIS_GENERATION_PROFILE,prompt:SOURCE_REVIEW_PROMPT,domainVersion:CONCEPT_VERSION,contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
+  const memoryHeader = "\n\n[HISTORISCHES PROGNOSEGEDÄCHTNIS · GEPRÜFTE BEISPIELE, KEIN TRAINING ODER SIGNAL]\n";
+  let memoryIncluded = false;
+  let memoryCasesIncluded = 0;
+  if (memoryContext && memoryContext.caseCount > 0 && memoryContext.text.trim()) {
+    const available = 26000 - sourceRequest.payload.length - memoryHeader.length;
+    if (available >= 80) {
+      const candidate = memoryContext.text.trim().slice(0, Math.min(1800, available));
+      const boundary = candidate.lastIndexOf("\n");
+      const complete = (boundary > 0 ? candidate.slice(0, boundary) : candidate).trim();
+      const includedCases = (complete.match(/^- /gm) ?? []).length;
+      if (includedCases > 0) { sourceRequest.payload += memoryHeader + complete; memoryIncluded = true; memoryCasesIncluded = includedCases; }
+    }
+  }
+  const effectiveSystemPrompt = memoryIncluded ? SOURCE_REVIEW_PROMPT + "\n\n" + MEMORY_RETRIEVAL_SYSTEM_RULES : SOURCE_REVIEW_PROMPT;
+  quality.normalizations.push(memoryIncluded ? `FORECAST_MEMORY_RETRIEVAL_V1_INCLUDED_${memoryCasesIncluded}_CASES` : memoryContext?.caseCount ? "FORECAST_MEMORY_RETRIEVAL_V1_OMITTED_INPUT_BUDGET" : "FORECAST_MEMORY_RETRIEVAL_V1_NO_ELIGIBLE_CASES");
+  const identity = JSON.stringify({sourcePayloadHash:createHash("sha256").update(sourceRequest.payload).digest("hex"),model:MODEL,transportProfile:RESEARCH_TRANSPORT_PROFILE,generationProfile:SYNTHESIS_GENERATION_PROFILE,prompt:effectiveSystemPrompt,domainVersion:CONCEPT_VERSION,contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
     question:text(input.context.question,500),appFactsPolicy:APP_FACTS_POLICY,appFacts:report.appFacts??null,...structuredInput});
   let payload=sourceRequest.payload;
   const withTiming = (value: ResearchSynthesis): ResearchSynthesis => ({ ...value, weightingContexts, priceReferences, cotDataQuality, cotAnalysis, domainConcepts, modelRequestsUsed, indexScenarios:indexScenarios??value.indexScenarios, quality: {
@@ -111,7 +128,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
   };
   try {
     // V49: COT semantics come from deterministic source facts, no specialist inference.
-    await saveFrozenRequest(redis,freezeRequest(snapshotTimestamp,SOURCE_REVIEW_PROMPT,sourceRequest.payload,SYNTHESIS_GENERATION_PROFILE.temperature,SYNTHESIS_GENERATION_PROFILE.maxTokens));
+    await saveFrozenRequest(redis,freezeRequest(snapshotTimestamp,effectiveSystemPrompt,sourceRequest.payload,SYNTHESIS_GENERATION_PROFILE.temperature,SYNTHESIS_GENERATION_PROFILE.maxTokens));
     const cached = await redis.get<ResearchSynthesis>(cacheKey);
     if (cached?.model === MODEL && cached.snapshotTimestamp === snapshotTimestamp && cached.quality?.contractVersion === SYNTHESIS_CONTRACT) {
       if (cached.sourceReview) {const sourceReview=recheckSourceReview(cached.sourceReview,report.appFacts);if(!sourceReview)return unavailable('Der gespeicherte Quellenbericht gehört zu einem anderen Faktenbestand. Keine Anfrage ausgelöst.');if(sourceReview.status==='VALID_SELECTION'||!allowGeneration)return {...cached,status:sourceReview.status==='VALID_SELECTION'?'SUCCESS':'UNAVAILABLE',sourceReview,message:sourceReview.status==='PARTIAL_SELECTION'?'Quellenwahl teilweise übernommen. Ungültige Instrumentteile bleiben zurückgehalten; Originalantwort unverändert.':cached.message,narrative:undefined,content:undefined,cached:true,weightingContexts,priceReferences,cotDataQuality,cotAnalysis,domainConcepts,modelRequestsUsed};}
@@ -161,7 +178,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
     if (admitted === -1) return unavailable("Aufrufpause aktiv. Eine neue KI-Analyse ist nach 90 Sekunden möglich.");
     if (admitted < 0) return unavailable("Das App-Tageslimit von 20 KI-Versuchen ist erreicht. Freigabe wieder ab 00:00 UTC.");
     // The single admission covers the main synthesis. Domain interpretation needs no model call.
-    await saveFrozenRequest(redis,freezeRequest(snapshotTimestamp,SOURCE_REVIEW_PROMPT,payload,SYNTHESIS_GENERATION_PROFILE.temperature,SYNTHESIS_GENERATION_PROFILE.maxTokens));
+    await saveFrozenRequest(redis,freezeRequest(snapshotTimestamp,effectiveSystemPrompt,payload,SYNTHESIS_GENERATION_PROFILE.temperature,SYNTHESIS_GENERATION_PROFILE.maxTokens));
     providerTimeoutMs = Math.min(45000, Math.max(0, Math.floor(deadlineAt - Date.now() - 5000)));
     if (providerTimeoutMs < 5000) {
       const failure = withTiming({ ...unavailable("Die Datenaufbereitung hat das verfügbare Zeitfenster verbraucht. Keine KI-Anfrage ausgelöst."),
@@ -175,7 +192,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${MODEL}`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, cache: "no-store", signal: AbortSignal.timeout(providerTimeoutMs),
       body: JSON.stringify(researchTransport({ max_tokens: SYNTHESIS_GENERATION_PROFILE.maxTokens, temperature: SYNTHESIS_GENERATION_PROFILE.temperature, messages: [
-        { role: "system", content: SOURCE_REVIEW_PROMPT },
+        { role: "system", content: effectiveSystemPrompt },
         { role: "user", content: payload },
       ] })),
     });
@@ -256,8 +273,8 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
 
 /** Persist the last successful result separately; failures never overwrite it. */
 export async function synthesizeResearch(input:AIResearchInput,report:AIResearchReport,allowGeneration=false,
- execution:{requestStartedAt?:number;deadlineAt?:number;preparationMs?:number}={}):Promise<ResearchSynthesis>{
- const result=await synthesizeCurrentResearch(input,report,allowGeneration,execution);
+ execution:{requestStartedAt?:number;deadlineAt?:number;preparationMs?:number}={},memoryContext?:{text:string;caseCount:number}):Promise<ResearchSynthesis>{
+ const result=await synthesizeCurrentResearch(input,report,allowGeneration,execution,memoryContext);
  const key=PREFIX+':last-success:v27:'+input.context.task;
  async function bounded<T>(promise:Promise<T>):Promise<T>{
   let timer:ReturnType<typeof setTimeout>|undefined;
