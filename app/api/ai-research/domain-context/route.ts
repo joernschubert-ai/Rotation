@@ -14,7 +14,7 @@ export async function GET(request:Request){
   const frame=result.report?.decisionSupport?.snapshotTimestamp,domainContext=prepareReportDomainContext(result.report,frame);
   return Response.json({ok:result.status==='SUCCESS'&&domainContext.status==='AVAILABLE',version:'DOMAIN_CONTEXT_READ_V79_4',modelRequestsUsed:0,readOnly:true,
    reportStatus:result.status,reportGeneratedAt:result.report?.generatedAt??null,reportSnapshotTimestamp:frame??null,
-   savedModelReport:{generatedAt:result.report?.aiSynthesis?.generatedAt??null,cached:result.report?.aiSynthesis?.cached??null,modelRequestsUsed:result.report?.aiSynthesis?.modelRequestsUsed??0},
+   savedModelReport:{generatedAt:result.report?.aiSynthesis?.generatedAt??null,cached:result.report?.aiSynthesis?.cached??null},
    domainContext,diagnostics:result.diagnostics},{headers});
  }catch{return Response.json({ok:false,version:'DOMAIN_CONTEXT_READ_V79_4',modelRequestsUsed:0,readOnly:true,message:'Gespeicherter Fachkontext derzeit nicht verfügbar. Kein neuer Bericht oder Modellaufruf gestartet.'},{status:503,headers});}
 }
