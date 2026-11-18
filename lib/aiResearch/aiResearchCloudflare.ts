@@ -85,9 +85,12 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
   if (memoryContext && memoryContext.caseCount > 0 && memoryContext.text.trim()) {
     const available = 26000 - sourceRequest.payload.length - memoryHeader.length;
     if (available >= 80) {
-      const candidate = memoryContext.text.trim().slice(0, Math.min(1800, available));
+      const fullMemoryText = memoryContext.text.trim();
+      const candidate = fullMemoryText.slice(0, Math.min(1800, available));
       const boundary = candidate.lastIndexOf("\n");
-      const complete = (boundary > 0 ? candidate.slice(0, boundary) : candidate).trim();
+      // Keep the final case line when the whole context fits. Only discard a
+      // trailing partial line when the available input budget cut it off.
+      const complete = (candidate.length >= fullMemoryText.length || boundary < 0 ? candidate : candidate.slice(0, boundary)).trim();
       const includedCases = (complete.match(/^- /gm) ?? []).length;
       if (includedCases > 0) { sourceRequest.payload += memoryHeader + complete; memoryIncluded = true; memoryCasesIncluded = includedCases; }
     }
