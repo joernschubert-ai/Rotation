@@ -38,7 +38,7 @@ const text = (value: unknown, limit = 650): string => typeof value === "string" 
 
 async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResearchReport, allowGeneration = false,
   execution: { requestStartedAt?: number; deadlineAt?: number; preparationMs?: number } = {},
-  memoryContext?: { text: string; caseCount: number; indexCount?: number; sampledPageCount?: number }): Promise<ResearchSynthesis> {
+  memoryContext?: { text: string; caseCount: number; indexCount?: number; sampledPageCount?: number; pageFailureCount?: number; pageFailureCodes?: string[] }): Promise<ResearchSynthesis> {
   const synthesisStartedAt = Date.now();
   // Reserve five seconds for validation, storage and returning the response.
   // The dashboard route keeps its existing 60-second limit.
@@ -95,9 +95,11 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
   const effectiveSystemPrompt = memoryIncluded ? SOURCE_REVIEW_PROMPT + "\n\n" + MEMORY_RETRIEVAL_SYSTEM_RULES : SOURCE_REVIEW_PROMPT;
   const memoryIndexCount=memoryContext?.indexCount??-1;
   const memoryPagesChecked=memoryContext?.sampledPageCount??0;
+  const memoryPageFailures=memoryContext?.pageFailureCount??0;
+  const memoryFailureCodes=(memoryContext?.pageFailureCodes??[]).join('_')||'NONE';
   const memoryFound=memoryContext?.caseCount??0;
-  const memoryDiagnostic=`INDEXED_${memoryIndexCount}_PAGES_CHECKED_${memoryPagesChecked}_FOUND_${memoryFound}`;
-  quality.normalizations.push(memoryIncluded ? `FORECAST_MEMORY_RETRIEVAL_V5_${memoryDiagnostic}_INCLUDED_${memoryCasesIncluded}` : memoryContext?.caseCount === -1 ? `FORECAST_MEMORY_RETRIEVAL_V5_READ_UNAVAILABLE_${memoryDiagnostic}` : memoryFound > 0 ? `FORECAST_MEMORY_RETRIEVAL_V5_${memoryDiagnostic}_OMITTED_INPUT_BUDGET` : `FORECAST_MEMORY_RETRIEVAL_V5_${memoryDiagnostic}`);
+  const memoryDiagnostic=`INDEXED_${memoryIndexCount}_PAGES_CHECKED_${memoryPagesChecked}_PAGE_FAILURES_${memoryPageFailures}_${memoryFailureCodes}_FOUND_${memoryFound}`;
+  quality.normalizations.push(memoryIncluded ? `FORECAST_MEMORY_RETRIEVAL_V6_${memoryDiagnostic}_INCLUDED_${memoryCasesIncluded}` : memoryContext?.caseCount === -1 ? `FORECAST_MEMORY_RETRIEVAL_V6_READ_UNAVAILABLE_${memoryDiagnostic}` : memoryFound > 0 ? `FORECAST_MEMORY_RETRIEVAL_V6_${memoryDiagnostic}_OMITTED_INPUT_BUDGET` : `FORECAST_MEMORY_RETRIEVAL_V6_${memoryDiagnostic}`);
   const identity = JSON.stringify({sourcePayloadHash:createHash("sha256").update(sourceRequest.payload).digest("hex"),model:MODEL,transportProfile:RESEARCH_TRANSPORT_PROFILE,generationProfile:SYNTHESIS_GENERATION_PROFILE,prompt:effectiveSystemPrompt,domainVersion:CONCEPT_VERSION,contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
     question:text(input.context.question,500),appFactsPolicy:APP_FACTS_POLICY,appFacts:report.appFacts??null,...structuredInput});
   let payload=sourceRequest.payload;
@@ -278,7 +280,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
 
 /** Persist the last successful result separately; failures never overwrite it. */
 export async function synthesizeResearch(input:AIResearchInput,report:AIResearchReport,allowGeneration=false,
- execution:{requestStartedAt?:number;deadlineAt?:number;preparationMs?:number}={},memoryContext?:{text:string;caseCount:number;indexCount?:number;sampledPageCount?:number}):Promise<ResearchSynthesis>{
+ execution:{requestStartedAt?:number;deadlineAt?:number;preparationMs?:number}={},memoryContext?:{text:string;caseCount:number;indexCount?:number;sampledPageCount?:number;pageFailureCount?:number;pageFailureCodes?:string[]}):Promise<ResearchSynthesis>{
  const result=await synthesizeCurrentResearch(input,report,allowGeneration,execution,memoryContext);
  const key=PREFIX+':last-success:v27:'+input.context.task;
  async function bounded<T>(promise:Promise<T>):Promise<T>{
