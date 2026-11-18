@@ -133,6 +133,8 @@ export interface ResearchSynthesis {
       includedCaseRefs: string[];
       modelOutputReadable: boolean;
       memoryReviewPresent: boolean;
+      fallbackUsed: boolean;
+      fallbackStatus: string;
       instruments: Array<{ instrument: string; status: string; retrievedCaseRefs: string[]; includedCaseRefs: string[]; reviewedCases: Array<{ ref: string; decision: string; similarity: string | null; difference: string | null; reason: string | null }>; reviewCoverageComplete: boolean; semanticUseVerified: false }>;
       semanticUseVerified: false;
       meaning: string;
