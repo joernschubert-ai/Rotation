@@ -79,7 +79,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
   domainConcepts=buildResearchConcepts(structuredInput);
   let sourceRequest:ReturnType<typeof prepareSourceReview>;
   try{sourceRequest=prepareSourceReview(report.appFacts,input.context.task,text(input.context.question,500));}catch(error){const reason=error instanceof Error?error.message:'';if(reason.startsWith('SOURCE_REVIEW_INPUT_LIMIT:')){let diagnostic:any={};try{diagnostic=JSON.parse(reason.slice('SOURCE_REVIEW_INPUT_LIMIT:'.length));}catch{}const largest=Array.isArray(diagnostic.largestRows)?diagnostic.largestRows.map((row:any)=>row.id+': '+row.characters+' Zeichen').join(', '):'';return unavailable('APP_FACT_INPUT_LIMIT · App-Befundblock '+(diagnostic.characters??'>26.000')+' Zeichen; Grenze 26.000. '+(diagnostic.observationCount??'?')+' Beobachtungen, '+(diagnostic.contextCardCount??'?')+' Kontextkarten. Groesste Faktenzeilen: '+(largest||'nicht verfügbar')+'. Keine KI-Anfrage ausgelöst.');}if(reason==='SOURCE_REVIEW_INPUT_LIMIT')return unavailable('APP_FACT_INPUT_LIMIT · Die App-Belege überschreiten die festgelegte Eingabegrenze von 26.000 Zeichen. Keine KI-Anfrage ausgelöst.');return unavailable('APP_FACT_PREPARATION_FAILED · Die App-Fakten konnten für die Quellenwahl nicht vollständig aufbereitet werden. Keine KI-Anfrage ausgelöst.');}
-  const memoryHeader = "\n\n[HISTORISCHES PROGNOSEGEDÄCHTNIS · GEPRÜFTE BEISPIELE, KEIN TRAINING ODER SIGNAL]\n";
+  const memoryHeader = "\n\n[PROGNOSEGEDÄCHTNIS · GEPRÜFTE VERGLEICHSFÄLLE]\n";
   let memoryIncluded = false;
   let memoryCasesIncluded = 0;
   if (memoryContext && memoryContext.caseCount > 0 && memoryContext.text.trim()) {
@@ -93,7 +93,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
     }
   }
   const effectiveSystemPrompt = memoryIncluded ? SOURCE_REVIEW_PROMPT + "\n\n" + MEMORY_RETRIEVAL_SYSTEM_RULES : SOURCE_REVIEW_PROMPT;
-  quality.normalizations.push(memoryIncluded ? `FORECAST_MEMORY_RETRIEVAL_V3_INCLUDED_${memoryCasesIncluded}_CASES` : memoryContext?.caseCount === -1 ? "FORECAST_MEMORY_RETRIEVAL_V3_READ_UNAVAILABLE" : memoryContext?.caseCount ? "FORECAST_MEMORY_RETRIEVAL_V3_OMITTED_INPUT_BUDGET" : "FORECAST_MEMORY_RETRIEVAL_V3_NO_ELIGIBLE_CASES");
+  quality.normalizations.push(memoryIncluded ? `FORECAST_MEMORY_RETRIEVAL_V4_SAMPLED_FOUND_${memoryContext?.caseCount??0}_INCLUDED_${memoryCasesIncluded}` : memoryContext?.caseCount === -1 ? "FORECAST_MEMORY_RETRIEVAL_V4_READ_UNAVAILABLE" : memoryContext?.caseCount ? `FORECAST_MEMORY_RETRIEVAL_V4_SAMPLED_FOUND_${memoryContext.caseCount}_OMITTED_INPUT_BUDGET` : "FORECAST_MEMORY_RETRIEVAL_V4_SAMPLED_FOUND_0");
   const identity = JSON.stringify({sourcePayloadHash:createHash("sha256").update(sourceRequest.payload).digest("hex"),model:MODEL,transportProfile:RESEARCH_TRANSPORT_PROFILE,generationProfile:SYNTHESIS_GENERATION_PROFILE,prompt:effectiveSystemPrompt,domainVersion:CONCEPT_VERSION,contractVersion:SYNTHESIS_CONTRACT,snapshotTimestamp,task:input.context.task,
     question:text(input.context.question,500),appFactsPolicy:APP_FACTS_POLICY,appFacts:report.appFacts??null,...structuredInput});
   let payload=sourceRequest.payload;
