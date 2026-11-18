@@ -6,7 +6,7 @@ import {MEMORY_COHORT} from './aiResearchMemoryCohort';
 export interface ForecastMemoryContext { text:string; caseCount:number; }
 export const MEMORY_RETRIEVAL_SYSTEM_RULES = "Wenn der folgende historische Gedächtnisblock vorhanden ist, nutze ihn ausschließlich als datierten Vergleich früherer App-Prognosen mit beobachteten Indexschlusskursen. Vergleiche Abfolge und Kontext mit dem heutigen Stand, nenne Unterschiede und Unsicherheit. Die kleine oder überlappende Stichprobe liefert weder Trefferquote noch Wahrscheinlichkeit. Überstimme keine aktuellen App-Fakten und ändere keine App-Freigabe, Scores, Trade-Stack- oder Positionsgrößenentscheidung. Ein ähnlicher Fall ist kein Wiederholungsversprechen.";
 const pct=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)?`${v>0?'+':''}${v.toFixed(2)}%`:'unavailable';
-async function bounded<T>(work:Promise<T>,ms=4200):Promise<T>{let timer:ReturnType<typeof setTimeout>|undefined;try{return await Promise.race([work,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('MEMORY_RETRIEVAL_TIMEOUT')),ms);})]);}finally{if(timer)clearTimeout(timer);}}
+async function bounded<T>(work:Promise<T>,ms=7500):Promise<T>{let timer:ReturnType<typeof setTimeout>|undefined;try{return await Promise.race([work,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('MEMORY_RETRIEVAL_TIMEOUT')),ms);})]);}finally{if(timer)clearTimeout(timer);}}
 
 /**
  * Read-only, lifetime-spanning retrieval from three evenly spaced positions in
@@ -22,7 +22,7 @@ export async function loadResearchMemoryContext():Promise<ForecastMemoryContext>
   if(indexedCount===0)return {text:'',caseCount:0};
   const targets=indexedCount<=3?[0,Math.floor((indexedCount-1)/2),indexedCount-1]:[0,Math.floor((indexedCount-1)/2),indexedCount-1];
   const offsets=[...new Set(targets.map(rank=>Math.floor(Math.min(rank,100000)/10)*10))];
-  const pages=await bounded(Promise.allSettled(offsets.map(offset=>inspectMemoryAudit(0,offset))),4200);
+  const pages=await bounded(Promise.allSettled(offsets.map(offset=>inspectMemoryAudit(0,offset))),7500);
   const episodes=new Map<string,Array<{plan:any;currentSourceAssessment:any}>>();
   for(const result of pages){
    if(result.status!=='fulfilled')continue;
