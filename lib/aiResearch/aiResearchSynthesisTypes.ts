@@ -124,5 +124,16 @@ export interface ResearchSynthesis {
       historicalAsOf: string | null;
       newsCount: number;
     };
+    memoryUseAudit?: {
+      version: string;
+      status: string;
+      eligibleCaseCount: number | null;
+      selectedCaseCount: number;
+      includedCaseRefs: string[];
+      modelOutputReadable: boolean;
+      instruments: Array<{ instrument: string; status: string; retrievedCaseRefs: string[]; includedCaseRefs: string[]; referencedCaseRefs: string[]; explicitNoMatch: boolean; mentionsSimilarity: boolean; mentionsDifference: boolean; semanticUseVerified: false }>;
+      semanticUseVerified: false;
+      meaning: string;
+    };
   };
 }

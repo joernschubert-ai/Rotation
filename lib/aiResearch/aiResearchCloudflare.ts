@@ -24,7 +24,7 @@ import { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 import { inspectSynthesis, validateSynthesis, deriveSynthesisConclusion, normalizeSynthesisEnvelope, SYNTHESIS_CONTRACT } from "./aiResearchLiveQwen";
 import { buildLiveInput, LIVE_RESEARCH_PROMPT as RESEARCH_SYSTEM_PROMPT } from "./aiResearchLiveQwen";
 import { buildInstrumentBriefs } from "./aiResearchInstrumentBriefs";
-import { MEMORY_RETRIEVAL_SYSTEM_RULES } from "./aiResearchMemoryRetrieval";
+import { MEMORY_RETRIEVAL_SYSTEM_RULES, type ForecastMemoryCaseReference } from "./aiResearchMemoryRetrieval";
 export { buildSynthesisEvidence } from "./aiResearchSynthesisEvidence";
 export { validateSynthesis } from "./aiResearchLiveQwen";
 
@@ -36,9 +36,31 @@ const PREFIX = "rotation:research:cf:v1";
 const DAILY_LIMIT = 20;
 const text = (value: unknown, limit = 650): string => typeof value === "string" ? value.slice(0, limit) : "";
 
+function buildMemoryUseAudit(raw:unknown,cases:ForecastMemoryCaseReference[],includedRefs:string[],memoryIncluded:boolean,eligibleCaseCount:number){
+  const root=(()=>{try{return typeof raw==='string'?JSON.parse(raw):raw;}catch{return null;}})();
+  const rows=Array.isArray(root?.instruments)?root.instruments:[];
+  const instruments=['NASDAQ_PUT','NASDAQ_CALL','RUSSELL_CALL'];
+  const caseInstruments=(c:ForecastMemoryCaseReference)=>c.market==='NASDAQ'?['NASDAQ_PUT','NASDAQ_CALL']:['RUSSELL_CALL'];
+  const reviewed=instruments.map(instrument=>{
+    const relevant=cases.filter(c=>caseInstruments(c).includes(instrument)),included=relevant.filter(c=>includedRefs.includes(c.ref));
+    const row=rows.find((item:any)=>item?.instrument===instrument),hypothesis=typeof row?.hypothesis==='string'?row.hypothesis:'';
+    const referenced=included.filter(c=>hypothesis.includes(`[${c.ref}]`)).map(c=>c.ref);
+    const comparisonWindows=referenced.map(ref=>{const at=hypothesis.indexOf(`[${ref}]`);return hypothesis.slice(at,Math.min(hypothesis.length,at+260));});
+    const saysNoMatch=/kein(?:e|en)?\s+(?:passender|geeigneter)\s+(?:archivierter\s+)?Ged[aä]chtnisfall|kein\s+passender\s+fr[uü]herer\s+Prognosefall|keine\s+passende\s+Ged[aä]chtnisprognose/i.test(hypothesis);
+    const similarity=comparisonWindows.some(value=>/Gemeinsamkeit|[äa]hnlich|[äa]hnlichkeit|vergleichbar/i.test(value));
+    const difference=comparisonWindows.some(value=>/Abweichung|Unterschied|anders als|weicht ab/i.test(value));
+    const hasPairedComparison=comparisonWindows.some(value=>/Gemeinsamkeit|[äa]hnlich|[äa]hnlichkeit|vergleichbar/i.test(value)&&/Abweichung|Unterschied|anders als|weicht ab/i.test(value));
+    const status=!relevant.length?'NO_CASE_FOR_INSTRUMENT':!memoryIncluded||!included.length?'CASE_NOT_INCLUDED':!row?'MODEL_INSTRUMENT_MISSING':referenced.length?(hasPairedComparison?'EXPLICIT_COMPARISON':'CASE_REFERENCE_INCOMPLETE'):saysNoMatch?'EXPLICITLY_NOT_COMPARABLE':'NOT_EXPLICITLY_ADDRESSED';
+    return {instrument,status,retrievedCaseRefs:relevant.map(c=>c.ref),includedCaseRefs:included.map(c=>c.ref),referencedCaseRefs:referenced,explicitNoMatch:saysNoMatch,mentionsSimilarity:similarity,mentionsDifference:difference,semanticUseVerified:false as const};
+  });
+  const relevant=reviewed.filter(row=>row.status!=='NO_CASE_FOR_INSTRUMENT');
+  const status=eligibleCaseCount<0?'MEMORY_RETRIEVAL_UNAVAILABLE':eligibleCaseCount===0?'NO_ELIGIBLE_CASES_FOUND':!memoryIncluded?'CASES_NOT_PASSED_TO_MODEL':!relevant.length?'NO_CASES_FOR_REQUESTED_DIRECTIONS':relevant.every(row=>['EXPLICIT_COMPARISON','EXPLICITLY_NOT_COMPARABLE'].includes(row.status))?'EXPLICITLY_ADDRESSED':'NOT_EXPLICITLY_ADDRESSED';
+  return {version:'FORECAST_MEMORY_USE_AUDIT_V1',status,eligibleCaseCount:eligibleCaseCount>=0?eligibleCaseCount:null,selectedCaseCount:cases.length,selectedCases:cases,includedCaseRefs:includedRefs,modelOutputReadable:!!rows.length,instruments:reviewed,semanticUseVerified:false as const,meaning:'Prüft, ob die KI übergebene Gedächtnisfälle im Instrumenttext ausdrücklich vergleicht oder als unpassend kennzeichnet. Ein Verweis belegt keine inhaltliche Richtigkeit oder tatsächliche kausale Nutzung; keine Änderung von Einstieg, Freigabe, Scores oder Positionsgröße.'};
+}
+
 async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResearchReport, allowGeneration = false,
   execution: { requestStartedAt?: number; deadlineAt?: number; preparationMs?: number } = {},
-  memoryContext?: { text: string; caseCount: number; indexCount?: number; sampledPageCount?: number; pageFailureCount?: number; pageFailureCodes?: string[] }): Promise<ResearchSynthesis> {
+  memoryContext?: { text: string; caseCount: number; indexCount?: number; sampledPageCount?: number; pageFailureCount?: number; pageFailureCodes?: string[]; selectedCases?: ForecastMemoryCaseReference[] }): Promise<ResearchSynthesis> {
   const synthesisStartedAt = Date.now();
   // Reserve five seconds for validation, storage and returning the response.
   // The dashboard route keeps its existing 60-second limit.
@@ -83,6 +105,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
   const memoryHeader = "\n\n[PROGNOSEGEDÄCHTNIS · GEPRÜFTE VERGLEICHSFÄLLE]\n";
   let memoryIncluded = false;
   let memoryCasesIncluded = 0;
+  let includedMemoryRefs:string[]=[];
   if (memoryContext && memoryContext.caseCount > 0 && memoryContext.text.trim()) {
     const available = 26000 - sourceRequest.payload.length - memoryHeader.length;
     if (available >= 80) {
@@ -93,7 +116,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
       // trailing partial line when the available input budget cut it off.
       const complete = (candidate.length >= fullMemoryText.length || boundary < 0 ? candidate : candidate.slice(0, boundary)).trim();
       const includedCases = (complete.match(/^- /gm) ?? []).length;
-      if (includedCases > 0) { sourceRequest.payload += memoryHeader + complete; memoryIncluded = true; memoryCasesIncluded = includedCases; }
+      if (includedCases > 0) { sourceRequest.payload += memoryHeader + complete; memoryIncluded = true; memoryCasesIncluded = includedCases; includedMemoryRefs=[...complete.matchAll(/\[(M\d+)\]/g)].map(m=>m[1]); }
     }
   }
   const effectiveSystemPrompt = memoryIncluded ? SOURCE_REVIEW_PROMPT + "\n\n" + MEMORY_RETRIEVAL_SYSTEM_RULES : SOURCE_REVIEW_PROMPT;
@@ -238,13 +261,14 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
     const providerDiagnostics=describeProviderResponse(body);
     stage='ANSWER_VALIDATION';
     const sourceReview=evaluateSourceReview(raw,providerDiagnostics.finishReason,report.appFacts);
+    const memoryUseAudit=buildMemoryUseAudit(raw,memoryContext?.selectedCases??[],includedMemoryRefs,memoryIncluded,memoryContext?.caseCount??-1);
     const accepted=sourceReview.status==='VALID_SELECTION';
     const usable=sourceReviewUsable(sourceReview);
     const result:ResearchSynthesis={status:usable?'SUCCESS':'UNAVAILABLE',model:MODEL,generatedAt:new Date().toISOString(),snapshotTimestamp,cached:false,
       message:accepted?'Quellenwahl geprüft. Sachliche Zustandsbeschreibung aus App-Daten; KI-Abwägung bleibt ungeprüft. Keine zusätzliche Einstiegsfreigabe.':usable?'Quellenwahl teilweise übernommen. Gültige Instrumente bleiben sichtbar; nur fehlerhafte Teile werden zurückgehalten.':'Die Quellenantwort ist unvollständig oder ungültig. App-Fakten bleiben verfügbar; keine automatische Wiederholung.',
-      sourceReview,quality:{...quality,providerDiagnostics,providerText:typeof raw==='string'?raw:undefined,
+      sourceReview,quality:{...quality,providerDiagnostics,providerText:typeof raw==='string'?raw:undefined,memoryUseAudit,
        issues:accepted?[]:[...sourceReview.validation.issues.map(i=>`${i.code} @ ${i.path}: ${i.message}`),...(sourceReview.status==='OUTPUT_INCOMPLETE'?['PROVIDER_OUTPUT_LIMIT_REACHED']:[])],
-       normalizations:[...quality.normalizations,'APP_DERIVED_STATE_AND_SOURCE_FRAGMENTS','UNMODIFIED_HYPOTHESIS_UNVERIFIED']}};
+       normalizations:[...quality.normalizations,'APP_DERIVED_STATE_AND_SOURCE_FRAGMENTS','UNMODIFIED_HYPOTHESIS_UNVERIFIED',`MEMORY_USE_AUDIT_V1_${memoryUseAudit.status}`]}};
     stage=usable?'APPROVED_ANSWER_CACHE_WRITE':'REJECTED_ANSWER_CACHE_WRITE';
     const diagnosed=withTiming(result);
     if(!usable)await storeRejectedDiagnosis(diagnosed);
@@ -284,7 +308,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
 
 /** Persist the last successful result separately; failures never overwrite it. */
 export async function synthesizeResearch(input:AIResearchInput,report:AIResearchReport,allowGeneration=false,
- execution:{requestStartedAt?:number;deadlineAt?:number;preparationMs?:number}={},memoryContext?:{text:string;caseCount:number;indexCount?:number;sampledPageCount?:number;pageFailureCount?:number;pageFailureCodes?:string[]}):Promise<ResearchSynthesis>{
+ execution:{requestStartedAt?:number;deadlineAt?:number;preparationMs?:number}={},memoryContext?:{text:string;caseCount:number;indexCount?:number;sampledPageCount?:number;pageFailureCount?:number;pageFailureCodes?:string[];selectedCases?:ForecastMemoryCaseReference[]}):Promise<ResearchSynthesis>{
  const result=await synthesizeCurrentResearch(input,report,allowGeneration,execution,memoryContext);
  const key=PREFIX+':last-success:v27:'+input.context.task;
  async function bounded<T>(promise:Promise<T>):Promise<T>{
