@@ -69,6 +69,7 @@ export function compactAnticyclicalContext(value:unknown){
  }
  if(a.earlyRecovery?.version==='EARLY_RECOVERY_SIGNALS_V1')result.early={rsiChange:round(a.earlyRecovery.rsiChange),events:a.earlyRecovery.signals.filter((s:any)=>s.status==='TODAY'||s.status==='RECENT').map((s:any)=>[s.id,s.ageIntervals])};
  if(a.asymmetricDecision?.version==='ASYMMETRIC_DECISION_V1'){const d=a.asymmetricDecision;result.asym=[({POSSIBLE_RECOVERY:'P',UNFAVORABLE_HISTORY:'U',NO_RECENT_SETUP:'N',NO_PRICE_SETUP:'N',OPEN:'O',UNKNOWN:'?'} as Record<string,string>)[d.status]??'?',d.weight,d.confluence.areas,({RSI_RECLAIM:'R',RSI_FAILURE_SWING:'F',RSI_DIVERGENCE:'D',MA20_RECLAIM_STRESS:'M'} as Record<string,string>)[d.basisId??'']??null];}
+ if(a.asymmetricEvidence?.version==='ASYMMETRIC_INDEX_EVIDENCE_V1'&&Array.isArray(a.asymmetricEvidence.studies)){const studies=a.asymmetricEvidence.studies.filter((s:any)=>s.family==='COMBINATION');if(studies.length)result.combos=studies.map((s:any)=>[s.id,[s.current?.detected===true,s.current?.signalDate??null,Number.isInteger(s.current?.ageIntervals)?s.current.ageIntervals:null,s.current?.recent===true],s.horizons.map((h:any)=>{const c=h.cases??{},b=h.baseline??{};return [h.intervals,[c.n,round(c.meanPct),round(c.medianPct),round(c.p10Pct),round(c.p90Pct),round(c.medianFurtherLowPct),c.overlapAllowed===true],[b.n,round(b.meanPct),round(b.medianPct),b.overlapAllowed===true],round(h.excessMeanPp)];})]);}
  const price=compactPriceReversalReading(a.priceReversals);if(price){result.priceReversals=price;delete result.columns;}
  return result;
 }
