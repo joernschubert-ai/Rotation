@@ -44,7 +44,7 @@ export async function loadResearchMemoryContext():Promise<ForecastMemoryContext>
     const outcomes=Array.isArray(assessment?.outcomes)?assessment.outcomes.filter((o:any)=>o?.status==='MATURED_OBSERVED'&&o?.metrics&&[5,10,20].includes(o.horizon)).map((o:any)=>{
      const m=o.metrics;return `${o.horizon}@${String(m.endDate).slice(5)} ${pct(m.indexReturnPct)} hit=${m.directionalHit===true?'yes':m.directionalHit===false?'no':'?'} path=${pct(m.maxCloseReturnPct)}/${pct(m.minCloseReturnPct)}`;
     }):[];
-    return `  ${p.market}/${p.direction} anchor=${anchor?.date?.slice(5)??'?'} ${outcomes.join(' ')} T:${String(p.statement).slice(0,55)} C:${String(p.counterargument).slice(0,35)}`;
+    return `- ${p.market}/${p.direction} anchor=${anchor?.date?.slice(5)??'?'} ${outcomes.join(' ')} T:${String(p.statement).slice(0,55)} C:${String(p.counterargument).slice(0,35)}`;
    });
    return [`Episode ${date}:`,...scenarios];
   });
