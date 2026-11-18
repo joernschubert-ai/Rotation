@@ -141,7 +141,8 @@ export function evaluateSourceReview(raw:unknown,finishReason:unknown,facts:AppF
  if(!incomplete&&originalText.length<=18000){
   let root:any;try{root=JSON.parse(originalText);}catch{root=null;}
   // Partial acceptance requires the original complete, closed envelope with three unique known instruments.
-  const closed=root&&typeof root==='object'&&!Array.isArray(root)&&Object.keys(root).length===2&&root.version===SELECTION_CONTRACT&&Array.isArray(root.instruments)&&root.instruments.length===3;
+  const rootKeys=root&&typeof root==='object'&&!Array.isArray(root)?Object.keys(root):[];
+  const closed=root&&typeof root==='object'&&!Array.isArray(root)&&(rootKeys.length===2||rootKeys.length===3&&rootKeys.includes('memoryReview'))&&root.version===SELECTION_CONTRACT&&Array.isArray(root.instruments)&&root.instruments.length===3;
   const known=closed&&root.instruments.every((r:any)=>r&&typeof r==='object'&&!Array.isArray(r)&&INSTRUMENTS.includes(r.instrument))&&new Set(root.instruments.map((r:any)=>r.instrument)).size===3;
   if(known){
    const approved:NonNullable<SourceReview['view']>=[];

@@ -38,24 +38,30 @@ const text = (value: unknown, limit = 650): string => typeof value === "string" 
 
 function buildMemoryUseAudit(raw:unknown,cases:ForecastMemoryCaseReference[],includedRefs:string[],memoryIncluded:boolean,eligibleCaseCount:number){
   const root=(()=>{try{return typeof raw==='string'?JSON.parse(raw):raw;}catch{return null;}})();
-  const rows=Array.isArray(root?.instruments)?root.instruments:[];
+  const rows=Array.isArray(root?.instruments)?root.instruments:[],memoryRows=Array.isArray(root?.memoryReview)?root.memoryReview:null;
   const instruments=['NASDAQ_PUT','NASDAQ_CALL','RUSSELL_CALL'];
   const caseInstruments=(c:ForecastMemoryCaseReference)=>c.market==='NASDAQ'?['NASDAQ_PUT','NASDAQ_CALL']:['RUSSELL_CALL'];
   const reviewed=instruments.map(instrument=>{
     const relevant=cases.filter(c=>caseInstruments(c).includes(instrument)),included=relevant.filter(c=>includedRefs.includes(c.ref));
-    const row=rows.find((item:any)=>item?.instrument===instrument),hypothesis=typeof row?.hypothesis==='string'?row.hypothesis:'';
-    const referenced=included.filter(c=>hypothesis.includes(`[${c.ref}]`)).map(c=>c.ref);
-    const comparisonWindows=referenced.map(ref=>{const at=hypothesis.indexOf(`[${ref}]`);return hypothesis.slice(at,Math.min(hypothesis.length,at+260));});
-    const saysNoMatch=/kein(?:e|en)?\s+(?:passender|geeigneter)\s+(?:archivierter\s+)?Ged[aä]chtnisfall|kein\s+passender\s+fr[uü]herer\s+Prognosefall|keine\s+passende\s+Ged[aä]chtnisprognose/i.test(hypothesis);
-    const similarity=comparisonWindows.some(value=>/Gemeinsamkeit|[äa]hnlich|[äa]hnlichkeit|vergleichbar/i.test(value));
-    const difference=comparisonWindows.some(value=>/Abweichung|Unterschied|anders als|weicht ab/i.test(value));
-    const hasPairedComparison=comparisonWindows.some(value=>/Gemeinsamkeit|[äa]hnlich|[äa]hnlichkeit|vergleichbar/i.test(value)&&/Abweichung|Unterschied|anders als|weicht ab/i.test(value));
-    const status=!relevant.length?'NO_CASE_FOR_INSTRUMENT':!memoryIncluded||!included.length?'CASE_NOT_INCLUDED':!row?'MODEL_INSTRUMENT_MISSING':referenced.length?(hasPairedComparison?'EXPLICIT_COMPARISON':'CASE_REFERENCE_INCOMPLETE'):saysNoMatch?'EXPLICITLY_NOT_COMPARABLE':'NOT_EXPLICITLY_ADDRESSED';
-    return {instrument,status,retrievedCaseRefs:relevant.map(c=>c.ref),includedCaseRefs:included.map(c=>c.ref),referencedCaseRefs:referenced,explicitNoMatch:saysNoMatch,mentionsSimilarity:similarity,mentionsDifference:difference,semanticUseVerified:false as const};
+    const row=memoryRows?.find((item:any)=>item?.instrument===instrument),entries=Array.isArray(row?.cases)?row.cases:[];
+    const refs=entries.map((entry:any)=>typeof entry?.ref==='string'?entry.ref:'').filter(Boolean),uniqueRefs=new Set(refs);
+    const expectedRefs=included.map(c=>c.ref),hasExactCoverage=refs.length===expectedRefs.length&&uniqueRefs.size===expectedRefs.length&&expectedRefs.every(ref=>uniqueRefs.has(ref));
+    const details=expectedRefs.map(ref=>{
+      const entry=entries.find((item:any)=>item?.ref===ref),decision=entry?.decision;
+      const similarity=typeof entry?.similarity==='string'?entry.similarity.trim():'';
+      const difference=typeof entry?.difference==='string'?entry.difference.trim():'';
+      const reason=typeof entry?.reason==='string'?entry.reason.trim():'';
+      const valid=decision==='COMPARE'?similarity.length>0&&difference.length>0&&entry?.reason===null:decision==='NOT_COMPARABLE'?reason.length>0&&entry?.similarity===null&&entry?.difference===null:false;
+      return {ref,decision:valid?decision:'INVALID_REVIEW',similarity:similarity||null,difference:difference||null,reason:reason||null};
+    });
+    const validReviews=hasExactCoverage&&details.length===expectedRefs.length&&details.every(item=>item.decision==='COMPARE'||item.decision==='NOT_COMPARABLE');
+    const allNotComparable=validReviews&&details.every(item=>item.decision==='NOT_COMPARABLE');
+    const status=!relevant.length?'NO_CASE_FOR_INSTRUMENT':!memoryIncluded||!included.length?'CASE_NOT_INCLUDED':!memoryRows?'MEMORY_REVIEW_MISSING':!row?'INSTRUMENT_ROW_MISSING':!Array.isArray(row.cases)?'CASE_LIST_INVALID':!validReviews?'CASE_REVIEW_INCOMPLETE':allNotComparable?'EXPLICITLY_NOT_COMPARABLE':'EXPLICIT_COMPARISON';
+    return {instrument,status,retrievedCaseRefs:relevant.map(c=>c.ref),includedCaseRefs:included.map(c=>c.ref),reviewedCases:details,reviewCoverageComplete:validReviews,semanticUseVerified:false as const};
   });
   const relevant=reviewed.filter(row=>row.status!=='NO_CASE_FOR_INSTRUMENT');
-  const status=eligibleCaseCount<0?'MEMORY_RETRIEVAL_UNAVAILABLE':eligibleCaseCount===0?'NO_ELIGIBLE_CASES_FOUND':!memoryIncluded?'CASES_NOT_PASSED_TO_MODEL':!relevant.length?'NO_CASES_FOR_REQUESTED_DIRECTIONS':relevant.every(row=>['EXPLICIT_COMPARISON','EXPLICITLY_NOT_COMPARABLE'].includes(row.status))?'EXPLICITLY_ADDRESSED':'NOT_EXPLICITLY_ADDRESSED';
-  return {version:'FORECAST_MEMORY_USE_AUDIT_V1',status,eligibleCaseCount:eligibleCaseCount>=0?eligibleCaseCount:null,selectedCaseCount:cases.length,selectedCases:cases,includedCaseRefs:includedRefs,modelOutputReadable:!!rows.length,instruments:reviewed,semanticUseVerified:false as const,meaning:'Prüft, ob die KI übergebene Gedächtnisfälle im Instrumenttext ausdrücklich vergleicht oder als unpassend kennzeichnet. Ein Verweis belegt keine inhaltliche Richtigkeit oder tatsächliche kausale Nutzung; keine Änderung von Einstieg, Freigabe, Scores oder Positionsgröße.'};
+  const status=eligibleCaseCount<0?'MEMORY_RETRIEVAL_UNAVAILABLE':eligibleCaseCount===0?'NO_ELIGIBLE_CASES_FOUND':!memoryIncluded?'CASES_NOT_PASSED_TO_MODEL':!relevant.length?'NO_CASES_FOR_REQUESTED_DIRECTIONS':relevant.every(row=>['EXPLICIT_COMPARISON','EXPLICITLY_NOT_COMPARABLE'].includes(row.status))?'EXPLICITLY_ADDRESSED':!memoryRows?'MEMORY_REVIEW_MISSING':'NOT_EXPLICITLY_ADDRESSED';
+  return {version:'FORECAST_MEMORY_USE_AUDIT_V2',status,eligibleCaseCount:eligibleCaseCount>=0?eligibleCaseCount:null,selectedCaseCount:cases.length,selectedCases:cases,includedCaseRefs:includedRefs,modelOutputReadable:!!rows.length,memoryReviewPresent:!!memoryRows,instruments:reviewed,semanticUseVerified:false as const,meaning:'Prüft das strukturierte Gedächtnisfeld und die Abdeckung aller tatsächlich übergebenen Fälle je Instrument. Ein strukturierter Eintrag belegt keine sachliche Richtigkeit oder kausale Nutzung; keine Änderung von Einstieg, Freigabe, Scores oder Positionsgröße.'};
 }
 
 async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResearchReport, allowGeneration = false,
@@ -268,7 +274,7 @@ async function synthesizeCurrentResearch(input: AIResearchInput, report: AIResea
       message:accepted?'Quellenwahl geprüft. Sachliche Zustandsbeschreibung aus App-Daten; KI-Abwägung bleibt ungeprüft. Keine zusätzliche Einstiegsfreigabe.':usable?'Quellenwahl teilweise übernommen. Gültige Instrumente bleiben sichtbar; nur fehlerhafte Teile werden zurückgehalten.':'Die Quellenantwort ist unvollständig oder ungültig. App-Fakten bleiben verfügbar; keine automatische Wiederholung.',
       sourceReview,quality:{...quality,providerDiagnostics,providerText:typeof raw==='string'?raw:undefined,memoryUseAudit,
        issues:accepted?[]:[...sourceReview.validation.issues.map(i=>`${i.code} @ ${i.path}: ${i.message}`),...(sourceReview.status==='OUTPUT_INCOMPLETE'?['PROVIDER_OUTPUT_LIMIT_REACHED']:[])],
-       normalizations:[...quality.normalizations,'APP_DERIVED_STATE_AND_SOURCE_FRAGMENTS','UNMODIFIED_HYPOTHESIS_UNVERIFIED',`MEMORY_USE_AUDIT_V1_${memoryUseAudit.status}`]}};
+       normalizations:[...quality.normalizations,'APP_DERIVED_STATE_AND_SOURCE_FRAGMENTS','UNMODIFIED_HYPOTHESIS_UNVERIFIED',`MEMORY_USE_AUDIT_V2_${memoryUseAudit.status}`]}};
     stage=usable?'APPROVED_ANSWER_CACHE_WRITE':'REJECTED_ANSWER_CACHE_WRITE';
     const diagnosed=withTiming(result);
     if(!usable)await storeRejectedDiagnosis(diagnosed);

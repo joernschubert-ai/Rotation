@@ -15,7 +15,8 @@ export function validateSelection(raw:unknown,context:base.SelectionContext){
  let root:Record<string,any>;
  if(typeof raw!=='string'||raw.length>18000)return {ok:false,issues:[{path:'$',code:'OUTPUT_SIZE',message:'Keine passende Textantwort.'}],selections:[] as Selection[],advisories};
  try{root=object(JSON.parse(raw));}catch{return {ok:false,issues:[{path:'$',code:'JSON_FORMAT',message:'Keine unveränderte JSON-Ausgabe; keine automatische Reparatur.'}],selections:[] as Selection[],advisories};}
- if(!exact(root,['version','instruments'])||root.version!==SELECTION_CONTRACT||!Array.isArray(root.instruments)||root.instruments.length!==3)return {ok:false,issues:[{path:'$',code:'ARGUMENT_SCHEMA',message:'Erwartet wird EVIDENCE_ARGUMENTS_V2 mit genau drei Instrumenten und einer einzigen Argumentliste.'}],selections:[] as Selection[],advisories};
+ const rootEnvelope=exact(root,['version','instruments'])||exact(root,['version','instruments','memoryReview']);
+ if(!rootEnvelope||root.version!==SELECTION_CONTRACT||!Array.isArray(root.instruments)||root.instruments.length!==3)return {ok:false,issues:[{path:'$',code:'ARGUMENT_SCHEMA',message:'Erwartet wird EVIDENCE_ARGUMENTS_V2 mit genau drei Instrumenten und einer einzigen Argumentliste; der optionale Gedächtnisabgleich steht separat im JSON-Root.'}],selections:[] as Selection[],advisories};
  const valid:Selection[]=[],seenInstruments=new Set<string>();
  for(const [index,item]of root.instruments.entries()){
   const row=object(item),p='instruments.'+index;

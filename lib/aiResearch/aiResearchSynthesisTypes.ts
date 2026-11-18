@@ -129,9 +129,11 @@ export interface ResearchSynthesis {
       status: string;
       eligibleCaseCount: number | null;
       selectedCaseCount: number;
+      selectedCases: Array<{ ref: string; tag: string; market: string; direction: string; role: string; issuedDate: string | null; anchorDate: string | null; outcome: string }>;
       includedCaseRefs: string[];
       modelOutputReadable: boolean;
-      instruments: Array<{ instrument: string; status: string; retrievedCaseRefs: string[]; includedCaseRefs: string[]; referencedCaseRefs: string[]; explicitNoMatch: boolean; mentionsSimilarity: boolean; mentionsDifference: boolean; semanticUseVerified: false }>;
+      memoryReviewPresent: boolean;
+      instruments: Array<{ instrument: string; status: string; retrievedCaseRefs: string[]; includedCaseRefs: string[]; reviewedCases: Array<{ ref: string; decision: string; similarity: string | null; difference: string | null; reason: string | null }>; reviewCoverageComplete: boolean; semanticUseVerified: false }>;
       semanticUseVerified: false;
       meaning: string;
     };
