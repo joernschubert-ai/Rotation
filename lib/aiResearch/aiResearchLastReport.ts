@@ -3,10 +3,11 @@ import {unpackMemoryRecord} from './aiResearchMemoryProtocol';
 import {recheckSourceReview,sourceFactsHash} from './aiResearchSourceReview';
 import type {AIResearchResult,AIResearchTask} from './aiResearchTypes';
 /** Existing immutable archive only. No history refresh, providers, model calls or writes. */
-export async function readLastDisplayedResearch(task:AIResearchTask){
- const now=Date.now(),rows=await listMemoryRecords(0);
+export async function readLastDisplayedResearch(task:AIResearchTask,beforeSnapshotTimestamp?:string){
+ const now=Date.now(),before=beforeSnapshotTimestamp?Date.parse(beforeSnapshotTimestamp):NaN,rows=await listMemoryRecords(0);
  const candidates=(rows as Array<any>).filter(m=>m&&m.kind==='SOURCE_SELECTION'&&m.task===task&&m.eligibleForForecast===true&&
   typeof m.id==='string'&&/^[a-f0-9]{64}$/.test(m.id)&&Number.isFinite(Date.parse(m.modelGeneratedAt))&&Date.parse(m.modelGeneratedAt)<=now&&
+  (!Number.isFinite(before)||(typeof m.snapshotTimestamp==='string'&&Number.isFinite(Date.parse(m.snapshotTimestamp))&&Date.parse(m.snapshotTimestamp)<before))&&
   (!m.provenance||m.provenance.question==='')).sort((a,b)=>Date.parse(b.modelGeneratedAt)-Date.parse(a.modelGeneratedAt)).slice(0,4);
  for(const meta of candidates)try{
   const entry=await readMemoryRecord(meta.id);if(!entry||entry.meta.id!==meta.id||entry.meta.kind!=='SOURCE_SELECTION'||entry.meta.task!==task||!entry.meta.eligibleForForecast)continue;
@@ -20,8 +21,8 @@ export async function readLastDisplayedResearch(task:AIResearchTask){
   synthesis.sourceReview=review;synthesis.modelRequestsUsed=0;synthesis.cached=true;
   return {ok:true,...result,modelRequestsUsed:0,memoryWritten:false,externalProviderRequests:0,
    storedDisplay:{version:'LAST_AVAILABLE_RESEARCH_V1',archived:true,recordId:entry.meta.id,snapshotTimestamp:facts.snapshotTimestamp,
-    scope:'LATEST_20_METADATA_UP_TO_4_VALIDATED_REPORTS',message:'Letzter verfÃƒÂ¼gbarer geprÃƒÂ¼fter Archivbericht. UnverÃƒÂ¤nderter Datenstand; keine neue MarktprÃƒÂ¼fung oder Einstiegsaussage.'}};
+    scope:'LATEST_20_METADATA_UP_TO_4_VALIDATED_REPORTS',message:'Letzter verfügbarer geprüfter Archivbericht. Unveränderter Datenstand; keine neue Marktprüfung oder Einstiegsaussage.'}};
  }catch{/* A damaged/unreadable candidate does not replace another valid archived report. */}
  return {ok:false,status:'INSUFFICIENT_DATA',report:null,modelRequestsUsed:0,memoryWritten:false,externalProviderRequests:0,
-  message:'Auf der jÃƒÂ¼ngsten Archivseite kein lesbarer passender erfolgreicher KI-Bericht vorhanden. Kein Ersatzbericht erzeugt.'};
+  message:'Auf der jüngsten Archivseite kein lesbarer passender erfolgreicher KI-Bericht vorhanden. Kein Ersatzbericht erzeugt.'};
 }
