@@ -2918,10 +2918,13 @@ const spLowerHigh = detectLowerHigh(spClosesFull);
 const spObservation = indexObservationQuality.get(spClosesFull);
 const spObservedDay = spObservation?.latestEndpointAvailable === true && typeof spObservation.currentObservationTimestamp === "string" ? spObservation.currentObservationTimestamp.slice(0,10) : null;
 const broadBreadth = await loadBroadBreadth(breadthUniverse, spObservedDay);
-// Refuse fabricated zero breadth when the data sample is mostly unavailable.
-if (broadBreadth.dataQuality.coverage < 0.98 || broadBreadth.b20 === null || broadBreadth.b50 === null || broadBreadth.b200 === null) {
+// Coverage describes breadth completeness; it must not block the full market
+// refresh when the available constituents still produce real breadth values.
+const freshBreadthCoverage = broadBreadth.dataQuality.coverage;
+if (!Number.isFinite(freshBreadthCoverage) || broadBreadth.b20 === null || broadBreadth.b50 === null || broadBreadth.b200 === null) {
   return NextResponse.json({ error: "Insufficient fresh breadth coverage", breadthDataQuality: broadBreadth.dataQuality }, { status: 503 });
 }
+if (freshBreadthCoverage < 0.98) console.warn("Breadth below strict signal coverage; continuing core market refresh with partial measured breadth", { coverage: freshBreadthCoverage, requiredForBreadthSignals: 0.98 });
 const breadth200 = broadBreadth.b200;
 const breadth50 = broadBreadth.b50;
 const { breadthScore, breadthDivergence } =
