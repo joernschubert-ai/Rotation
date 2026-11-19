@@ -91,7 +91,7 @@ function summarizeBreadth(symbols: string[], bars: Map<string, BreadthBars>, now
     b20: accepted.length ? above.b20 / accepted.length : null,
     b50: accepted.length ? above.b50 / accepted.length : null,
     b200: accepted.length ? above.b200 / accepted.length : null,
-    dataQuality: { universeVersion: BREADTH_UNIVERSE_VERSION, definition: "NASDAQ100_CURRENT_CONSTITUENTS_EQUAL_WEIGHT", constituentFingerprint: createHash("sha256").update([...symbols].sort().join(",")).digest("hex"), constituentCount: symbols.length, representsEntireUSMarket: false, minimumCoverage: 0.98, thresholdCalibration: "EXISTING_RULES_NOT_RECALIBRATED_FOR_THIS_UNIVERSE", countsAboveMovingAverage: above, constituentSource: NASDAQ_MEMBERS_SOURCE, constituentListOfficiallyVerified: false, referenceDate, constituentRefreshSeconds: 86400, historicalMembershipReconstructed: false, shareClassesCountSeparately: true, officialIndexBreadth: false, expected: symbols.length, valid: accepted.length, coverage: accepted.length / symbols.length, accepted, excluded, commonDenominator: true, smoothing: "NONE", latestBarFinality: "UNVERIFIED", freshnessLimitCalendarDays: 5 }
+    dataQuality: { universeVersion: BREADTH_UNIVERSE_VERSION, definition: "NASDAQ100_CURRENT_CONSTITUENTS_EQUAL_WEIGHT", constituentFingerprint: createHash("sha256").update([...symbols].sort().join(",")).digest("hex"), constituentCount: symbols.length, representsEntireUSMarket: false, minimumCoverage: 0.75, thresholdCalibration: "OPERATIONAL_COVERAGE_FLOOR_75_PERCENT_NOT_SIGNAL_CALIBRATED", countsAboveMovingAverage: above, constituentSource: NASDAQ_MEMBERS_SOURCE, constituentListOfficiallyVerified: false, referenceDate, constituentRefreshSeconds: 86400, historicalMembershipReconstructed: false, shareClassesCountSeparately: true, officialIndexBreadth: false, expected: symbols.length, valid: accepted.length, coverage: accepted.length / symbols.length, accepted, excluded, commonDenominator: true, smoothing: "NONE", latestBarFinality: "UNVERIFIED", freshnessLimitCalendarDays: 5 }
   };
 }
 
@@ -113,10 +113,10 @@ async function loadBroadBreadth(symbols: string[], priceObservationDate: string 
     }
   }));
   let main = summarizeBreadth(symbols, bars);
-  const requiredBreadthCount = Math.ceil(symbols.length * 0.98);
+  const requiredBreadthCount = Math.ceil(symbols.length * 0.75);
   if (main.dataQuality.valid < requiredBreadthCount) {
     // Retry only a few transiently missing or stale rows directly, bypassing the 15-minute cache.
-    // Keep the 98% quality threshold; never substitute stale or synthetic breadth values.
+    // Retry only toward the 75% usability floor; never substitute stale or synthetic values.
     const retryableReasons = new Set(["UNAVAILABLE", "DIFFERENT_SESSION_DATE", "STALE_OR_FUTURE_BAR"]);
     const retryTarget = Math.max(1, requiredBreadthCount - main.dataQuality.valid + 1);
     const retrySymbols = symbols.filter(symbol => retryableReasons.has(main.dataQuality.excluded[symbol]));
@@ -131,7 +131,7 @@ async function loadBroadBreadth(symbols: string[], priceObservationDate: string 
   const referenceDate = main.dataQuality.referenceDate;
   const aligned = new Map([...bars].filter(([, value]) => value.sessionDate === referenceDate));
   const etf = summarizeBreadth(SUPPLEMENTAL_ETF_UNIVERSE, aligned);
-  const etfReady = etf.dataQuality.coverage >= 0.98;
+  const etfReady = etf.dataQuality.coverage >= 0.75;
   const adRows = main.dataQuality.accepted.map(symbol => aligned.get(symbol)!).filter(row => row.closes.length >= 2);
   const advances = adRows.filter(row => row.closes.at(-1)! > row.closes.at(-2)!).length;
   const declines = adRows.filter(row => row.closes.at(-1)! < row.closes.at(-2)!).length;
@@ -144,7 +144,7 @@ async function loadBroadBreadth(symbols: string[], priceObservationDate: string 
   const marketContextSP500 = sp500 ? {
     definition: "SP500_REFERENCE_ONLY", affectsEngineScores: false, referenceDate,
     expected: sp500.dataQuality.expected, valid: sp500.dataQuality.valid, coverage: sp500.dataQuality.coverage,
-    percentages: sp500.dataQuality.coverage >= 0.98 ? { b20: sp500.b20! * 100, b50: sp500.b50! * 100, b200: sp500.b200! * 100 } : null,
+    percentages: sp500.dataQuality.coverage >= 0.75 ? { b20: sp500.b20! * 100, b50: sp500.b50! * 100, b200: sp500.b200! * 100 } : null,
     constituentSource: BREADTH_CONSTITUENTS_SOURCE, excluded: sp500.dataQuality.excluded
   } : { definition: "SP500_REFERENCE_ONLY", affectsEngineScores: false, status: "UNAVAILABLE" };
   const russell2000 = summarizeRussellBreadth(russellHoldings, aligned, referenceDate);
@@ -185,7 +185,7 @@ function summarizeEarlyETFTrend(symbols: string[], bars: Map<string, BreadthBars
     const end = closes.length - offset;
     return closes[end - 1] > closes.slice(end - period, end).reduce((sum, value) => sum + value, 0) / period;
   }).length / valid.length : null;
-  const ready = coverage >= 0.98;
+  const ready = coverage >= 0.75;
   const current20 = ready ? pct(20, 0) : null, prior20 = ready ? pct(20, 5) : null;
   const current50 = ready ? pct(50, 0) : null, prior50 = ready ? pct(50, 5) : null;
   const delta20Pp = current20 !== null && prior20 !== null ? current20 - prior20 : null;
@@ -233,7 +233,8 @@ function summarizeNasdaqBreadth(symbols: string[], bars: Map<string, BreadthBars
     dataQuality: { ...result.dataQuality, universeVersion: "NASDAQ100_CURRENT_MEMBERS_BREADTH_V1",
       definition: "NASDAQ100_CURRENT_CONSTITUENTS_EQUAL_WEIGHT", constituentSource: NASDAQ_MEMBERS_SOURCE,
       referenceDate, unit: "FRACTION", sourceIsOfficial: false,
-      available: result.dataQuality.coverage >= 0.98 && result.dataQuality.valid > 0 && result.dataQuality.referenceDate === referenceDate,
+      minimumCoverage: 0.75,
+      available: result.dataQuality.coverage >= 0.75 && result.dataQuality.valid > 0 && result.dataQuality.referenceDate === referenceDate,
       highLowObservation: buildConstituentExtremesObservation(symbols, result.dataQuality.accepted, aligned, referenceDate),
       highLowValid252: annual.length, highLowExpected: symbols.length,
       highLowCoverage: annual.length / symbols.length, historicalMembershipReconstructed: false,
@@ -281,8 +282,8 @@ function summarizeRussellBreadth(holdings: { symbols: string[]; asOfDate: string
     universeVersion: "IWM_EQUITY_HOLDINGS_SMALLCAP_BREADTH_V1", definition: "IWM_EQUITY_HOLDINGS_SMALLCAP_PROXY",
     constituentSource: RUSSELL_HOLDINGS_URL, sourceIsOfficial: true, officialIndexBreadth: false,
     membershipIsOfficialRussellIndexRoster: false, holdingsAsOfDate: holdings.asOfDate, holdingsAgeDays,
-    minimumCoverage: 0.95, available: listFresh && frame.dataQuality.coverage >= 0.95 && frame.dataQuality.valid > 0 && frame.dataQuality.referenceDate === referenceDate,
-    reason: !listFresh ? "STALE_HOLDINGS" : frame.dataQuality.coverage < 0.95 ? "INSUFFICIENT_SMALLCAP_COVERAGE" : null } };
+    minimumCoverage: 0.75, available: listFresh && frame.dataQuality.coverage >= 0.75 && frame.dataQuality.valid > 0 && frame.dataQuality.referenceDate === referenceDate,
+    reason: !listFresh ? "STALE_HOLDINGS" : frame.dataQuality.coverage < 0.75 ? "INSUFFICIENT_SMALLCAP_COVERAGE" : null } };
 }
 
 /* ================= MARKET CACHE ================= */
@@ -2918,30 +2919,29 @@ const spLowerHigh = detectLowerHigh(spClosesFull);
 const spObservation = indexObservationQuality.get(spClosesFull);
 const spObservedDay = spObservation?.latestEndpointAvailable === true && typeof spObservation.currentObservationTimestamp === "string" ? spObservation.currentObservationTimestamp.slice(0,10) : null;
 const broadBreadth = await loadBroadBreadth(breadthUniverse, spObservedDay);
-// Coverage describes breadth completeness; it must not block the full market
-// refresh when the available constituents still produce real breadth values.
 const freshBreadthCoverage = broadBreadth.dataQuality.coverage;
-if (!Number.isFinite(freshBreadthCoverage) || broadBreadth.b20 === null || broadBreadth.b50 === null || broadBreadth.b200 === null) {
-  return NextResponse.json({ error: "Insufficient fresh breadth coverage", breadthDataQuality: broadBreadth.dataQuality }, { status: 503 });
-}
-if (freshBreadthCoverage < 0.98) console.warn("Breadth below strict signal coverage; continuing core market refresh with partial measured breadth", { coverage: freshBreadthCoverage, requiredForBreadthSignals: 0.98 });
-const breadth200 = broadBreadth.b200;
-const breadth50 = broadBreadth.b50;
+const breadthSignalEligible = Number.isFinite(freshBreadthCoverage) && freshBreadthCoverage >= 0.75 &&
+  [broadBreadth.b20, broadBreadth.b50, broadBreadth.b200].every(value => typeof value === "number" && Number.isFinite(value));
+if (!breadthSignalEligible) console.warn("Breadth below the 75% usability floor or unavailable; continuing core market refresh without breadth influence", { coverage: freshBreadthCoverage, requiredForBreadthUse: 0.75, valid: broadBreadth.dataQuality.valid, expected: broadBreadth.dataQuality.expected });
+// Keep measured values in the response. Only internal composite calculations
+// use neutral 50% inputs when breadth does not meet the usability floor.
+const breadth200 = breadthSignalEligible ? broadBreadth.b200! : 0.5;
+const breadth50 = breadthSignalEligible ? broadBreadth.b50! : 0.5;
 const { breadthScore, breadthDivergence } =
 calculateBreadthScore(breadth200, breadth50);
 
 /* HIGH LOW BREADTH */
 
 const highLowData =
-await calculateHighLowIndicator(async (symbol: string) => broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], breadthUniverse);
+await calculateHighLowIndicator(async (symbol: string) => breadthSignalEligible && broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], breadthUniverse);
 
 /* ADVANCE DECLINE */
 
 const adData =
-await calculateAdvanceDecline(async (symbol: string) => broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], breadthUniverse);
+await calculateAdvanceDecline(async (symbol: string) => breadthSignalEligible && broadBreadth.dataQuality.accepted.includes(symbol) ? broadBreadth.bars.get(symbol)?.closes ?? [] : [], breadthUniverse);
 
 const breadth20Data =
-{ breadth20: broadBreadth.b20, breadth20Signal: broadBreadth.b20 < 0.25 ? "panic" : broadBreadth.b20 < 0.4 ? "weak" : "neutral" };
+{ breadth20: breadthSignalEligible ? broadBreadth.b20! : 0.5, breadth20Signal: breadthSignalEligible ? (broadBreadth.b20! < 0.25 ? "panic" : broadBreadth.b20! < 0.4 ? "weak" : "neutral") : "unavailable" };
 
 /* ================= INTERNAL MOMENTUM ================= */
 
@@ -3924,9 +3924,9 @@ adSignal: adData.adSignal,
 
 crashProbability: crashRisk.probability,
 crashRiskRegime: crashRisk.regime,
-breadth20: breadth20Data.breadth20,
-breadth20Signal: breadth20Data.breadth20Signal,
-breadthDataQuality: broadBreadth.dataQuality,
+breadth20: broadBreadth.b20,
+breadth20Signal: breadthSignalEligible ? breadth20Data.breadth20Signal : "unavailable",
+breadthDataQuality: { ...broadBreadth.dataQuality, minimumCoverage: 0.75, signalEligible: breadthSignalEligible, limitedContextOnly: !breadthSignalEligible },
 indexBreadth: { nasdaq100: broadBreadth.nasdaq100, russell2000: broadBreadth.russell2000 },
 
 liquidityScore: liquidityData.liquidityScore,
