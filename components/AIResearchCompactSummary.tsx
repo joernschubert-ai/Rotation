@@ -8,26 +8,39 @@ function antiFactorSummary(report:AIResearchReport,instrument:string){
  const sequence=report.appFacts?.sequenceAnalysis;
  if(sequence?.status!=='AVAILABLE')return '';
  const events=sequence.sequence;
- const latest=(factor:string,direction?:string)=>{const event=[...events].reverse().find(item=>item.factor===factor);return event&&(!direction||event.direction===direction)?event:undefined;};
+ const dated=events.filter(event=>Number.isFinite(dateNumber(event.date))).sort((a,b)=>a.date.localeCompare(b.date));
+ if(!dated.length)return '';
+ const latestDate=dated[dated.length-1].date,cutoff=dateNumber(latestDate)-7*86400000;
+ const recent=dated.filter(event=>dateNumber(event.date)>=cutoff);
+ const all=(factor:string,direction:string)=>recent.filter(event=>event.factor===factor&&event.direction===direction);
+ const last=(factor:string,direction:string)=>all(factor,direction).at(-1);
  const dateLabel=(event:{date:string}|undefined)=>event?new Date(event.date+'T12:00:00Z').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',timeZone:'UTC'}):'';
  const parts:string[]=[];
  const isPut=instrument==='NASDAQ_PUT';
- const price=latest('NASDAQ_INDEX_OBSERVATION',isPut?'UP':'DOWN');
- const breadthFactors=['BREADTH20','BREADTH50'];
- const breadth=breadthFactors.map(factor=>latest(factor,isPut?'DOWN':'UP')).filter((event):event is NonNullable<typeof event>=>Boolean(event)).sort((a,b)=>b.date.localeCompare(a.date))[0];
- const vix=latest('VIX_LEVEL');
- if(price&&breadth&&closeInTime(price,breadth)){
-   parts.push(isPut
-     ?`Nasdaq steigt, Breite lässt nach (${dateLabel(breadth)}) – die antizyklische Put-Prüfung wird gestützt.`
-     :`Nasdaq fällt, Breite steigt (${dateLabel(breadth)}) – die antizyklische Call-Prüfung wird gestützt.`);
-   if(vix&&closeInTime(price,vix))parts.push(`VIX ${vix.direction==='UP'?'steigt':'fällt'} dazu (${dateLabel(vix)}).`);
- }else if(price&&vix&&vix.direction==='UP'&&closeInTime(price,vix)){
-   parts.push(isPut
-     ?`Nasdaq steigt und der VIX zieht an (${dateLabel(vix)}) – Stress nimmt trotz Aufwärtsbewegung zu; Put-Gegenidee im Blick.`
-     :`Nasdaq fällt und der VIX zieht an (${dateLabel(vix)}) – Stress verstärkt den antizyklischen Call-Kontext; eine Umkehr ist damit nicht bestätigt.`);
+ const priceDown=last('NASDAQ_INDEX_OBSERVATION','DOWN'),priceUp=last('NASDAQ_INDEX_OBSERVATION','UP');
+ const breadthUp=[last('BREADTH20','UP'),last('BREADTH50','UP')].filter((event):event is NonNullable<typeof event>=>Boolean(event));
+ const breadthDown=[last('BREADTH20','DOWN'),last('BREADTH50','DOWN')].filter((event):event is NonNullable<typeof event>=>Boolean(event));
+ const vixUp=last('VIX_LEVEL','UP'),vixDown=last('VIX_LEVEL','DOWN');
+ if(isPut){
+   const price=priceUp,breadth=breadthDown.find(event=>!price||event.date>=price.date);
+   if(price&&breadth&&closeInTime(price,breadth,7))parts.push(`Nach dem Nasdaq-Anstieg am ${dateLabel(price)} ließ die Breite am ${dateLabel(breadth)} nach – das stützt die antizyklische Put-Prüfung.`);
+   if(price&&vixUp&&vixUp.date>=price.date&&closeInTime(price,vixUp,7))parts.push(`Der VIX zog am ${dateLabel(vixUp)} ebenfalls an.`);
+ }else{
+   const price=priceDown;
+   const improving=breadthUp.filter(event=>!price||event.date>=price.date);
+   const recovery=price&&improving.length>0&&closeInTime(price,improving[improving.length-1],7);
+   if(recovery){
+     const breadthDates=[...new Set(improving.map(dateLabel))].join(' und ');
+     parts.push(`Nach dem Nasdaq-Rückgang am ${dateLabel(price)} verbesserte sich die Breite am ${breadthDates}${priceUp&&priceUp.date>price.date?`; am ${dateLabel(priceUp)} stieg auch der Nasdaq wieder`:''} – das stützt die antizyklische Call-Prüfung, bestätigt aber keine Trendwende.`);
+     if(vixUp&&vixDown&&vixUp.date<=vixDown.date&&closeInTime(price,vixDown,7))parts.push(`Der VIX zog am ${dateLabel(vixUp)} zunächst an und gab am ${dateLabel(vixDown)} wieder nach.`);
+     else if(vixDown&&closeInTime(price,vixDown,7))parts.push(`Der VIX gab am ${dateLabel(vixDown)} nach.`);
+     else if(vixUp&&closeInTime(price,vixUp,7))parts.push(`Der VIX zog am ${dateLabel(vixUp)} an.`);
+   }else if(price&&vixUp&&closeInTime(price,vixUp,4)){
+     parts.push(`Nasdaq-Rückgang am ${dateLabel(price)} und VIX-Anstieg am ${dateLabel(vixUp)} bilden Stresskontext für die antizyklische Call-Prüfung; eine Umkehr ist nicht bestätigt.`);
+   }
  }
  if(instrument==='RUSSELL_CALL'){
-   const relative=latest('SMALL_VS_TECH','UP');
+   const relative=last('SMALL_VS_TECH','UP');
    if(relative)parts.push(`Russell gewinnt relativ zu Tech (${dateLabel(relative)}) – zusätzliche relative Unterstützung für den Russell Call.`);
  }
  return parts.join(' ');
