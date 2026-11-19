@@ -8,6 +8,7 @@ import { buildNewsEventContext } from './aiResearchNewsEvents';
 import { diagnosticModelValue } from './aiResearchDiagnosticModelView';
 import { buildInstrumentBindings, instrumentBindingFact } from './aiResearchInstrumentBindings';
 import { periodBinding } from './aiResearchPeriodBindings';
+import { buildSequenceAnalysis, type SequenceAnalysis } from './aiResearchSequenceAnalysis';
 type Row=Record<string,any>;
 const obj=(v:unknown):Row=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Row:{};
 const rows=(v:unknown):Row[]=>Array.isArray(v)?v.map(obj):[];
@@ -15,12 +16,13 @@ const num=(v:unknown):number|null=>typeof v==='number'&&Number.isFinite(v)?v:nul
 const date=(v:unknown):string|null=>{if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;const n=Date.parse(v+'T00:00:00Z');return Number.isFinite(n)&&new Date(n).toISOString().slice(0,10)===v?v:null;};
 export const APP_FACTS_POLICY='APP_FACTS_V71' as const;
 export interface AppFact {id:string;domain:string;market:string;asOf:string|null;status:'CALCULATED'|'SUPPLIED'|'MISSING';text:string;values:Record<string,unknown>;}
-export interface AppFacts {version:typeof APP_FACTS_POLICY;snapshotTimestamp:string;facts:AppFact[];modelCoverage:{includedIds:string[];omittedIds:string[];reason:string};limitations:string[];}
+export interface AppFacts {version:typeof APP_FACTS_POLICY;snapshotTimestamp:string;facts:AppFact[];modelCoverage:{includedIds:string[];omittedIds:string[];reason:string};limitations:string[];sequenceAnalysis?:SequenceAnalysis;}
 const modelIncluded=(f:AppFact)=>!/-CASE-\d+$/.test(f.id)&&!f.id.endsWith('-ROTATION-SEMANTICS')&&!f.id.endsWith('-ENTRY-CONTEXT')&&!f.id.endsWith('-PATH')&&!/-PF[01]-GRID\d+$/.test(f.id)
   &&!(f.domain==='Preisbedingungen'&&f.values.role!=='REFERENCE')&&!/-WEEK-[1-3]$/.test(f.id)&&!/-PF[01]-LAST-TARGET$/.test(f.id)&&(f.domain!=='Nachrichten-Ereignisstruktur'||f.id==='NEWS-EVENT-OVERVIEW');
 /** Authority covers transformations of supplied facts, not source truth or future prices. */
 export function buildAppFacts(input:unknown,snapshotTimestamp:string,appContext:unknown={}):AppFacts{
   const d=obj(input),app=obj(appContext),concepts=buildResearchConcepts(d),facts:AppFact[]=[];
+  const sequenceAnalysis=buildSequenceAnalysis(app.sequenceHistory);
   const add=(id:string,domain:string,market:string,asOf:string|null,status:AppFact['status'],text:string,values:Record<string,unknown>={})=>facts.push({id,domain,market,asOf,status,text,values});
   for(const market of ['NASDAQ','RUSSELL_2000']){
     const own=obj(obj(d.indices)[market]),chart=obj(own.completedChart),day=date(chart.asOfDate),close=num(chart.lastClose),prefix=market==='NASDAQ'?'N-F':'R-F';
@@ -103,7 +105,7 @@ export function buildAppFacts(input:unknown,snapshotTimestamp:string,appContext:
     'Struktur, Regime und Freigaben werden übernommen, nicht neu kalibriert. Quellen können gemeinsame Ursprünge und verschiedene Beobachtungstage haben.',
     'Datenlücken bleiben sichtbar. Nachrichtenton ist keine Preisrichtung; historische Rendite ist keine Optionsrendite.',
     'Die freie KI-Meinung ist ungeprüfte Interpretation und ersetzt keine Fakten oder App-Freigaben.'
-  ]};
+  ],sequenceAnalysis};
 }
 export function appFactsForModel(facts:AppFacts):string{
   const pairs=entryPairs(facts);
