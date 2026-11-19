@@ -152,7 +152,7 @@ export async function runAIResearchFromHistory(
         const factEvidence=buildSynthesisEvidence(researchInput,result.report);
         const heatSource=(currentSnapshot as any).systemHeat??(currentSnapshot as any).heat;
         const heat=heatSource&&typeof heatSource==='object'?Object.fromEntries(['score','state','signal','status','level'].filter(k=>typeof heatSource[k]==='number'||typeof heatSource[k]==='string').map(k=>[k,heatSource[k]])):null;
-        result.report.appFacts=buildAppFacts(buildNarrativeFacts(factEvidence),currentSnapshot.timestamp,{...factEvidence.find(e=>e.id==='APP')?.data,systemHeat:heat,entryContext:buildEntryContext(currentSnapshot),sequenceHistory:researchInput.history,
+        result.report.appFacts=buildAppFacts(buildNarrativeFacts(factEvidence),currentSnapshot.timestamp,{...factEvidence.find(e=>e.id==='APP')?.data,indexBreadth:(currentSnapshot as any).indexBreadth,systemHeat:heat,entryContext:buildEntryContext(currentSnapshot),sequenceHistory:researchInput.history,
           putTiming:{...((factEvidence.find(e=>e.id==='APP')?.data.putTiming as Record<string,unknown>)??{}),meta:{
             earlyStructuralTrigger:(currentSnapshot as any).putTiming?.meta?.earlyStructuralTrigger??null,
             earlyCurrentTrigger:(currentSnapshot as any).putTiming?.meta?.earlyCurrentTrigger??null,

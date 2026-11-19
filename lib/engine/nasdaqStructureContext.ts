@@ -7,7 +7,7 @@ import { marketQualityEngine } from "./marketQualityEngine";
 export function buildNasdaqStructureContext(data: any, shared: any): any | null {
   const frame = data?.indexBreadth?.nasdaq100;
   const quality = frame?.dataQuality;
-  if (quality?.available !== true || quality?.unit !== "FRACTION" || quality?.definition !== "NASDAQ100_CURRENT_CONSTITUENTS_EQUAL_WEIGHT" || !(quality.coverage >= 0.98) || typeof quality.referenceDate !== "string") return null;
+  if (quality?.available !== true || quality?.unit !== "FRACTION" || quality?.definition !== "NASDAQ100_CURRENT_CONSTITUENTS_EQUAL_WEIGHT" || !(quality.coverage >= 0.75) || typeof quality.referenceDate !== "string") return null;
   const values = [frame.b20, frame.b50, frame.b200];
   if (values.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return null;
   const structure = structureEngine({ ...data, breadth20: frame.b20, breadth50: frame.b50, breadth200: frame.b200,
@@ -16,7 +16,7 @@ export function buildNasdaqStructureContext(data: any, shared: any): any | null 
   const participation = participationEngine({ historyMetrics: {}, breadthUnit: "PERCENT", breadth20, breadth50, breadth200,
     structure, highs: frame.newHighs, lows: frame.newLows, rsEqual: shared.rotation?.rsEqual, rsSmall: shared.rotation?.rsSmall,
     rotation: shared.rotation, concentrationScore: Number(data.concentrationScore ?? 50), rotationScore: shared.rotation?.score });
-  const breadthThrust = breadthThrustEngine({ breadthUnit: "PERCENT", breadth20, breadth50, breadth200, structure, advanceDecline: frame.advanceDecline,
+  const breadthThrust = breadthThrustEngine({ breadth20, breadth50, breadth200, structure, advanceDecline: frame.advanceDecline,
     rsEqual: shared.rotation?.rsEqual, rsSmall: shared.rotation?.rsSmall, rotationScore: shared.rotation?.score,
     participationScore: participation.score, concentrationScore: Number(data.concentrationScore ?? 50) });
   const marketQuality = marketQualityEngine({ ...shared, structure, participation, breadthThrust, breadth50, breadth200,
