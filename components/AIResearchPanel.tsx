@@ -265,6 +265,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
   marketPending?: boolean;
 } = {}) {
   const [data, setData] = useState<ResponseData | null>(null);
+  const [archiveData,setArchiveData]=useState<ResponseData|null>(null);
   const [loading, setLoading] = useState(false);
   const [archiveLoading,setArchiveLoading]=useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -288,8 +289,9 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       if (!response.ok || result.status !== "SUCCESS" || !result.report) throw new Error(result.error ?? "Kein vollständiger Research-Bericht verfügbar.");
       if (id === requestId.current && !request.signal.aborted) {
         const synthesis=result.report.aiSynthesis;
-        const fullCurrentReport=Boolean(synthesis?.content||synthesis?.narrative);
-        setData(previous=>!fullCurrentReport&&previous?.report?previous:result);
+        const currentSourceReview=synthesis?.sourceReview?.status==='VALID_SELECTION'&&synthesis.sourceReview.snapshotTimestamp===result.report.appFacts?.snapshotTimestamp;
+        const usableCurrentResearch=synthesis?.status==='SUCCESS'&&(Boolean(synthesis.content||synthesis.narrative)||currentSourceReview);
+        if(usableCurrentResearch)setData(result);
         if(result.report.aiSynthesis?.status!=='SUCCESS')setError(result.report.aiSynthesis?.message??'Aktuelle KI-Auswertung nicht verfügbar; der bisherige Bericht bleibt erhalten.');
       }
     } catch (failure) {
@@ -308,8 +310,14 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       const before=expectedSnapshotTimestamp?`&before=${encodeURIComponent(expectedSnapshotTimestamp)}`:'';
       const response=await fetch(`/api/ai-research/dashboard?task=DAILY_MARKET_REVIEW&stored=latest${before}`,{method:'GET',cache:'no-store',credentials:'same-origin',signal:request.signal});
       const saved:ResponseData=await response.json();
-      if(!request.signal.aborted&&response.ok&&saved.status==='SUCCESS'&&saved.report&&saved.storedDisplay?.archived)
-        setData(previous=>previous?.report?.aiSynthesis?.content||previous?.report?.aiSynthesis?.narrative?previous:saved);
+      if(!request.signal.aborted&&response.ok&&saved.status==='SUCCESS'&&saved.report&&saved.storedDisplay?.archived){
+        setArchiveData(saved);
+        setData(previous=>{
+          const previousFrame=previous?.report?.decisionSupport?.snapshotTimestamp??previous?.diagnostics?.snapshotTimestamp;
+          const previousIsCurrent=Boolean(previous?.report&&!previous.storedDisplay?.archived&&(!expectedSnapshotTimestamp||previousFrame===expectedSnapshotTimestamp));
+          return previousIsCurrent?previous:saved;
+        });
+      }
     }catch{/* Keep any displayed report. No model retry or replacement generation. */}
     finally{if(!request.signal.aborted)setArchiveLoading(false);}})();
     return ()=>request.abort();
@@ -355,6 +363,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
     {report && <>
       <Detail title="Auftragsstatus und Herkunft"><ResearchSequenceStatus synthesis={report.aiSynthesis} /></Detail>
       {archivedDisplay?<AIResearchArchivedReport report={report} />:<AIResearchOverview report={report} snapshotTimestamp={reportSnapshotTimestamp} suspended={suspended} />}
+      {!archivedDisplay&&archiveData?.report&&archiveData.report.decisionSupport?.snapshotTimestamp!==reportSnapshotTimestamp&&<Detail title={`Letzter vollständiger KI-Bericht · gespeicherter Stand ${date(archiveData.report.decisionSupport?.snapshotTimestamp)}`}><AIResearchArchivedReport report={archiveData.report} /></Detail>}
       <Detail title="Gespeicherte Szenarien und Kontextabwägung · ohne neue KI"><AIResearchStoredWeighing report={report} displayedSnapshotTimestamp={expectedSnapshotTimestamp ?? reportSnapshotTimestamp} suspended={suspended} /></Detail>
       <Detail title="Weitere Modell-, Chart- und Syntheseansichten">
       <ResearchWeightingPanel synthesis={report.aiSynthesis} suspended={suspended} />
