@@ -152,7 +152,12 @@ export async function runAIResearchFromHistory(
         const factEvidence=buildSynthesisEvidence(researchInput,result.report);
         const heatSource=(currentSnapshot as any).systemHeat??(currentSnapshot as any).heat;
         const heat=heatSource&&typeof heatSource==='object'?Object.fromEntries(['score','state','signal','status','level'].filter(k=>typeof heatSource[k]==='number'||typeof heatSource[k]==='string').map(k=>[k,heatSource[k]])):null;
-        result.report.appFacts=buildAppFacts(buildNarrativeFacts(factEvidence),currentSnapshot.timestamp,{...factEvidence.find(e=>e.id==='APP')?.data,indexBreadth:(currentSnapshot as any).indexBreadth,systemHeat:heat,entryContext:buildEntryContext(currentSnapshot),sequenceHistory:researchInput.history,
+        const snapshotBreadthQuality=(currentSnapshot as any).breadthDataQuality??{};
+        const snapshotIndexBreadth=(currentSnapshot as any).indexBreadth??{
+          nasdaq100:snapshotBreadthQuality.nasdaq100??(String(snapshotBreadthQuality.definition??'').includes('NASDAQ100')?snapshotBreadthQuality:undefined),
+          russell2000:snapshotBreadthQuality.russell2000
+        };
+        result.report.appFacts=buildAppFacts(buildNarrativeFacts(factEvidence),currentSnapshot.timestamp,{...factEvidence.find(e=>e.id==='APP')?.data,indexBreadth:snapshotIndexBreadth,breadthDataQuality:snapshotBreadthQuality,systemHeat:heat,entryContext:buildEntryContext(currentSnapshot),sequenceHistory:researchInput.history,
           putTiming:{...((factEvidence.find(e=>e.id==='APP')?.data.putTiming as Record<string,unknown>)??{}),meta:{
             earlyStructuralTrigger:(currentSnapshot as any).putTiming?.meta?.earlyStructuralTrigger??null,
             earlyCurrentTrigger:(currentSnapshot as any).putTiming?.meta?.earlyCurrentTrigger??null,
