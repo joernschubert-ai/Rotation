@@ -2,6 +2,7 @@
 import type {SourceReview} from '@/lib/aiResearch/aiResearchSourceReview';
 const names:Record<string,string>={NASDAQ:'Nasdaq-100',RUSSELL_2000:'Russell 2000',SHARED:'Gemeinsamer Kontext',NASDAQ_PUT:'Nasdaq Put',NASDAQ_CALL:'Nasdaq Call',RUSSELL_CALL:'Russell Call'};
 const stances:Record<string,string>={CONTEXT_SUPPORTS:'Stützender Kontext überwiegt laut KI',CONTEXT_OPPOSES:'Gegenargumente überwiegen laut KI',MIXED:'Gemischte Abwägung laut KI',UNCLEAR:'Einordnung offen'};
+function sourceFactText(domain:string,text:string){return domain==='COT'?text.replace(/\bLEVERAGED_MONEY\b/g,'Leveraged Money (Hedgefonds/Trading-Profis)').replace(/\bASSET_MANAGER\b/g,'Asset Manager (institutionelle Fonds)'):text;}
 /** Canonical source facts and explicitly unverified model judgements remain separate. */
 export function AIResearchSourceReview({review,archived=false}:{review:SourceReview;archived?:boolean}){
  return <section className="border-y border-slate-700 p-4 text-xs leading-relaxed text-slate-300 sm:p-5" aria-label={archived?'Archivierter Quellenbericht':'App-Zustandsbeschreibung und KI-Quellenwahl'}>
@@ -12,7 +13,7 @@ export function AIResearchSourceReview({review,archived=false}:{review:SourceRev
    return <article key={market} className="rounded border border-slate-700 p-3"><h4 className="font-semibold text-slate-100">{names[market]} · Zustand aus der App</h4>
     {!core.length&&<p className="mt-2 text-amber-200">Keine gültige datierte Kurslage verfügbar.</p>}
     {core.map(s=><p key={s.id} className="mt-2">{s.text}<span className="block text-[10px] text-slate-500">{s.id} · {s.asOf??'Datum unbekannt'}</span></p>)}
-    <details className="mt-3"><summary className="cursor-pointer font-semibold">Struktur, Kursverlauf, P&F, COT und Historie aus der App</summary>{rest.map(s=><div key={s.id} className="mt-3 border-t border-slate-800 pt-2"><p className="font-semibold">{s.domain} · {s.asOf??'Datum unbekannt'}</p><p className="mt-1">{s.text}</p><p className="text-[10px] text-slate-500">{s.id} · {s.status}</p></div>)}</details>
+    <details className="mt-3"><summary className="cursor-pointer font-semibold">Struktur, Kursverlauf, P&F, COT und Historie aus der App</summary>{rest.map(s=><div key={s.id} className="mt-3 border-t border-slate-800 pt-2"><p className="font-semibold">{s.domain} · {s.asOf??'Datum unbekannt'}</p><p className="mt-1">{sourceFactText(s.domain,s.text)}</p><p className="text-[10px] text-slate-500">{s.id} · {s.status}</p></div>)}{rest.some(s=>s.domain==='COT')&&<p className="mt-3 text-[10px] text-slate-500">CFTC-Positionsgruppen, keine feste Kurz-/Langfrist-Einteilung. Kleinanleger und Commercials sind separate COT-Gruppen.</p>}</details>
    </article>;
   })}</div>
   <details className="mt-3"><summary className="cursor-pointer">Gemeinsamer Regime-, Kredit-, Volatilitäts- und Nachrichtenkontext</summary>{review.states.filter(s=>s.market==='SHARED').map(s=><p key={s.id} className="mt-2">{s.text}<span className="block text-[10px] text-slate-500">{s.id} · {s.asOf??'Datum unbekannt'}</span></p>)}</details>
