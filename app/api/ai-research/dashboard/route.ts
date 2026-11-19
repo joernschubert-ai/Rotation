@@ -20,7 +20,9 @@ async function handle(request: Request, generate: boolean) {
     const question = url.searchParams.get("question")?.slice(0, 500);
     if(!generate&&url.searchParams.get('stored')==='latest'){
       if(question)return NextResponse.json({ok:false,modelRequestsUsed:0,error:'Die Archivansicht gilt nur dem Standardbericht ohne Zusatzfrage.'},{status:400,headers});
-      return NextResponse.json(await readLastDisplayedResearch(task),{headers});
+      const before=url.searchParams.get('before')??undefined;
+      if(before&&!Number.isFinite(Date.parse(before)))return NextResponse.json({ok:false,modelRequestsUsed:0,error:'Ungültiger Archiv-Stichtag.'},{status:400,headers});
+      return NextResponse.json(await readLastDisplayedResearch(task,before),{headers});
     }
     const result = await runAIResearchFromHistory({ task, question, allowAIGeneration: generate });
     return NextResponse.json({ ok: result.status === "SUCCESS", ...result }, { headers });
