@@ -289,7 +289,7 @@ export default function AIResearchPanel({ expectedSnapshotTimestamp, marketReady
       if (!response.ok || result.status !== "SUCCESS" || !result.report) throw new Error(result.error ?? "Kein vollständiger Research-Bericht verfügbar.");
       if (id === requestId.current && !request.signal.aborted) {
         const synthesis=result.report.aiSynthesis;
-        const currentSourceReview=synthesis?.sourceReview?.status==='VALID_SELECTION'&&synthesis.sourceReview.snapshotTimestamp===result.report.appFacts?.snapshotTimestamp;
+        const currentSourceReview=(synthesis?.sourceReview?.status==='VALID_SELECTION'||synthesis?.sourceReview?.status==='PARTIAL_SELECTION')&&synthesis.sourceReview.snapshotTimestamp===result.report.appFacts?.snapshotTimestamp;
         const usableCurrentResearch=synthesis?.status==='SUCCESS'&&(Boolean(synthesis.content||synthesis.narrative)||currentSourceReview);
         if(usableCurrentResearch)setData(result);
         if(result.report.aiSynthesis?.status!=='SUCCESS')setError(result.report.aiSynthesis?.message??'Aktuelle KI-Auswertung nicht verfügbar; der bisherige Bericht bleibt erhalten.');
