@@ -1,6 +1,7 @@
 import {buildConstituentExtremesObservation} from '@/lib/market/constituentExtremes';
 import {calculateDatedCredit, type CreditBar} from '@/lib/market/datedCredit';
 import {prepareFuturesObservation} from '@/lib/market/futuresObservation';
+import {completedDailyCutoff} from '@/lib/market/entryContext';
 import { selectVolatilityContext } from "@/lib/market/volatilityContext";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -2822,6 +2823,9 @@ trend
 
 
 const spClosesFull = await fetchIndex("^GSPC","5y");
+const futuresReferenceCutoff=completedDailyCutoff(new Date());
+const spObservedSessions=indexObservationQuality.get(spClosesFull)?.observedSessions;
+const futuresReferenceDate=Array.isArray(spObservedSessions)?[...spObservedSessions].reverse().find((row:any)=>typeof row?.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(row.date)&&row.date<=futuresReferenceCutoff&&typeof row.close==='number'&&Number.isFinite(row.close)&&row.close>0)?.date??null:null;
 
 /* ================= FUTURES FETCH ================= */
 
@@ -2846,7 +2850,7 @@ const data = await res.json();
 
 if (!data?.chart?.result) return [];
 
-const observation=prepareFuturesObservation(data.chart.result[0],symbol,Date.now(),indexObservationQuality.get(spClosesFull)?.latestEndpointAvailable===true?String(indexObservationQuality.get(spClosesFull)?.currentObservationTimestamp??" ").slice(0,10):null);
+const observation=prepareFuturesObservation(data.chart.result[0],symbol,Date.now(),futuresReferenceDate);
 futuresObservations.set(observation.engineCloses,observation);
 return observation.engineCloses;
 
