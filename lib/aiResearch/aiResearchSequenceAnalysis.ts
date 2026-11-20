@@ -1,13 +1,13 @@
 type Row = Record<string, unknown>;
 export interface SequenceEvent { date: string; factor: string; direction: "UP" | "DOWN"; change: number | null; }
 export interface SequenceAnalysis {
-  version: "OBSERVED_FACTOR_SEQUENCE_V1";
+  version: "OBSERVED_FACTOR_SEQUENCE_V2";
   status: "AVAILABLE" | "INSUFFICIENT_COMPARABLE_HISTORY" | "VERSION_IDENTITY_UNKNOWN";
   asOfDate: string | null;
   observationCount: number;
   dateBasis: "NEW_YORK_CAPTURE_DATE_NOT_VERIFIED_EXCHANGE_SESSION";
   sequence: SequenceEvent[];
-  latestValues: { breadth20: number | null; breadth50: number | null; nasdaq: number | null; rsi14: number | null; vix: number | null; smallVsTech: number | null };
+  latestValues: { breadth20: number | null; breadth50: number | null; nasdaq: number | null; rsi14: number | null; vix: number | null; smallVsTech: number | null; smallVsTech20: number | null; smallVsTech60: number | null };
   limitations: string[];
   historicalMatches: HistoricalSequenceMatch[];
 }
@@ -45,12 +45,15 @@ function rsi14(snapshot: Row): number | null {
   for (const key of ["rsi14", "rsi14Value", "rsi", "rsiValue"]) { const value = numeric(ndx[key]); if (value !== null) return value; }
   return null;
 }
-function relative(snapshot: Row): number | null {
+function relative(snapshot: Row, horizon: 20 | 60 = 20): number | null {
   const leadership = obj(snapshot.relativeLeadership);
-  for (const key of ["smallVsTech20Pp", "smallVsTech20D", "smallVsTech20", "rsSmall20", "smallVsTech", "rsSmall"]) {
+  const keys = horizon === 20
+    ? ["smallVsTech20Pp", "smallVsTech20D", "smallVsTech20", "rsSmall20", "smallVsTech", "rsSmall"]
+    : ["smallVsTech60Pp", "smallVsTech60D", "smallVsTech60", "rsSmall60"];
+  for (const key of keys) {
     const value = numeric(leadership[key]); if (value !== null) return value;
   }
-  return numeric(obj(snapshot.rotation).rsSmall);
+  return numeric(obj(snapshot.rotation)[horizon === 20 ? "rsSmall20" : "rsSmall60"]);
 }
 function move(previous: number | null, current: number | null, percent = false): number | null {
   if (previous === null || current === null || previous === 0) return null;
@@ -59,10 +62,10 @@ function move(previous: number | null, current: number | null, percent = false):
 const round = (value: number | null) => value === null ? null : Number(value.toFixed(3));
 
 /** Conservative, dated sequence fingerprints; these add one anticyclical area, never an entry rule. */
-function matchHistoricalSequences(events: SequenceEvent[], asOfDate: string | null): HistoricalSequenceMatch[] {
+function matchHistoricalSequences(events: SequenceEvent[], asOfDate: string | null, current: SequenceAnalysis["latestValues"]): HistoricalSequenceMatch[] {
   if (!asOfDate || !Number.isFinite(Date.parse(asOfDate + "T00:00:00Z"))) return [];
   const age = (date: string) => (Date.parse(asOfDate + "T00:00:00Z") - Date.parse(date + "T00:00:00Z")) / 86400000;
-  const recent = events.filter(e => Number.isFinite(Date.parse(e.date + "T00:00:00Z")) && age(e.date) >= 0 && age(e.date) <= 60 && typeof e.change === "number");
+  const recent = events.filter(e => Number.isFinite(Date.parse(e.date + "T00:00:00Z")) && age(e.date) >= 0 && age(e.date) <= 90 && typeof e.change === "number");
   const isFresh = (e: SequenceEvent) => age(e.date) <= 5;
   const rows = (factor: string, direction: SequenceEvent["direction"], test: (change: number) => boolean) => recent.filter(e => e.factor === factor && e.direction === direction && e.change !== null && test(e.change));
   const after = (a: SequenceEvent, b: SequenceEvent, days: number) => b.date >= a.date && (Date.parse(b.date + "T00:00:00Z") - Date.parse(a.date + "T00:00:00Z")) <= days * 86400000;
@@ -75,30 +78,49 @@ function matchHistoricalSequences(events: SequenceEvent[], asOfDate: string | nu
     ...rows("BREADTH20", "UP", n => n >= 5),
     ...rows("BREADTH50", "UP", n => n >= 5),
   ];
-  const call = declines.some(d => stress.some(v => after(d, v, 10) && turns.some(t => after(v, t, 10) && isFresh(t))));
+  const call = declines.some(d => stress.some(v => after(d, v, 20) && turns.some(t => after(v, t, 20) && isFresh(t))));
   if (call) {
-    const chosen = declines.find(d => stress.some(v => after(d, v, 10) && turns.some(t => after(v, t, 10) && isFresh(t))));
-    const v = stress.find(x => chosen && after(chosen, x, 10) && turns.some(t => after(x, t, 10) && isFresh(t)));
-    const t = v && turns.find(x => after(v, x, 10) && isFresh(x));
-    if (chosen && v && t) matches.push({ instrument: "NASDAQ_CALL", patternId: "STRESS_THEN_FIRST_TURN", label: "Stress → erste Gegenbewegung", evidenceDates: [...new Set([chosen.date, v.date, t.date])], summary: `Nach einem Nasdaq-Rückgang folgten VIX-Stress und ein erstes Umkehrzeichen (${chosen.date} → ${v.date} → ${t.date}); das ergänzt die frühe Call-Abwägung.` });
+    const d = declines.find(x => stress.some(v => after(x, v, 20) && turns.some(t => after(v, t, 20) && isFresh(t))));
+    const v = stress.find(x => d && after(d, x, 20) && turns.some(t => after(x, t, 20) && isFresh(t)));
+    const t = v && turns.find(x => after(v, x, 20) && isFresh(x));
+    if (d && v && t) matches.push({ instrument: "NASDAQ_CALL", patternId: "STRESS_THEN_FIRST_TURN", label: "Stress → erste Gegenbewegung", evidenceDates: [...new Set([d.date, v.date, t.date])], summary: `Nach einem Nasdaq-Rückgang folgten VIX-Stress und ein erstes Umkehrzeichen (${d.date} → ${v.date} → ${t.date}); das ergänzt die frühe Call-Abwägung.` });
   }
-  const breadthRepair = rows("BREADTH50", "UP", n => n >= 5);
-  const relativeLead = rows("SMALL_VS_TECH", "UP", n => n >= 1);
-  const russellDecline = declines.find(d => breadthRepair.some(b => after(d, b, 30) && relativeLead.some(r => after(b, r, 30) && isFresh(r))));
-  if (russellDecline) {
-    const b = breadthRepair.find(x => after(russellDecline, x, 30) && relativeLead.some(r => after(x, r, 30) && isFresh(r)));
-    const r = b && relativeLead.find(x => after(b, x, 30) && isFresh(x));
-    if (b && r) matches.push({ instrument: "RUSSELL_CALL", patternId: "BREADTH_THEN_SMALL_LEADERSHIP", label: "Breitenreparatur → Small-Cap-Führung", evidenceDates: [...new Set([russellDecline.date, b.date, r.date])], summary: `Nach Nasdaq-Schwäche verbesserten sich Breite und Small-vs-Tech nacheinander (${russellDecline.date} → ${b.date} → ${r.date}); das ergänzt die frühe Russell-Call-Abwägung.` });
+  const breadthRepair = [...rows("BREADTH20", "UP", n => n >= 5), ...rows("BREADTH50", "UP", n => n >= 5)];
+  if (!call) {
+    const d = declines.find(x => breadthRepair.some(b => after(x, b, 30) && isFresh(b)));
+    const b = d && breadthRepair.find(x => after(d, x, 30) && isFresh(x));
+    if (d && b) matches.push({ instrument: "NASDAQ_CALL", patternId: "DRAWDOWN_THEN_BREADTH_REPAIR", label: "Nasdaq-Rückgang → Breitenreparatur", evidenceDates: [...new Set([d.date, b.date])], summary: `Nach Nasdaq-Schwäche verbesserte sich die Breite (${d.date} → ${b.date}); ein früher Call-Gegenhinweis, noch keine bestätigte Trendwende.` });
   }
+
+  // Rolling 20/60 observation intervals detect a fresh relative turn even when the preceding lag predates stored snapshots.
+  const russellCross = rows("SMALL_VS_TECH_20_CROSS", "UP", n => n >= 0).find(e => isFresh(e));
+  if (russellCross && current.smallVsTech20 !== null && current.smallVsTech20 > 0 && current.smallVsTech60 !== null && current.smallVsTech60 < 0) {
+    matches.push({ instrument: "RUSSELL_CALL", patternId: "SMALL_CAP_CATCHUP_AFTER_LAG", label: "Russell-Aufholung nach längerer Tech-Führung", evidenceDates: [...new Set([russellCross.date, asOfDate])], summary: `Small-vs-Tech dreht kurzfristig positiv, während der 60-Intervall-Vergleich noch negativ ist (${russellCross.date} → ${asOfDate}); ein früher Russell-Aufholhinweis, kein absolutes Kaufsignal.` });
+  }
+
   const rallies = rows("NASDAQ_INDEX_OBSERVATION", "UP", n => n >= 2);
+  const declinesAfterRally = rows("NASDAQ_INDEX_OBSERVATION", "DOWN", n => n <= -2);
   const breadthWeakening = [...rows("BREADTH20", "DOWN", n => n <= -5), ...rows("BREADTH50", "DOWN", n => n <= -5)];
-  const putRally = rallies.find(p => breadthWeakening.some(b => after(p, b, 10) && stress.some(v => after(b, v, 7) && isFresh(v))));
+  const putRally = rallies.find(p => breadthWeakening.some(b => after(p, b, 30) && declinesAfterRally.some(d => after(b, d, 20) && stress.some(v => after(d, v, 10) && isFresh(v)))));
   if (putRally) {
-    const b = breadthWeakening.find(x => after(putRally, x, 10) && stress.some(v => after(x, v, 7) && isFresh(v)));
-    const v = b && stress.find(x => after(b, x, 7) && isFresh(x));
-    if (b && v) matches.push({ instrument: "NASDAQ_PUT", patternId: "RALLY_THEN_BREADTH_FAILURE", label: "Erholung → Breitenabbruch → Volatilitätsstress", evidenceDates: [...new Set([putRally.date, b.date, v.date])], summary: `Auf einen Nasdaq-Anstieg folgten Breitenverschlechterung und VIX-Stress (${putRally.date} → ${b.date} → ${v.date}); das ergänzt die frühe Put-Abwägung.` });
+    const b = breadthWeakening.find(x => after(putRally, x, 30) && declinesAfterRally.some(d => after(x, d, 20) && stress.some(v => after(d, v, 10) && isFresh(v))));
+    const d = b && declinesAfterRally.find(x => after(b, x, 20) && stress.some(v => after(x, v, 10) && isFresh(v)));
+    const v = d && stress.find(x => after(d, x, 10) && isFresh(x));
+    if (b && d && v) matches.push({ instrument: "NASDAQ_PUT", patternId: "RALLY_THEN_BREADTH_FAILURE", label: "Erholung → Breitenabbruch → Verkaufsdruck", evidenceDates: [...new Set([putRally.date, b.date, d.date, v.date])], summary: `Auf Nasdaq-Stärke folgten schwächere Breite, erneuter Kursdruck und VIX-Anstieg (${putRally.date} → ${b.date} → ${d.date} → ${v.date}); das ergänzt die frühe Put-Abwägung.` });
   }
-  return matches;
+  if (!putRally) {
+    const b20 = rows("BREADTH20", "DOWN", n => n <= -5);
+    const b50 = rows("BREADTH50", "DOWN", n => n <= -5);
+    const p = rallies.find(x => b20.some(a => after(x, a, 30) && isFresh(a)) && b50.some(a => after(x, a, 30) && isFresh(a)));
+    if (p) {
+      const dates = [...new Set([...b20, ...b50].filter(x => after(p, x, 30) && isFresh(x)).map(x => x.date))];
+      matches.push({ instrument: "NASDAQ_PUT", patternId: "RALLY_WITH_NARROWING_BREADTH", label: "Nasdaq-Stärke bei schmaler werdender Breite", evidenceDates: [...new Set([p.date, ...dates])], summary: `Der Nasdaq stieg, während sowohl 20- als auch 50-Intervall-Breite deutlich nachließen (${p.date} → ${dates.join(" / ")}); ein Warnhinweis auf schmale Marktführung, kein Put-Auftrag.` });
+    }
+  }
+  return ["NASDAQ_PUT", "NASDAQ_CALL", "RUSSELL_CALL"].flatMap(instrument => {
+    const match = matches.find(item => item.instrument === instrument);
+    return match ? [match] : [];
+  });
 }
 
 /** Describes observed direction changes only; it never assigns a score, trigger, or forecast. */
@@ -106,21 +128,21 @@ export function buildSequenceAnalysis(history: unknown): SequenceAnalysis {
   const snapshots = (Array.isArray(history) ? history : []).map(obj).filter(row => nyDate(row.timestamp) !== null)
     .sort((a, b) => Date.parse(String(a.timestamp)) - Date.parse(String(b.timestamp)));
   const current = snapshots[snapshots.length - 1];
-  const latestValues = current ? { breadth20: breadth(current, "b20"), breadth50: breadth(current, "b50"), nasdaq: index(current, "nasdaq"), rsi14: rsi14(current), vix: index(current, "vix"), smallVsTech: relative(current) } : { breadth20: null, breadth50: null, nasdaq: null, rsi14: null, vix: null, smallVsTech: null };
-  const unknown: SequenceAnalysis = { version: "OBSERVED_FACTOR_SEQUENCE_V1", status: "VERSION_IDENTITY_UNKNOWN", asOfDate: current ? nyDate(current.timestamp) : null, observationCount: 0, dateBasis: "NEW_YORK_CAPTURE_DATE_NOT_VERIFIED_EXCHANGE_SESSION", sequence: [], latestValues: { breadth20: round(latestValues.breadth20), breadth50: round(latestValues.breadth50), nasdaq: round(latestValues.nasdaq), rsi14: round(latestValues.rsi14), vix: round(latestValues.vix), smallVsTech: round(latestValues.smallVsTech) }, limitations: ["Modell-/Universitätsversion nicht vollständig belegt; keine übergreifende Sequenz gebildet."], historicalMatches: [] };
+  const latestValues = current ? { breadth20: breadth(current, "b20"), breadth50: breadth(current, "b50"), nasdaq: index(current, "nasdaq"), rsi14: rsi14(current), vix: index(current, "vix"), smallVsTech: relative(current, 20), smallVsTech20: relative(current, 20), smallVsTech60: relative(current, 60) } : { breadth20: null, breadth50: null, nasdaq: null, rsi14: null, vix: null, smallVsTech: null, smallVsTech20: null, smallVsTech60: null };
+  const unknown: SequenceAnalysis = { version: "OBSERVED_FACTOR_SEQUENCE_V2", status: "VERSION_IDENTITY_UNKNOWN", asOfDate: current ? nyDate(current.timestamp) : null, observationCount: 0, dateBasis: "NEW_YORK_CAPTURE_DATE_NOT_VERIFIED_EXCHANGE_SESSION", sequence: [], latestValues: { breadth20: round(latestValues.breadth20), breadth50: round(latestValues.breadth50), nasdaq: round(latestValues.nasdaq), rsi14: round(latestValues.rsi14), vix: round(latestValues.vix), smallVsTech: round(latestValues.smallVsTech), smallVsTech20: round(latestValues.smallVsTech20), smallVsTech60: round(latestValues.smallVsTech60) }, limitations: ["Modell-/Universitätsversion nicht vollständig belegt; keine übergreifende Sequenz gebildet."], historicalMatches: [] };
   if (!current) return { ...unknown, status: "INSUFFICIENT_COMPARABLE_HISTORY", limitations: ["Keine datierten Snapshot-Beobachtungen verfügbar."] };
   const currentSignature = signature(current); if (!currentSignature) return unknown;
   let start = snapshots.length - 1;
   while (start > 0 && signature(snapshots[start - 1]) === currentSignature) start--;
   const comparable = snapshots.slice(start);
-  const values = { breadth20: breadth(current, "b20"), breadth50: breadth(current, "b50"), nasdaq: index(current, "nasdaq"), rsi14: rsi14(current), vix: index(current, "vix"), smallVsTech: relative(current) };
+  const values = { breadth20: breadth(current, "b20"), breadth50: breadth(current, "b50"), nasdaq: index(current, "nasdaq"), rsi14: rsi14(current), vix: index(current, "vix"), smallVsTech: relative(current, 20), smallVsTech20: relative(current, 20), smallVsTech60: relative(current, 60) };
   const currentDate = nyDate(current.timestamp);
-  const base: SequenceAnalysis = { version: "OBSERVED_FACTOR_SEQUENCE_V1", status: comparable.length >= 2 ? "AVAILABLE" : "INSUFFICIENT_COMPARABLE_HISTORY", asOfDate: currentDate, observationCount: comparable.length, dateBasis: "NEW_YORK_CAPTURE_DATE_NOT_VERIFIED_EXCHANGE_SESSION", sequence: [], latestValues: { breadth20: round(values.breadth20), breadth50: round(values.breadth50), nasdaq: round(values.nasdaq), rsi14: round(values.rsi14), vix: round(values.vix), smallVsTech: round(values.smallVsTech) }, limitations: ["Snapshots sind Beobachtungstage, keine verifizierten Börsensitzungen; ausgelassene Tage sind möglich.", "Richtungswechsel sind beschreibend. Reihenfolge und zeitliche Nähe belegen weder Vorhersagekraft noch Ursache.", "Keine Punktzahl, Einstiegsfreigabe, Positionsgröße oder historische Trefferquote wird daraus berechnet."], historicalMatches: [] };
+  const base: SequenceAnalysis = { version: "OBSERVED_FACTOR_SEQUENCE_V2", status: comparable.length >= 2 ? "AVAILABLE" : "INSUFFICIENT_COMPARABLE_HISTORY", asOfDate: currentDate, observationCount: comparable.length, dateBasis: "NEW_YORK_CAPTURE_DATE_NOT_VERIFIED_EXCHANGE_SESSION", sequence: [], latestValues: { breadth20: round(values.breadth20), breadth50: round(values.breadth50), nasdaq: round(values.nasdaq), rsi14: round(values.rsi14), vix: round(values.vix), smallVsTech: round(values.smallVsTech), smallVsTech20: round(values.smallVsTech20), smallVsTech60: round(values.smallVsTech60) }, limitations: ["Snapshots sind Beobachtungstage, keine verifizierten Börsensitzungen; ausgelassene Tage sind möglich.", "Richtungswechsel sind beschreibend. Reihenfolge und zeitliche Nähe belegen weder Vorhersagekraft noch Ursache.", "Keine Punktzahl, Einstiegsfreigabe, Positionsgröße oder historische Trefferquote wird daraus berechnet."], historicalMatches: [] };
   if (comparable.length < 2) return base;
   const events: SequenceEvent[] = [];
   const add = (date: string | null, factor: string, delta: number | null) => {
     if (!date || delta === null || delta === 0) return;
-    const noiseFloor: Record<string, number> = { BREADTH20: 3, BREADTH50: 3, NASDAQ_INDEX_OBSERVATION: 1, NASDAQ_RSI14: 3, VIX_LEVEL: 3, SMALL_VS_TECH: 0.5 };
+    const noiseFloor: Record<string, number> = { BREADTH20: 3, BREADTH50: 3, NASDAQ_INDEX_OBSERVATION: 1, NASDAQ_RSI14: 3, VIX_LEVEL: 3, SMALL_VS_TECH_20: 0.5, SMALL_VS_TECH_60: 0.5 };
     if (Math.abs(delta) < (noiseFloor[factor] ?? 0)) return;
     const direction = delta > 0 ? "UP" : "DOWN";
     events.push({ date, factor, direction, change: round(delta) });
@@ -132,8 +154,13 @@ export function buildSequenceAnalysis(history: unknown): SequenceAnalysis {
     add(date, "NASDAQ_INDEX_OBSERVATION", move(index(previous, "nasdaq"), index(next, "nasdaq"), true));
     add(date, "NASDAQ_RSI14", move(rsi14(previous), rsi14(next)));
     add(date, "VIX_LEVEL", move(index(previous, "vix"), index(next, "vix"), true));
-    add(date, "SMALL_VS_TECH", move(relative(previous), relative(next)));
+    const previous20 = relative(previous, 20), next20 = relative(next, 20);
+    const previous60 = relative(previous, 60), next60 = relative(next, 60);
+    add(date, "SMALL_VS_TECH_20", move(previous20, next20));
+    add(date, "SMALL_VS_TECH_60", move(previous60, next60));
+    if (date && previous20 !== null && next20 !== null && previous20 <= 0 && next20 > 0) events.push({ date, factor: "SMALL_VS_TECH_20_CROSS", direction: "UP", change: round(next20 - previous20) });
   }
-  const sequence = events.slice(-36);
-  return { ...base, sequence, historicalMatches: matchHistoricalSequences(sequence, currentDate) };
+  // Retain enough dated observations to preserve multi-step patterns across several weeks.
+  const sequence = events.slice(-90);
+  return { ...base, sequence, historicalMatches: matchHistoricalSequences(sequence, currentDate, base.latestValues) };
 }
