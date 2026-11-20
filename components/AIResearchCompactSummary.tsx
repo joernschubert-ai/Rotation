@@ -11,7 +11,7 @@ export function AIResearchCompactSummary({report,view}:{report:AIResearchReport;
    const f=current?report.appFacts?.facts.find(f=>f.id===(card.instrument==='RUSSELL_CALL'?'R-F-ENTRY-TIMING':'N-F-ENTRY-TIMING')&&f.asOf===d.index.asOf):null;
    const baseAnti=anticyclicalInstrumentReading(f,card.instrument);
    const historicalMatch=current?report.appFacts?.sequenceAnalysis?.historicalMatches?.find(match=>match.instrument===card.instrument):undefined;
-   const anti=baseAnti?{...baseAnti,tone:historicalMatch?'good':baseAnti.tone,label:historicalMatch?'Antizyklischer Vorteil · Faktorenfolge passt':baseAnti.label,areas:baseAnti.areas+(historicalMatch?1:0),signalAreas:historicalMatch?[...baseAnti.signalAreas,'Historische Faktorenfolge']:baseAnti.signalAreas}:historicalMatch?{tone:'good',label:'Antizyklischer Vorteil · Faktorenfolge passt',areas:1,signalAreas:['Historische Faktorenfolge'],rsi:null,asOf:historicalMatch.evidenceDates.at(-1)}:null;
+   const anti=baseAnti?{...baseAnti,tone:historicalMatch?'good':baseAnti.tone,label:historicalMatch?'Antizyklischer Vorteil · Faktorenfolge passt':baseAnti.label,areas:baseAnti.areas+(historicalMatch?1:0),signalAreas:historicalMatch?[...baseAnti.signalAreas,'Faktorenfolge']:baseAnti.signalAreas}:historicalMatch?{tone:'good',label:'Antizyklischer Vorteil · Faktorenfolge passt',areas:1,signalAreas:['Faktorenfolge'],rsi:null,asOf:historicalMatch.evidenceDates.at(-1)}:null;
    const chart=current?report.aiSynthesis?.priceReferences?.find(x=>x.instrument===card.instrument&&x.asOfDate===d.index.asOf):undefined;
    const lower=chart?.downLevels?.[0],upper=chart?.upLevels?.[0];
    const row=card.status==='AVAILABLE'?report.aiSynthesis?.sourceReview?.view?.find(r=>r.instrument===card.instrument):null;
