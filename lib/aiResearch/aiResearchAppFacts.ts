@@ -28,9 +28,12 @@ export function buildAppFacts(input:unknown,snapshotTimestamp:string,appContext:
     return rows(obj(chart.priceTrajectory).windows).find(window=>num(window.sessions)===5)??{};
   };
   const nasdaq5=fiveIntervalWindow('NASDAQ'),russell5=fiveIntervalWindow('RUSSELL_2000');
+  const nasdaqChartDate=date(obj(obj(d.indices).NASDAQ).completedChart?.asOfDate);
+  const russellChartDate=date(obj(obj(d.indices).RUSSELL_2000).completedChart?.asOfDate);
   const nasdaq5Return=num(nasdaq5.returnPct),russell5Return=num(russell5.returnPct);
   const sameFiveIntervalWindow=date(nasdaq5.fromDate)!==null&&date(nasdaq5.toDate)!==null&&
-    date(nasdaq5.fromDate)===date(russell5.fromDate)&&date(nasdaq5.toDate)===date(russell5.toDate)&&date(nasdaq5.toDate)===snapshotTimestamp.slice(0,10);
+    date(nasdaq5.fromDate)===date(russell5.fromDate)&&date(nasdaq5.toDate)===date(russell5.toDate)&&
+    date(nasdaq5.toDate)===nasdaqChartDate&&nasdaqChartDate===russellChartDate;
   const russellAbsoluteStatus:NonNullable<SequenceAnalysis['russellAbsoluteConfirmation']>['status']=!sameFiveIntervalWindow||nasdaq5Return===null||russell5Return===null?'UNAVAILABLE':russell5Return>=0&&nasdaq5Return<0?'CONFIRMED':'NOT_MET';
   const russellAbsoluteConfirmation={status:russellAbsoluteStatus,nasdaqFiveIntervalReturnPct:nasdaq5Return,russellFiveIntervalReturnPct:russell5Return,fromDate:sameFiveIntervalWindow?date(nasdaq5.fromDate):null,toDate:sameFiveIntervalWindow?date(nasdaq5.toDate):null,rule:'RUSSELL_5D_NONNEGATIVE_AND_NASDAQ_5D_NEGATIVE' as const};
   const sequenceAnalysis:SequenceAnalysis={...sequenceBase,
