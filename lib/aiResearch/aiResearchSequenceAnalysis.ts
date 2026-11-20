@@ -47,13 +47,22 @@ function rsi14(snapshot: Row): number | null {
 }
 function relative(snapshot: Row, horizon: 20 | 60 = 20): number | null {
   const leadership = obj(snapshot.relativeLeadership);
+  const smallVsTech = obj(leadership.smallVsTech);
+  const nestedValue = numeric(smallVsTech[horizon === 20 ? "relativeReturnDifference20Pp" : "relativeReturnDifference60Pp"]);
+  if (nestedValue !== null) return nestedValue;
   const keys = horizon === 20
     ? ["smallVsTech20Pp", "smallVsTech20D", "smallVsTech20", "rsSmall20", "smallVsTech", "rsSmall"]
     : ["smallVsTech60Pp", "smallVsTech60D", "smallVsTech60", "rsSmall60"];
   for (const key of keys) {
     const value = numeric(leadership[key]); if (value !== null) return value;
   }
-  return numeric(obj(snapshot.rotation)[horizon === 20 ? "rsSmall20" : "rsSmall60"]);
+  const details = obj(snapshot.rotationDetails);
+  const detailValue = numeric(details[horizon === 20 ? "rsSmall20" : "rsSmall60"]);
+  if (detailValue !== null && details[horizon === 20 ? "rsSmall20Available" : "rsSmall60Available"] === true) return detailValue * 100;
+  // The normalized engine rotation stores the 20-interval relative return as a ratio (1 = parity).
+  const rotation = obj(snapshot.rotation);
+  const ratio = numeric(rotation[horizon === 20 ? "rsSmall" : "rsSmall60"]);
+  return horizon === 20 && ratio !== null ? (ratio - 1) * 100 : null;
 }
 function move(previous: number | null, current: number | null, percent = false): number | null {
   if (previous === null || current === null || previous === 0) return null;
@@ -95,7 +104,7 @@ function matchHistoricalSequences(events: SequenceEvent[], asOfDate: string | nu
   // Rolling 20/60 observation intervals detect a fresh relative turn even when the preceding lag predates stored snapshots.
   const russellCross = rows("SMALL_VS_TECH_20_CROSS", "UP", n => n >= 0).find(e => isFresh(e));
   if (russellCross && current.smallVsTech20 !== null && current.smallVsTech20 > 0 && current.smallVsTech60 !== null && current.smallVsTech60 < 0) {
-    matches.push({ instrument: "RUSSELL_CALL", patternId: "SMALL_CAP_CATCHUP_AFTER_LAG", label: "Russell-Aufholung nach längerer Tech-Führung", evidenceDates: [...new Set([russellCross.date, asOfDate])], summary: `Small-vs-Tech dreht kurzfristig positiv, während der 60-Intervall-Vergleich noch negativ ist (${russellCross.date} → ${asOfDate}); ein früher Russell-Aufholhinweis, kein absolutes Kaufsignal.` });
+    matches.push({ instrument: "RUSSELL_CALL", patternId: "SMALL_CAP_CATCHUP_AFTER_LAG", label: "Russell-Aufholung nach längerer Tech-Führung", evidenceDates: [...new Set([russellCross.date, asOfDate])], summary: `Small-vs-Tech dreht in der gespeicherten Snapshotfolge kurzfristig positiv, während der 60-Intervall-Vergleich noch negativ ist (${russellCross.date} → ${asOfDate}). ETF-Balkendatum nicht bestätigt; relativer Hinweis, kein absolutes Kaufsignal.` });
   }
 
   const rallies = rows("NASDAQ_INDEX_OBSERVATION", "UP", n => n >= 2);
