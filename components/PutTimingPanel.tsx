@@ -414,26 +414,15 @@ marginBottom: "12px"
 style={{
 fontWeight: "bold",
 
-color:
-execution === "FULL SIZE"
-? "#fda4af"
-
-: execution === "PARTIAL SIZE"
-? "#fdba74"
-
-: execution === "SMALL STARTER"
-? "#fcd34d"
-
-: execution === "REDUCE RISK"
-? "#fda4af"
-
-: "#94a3b8"
+color: finalPutEligible ? "#6ee7b7" : "#94a3b8"
 }}
 >
-{hasFinalSizing ? finalPutEligible ? `${execution} · ${finalPutSize}%` : "KEIN EINSTIEG · 0%" : execution === "FULL SIZE" ? "STARKES EINSTIEGSSIGNAL" : execution}
+{hasFinalSizing
+  ? finalPutEligible ? `${execution} · Modellanteil ${finalPutSize}%` : `Keine finale Freigabe · 0% (Timing: ${execution})`
+  : `Timing-Signalstufe: ${execution} · finale Größe nicht verfügbar`}
 </div>
-<div style={{color:"#94a3b8",fontSize:"10px",marginTop:"4px"}}>{hasFinalSizing ? finalPutEligible ? "Finale Freigabe aus Trade Stack und risikobereinigter Positionsgröße." : "Timing-Kandidat vorhanden, aber aktuell keine freigegebene Positionsgröße." : "Signalstufe; finale Positionsgröße entscheidet über die Freigabe."}</div>
-<details style={{fontSize:"10px",color:"#94a3b8"}}><summary>Originale Timing-Signalstufe</summary>{execution} · Entry Window {entryWindow}</details>
+<div style={{color:"#94a3b8",fontSize:"10px",marginTop:"4px"}}>{hasFinalSizing ? "Die Timing-Signalstufe ist separat; maßgeblich für den Modellanteil ist die finale Freigabe aus Trade Stack und risikobereinigter Positionsgröße." : "Die finale Positionsgröße wurde nicht geliefert; die Timing-Signalstufe allein ist keine Größenfreigabe."}</div>
+<details style={{fontSize:"10px",color:"#94a3b8"}}><summary>Timing-Signalstufe</summary>{execution} · Entry Window {entryWindow}</details>
 
 </div>
 
