@@ -1,11 +1,9 @@
-import { compactFormationHistory } from "./aiResearchFormationHistory";
-import { compactFormationContext } from "./aiResearchFormations";
 import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
 
 export type SynthesisMarket = "NASDAQ" | "RUSSELL_2000" | "SP500";
 export interface SynthesisEvidence {
   id: string;
-  kind: "APP" | "PRICE" | "LAYER" | "COT" | "HISTORY" | "NEWS" | "CHART";
+  kind: "APP" | "PRICE" | "LAYER" | "COT" | "HISTORY" | "NEWS" | "HISTORICAL_PATTERN";
   market?: SynthesisMarket;
   available: boolean;
   entryDataReady?: boolean;
@@ -21,20 +19,6 @@ const pick = (value: unknown, keys: string[]) => {
 };
 function iso(value: unknown): string | null {
   return typeof value === "string" && /(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value)) ? value : null;
-}
-
-/** Verified own index observation date, never inferred from a weekend calendar alone. */
-export function verifiedResearchMarketDate(value: unknown, market: string): string | null {
-  const snapshot = object(value), indices = object(snapshot.indices);
-  const index = market === "NASDAQ" ? "nasdaq" : market === "RUSSELL_2000" ? "russell" : market === "SP500" ? "sp500" : null;
-  if (!index) return null;
-  const quality = object(object(object(indices[index]).priceMetrics).dataQuality);
-  const stamp = iso(quality.currentObservationTimestamp) ?? iso(quality.lastValidBarTimestamp) ?? iso(quality.latestBarTimestamp);
-  const time = stamp ? Date.parse(stamp) : NaN, reference = Date.parse(snapshot.timestamp);
-  if (!Number.isFinite(time) || !Number.isFinite(reference) || time > reference || reference-time > 5*86400000 || quality.stale === true || quality.freshnessVerified !== true) return null;
-  const parts = new Intl.DateTimeFormat("en-US", {timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit"}).formatToParts(new Date(time));
-  const part = (name: string) => parts.find(item => item.type === name)?.value ?? "";
-  return part("year") + "-" + part("month") + "-" + part("day");
 }
 
 function priceEvidence(snapshot: Record<string, any>, market: SynthesisMarket, indexKey: string, momentumKey: string): SynthesisEvidence {
@@ -55,12 +39,10 @@ function priceEvidence(snapshot: Record<string, any>, market: SynthesisMarket, i
   const quoteTimestamp = iso(quote.timestamp) ?? iso(quote.asOf) ?? iso(quote.quoteTimestamp);
   const snapshotTime = Date.parse(snapshot.timestamp);
   const quoteAgeHours = quoteTimestamp ? (snapshotTime - Date.parse(quoteTimestamp)) / 3600000 : null;
-  const observedTimestamp = iso(barsQuality.currentObservationTimestamp) ?? iso(barsQuality.lastValidBarTimestamp) ?? iso(barsQuality.latestBarTimestamp);
-  const observedMarketDate = verifiedResearchMarketDate(snapshot, market);
   return { id: `PRICE_${market}`, kind: "PRICE", market, available: current !== null || momentum5D !== null || momentum20D !== null,
     // Unknown quote time remains explicit; it does not silently become live data.
     entryDataReady: current !== null && momentum5D !== null && momentum20D !== null && (quoteAgeHours === null || quoteAgeHours >= 0 && quoteAgeHours <= 96),
-    data: { observedMarketDate, observedTimestamp, current, changeAsProvided: finite(quote.change), quoteTimestamp, quoteAgeHours,
+    data: { current, changeAsProvided: finite(quote.change), quoteTimestamp, quoteAgeHours,
       snapshotTimestampIsNotQuoteTimestamp: true, momentum5D, momentum20D,
       acceleration: quality.accelerationAvailable === true ? finite(measured.acceleration) ?? finite(momentum.acceleration) : null,
       accelerationDefinition: "MOMENTUM_5D_MINUS_MOMENTUM_20D_DIVIDED_BY_4",
@@ -71,87 +53,28 @@ function priceEvidence(snapshot: Record<string, any>, market: SynthesisMarket, i
     } };
 }
 
-/** Distinct observed own-market dates, same known universe; snapshots are read-only. */
-function ownStructuralObservations(input: AIResearchInput, market: SynthesisMarket) {
-  const latest=object(input.snapshot), cutoff=Date.parse(latest.timestamp);
-  const own=(frame:Record<string,any>):Record<string,any> => market==='NASDAQ' ? {source:'NASDAQ100_PRIMARY_CONSTITUENT_BREADTH',referenceDate:object(frame.breadthDataQuality).referenceDate,breadth:object(frame.structure).breadth,phase:typeof frame.phase==='string'?frame.phase:object(frame.phase).phase,rotationConfirm:object(frame.rotationConfirm).state,universe:object(frame.breadthDataQuality).universeVersion} : (()=>{
-    const context=object(object(object(frame.russell).meta).independentContext);
-    const quality=object(object(object(frame.breadthDataQuality).russell2000).dataQuality);
-    return {...context,universe:quality.universeVersion};
-  })();
-  const current=own(latest), byDate=new Map<string,Record<string,unknown>>();
-  if(typeof current.universe!=='string'||!current.universe)return [];
-  for(const frame of [...(Array.isArray(input.history)?input.history:[]),latest].map(object).sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp))){
-    const time=Date.parse(frame.timestamp);if(!Number.isFinite(time)||time>cutoff)continue;
-    const context=own(frame), date=verifiedResearchMarketDate(frame,market);
-    const expected=market==='NASDAQ'?'NASDAQ100_PRIMARY_CONSTITUENT_BREADTH':'IWM_EQUITY_HOLDINGS_SMALLCAP_PROXY';
-    if(!date||context.referenceDate!==date||context.source!==expected||context.universe!==current.universe)continue;
-    const index=object(object(frame.indices)[market==='NASDAQ'?'nasdaq':'russell']), close=finite(index.value);
-    if(close===null||close<=0)continue;
-    const breadth=object(context.breadth), scalar=(x:unknown)=>finite(x)??finite(object(x).value);
-    const latestVersions=object(latest.calculationVersions), frameVersions=object(frame.calculationVersions);
-    const rotationComparable=['rotation','participation','liquidity','fragility'].every(key=>typeof latestVersions[key]==='string'&&latestVersions[key]===frameVersions[key]);
-    byDate.set(date,{date,close,b20:scalar(breadth.b20),b50:scalar(breadth.b50),b200:scalar(breadth.b200),phase:text(context.phase),rotationConfirm:text(context.rotationConfirm),comparable:true,rotationComparable});
-  }
-  return [...byDate.values()].slice(-3);
-}
-
 /** Only allowlisted market evidence is sent. No raw snapshot or provider credentials. */
 export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearchReport): SynthesisEvidence[] {
   const snapshot = object(input.snapshot);
-  const leadership = object(snapshot.relativeLeadership);
-  const smallLeadership = object(leadership.smallVsTech);
-  const growthLeadership = object(leadership.growthVsValue);
-  const relativeLeadershipEvidence = {
-    available: [smallLeadership.relativeReturnDifference20Pp, smallLeadership.relativeReturnDifference60Pp, growthLeadership.relativeReturnDifference20Pp, growthLeadership.relativeReturnDifference60Pp].some(value => finite(value) !== null),
-    definition: text(leadership.definition, 80), unit: text(leadership.unit, 40), source: text(leadership.source, 100),
-    snapshotTimestamp: iso(snapshot.timestamp), sourceBarDateKnown: leadership.sourceBarDateKnown === true,
-    dateAlignmentVerified: leadership.dateAlignmentVerified === true, latestBarFinality: text(leadership.latestBarFinality, 40),
-    smallVsTech: pick(smallLeadership, ["relativeReturnDifference20Pp", "relativeReturnDifference60Pp", "twentyMinusSixtyPp"]),
-    growthVsValue: pick(growthLeadership, ["relativeReturnDifference20Pp", "relativeReturnDifference60Pp", "twentyMinusSixtyPp"]),
-    interpretation: "Positive means the first-listed ETF outperformed the second over that observation window. The 20D-minus-60D spread can flag improving relative leadership even while the longer comparison remains negative. Descriptive context only: not measured fund flows, absolute market health, an entry gate, or position sizing."
-  };
   const reference = Date.parse(snapshot.timestamp);
   const evidence: SynthesisEvidence[] = [
     { id: "APP", kind: "APP", available: true, data: {
-      snapshotTimestamp: snapshot.timestamp,
       phase: typeof snapshot.phase === "string" ? snapshot.phase : pick(snapshot.phase, ["phase", "regimeState", "subPhase", "confidence"]),
       master: pick(snapshot.master, ["score", "signal", "mode", "regime"]),
-      flows: report.decisionSupport?.flows.map(flow => ({ instrument: flow.instrument, eligible: flow.eligible, modelSize: flow.modelSize, execution: text(flow.execution), reason: text(flow.reason) })),
-      putTiming: pick(snapshot.putTiming, ["score", "decision", "timing", "execution", "entryWindow"]),
+      flows: report.decisionSupport?.flows.map(flow => ({ instrument: flow.instrument, eligible: flow.eligible, modelSize: flow.modelSize, finalAllocationMode: text(flow.execution), timingExecution: text(flow.timingExecution), reason: text(flow.reason) })),
+      putTiming: { ...pick(snapshot.putTiming, ["score", "decision", "timing", "execution", "entryWindow"]), executionMeaning: "Technical timing signal tier only; it is not the final model allocation. Use APP.flows.finalAllocationMode and modelSize for final eligibility and size." },
       nasdaq: pick(snapshot.nasdaqCall, ["score", "decision", "signal", "state"]), russell: pick(snapshot.russell, ["score", "decision", "signal", "state"]),
       participation: pick(snapshot.participation, ["score", "state"]), liquidity: pick(snapshot.liquidity, ["score", "state"]),
       fragility: pick(snapshot.fragility, ["score", "state"]), marketQuality: pick(snapshot.marketQuality, ["score", "state"]),
       crash: pick(snapshot.crash, ["score", "probability"]), squeeze: pick(snapshot.squeeze, ["risk", "state", "squeezeType"]),
-      volatilityDataQuality: { ...pick(snapshot.volatilityDataQuality,["policy","available","asOfDate","asOfTimestamp","fallbackUsed","entryBlocked"]), interpretation:"Dated observed values may be used when a provider endpoint is empty. Keep the observation date; do not call them live quotes. A valid dated fallback is not itself an entry block." },
       volatility: { vix: finite(object(object(snapshot.indices).vix).current),
         vixTermRatio: finite(object(snapshot.indices).vixTermRatio), termDefinition: "VIX / VIX3M; below one is contango",
         volOfVolRatio: finite(object(snapshot.indices).volOfVolRatio) },
       credit: { ...pick(snapshot.credit, ["rawRatio", "ma50", "ratioToMA50", "distancePct", "signal"]),
-        ...pick(object(snapshot.credit).dataQuality, ["available", "ratioDefinition", "normalizedDefinition", "dateAlignmentVerified", "asOfDate", "fallbackUsed", "latestBarFinality"]),
+        ...pick(object(snapshot.credit).dataQuality, ["available", "ratioDefinition", "normalizedDefinition", "dateAlignmentVerified"]),
         interpretation: "Raw HYG/IEF is a price ratio, not an absolute stress threshold. Interpret its verified signal/ratioToMA50 and data quality." },
       gammaDiagnostics: { ...pick(snapshot.gamma, ["score", "effectiveGamma", "structuralGammaFloor"]), measurementStatus: "Producer model diagnostics; not independently verified dealer exposure" },
       rotation: pick(snapshot.rotation, ["score", "signal", "rsSmall", "rsEqual", "rsGrowth"]),
-      relativeLeadership: relativeLeadershipEvidence,
-      rotationComparison: {asOfDate: verifiedResearchMarketDate(snapshot,"NASDAQ")===verifiedResearchMarketDate(snapshot,"RUSSELL_2000")?verifiedResearchMarketDate(snapshot,"NASDAQ"):null, rsSmall:finite(object(snapshot.rotation).rsSmall)},
-      instrumentStructure: {
-        NASDAQ: { source: "NASDAQ100_PRIMARY_CONSTITUENT_BREADTH", rotationConfirm:text(object(snapshot.rotationConfirm).state), phase: typeof snapshot.phase === "string" ? snapshot.phase : object(snapshot.phase).phase,
-          breadth: object(object(snapshot.structure).breadth), participation: finite(object(snapshot.participation).score), quality: finite(object(snapshot.marketQuality).score),
-          referenceDate: text(object(snapshot.breadthDataQuality).referenceDate, 10),
-          analysis: { observations:ownStructuralObservations(input,"NASDAQ"), historyQuality:pick(object(object(snapshot.historyMetrics).dataQuality).universeCompatibility,['mixedUniverseContext','compatibleDailyObservations','retainedContextObservations']), phaseConfidence: finite(object(snapshot.phase).confidence), phaseDataQuality: pick(object(snapshot.phase).dataQuality,['complete','classificationIsProvisional','derivedHistoryIncomplete','derivedHistoryCompatibleObservations','rawAdThresholdRecalibrated','rawAdComparability','rawAdCountDenominator','rawAdThresholdReachable']),
-            dynamics: { ...pick(snapshot.breadthVelocity,['velocity20','velocity50']), complete: object(object(snapshot.breadthVelocity).dataQuality).complete===true, timeBasis: object(object(snapshot.historyMetrics).dataQuality).timeBasis??'UNKNOWN' },
-            entry: { ...pick(snapshot.putTiming,['decision','entryWindow']), earlyCurrentTrigger: object(object(snapshot.putTiming).meta).earlyCurrentTrigger,
-              failedChecks: Array.isArray(object(object(snapshot.putTiming).meta).earlyCurrentBlockedReasons)?object(object(snapshot.putTiming).meta).earlyCurrentBlockedReasons.filter((v:unknown)=>typeof v==='string').slice(0,16):[] } } },
-        RUSSELL_2000: (() => {
-          const own = object(object(object(snapshot.russell).meta).independentContext);
-          return { available: Object.keys(own).length > 0, source: text(own.source), phase: text(own.phase),
-            referenceDate: text(own.referenceDate, 10), coverage: finite(own.coverage),
-            breadth: Object.fromEntries(["b20", "b50", "b200"].map(key => [key, finite(object(object(own.breadth)[key]).value)])),
-            participation: finite(own.participation), quality: finite(own.quality), rotationConfirm: text(own.rotationConfirm),
-            analysis: { observations:ownStructuralObservations(input,"RUSSELL_2000"), entry: { ...pick(snapshot.russell,['decision']), failedChecks: Array.isArray(object(snapshot.russell).blockReasons)?object(snapshot.russell).blockReasons.filter((v:unknown)=>typeof v==='string').slice(0,16):[] } },
-            missingOwnStructureDoesNotUseNasdaqFallback: true };
-        })(),
-      },
       breadth: Object.fromEntries(["b20", "b50", "b200"].map(key => { const value = object(object(snapshot.structure).breadth)[key]; return [key, finite(value) ?? finite(object(value).value)]; })),
       limitations: "Shared inputs overlap; App risk and sizing scores are not independent success probabilities. Gamma and liquidity can include model estimates.",
     } },
@@ -162,6 +85,7 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
       available: block.state !== "NOT_AVAILABLE", data: { category: block.category, state: block.state, summary: text(block.summary, 280),
         evidence: block.evidence.slice(0, 2).map(value => text(value, 180)), heuristicNotIndependent: true } })),
   ];
+  evidence.push({ id: "HISTORICAL_PATTERNS", kind: "HISTORICAL_PATTERN", available: true, data: { version: "ROTATION_PATTERN_CATALOG_V1", catalogInSystemPrompt: true, interpretation: "Qualitative historical analogies only; no matched backtest or forecast." } });
   for (const market of ["NASDAQ", "RUSSELL_2000"] as const) {
     const summaries = (input.positioning?.summaries ?? []).filter(item => item.market === market && ["ASSET_MANAGER", "LEVERAGED_MONEY"].includes(item.group));
     const fresh = summaries.filter(item => {
@@ -173,7 +97,7 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     const leveraged = safe.find(item => item.group === "LEVERAGED_MONEY");
     const sign = (value: number | null | undefined) => typeof value === "number" && Number.isFinite(value) ? Math.sign(value) : null;
     evidence.push({ id: `COT_${market}`, kind: "COT", market, available: safe.length > 0,
-      data: { dataQuality:input.positioning?.dataQuality??null, publicationTimeKnown: false, laggedContextOnly: true, summaries: safe.slice(0, 2).map(item => pick(item, ["reportDate", "group", "bias", "netPosition", "weeklyChange", "change4W", "change13W", "change26W", "percentile", "zScore"])), missingOrStale: safe.length === 0,
+      data: { publicationTimeKnown: false, laggedContextOnly: true, summaries: safe.slice(0, 2).map(item => pick(item, ["reportDate", "group", "bias", "netPosition", "weeklyChange", "change4W", "change13W", "change26W", "percentile", "zScore"])), missingOrStale: safe.length === 0,
         groupComparison: {
           bothGroupsPresent: Boolean(asset && leveraged),
           sameObservationDate: Boolean(asset && leveraged && asset.reportDate === leveraged.reportDate),
@@ -201,10 +125,6 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     asOf: historical?.asOfDate ?? null, states: states.map(state => pick(state, ["family", "market", "state", "asOfDate", "comparable"])), comparisons,
     selection: "Only groups matching the supplied dated states; non-current states are descriptive only. Overlapping index returns are not warrant returns or proven alpha.",
   } });
-  const ownMarketDate = (market: SynthesisMarket) => {
-    const date = evidence.find(item => item.id === `PRICE_${market}`)?.data.observedMarketDate;
-    return typeof date === "string" ? date : null;
-  };
   const studies = (historical?.marketStudies ?? []).filter(study => study.asOfDate <= marketDate);
   for (const market of ["NASDAQ", "RUSSELL_2000"] as const) {
     const ownStudies = studies.filter(study => study.market === market);
@@ -213,8 +133,7 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
       data: {
         statisticsColumns: ["horizonDays", "sampleSize", "meanReturn", "medianReturn", "p10Return", "p90Return", "positiveRate", "meanMaximumRise", "meanMaximumFall", "baselineSampleSize", "baselineMeanReturn", "excessMeanReturn", "nonOverlappingSampleSize", "nonOverlappingMeanReturn"],
         studies: ownStudies.map(study => ({ family: study.family, state: study.state, asOfDate: study.asOfDate,
-          currentMatch: study.currentMatch && study.asOfDate === ownMarketDate(market),
-          snapshotMarketDate: ownMarketDate(market), definition: study.definition,
+          currentMatch: study.currentMatch && study.asOfDate === marketDate, definition: study.definition,
           // Named fields remove the need for the model to decode an array column
           // before making its main comparison. All horizons remain below.
           focus20D: (() => {
@@ -238,24 +157,15 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
         interpretation: "Own-index 5/20/60 aligned-observation outcomes. Mean, median and tails are descriptive, not calibrated forecasts. Maximum rise/fall use daily closes including entry zero; reverse their directional meaning for PUT. Non-overlapping subset is not independent validation. No COT-conditioned or combined-factor edge has been established. Do not infer non-existent options-market activity from app permissions."
       } });
   }
-  const charts=historical?.chartContext;
-  for(const market of ["NASDAQ","RUSSELL_2000"] as const){
-    const chart=market==="NASDAQ"?charts?.nasdaq:charts?.russell;
-    const available=!!chart?.asOfDate && chart.asOfDate<=marketDate && reference-Date.parse(chart.asOfDate+"T00:00:00Z")<=5*86400000 && chart.momentum.state!=="INSUFFICIENT_DATA";
-    evidence.push({id:"CHART_"+market,kind:"CHART",market,available,entryDataReady:false,data:chart?{
-      asOfDate:chart.asOfDate,basis:chart.basis,snapshotMarketDate:ownMarketDate(market),sameObservedDate:chart.asOfDate===ownMarketDate(market),
-      timing:"COMPLETED_DAILY_CLOSE_CONTEXT_NOT_INTRADAY",momentum:{state:chart.momentum.state,fast:chart.momentum.fast,slow:chart.momentum.slow,intermediate:chart.momentum.intermediate,stateChangedIn5Sessions:chart.momentum.stateChangedIn5Sessions},
-      prior20:chart.prior20,prior63:chart.prior63,prior252:chart.prior252,lastClose:chart.lastClose,return5SessionsPct:chart.return5SessionsPct,return20SessionsPct:chart.return20SessionsPct,drawdownFrom252SessionHighClosePct:chart.drawdownFrom252SessionHighClosePct,
-      priceTrajectory:chart.priceTrajectory,movingAverages:chart.movingAverages.map(m=>({period:m.period,closeAverage:m.closeAverage,distancePct:m.distancePct,slope5SessionsPct:m.slope5SessionsPct})),observations:chart.observations,formations:chart.formations?compactFormationContext(chart.formations):null,formationHistory:chart.formationHistory&&chart.formations?compactFormationHistory(chart.formationHistory,chart.formations):null,
-      highCloseZone:chart.zones.high,lowCloseZone:chart.zones.low,
-      limitations:"Close-based context only. Momentum state is NOT an app phase or confirmed turn. No independent confirmations from repeated price indicators. Supplied P&F targets are conditional price projections, not options asymmetry or calibrated probability."
-    }:{missing:true}});
-  }
   const sources = report.sources.filter(source => {
     const time = iso(source.publishedAt);
     return time !== null && Date.parse(time) <= reference && reference - Date.parse(time) <= 7 * 86400000;
-  }).slice(0, 12);
+  }).slice(0, 6);
   sources.forEach((source, index) => evidence.push({ id: `NEWS_${index}`, kind: "NEWS", available: true,
-    data: { ...pick(source, ["title", "summary", "publishedAt", "publisher"]), url: text(source.url, 1200), fullArticleVerified: false } }));
+    data: { ...pick(source, ["title", "summary", "publishedAt", "publisher"]), fullArticleVerified: false } }));
   return evidence;
 }
+
+
+
+

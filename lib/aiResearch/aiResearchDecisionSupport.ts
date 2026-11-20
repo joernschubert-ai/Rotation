@@ -32,7 +32,8 @@ export function buildAIResearchDecisionSupport(
     const hasFinalFlow = Object.keys(finalFlow).length > 0;
     const modelSize = numeric(finalFlow.finalSize) ?? numeric(allocation.size);
     const timingExecution = text(timing.execution);
-    const execution = text(finalFlow.mode) || text(allocation.mode) || timingExecution || "UNKNOWN";
+    // `execution` describes the final model allocation; raw timing is kept separately.
+    const execution = text(finalFlow.mode) || text(allocation.mode) || "UNKNOWN";
     const blocks = Array.isArray(candidate.blockReasons) ? candidate.blockReasons.filter(item => typeof item === "string") as string[] : [];
     const putOpen = key !== "nasdaqPut" || (timing.entryWindow === "OPEN" && ["SMALL STARTER", "PARTIAL SIZE", "FULL SIZE"].includes(timingExecution));
     const sizingEligible = typeof finalFlow.eligible === "boolean"
@@ -41,7 +42,7 @@ export function buildAIResearchDecisionSupport(
         ? allocation.eligible
         : modelSize !== null && modelSize > 0;
     const eligible = candidate.eligible === true && sizingEligible && modelSize !== null && modelSize > 0 && modelSize <= 100 && blocks.length === 0 && putOpen;
-    return { instrument, eligible, modelSize, execution,
+    return { instrument, eligible, modelSize, execution, timingExecution,
       reason: blocks.join(" · ") || (!eligible && hasFinalFlow && text(finalFlow.reason) ? text(finalFlow.reason) : eligible ? "TradeStack und finales Positionsmodell geben diesen Flow frei." : "Kein gemeinsam freigegebener Flow mit positiver finaler Modellgröße.") };
   });
   const approved = flows.filter(flow => flow.eligible);

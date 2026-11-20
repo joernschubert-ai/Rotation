@@ -352,7 +352,7 @@ action: string;
 reason: string;
 asymmetry: string;
 snapshotTimestamp: string;
-flows: Array<{ instrument: string; eligible: boolean; modelSize: number | null; execution: string; reason: string }>;
+flows: Array<{ instrument: string; eligible: boolean; modelSize: number | null; execution: string; timingExecution: string; reason: string }>;
 evidence: Array<{ category: string; state: string; summary: string }>;
 confirmation: string[];
 invalidation: string[];
