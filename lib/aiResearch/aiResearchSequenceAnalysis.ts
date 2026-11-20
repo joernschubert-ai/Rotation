@@ -101,10 +101,10 @@ function matchHistoricalSequences(events: SequenceEvent[], asOfDate: string | nu
     if (d && b) matches.push({ instrument: "NASDAQ_CALL", patternId: "DRAWDOWN_THEN_BREADTH_REPAIR", label: "Nasdaq-Rückgang → Breitenreparatur", evidenceDates: [...new Set([d.date, b.date])], summary: `Nach Nasdaq-Schwäche verbesserte sich die Breite (${d.date} → ${b.date}); ein früher Call-Gegenhinweis, noch keine bestätigte Trendwende.` });
   }
 
-  // Rolling 20/60 observation intervals detect a fresh relative turn even when the preceding lag predates stored snapshots.
-  const russellCross = rows("SMALL_VS_TECH_20_CROSS", "UP", n => n >= 0).find(e => isFresh(e));
-  if (russellCross && current.smallVsTech20 !== null && current.smallVsTech20 > 0 && current.smallVsTech60 !== null && current.smallVsTech60 < 0) {
-    matches.push({ instrument: "RUSSELL_CALL", patternId: "SMALL_CAP_CATCHUP_AFTER_LAG", label: "Russell-Aufholung nach längerer Tech-Führung", evidenceDates: [...new Set([russellCross.date, asOfDate])], summary: `Small-vs-Tech dreht in der gespeicherten Snapshotfolge kurzfristig positiv, während der 60-Intervall-Vergleich noch negativ ist (${russellCross.date} → ${asOfDate}). ETF-Balkendatum nicht bestätigt; relativer Hinweis, kein absolutes Kaufsignal.` });
+  // A positive short window while the longer window remains negative is the mixed-horizon catch-up state.
+  // Do not require the initial zero-cross to be inside the short retained snapshot window.
+  if (current.smallVsTech20 !== null && current.smallVsTech20 > 0 && current.smallVsTech60 !== null && current.smallVsTech60 < 0) {
+    matches.push({ instrument: "RUSSELL_CALL", patternId: "SMALL_CAP_CATCHUP_AFTER_LAG", label: "Kurzfristige Russell-Führung, längerer Vergleich noch negativ", evidenceDates: [asOfDate], summary: `Small-vs-Tech 20D +${current.smallVsTech20.toFixed(2)} Pp., 60D ${current.smallVsTech60.toFixed(2)} Pp.: Russell lag längerfristig noch, liegt im kurzen Vergleich aber vorn. Snapshot-/ETF-Balkendatum nicht verifiziert; relativer Beobachtungshinweis, kein absolutes Kaufsignal.` });
   }
 
   const rallies = rows("NASDAQ_INDEX_OBSERVATION", "UP", n => n >= 2);
