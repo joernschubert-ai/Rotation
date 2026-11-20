@@ -22,7 +22,23 @@ const modelIncluded=(f:AppFact)=>!/-CASE-\d+$/.test(f.id)&&!f.id.endsWith('-ROTA
 /** Authority covers transformations of supplied facts, not source truth or future prices. */
 export function buildAppFacts(input:unknown,snapshotTimestamp:string,appContext:unknown={}):AppFacts{
   const d=obj(input),app=obj(appContext),concepts=buildResearchConcepts(d),facts:AppFact[]=[];
-  const sequenceAnalysis=buildSequenceAnalysis(app.sequenceHistory);
+  const sequenceBase=buildSequenceAnalysis(app.sequenceHistory);
+  const fiveIntervalWindow=(market:string)=>{
+    const chart=obj(obj(obj(d.indices)[market]).completedChart);
+    return rows(obj(chart.priceTrajectory).windows).find(window=>num(window.sessions)===5)??{};
+  };
+  const nasdaq5=fiveIntervalWindow('NASDAQ'),russell5=fiveIntervalWindow('RUSSELL_2000');
+  const nasdaq5Return=num(nasdaq5.returnPct),russell5Return=num(russell5.returnPct);
+  const sameFiveIntervalWindow=date(nasdaq5.fromDate)!==null&&date(nasdaq5.toDate)!==null&&
+    date(nasdaq5.fromDate)===date(russell5.fromDate)&&date(nasdaq5.toDate)===date(russell5.toDate)&&date(nasdaq5.toDate)===snapshotTimestamp.slice(0,10);
+  const russellAbsoluteStatus:NonNullable<SequenceAnalysis['russellAbsoluteConfirmation']>['status']=!sameFiveIntervalWindow||nasdaq5Return===null||russell5Return===null?'UNAVAILABLE':russell5Return>=0&&nasdaq5Return<0?'CONFIRMED':'NOT_MET';
+  const russellAbsoluteConfirmation={status:russellAbsoluteStatus,nasdaqFiveIntervalReturnPct:nasdaq5Return,russellFiveIntervalReturnPct:russell5Return,fromDate:sameFiveIntervalWindow?date(nasdaq5.fromDate):null,toDate:sameFiveIntervalWindow?date(nasdaq5.toDate):null,rule:'RUSSELL_5D_NONNEGATIVE_AND_NASDAQ_5D_NEGATIVE' as const};
+  const sequenceAnalysis:SequenceAnalysis={...sequenceBase,
+    historicalMatches:sequenceBase.historicalMatches.filter(match=>match.instrument!=='RUSSELL_CALL'||russellAbsoluteStatus==='CONFIRMED').map(match=>match.instrument==='RUSSELL_CALL'?{...match,
+      evidenceDates:[russellAbsoluteConfirmation.fromDate,russellAbsoluteConfirmation.toDate].filter((value):value is string=>value!==null),
+      summary:`Russell 5 Intervalle ${russell5Return?.toFixed(2)??'?'} %, Nasdaq ${nasdaq5Return?.toFixed(2)??'?'} %; Small-vs-Tech 20D ${sequenceBase.latestValues.smallVsTech20??'?'} Pp., 60D ${sequenceBase.latestValues.smallVsTech60??'?'} Pp. Russell stabilisiert/steigt absolut, während Nasdaq fällt. ETF-Balkendatum nicht verifiziert; früher relativer Beobachtungshinweis, kein Einstiegssignal.`}:match),
+    russellAbsoluteConfirmation,
+    limitations:russellAbsoluteStatus==='NOT_MET'?[...sequenceBase.limitations,'Russell relative outperformance while the Russell itself falls does not count as an anticyclical Russell-call area.']:sequenceBase.limitations};
   const add=(id:string,domain:string,market:string,asOf:string|null,status:AppFact['status'],text:string,values:Record<string,unknown>={})=>facts.push({id,domain,market,asOf,status,text,values});
   for(const market of ['NASDAQ','RUSSELL_2000']){
     const own=obj(obj(d.indices)[market]),chart=obj(own.completedChart),day=date(chart.asOfDate),close=num(chart.lastClose),prefix=market==='NASDAQ'?'N-F':'R-F';

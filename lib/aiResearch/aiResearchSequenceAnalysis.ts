@@ -10,6 +10,14 @@ export interface SequenceAnalysis {
   latestValues: { breadth20: number | null; breadth50: number | null; nasdaq: number | null; rsi14: number | null; vix: number | null; smallVsTech: number | null; smallVsTech20: number | null; smallVsTech60: number | null };
   limitations: string[];
   historicalMatches: HistoricalSequenceMatch[];
+  russellAbsoluteConfirmation?: {
+    status: "CONFIRMED" | "NOT_MET" | "UNAVAILABLE";
+    nasdaqFiveIntervalReturnPct: number | null;
+    russellFiveIntervalReturnPct: number | null;
+    fromDate: string | null;
+    toDate: string | null;
+    rule: "RUSSELL_5D_NONNEGATIVE_AND_NASDAQ_5D_NEGATIVE";
+  };
 }
 export interface HistoricalSequenceMatch { instrument: "NASDAQ_PUT" | "NASDAQ_CALL" | "RUSSELL_CALL"; patternId: string; label: string; evidenceDates: string[]; summary: string; }
 const obj = (value: unknown): Row => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Row : {};
