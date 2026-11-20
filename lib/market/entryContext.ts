@@ -1,6 +1,6 @@
 const num=(v:any):number|null=>typeof v==='number'&&Number.isFinite(v)?v:null;
 const day=(v:any):string|null=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T00:00:00Z'))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v?v:null;
-const completedDailyCutoff=(now:Date):string=>{
+export const completedDailyCutoff=(now:Date):string=>{
  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(now);
  const get=(name:string)=>parts.find(p=>p.type===name)?.value??'';
  const date=`${get('year')}-${get('month')}-${get('day')}`;
@@ -9,7 +9,7 @@ const completedDailyCutoff=(now:Date):string=>{
 export function buildEntryContext(frame:any){
  const now=Date.parse(frame?.timestamp??''),indices=frame?.indices??{},futures=frame?.futures??{};
  const cutoff=Number.isFinite(now)?completedDailyCutoff(new Date(now)):null;
- const specs=[{market:'NASDAQ',index:indices.nasdaq??indices.ndx,future:futures.nasdaq??futures.nq,symbol:'NQ=F'},{market:'RUSSELL_2000',index:indices.russell??indices.rut,future:futures.russell??futures.rty,symbol:'RTY=F'}];
+ const specs=[{market:'NASDAQ',index:indices.nasdaq??indices.ndx,future:futures['NQ=F']??futures.nasdaq??futures.nq,symbol:'NQ=F'},{market:'RUSSELL_2000',index:indices.russell??indices.rut,future:futures['RTY=F']??futures.russell??futures.rty,symbol:'RTY=F'}];
  return {version:'STRUCTURE_VS_NEW_ENTRY_CONTEXT_V2',snapshotTimestamp:frame?.timestamp??null,productionEntryRulesChanged:false,heuristicCalibrated:false,markets:specs.map(s=>{
   const q=s.index?.priceMetrics?.dataQuality??{},allRows=Array.isArray(q.observedSessions)?q.observedSessions:[];
   const ordered=allRows.length>=2&&allRows.every((r:any,i:number)=>day(r.date)!==null&&(i===0||allRows[i-1].date<r.date));
