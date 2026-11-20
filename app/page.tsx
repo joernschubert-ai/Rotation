@@ -381,6 +381,7 @@ export default function Home() {
           />
           <PutTimingPanel
             putTiming={engine.putTiming}
+            sizing={engine.sizing}
             exit={engine.exit?.short}
           />
           <RussellPanel
