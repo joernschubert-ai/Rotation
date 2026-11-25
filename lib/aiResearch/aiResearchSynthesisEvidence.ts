@@ -57,6 +57,35 @@ function priceEvidence(snapshot: Record<string, any>, market: SynthesisMarket, i
 export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearchReport): SynthesisEvidence[] {
   const snapshot = object(input.snapshot);
   const reference = Date.parse(snapshot.timestamp);
+  const relative = object(snapshot.relativeLeadership);
+  const smallVsTech = object(relative.smallVsTech);
+  const smallVsTech20 = finite(smallVsTech.relativeReturnDifference20Pp);
+  const smallVsTech60 = finite(smallVsTech.relativeReturnDifference60Pp);
+  // Do not manufacture an available Russell comparison from metadata alone.
+  // At least one measured Small-vs-Tech horizon must be present.
+  const relativeLeadership = smallVsTech20 !== null || smallVsTech60 !== null ? {
+    definition: text(relative.definition, 120),
+    unit: text(relative.unit, 40),
+    observations: Array.isArray(relative.observations) ? relative.observations.filter((value: unknown) => value === 20 || value === 60) : [],
+    source: text(relative.source, 120),
+    dateAlignmentVerified: relative.dateAlignmentVerified === true,
+    sourceBarDateKnown: relative.sourceBarDateKnown === true,
+    latestBarFinality: text(relative.latestBarFinality, 40),
+    available: true,
+    smallVsTech: {
+      relativeReturnDifference20Pp: smallVsTech20,
+      relativeReturnDifference60Pp: smallVsTech60,
+      twentyMinusSixtyPp: finite(smallVsTech.twentyMinusSixtyPp),
+    },
+    growthVsValue: (() => {
+      const value = object(relative.growthVsValue);
+      return {
+        relativeReturnDifference20Pp: finite(value.relativeReturnDifference20Pp),
+        relativeReturnDifference60Pp: finite(value.relativeReturnDifference60Pp),
+        twentyMinusSixtyPp: finite(value.twentyMinusSixtyPp),
+      };
+    })(),
+  } : undefined;
   const evidence: SynthesisEvidence[] = [
     { id: "APP", kind: "APP", available: true, data: {
       phase: typeof snapshot.phase === "string" ? snapshot.phase : pick(snapshot.phase, ["phase", "regimeState", "subPhase", "confidence"]),
@@ -75,6 +104,7 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
         interpretation: "Raw HYG/IEF is a price ratio, not an absolute stress threshold. Interpret its verified signal/ratioToMA50 and data quality." },
       gammaDiagnostics: { ...pick(snapshot.gamma, ["score", "effectiveGamma", "structuralGammaFloor"]), measurementStatus: "Producer model diagnostics; not independently verified dealer exposure" },
       rotation: pick(snapshot.rotation, ["score", "signal", "rsSmall", "rsEqual", "rsGrowth"]),
+      relativeLeadership,
       breadth: Object.fromEntries(["b20", "b50", "b200"].map(key => { const value = object(object(snapshot.structure).breadth)[key]; return [key, finite(value) ?? finite(object(value).value)]; })),
       limitations: "Shared inputs overlap; App risk and sizing scores are not independent success probabilities. Gamma and liquidity can include model estimates.",
     } },
