@@ -43,6 +43,8 @@ export function validateSelection(raw:unknown,context:base.SelectionContext){
   const peers=base.INSTRUMENTS.filter(x=>x!==row.instrument).map(instrument=>({instrument,stance:'UNCLEAR',supports:[],opposes:[],hypothesis:'Ungeprüfte Platzhalterhypothese nur zur internen Prüfung des eigenen Instruments.',changeConditionId:null}));
   const result=base.validateSelection(JSON.stringify({version:base.SELECTION_CONTRACT,instruments:[projected,...peers]}),context);
   for(const problem of result.issues){if(problem.path.startsWith('instruments.0'))issue(problem.path.replace('instruments.0',p).replace('.supports','.arguments.SUPPORTS').replace('.opposes','.arguments.OPPOSES'),problem.code,problem.message);else issue(p,problem.code,problem.message);}
+  for(const [argumentIndex,argument] of usable.entries())if(/^[NR]-F-CASE-SUMMARY$/.test(argument.sourceId))
+   issue(`${p}.arguments.${argumentIndex}`,'FIXED_CONTEXT_AS_ARGUMENT','Die Fallzusammenfassung beschreibt Datenabdeckung und Einstiegserlaubnis, keine Richtung. Sie bleibt als neutraler Kontext im Faktenbestand und darf nicht als SUPPORTS oder OPPOSES gezählt werden.');
   if(row.instrument==='RUSSELL_CALL'&&usable.some(argument=>argument.sourceId==='G-RELATIVE_ROTATION'&&argument.side==='SUPPORTS')&&context.facts.sequenceAnalysis?.russellAbsoluteConfirmation?.status!=='CONFIRMED')
    issue(p+'.arguments.SUPPORTS','RUSSELL_RELATIVE_NOT_ABSOLUTELY_CONFIRMED','Relative Russell-Stärke ist ohne bestätigtes gemeinsames Fünf-Intervall-Fenster (Russell >= 0 %, Nasdaq < 0 %) kein Russell-Call-Unterstützungsargument. Der Russell-Teil wird separat zurückgehalten; andere Instrumentkarten bleiben prüfbar.');
   valid.push({...normalizedRow,arguments:usable} as Selection);
