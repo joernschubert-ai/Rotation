@@ -43,6 +43,8 @@ export function validateSelection(raw:unknown,context:base.SelectionContext){
   const peers=base.INSTRUMENTS.filter(x=>x!==row.instrument).map(instrument=>({instrument,stance:'UNCLEAR',supports:[],opposes:[],hypothesis:'Ungeprüfte Platzhalterhypothese nur zur internen Prüfung des eigenen Instruments.',changeConditionId:null}));
   const result=base.validateSelection(JSON.stringify({version:base.SELECTION_CONTRACT,instruments:[projected,...peers]}),context);
   for(const problem of result.issues){if(problem.path.startsWith('instruments.0'))issue(problem.path.replace('instruments.0',p).replace('.supports','.arguments.SUPPORTS').replace('.opposes','.arguments.OPPOSES'),problem.code,problem.message);else issue(p,problem.code,problem.message);}
+  if(row.instrument==='RUSSELL_CALL'&&usable.some(argument=>argument.sourceId==='G-RELATIVE_ROTATION'&&argument.side==='SUPPORTS')&&context.facts.sequenceAnalysis?.russellAbsoluteConfirmation?.status!=='CONFIRMED')
+   issue(p+'.arguments.SUPPORTS','RUSSELL_RELATIVE_NOT_ABSOLUTELY_CONFIRMED','Relative Russell-Stärke ist ohne bestätigtes gemeinsames Fünf-Intervall-Fenster (Russell >= 0 %, Nasdaq < 0 %) kein Russell-Call-Unterstützungsargument. Der Russell-Teil wird separat zurückgehalten; andere Instrumentkarten bleiben prüfbar.');
   valid.push({...normalizedRow,arguments:usable} as Selection);
  }
  if(seenInstruments.size!==3)issue('$','MISSING_INSTRUMENT','Alle drei Instrumente müssen genau einmal vorkommen.');
