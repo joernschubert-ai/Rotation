@@ -3,7 +3,7 @@ import type { AIResearchInput, AIResearchReport } from "./aiResearchTypes";
 export type SynthesisMarket = "NASDAQ" | "RUSSELL_2000" | "SP500";
 export interface SynthesisEvidence {
   id: string;
-  kind: "APP" | "PRICE" | "LAYER" | "COT" | "HISTORY" | "NEWS" | "HISTORICAL_PATTERN";
+  kind: "APP" | "PRICE" | "CHART" | "LAYER" | "COT" | "HISTORY" | "NEWS" | "HISTORICAL_PATTERN";
   market?: SynthesisMarket;
   available: boolean;
   entryDataReady?: boolean;
@@ -53,10 +53,57 @@ function priceEvidence(snapshot: Record<string, any>, market: SynthesisMarket, i
     } };
 }
 
+function compactChartEvidence(value: unknown, marketDate: string): Record<string, unknown> | null {
+  const chart = object(value);
+  const asOfDate = text(chart.asOfDate, 10);
+  const close = finite(chart.lastClose);
+  if (!asOfDate || !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate) || asOfDate > marketDate || close === null || close <= 0 || !["AVAILABLE", "PARTIAL"].includes(String(chart.status))) return null;
+  const event = (value: unknown) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const e = object(value);
+    const result: Record<string, unknown> = pick(e, ["family", "bias", "status", "confirmedAt", "discoveredAt", "invalidatedAt", "currentRelation", "confirmationConditionMetNow", "confirmationLevel", "invalidationLevel"]);
+    const target = object(e.target);
+    if (Object.keys(target).length) result.target = pick(target, ["price", "status", "knownAt"]);
+    return result;
+  };
+  const formations = object(chart.formations);
+  const pointFigure = (Array.isArray(formations.pointFigure) ? formations.pointFigure : []).slice(0, 2).map((value: unknown) => {
+    const p = object(value), mechanics = object(p.mechanics), advanced = object(p.advanced);
+    return {
+      ...pick(p, ["boxPercent", "reversalBoxes", "currentColumn", "currentColumnSince"]),
+      latest: event(p.latest), forming: event(p.forming),
+      mechanics: { ...pick(mechanics, ["version", "asOfDate", "referenceClose", "currentColumnObservedIntervals"]),
+        lastBasicSignal: pick(mechanics.lastBasicSignal, ["bias", "triggeredAt", "patternStatus"]),
+        nextThresholds: (Array.isArray(mechanics.nextThresholds) ? mechanics.nextThresholds : []).slice(0, 4).map((v: unknown) => pick(v, ["kind", "direction", "price", "row", "distancePoints", "distancePct", "conditionMetNow", "requiresNewColumn"])) },
+      advanced: { ...pick(advanced, ["version", "asOfDate"]), latest: event(advanced.latest) ? { ...event(advanced.latest), recognition: pick(object(object(advanced.latest).recognition), ["triggerRow", "invalidationRow", "sourceColumnStarts", "version", "definition"]) } : null },
+    };
+  });
+  const trajectory = object(chart.priceTrajectory), magnitude = object(trajectory.magnitudeContext);
+  const move = (value: unknown) => pick(value, ["date", "fromDate", "returnPct", "absolutePct", "historicalComparisonCount", "priorAbsoluteMovesStrictlySmallerPct"]);
+  return {
+    status: chart.status, asOfDate, lastClose: close,
+    movingAverages: (Array.isArray(chart.movingAverages) ? chart.movingAverages : []).slice(0, 3).map((v: unknown) => pick(v, ["period", "closeAverage", "distancePct", "slope5SessionsPct"])),
+    return5SessionsPct: finite(chart.return5SessionsPct), return20SessionsPct: finite(chart.return20SessionsPct),
+    drawdownFrom252SessionHighClosePct: finite(chart.drawdownFrom252SessionHighClosePct),
+    prior20: pick(chart.prior20, ["highClose", "lowClose"]),
+    priceTrajectory: { available: trajectory.available === true, asOfDate: text(trajectory.asOfDate, 10),
+      windows: (Array.isArray(trajectory.windows) ? trajectory.windows : []).slice(0, 6).map((v: unknown) => pick(v, ["sessions", "fromDate", "toDate", "returnPct", "definition"])),
+      completedWeeks: (Array.isArray(trajectory.completedWeeks) ? trajectory.completedWeeks : []).slice(0, 4).map((v: unknown) => pick(v, ["calendarWeekStart", "calendarWeekEnd", "available", "baselineDate", "endDate", "observedSessions", "returnPct"])),
+      latestCompletedWeek: pick(trajectory.latestCompletedWeek, ["calendarWeekStart", "calendarWeekEnd", "available", "baselineDate", "endDate", "observedSessions", "returnPct"]),
+      sinceCompletedWeek: pick(trajectory.sinceCompletedWeek, ["fromDate", "toDate", "observedIntervals", "returnPct", "cumulativeSinceWeekBaselinePct"]),
+      magnitudeContext: { latest: move(magnitude.latest), largestInLast10ObservedIntervals: move(magnitude.largestInLast10ObservedIntervals), meaning: text(magnitude.meaning, 280) },
+      limitations: text(trajectory.limitations, 320) },
+    formations: { version: text(formations.version, 80), asOfDate: text(formations.asOfDate, 10),
+      classic: (Array.isArray(formations.classic) ? formations.classic : []).slice(0, 3).map((v: unknown) => pick(v, ["family", "bias", "status", "discoveredAt", "confirmedAt", "invalidatedAt", "confirmationLevel", "invalidationLevel"])), pointFigure },
+  };
+}
 /** Only allowlisted market evidence is sent. No raw snapshot or provider credentials. */
 export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearchReport): SynthesisEvidence[] {
   const snapshot = object(input.snapshot);
   const reference = Date.parse(snapshot.timestamp);
+  const chartDateParts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(reference));
+  const chartPart = (type: string) => chartDateParts.find(item => item.type === type)?.value ?? "";
+  const chartMarketDate = chartPart("year") + "-" + chartPart("month") + "-" + chartPart("day");
   const relative = object(snapshot.relativeLeadership);
   const smallVsTech = object(relative.smallVsTech);
   const smallVsTech20 = finite(smallVsTech.relativeReturnDifference20Pp);
@@ -111,6 +158,12 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     priceEvidence(snapshot, "NASDAQ", "nasdaq", "ndx"),
     priceEvidence(snapshot, "RUSSELL_2000", "russell", "rut"),
     priceEvidence(snapshot, "SP500", "sp500", "spx"),
+    ...(["NASDAQ", "RUSSELL_2000"] as const).map(market => {
+      const chartRoot = object(report.historicalEvidence?.chartContext);
+      const chartValue = compactChartEvidence(chartRoot[market === "NASDAQ" ? "nasdaq" : "russell"], chartMarketDate);
+      return { id: "CHART_" + market, kind: "CHART" as const, market, available: chartValue !== null,
+        data: chartValue ?? { status: "UNAVAILABLE", asOfDate: null, lastClose: null } };
+    }),
     ...(report.evidenceAssessment?.evidence ?? []).map(block => ({ id: `LAYER_${block.category}`, kind: "LAYER" as const,
       available: block.state !== "NOT_AVAILABLE", data: { category: block.category, state: block.state, summary: text(block.summary, 280),
         evidence: block.evidence.slice(0, 2).map(value => text(value, 180)), heuristicNotIndependent: true } })),
@@ -195,6 +248,8 @@ export function buildSynthesisEvidence(input: AIResearchInput, report: AIResearc
     data: { ...pick(source, ["title", "summary", "publishedAt", "publisher"]), fullArticleVerified: false } }));
   return evidence;
 }
+
+
 
 
 
