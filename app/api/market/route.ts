@@ -1953,7 +1953,10 @@ rty:number[]
 if(es.length < 2 || nq.length < 2 || rty.length < 2){
 return {
 signal: "neutral",
-score: 0
+score: 0,
+esMove: null,
+nqMove: null,
+rtyMove: null
 }
 }
 
@@ -2829,6 +2832,7 @@ const futuresReferenceDate=Array.isArray(spObservedSessions)?[...spObservedSessi
 
 /* ================= FUTURES FETCH ================= */
 
+const futuresDiagnostics: Record<string, Record<string, unknown>> = {};
 async function fetchFutures(symbol: string) {
 
 /* CACHE HIT */
@@ -2846,16 +2850,34 @@ cache: "no-store"
 }
 );
 
-const data = await res.json();
+let data: any;
+try { data = await res.json(); }
+catch (e) {
+  futuresDiagnostics[symbol] = { available:false, reason:"INVALID_PROVIDER_JSON", httpStatus:res.status, detail:e instanceof Error ? e.message.slice(0,160) : "JSON_PARSE_ERROR" };
+  return [];
+}
+if (!res.ok) {
+  futuresDiagnostics[symbol] = { available:false, reason:"PROVIDER_HTTP_ERROR", httpStatus:res.status, providerCode:data?.chart?.error?.code??null };
+  return [];
+}
+if (!data?.chart?.result?.[0]) {
+  futuresDiagnostics[symbol] = { available:false, reason:"PROVIDER_RESULT_MISSING", httpStatus:res.status, providerCode:data?.chart?.error?.code??null, providerMessage:typeof data?.chart?.error?.description==="string"?data.chart.error.description.slice(0,160):null };
+  return [];
+}
 
-if (!data?.chart?.result) return [];
-
-const observation=prepareFuturesObservation(data.chart.result[0],symbol,Date.now(),futuresReferenceDate);
+const result=data.chart.result[0];
+const observation=prepareFuturesObservation(result,symbol,Date.now(),futuresReferenceDate);
 futuresObservations.set(observation.engineCloses,observation);
+futuresDiagnostics[symbol] = { available:observation.current!==null, reason:observation.dataQuality.reason??null, httpStatus:res.status,
+  rawTimestampCount:Array.isArray(result.timestamp)?result.timestamp.length:0,
+  rawCloseCount:Array.isArray(result.indicators?.quote?.[0]?.close)?result.indicators.quote[0].close.length:0,
+  acceptedBars:observation.engineCloses.length, quoteTimestamp:observation.quoteTimestamp };
 return observation.engineCloses;
 
 } catch (e) {
-console.log("Futures fetch error:", symbol);
+const detail=e instanceof Error?e.message.slice(0,160):"FETCH_OR_NORMALIZATION_ERROR";
+futuresDiagnostics[symbol] = { available:false, reason:"FETCH_OR_NORMALIZATION_ERROR", detail };
+console.warn("Futures fetch error:", symbol, detail);
 return [];
 }
 }
@@ -2876,21 +2898,11 @@ const spCurrent = spClosesFull.length ? spClosesFull[spClosesFull.length - 1] : 
 const spMA200 = movingAverage(spClosesFull,200) ?? 0;
 const spMA50 = movingAverage(spClosesFull,50) ?? 0;
 
-if (es.length === 0 || nq.length === 0) {
-console.log("CRITICAL: Futures missing");
-
-return NextResponse.json({
-error: "Futures data missing",
-details: { es: es.length, nq: nq.length, rty: rty.length }
-}, { status: 500 });
-}
-
-console.log("FUTURES FINAL:", {
-es_last: es[es.length - 1],
-nq_last: nq[nq.length - 1],
-rty_last: rty[rty.length - 1]
+if ([es, nq, rty].some(closes => closes.length < 2)) {
+console.warn("Optional futures context incomplete; market calculation continues with neutral futures signal", {
+  es: es.length, nq: nq.length, rty: rty.length, diagnostics: futuresDiagnostics
 });
-
+}
 for(const [symbol,closes]of [['ES=F',es],['NQ=F',nq],['RTY=F',rty],['YM=F',ym]] as const){
  const observation=futuresObservations.get(closes);
  marketData[symbol]={current:observation?.current??null,previous:observation?.previous??null,
@@ -3970,6 +3982,7 @@ auxiliaryIndices: {
   vix3m: { ...volatilityContext.quality, symbol:"^VIX3M", latestEndpointAvailable:volatilityContext.quality.sourceEndpoints.find(s=>s.symbol==="^VIX3M")?.available??false, source:"ALIGNED_OBSERVED_VOLATILITY_CONTEXT_NOT_LIVE" },
   vix9d: { ...volatilityContext.quality, symbol:"^VIX9D", latestEndpointAvailable:volatilityContext.quality.sourceEndpoints.find(s=>s.symbol==="^VIX9D")?.available??false, source:"ALIGNED_OBSERVED_VOLATILITY_CONTEXT_NOT_LIVE" }
 },
+futuresDiagnostics,
 futuresAvailable:
 es.length > 0 && nq.length > 0 && rty.length > 0,
 futuresPricesAvailable:[es,nq,rty].every(closes=>futuresObservations.get(closes)?.current!=null),
